@@ -26,6 +26,8 @@ import (
 	"strings"
 	"time"
 
+	"gopkg.in/yaml.v3"
+
 	"mby.fr/utils/ansi"
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/collections"
@@ -81,23 +83,33 @@ type RuleType string
 type AssertionRule struct {
 	Typ      RuleType
 	Operator string
-	Value    string
+	Expected string
+	Result   string
+}
+
+type Context struct {
+	StopOnFailure bool      `yaml:""`
+	LogOnSuccess  bool      `yaml:""`
+	Parallel      bool      `yaml:""`
+	StartTime     time.Time `yaml:""`
 }
 
 var (
 	AssertionPrefix   = "@"
 	ContextEnvVarName = "__CMDTEST_CONTEXT_KEY_"
 
-	ActionInit   = "init"
-	ActionReport = "report"
+	ActionInit   = RuleType("init")
+	ActionReport = RuleType("report")
+	ActionTest   = RuleType("test")
 
-	ConfigStopOnFailure = "stopOnFailure"
-	ConfigLogOnSuccess  = "logOnSuccess"
-	ConfigParallel      = "parallel"
+	ConfigStopOnFailure = RuleType("stopOnFailure")
+	ConfigLogOnSuccess  = RuleType("logOnSuccess")
+	ConfigIgnore        = RuleType("ignore")
+	ConfigParallel      = RuleType("parallel")
 
 	RuleFail    = RuleType("fail")
 	RuleSuccess = RuleType("success")
-	RuleRc      = RuleType("rc")
+	RuleRc      = RuleType("exit")
 	RuleStdout  = RuleType("stdout")
 	RuleStderr  = RuleType("stderr")
 	RuleExists  = RuleType("exists")
@@ -105,7 +117,7 @@ var (
 	AssertFail    = &AssertionRule{Typ: RuleFail}
 	AssertSuccess = &AssertionRule{Typ: RuleSuccess}
 
-	ConfigFilename   = "config.yaml"
+	ContextFilename  = "context.yaml"
 	SequenceFilename = "seq.txt"
 	StdoutFilename   = "stdout.log"
 	StderrFilename   = "stderr.log"
@@ -153,7 +165,7 @@ func buildRule(arg string) (rule *AssertionRule, err error) {
 			}
 		}
 
-		rule = &AssertionRule{typ, operator, value}
+		rule = &AssertionRule{typ, operator, value, ""}
 	}
 	return
 }
@@ -184,14 +196,50 @@ func tmpDirectoryPath(uniqKey string) string {
 	return path
 }
 
-func storeConfig(uniqKey string, configs []*AssertionRule) {
-	tmpDir := tmpDirectoryPath(uniqKey)
-	_ = tmpDir
+func testConfigFilepath(uniqKey string) string {
+	return filepath.Join(tmpDirectoryPath(uniqKey), ContextFilename)
 }
 
-func loadConfig(uniqKey string) (configs []*AssertionRule) {
-	tmpDir := tmpDirectoryPath(uniqKey)
-	_ = tmpDir
+func buildContext(rules []*AssertionRule) (config Context) {
+	config.StartTime = time.Now()
+	for _, rule := range rules {
+		switch rule.Typ {
+		case ConfigStopOnFailure:
+			config.StopOnFailure = true
+		case ConfigLogOnSuccess:
+			config.LogOnSuccess = true
+		case ConfigParallel:
+			config.Parallel = true
+		}
+	}
+	return
+}
+
+func persistContext(uniqKey string, configRules []*AssertionRule) {
+	contextFilepath := testConfigFilepath(uniqKey)
+	context := buildContext(configRules)
+	//stdPrinter.Errf("Built context: %v\n", context)
+	content, err := yaml.Marshal(context)
+	if err != nil {
+		log.Fatal(err)
+	}
+	//stdPrinter.Errf("Persisting context: %s\n", content)
+	err = os.WriteFile(contextFilepath, content, 0600)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func loadContext(uniqKey string) (context Context) {
+	contextFilepath := testConfigFilepath(uniqKey)
+	content, err := os.ReadFile(contextFilepath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = yaml.Unmarshal(content, &context)
+	if err != nil {
+		log.Fatal(err)
+	}
 	return
 }
 
@@ -277,7 +325,7 @@ func initAction(testSuite string, configs []*AssertionRule) {
 		log.Fatalf("Unable to create temp dir: %s ! Error: %s", tmpDir, err)
 	}
 	// store config
-	storeConfig(uniqKey, configs)
+	persistContext(uniqKey, configs)
 	initSeq(uniqKey)
 	// print export the key
 	fmt.Printf("export %s%s=%s\n", ContextEnvVarName, strings.ToUpper(testSuite), uniqKey)
@@ -285,12 +333,13 @@ func initAction(testSuite string, configs []*AssertionRule) {
 		testSuite = "default"
 	}
 	stdPrinter.ColoredErrf(messageColor, "Initialized new [%s] test suite.\n", testSuite)
+	stdPrinter.Errf("%s\n", tmpDir)
 }
 
 func reportAction(testSuite string, configs []*AssertionRule) {
 	// load context
 	uniqKey := loadUniqKey(testSuite)
-	context := loadConfig(uniqKey)
+	context := loadContext(uniqKey)
 	// TODO: print report
 	if testSuite == "" {
 		testSuite = "default"
@@ -303,22 +352,15 @@ func reportAction(testSuite string, configs []*AssertionRule) {
 func testAction(testSuite, name string, command []string, configs, rules []*AssertionRule) (success bool) {
 	success = false
 
-	// load context
+	// load config
 	uniqKey := loadUniqKey(testSuite)
-	context := loadConfig(uniqKey)
+	context := loadContext(uniqKey)
 	seq := incrementSeq(uniqKey)
-
-	_ = context
 
 	testName := name
 	if testSuite != "" {
 		testName = fmt.Sprintf("%s/%s", testSuite, name)
 	}
-
-	//fmt.Printf("context: %v\n", context)
-	//fmt.Printf("will execute cmd (%d): %s\n", seq, command)
-	stdPrinter.ColoredErrf(testColor, "Test #%02d: [%s]... ", seq, testName)
-	stdPrinter.Flush()
 
 	stdoutLog, stderrLog, reportLog := cmdLogFiles(uniqKey, seq)
 	defer stdoutLog.Close()
@@ -327,11 +369,24 @@ func testAction(testSuite, name string, command []string, configs, rules []*Asse
 
 	cmd := cmdz.Cmd(command[0], command[1:]...)
 	cmd.SetOutputs(stdoutLog, stderrLog)
-	exitCode, err := cmd.BlockRun()
 
+	//fmt.Printf("context: %v\n", context)
+	//fmt.Printf("will execute cmd (%d): %s\n", seq, command)
+	if testName == "" {
+		stdPrinter.ColoredErrf(testColor, "[%05d] Test cmd: [%s] #%02d... ", int(time.Since(context.StartTime).Milliseconds()), cmd, seq)
+	} else {
+		stdPrinter.ColoredErrf(testColor, "[%05d] Test %s #%02d... ", int(time.Since(context.StartTime).Milliseconds()), testName, seq)
+	}
+	stdPrinter.Flush()
+
+	exitCode, err := cmd.BlockRun()
+	if err != nil {
+		//stdPrinter.ColoredErrf(errorColor, "Error: %s", err)
+		log.Fatalf("\nError: %s", err)
+	}
+
+	var failedRules []*AssertionRule
 	// TODO: merge configs
-	// TODO: launch command with config
-	// TODO: perform all assertions
 	for _, rule := range rules {
 		switch rule.Typ {
 		case RuleSuccess:
@@ -339,28 +394,37 @@ func testAction(testSuite, name string, command []string, configs, rules []*Asse
 		case RuleFail:
 			success = exitCode > 0
 		case RuleRc:
-			expectedRc, _ := strconv.Atoi(rule.Value)
+			expectedRc, _ := strconv.Atoi(rule.Expected)
 			success = exitCode == expectedRc
+			rule.Result = fmt.Sprintf("%d", exitCode)
 		case RuleStdout:
-			success = rule.Value == cmd.StdoutRecord()
+			success = rule.Expected == cmd.StdoutRecord()
+			rule.Result = cmd.StdoutRecord()
 		case RuleStderr:
-			success = rule.Value == cmd.StderrRecord()
+			success = rule.Expected == cmd.StderrRecord()
+			rule.Result = cmd.StderrRecord()
 		case RuleExists:
-			// TODO
+			log.Fatalf("assertion @%s not implemented yet", rule.Typ)
+		default:
+			log.Fatalf("assertion @%s does not exists", rule.Typ)
+		}
+		if !success {
+			failedRules = append(failedRules, rule)
 		}
 	}
 
+	testDuration := cmd.Duration()
 	if success {
-		stdPrinter.ColoredErrf(successColor, "ok\n")
+		stdPrinter.ColoredErrf(successColor, "ok")
+		stdPrinter.Errf(" (in %s)\n", testDuration)
 	} else {
-		stdPrinter.ColoredErrf(failureColor, "ko\n")
-		stdout := cmd.StdoutRecord()
-		if stdout != "" {
-			stdPrinter.Errf("%s\n", stdout)
-		}
-		stderr := cmd.StderrRecord()
-		if stderr != "" {
-			stdPrinter.ColoredErrf(errorColor, "%s\n", stderr)
+		stdPrinter.ColoredErrf(failureColor, "ko")
+		stdPrinter.Errf(" (in %s)\n", testDuration)
+		stdPrinter.Errf("Failure calling: [%s]\n", cmd)
+		for _, rule := range failedRules {
+			if rule.Expected != rule.Result {
+				stdPrinter.Errf("Expected %s: [%s] but got: [%s]\n", rule.Typ, rule.Expected, rule.Result)
+			}
 		}
 	}
 	stdPrinter.Flush()
@@ -381,6 +445,7 @@ func main() {
 	defer stdPrinter.Flush()
 	actionInit := false
 	actionReport := false
+	actionTest := false
 
 	var configs []*AssertionRule
 	var rules []*AssertionRule
@@ -388,19 +453,19 @@ func main() {
 	name := ""
 	var cmdArgs []string
 
-	for pos, arg := range os.Args[1:] {
+	for _, arg := range os.Args[1:] {
 		switch arg {
-		case AssertionPrefix + ActionInit:
+		case AssertionPrefix + string(ActionInit):
 			actionInit = true
-		case AssertionPrefix + ActionReport:
+		case AssertionPrefix + string(ActionReport):
 			actionReport = true
-		case AssertionPrefix + ConfigStopOnFailure:
+		case AssertionPrefix + string(ConfigStopOnFailure):
 			rule, err := buildRule(arg)
 			if err != nil {
 				log.Fatal(err)
 			}
 			configs = append(configs, rule)
-		case AssertionPrefix + ConfigStopOnFailure:
+		case AssertionPrefix + string(ConfigStopOnFailure):
 			rule, err := buildRule(arg)
 			if err != nil {
 				log.Fatal(err)
@@ -412,15 +477,16 @@ func main() {
 				log.Fatal(err)
 			}
 			if rule != nil {
-				rules = append(rules, rule)
-
-			} else if pos == 0 {
-				name = arg
+				if rule.Typ == ActionTest {
+					actionTest = true
+					name = rule.Expected
+				} else {
+					rules = append(rules, rule)
+				}
 			} else {
 				cmdArgs = append(cmdArgs, arg)
 			}
 		}
-
 	}
 
 	if actionInit && actionReport {
@@ -433,20 +499,27 @@ func main() {
 		}
 	}
 
-	if collections.Contains[*AssertionRule](&rules, AssertFail) && collections.Contains[*AssertionRule](&rules, AssertSuccess) {
-		log.Fatalf("You must not declare @fail and @success on same test !")
-	}
-
-	actionTest := !actionInit && !actionReport
+	actionTest = !actionInit && !actionReport
 	slashCount := strings.Count(name, "/")
 	testSuiteName := ""
 	testName := ""
 
 	if actionTest {
+		if len(rules) == 0 {
+			//log.Fatalf("You must declare at least one assertion on test: [%s]", testName)
+			rules = append(rules, AssertSuccess)
+		}
+
+		if len(cmdArgs) == 0 {
+			log.Fatalf("You must supply a command argument")
+		}
+
+		if collections.Contains[*AssertionRule](&rules, AssertFail) && collections.Contains[*AssertionRule](&rules, AssertSuccess) {
+			log.Fatalf("You must not declare @fail and @success on same test: [%s]", testName)
+		}
+
 		slashCount := strings.Count(name, "/")
-		if name == "" {
-			log.Fatalf("You must supply a test name as first arg !")
-		} else if slashCount > 1 {
+		if slashCount > 1 {
 			log.Fatalf("Your test name cannot contains more than one slash (/) !")
 		} else if slashCount == 0 {
 			testName = name
@@ -465,8 +538,10 @@ func main() {
 
 	if actionInit {
 		initAction(testSuiteName, configs)
+		exitCode = 0
 	} else if actionReport {
 		reportAction(testSuiteName, configs)
+		exitCode = 0
 	} else if actionTest {
 		success := testAction(testSuiteName, testName, cmdArgs, configs, rules)
 		if success {
