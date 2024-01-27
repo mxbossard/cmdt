@@ -22,15 +22,15 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
-	"strconv"
 
+	"mby.fr/utils/ansi"
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/collections"
-	"mby.fr/utils/trust"
 	"mby.fr/utils/printz"
-	"mby.fr/utils/ansi"
+	"mby.fr/utils/trust"
 )
 
 /**
@@ -111,28 +111,16 @@ var (
 	StderrFilename   = "stderr.log"
 	ReportFilename   = "report.log"
 
-	messageColor 	= ansi.Cyan
-	testColor 		= ansi.Yellow
-	successColor 	= ansi.Green
-	failureColor 	= ansi.Red
-	errorColor 		= ansi.Red
+	messageColor = ansi.Cyan
+	testColor    = ansi.Yellow
+	successColor = ansi.Green
+	failureColor = ansi.Red
+	errorColor   = ansi.Red
 )
 
 var stdPrinter printz.Printer
 
-// var assertionPattern = regexp.MustCompile("^@([a-zA-Z]+)$")
-var assertionRulePattern = regexp.MustCompile("^" + AssertionPrefix + "([a-zA-Z]+)(?:([=~])(.+))?$")
-
-/*
-func buildAssertion(arg string) (assert Assertion) {
-	submatch := assertionPattern.FindStringSubmatch(arg)
-	if submatch != nil {
-		name := submatch[1]
-		assert = Assertion(name)
-	}
-	return
-}
-*/
+var assertionRulePattern = regexp.MustCompile("^" + AssertionPrefix + "([a-zA-Z]+)([=~])?(.+)?$")
 
 func buildRule(arg string) (rule *AssertionRule, err error) {
 	submatch := assertionRulePattern.FindStringSubmatch(arg)
@@ -140,6 +128,19 @@ func buildRule(arg string) (rule *AssertionRule, err error) {
 		typ := RuleType(submatch[1])
 		operator := submatch[2]
 		value := submatch[3]
+
+		switch typ {
+		case RuleSuccess, RuleFail:
+			if operator != "" || value != "" {
+				err = fmt.Errorf("%s rule must have no value", typ)
+				return
+			}
+		default:
+			if operator == "" {
+				err = fmt.Errorf("%s rule must have a value", typ)
+				return
+			}
+		}
 
 		switch typ {
 		case RuleRc:
@@ -151,6 +152,7 @@ func buildRule(arg string) (rule *AssertionRule, err error) {
 				return
 			}
 		}
+
 		rule = &AssertionRule{typ, operator, value}
 	}
 	return
@@ -193,13 +195,32 @@ func loadConfig(uniqKey string) (configs []*AssertionRule) {
 	return
 }
 
-func cmdLogFilesPathes(uniqKey string, seq int) (string, string, string) {
+func cmdLogFiles(uniqKey string, seq int) (*os.File, *os.File, *os.File) {
 	tmpDir := tmpDirectoryPath(uniqKey)
 	testDir := filepath.Join(tmpDir, "test-"+fmt.Sprint(seq))
 	stdoutFilepath := filepath.Join(testDir, StdoutFilename)
 	stderrFilepath := filepath.Join(testDir, StderrFilename)
 	reportFilepath := filepath.Join(testDir, ReportFilename)
-	return stdoutFilepath, stderrFilepath, reportFilepath
+
+	err := os.MkdirAll(testDir, 0700)
+	if err != nil {
+		log.Fatalf("cannot create work dir: %s ! Error: %s", testDir, err)
+	}
+
+	stdoutFile, err := os.OpenFile(stdoutFilepath, os.O_RDWR|os.O_CREATE, 0600)
+	if err != nil {
+		log.Fatalf("Cannot open file: %s ! Error: %s", stdoutFilepath, err)
+	}
+	stderrFile, err := os.OpenFile(stderrFilepath, os.O_RDWR|os.O_CREATE, 0600)
+	if err != nil {
+		log.Fatalf("Cannot open file: %s ! Error: %s", stderrFilepath, err)
+	}
+	reportFile, err := os.OpenFile(reportFilepath, os.O_RDWR|os.O_CREATE, 0600)
+	if err != nil {
+		log.Fatalf("Cannot open file: %s ! Error: %s", reportFilepath, err)
+	}
+
+	return stdoutFile, stderrFile, reportFile
 }
 
 func initSeq(uniqKey string) {
@@ -211,7 +232,7 @@ func initSeq(uniqKey string) {
 	}
 }
 
-func incrementSeq(uniqKey string) (seq int64) {
+func incrementSeq(uniqKey string) (seq int) {
 	// return an increment for test indexing
 	tmpDir := tmpDirectoryPath(uniqKey)
 	seqFilepath := filepath.Join(tmpDir, SequenceFilename)
@@ -221,28 +242,24 @@ func incrementSeq(uniqKey string) (seq int64) {
 		log.Fatalf("Cannot open seq file ! Error: %s", err)
 	}
 	defer file.Close()
-	/*
-		buf := make([]byte, 32)
-		n, err := file.Read(buf)
-		if err != nil {
-			log.Fatalf("Cannot read seq file ! Error: %s", err)
-		}
-		seq, err = strconv.ParseInt(string(buf[n]), 10, 64)
-	*/
-	// FIXME: bad seq reading or writing !
-	_, err = fmt.Fscanln(file, &seq)
+	var strSeq string
+	_, err = fmt.Fscanln(file, &strSeq)
 	if err != nil {
-		log.Fatalf("Cannot read seq file as an integer ! Error: %s", err)
+		log.Fatalf("cannot read seq file as an integer ! Error: %s", err)
+	}
+	seq, err = strconv.Atoi(strSeq)
+	if err != nil {
+		log.Fatalf("cannot read seq file as an integer ! Error: %s", err)
 	}
 
-	seq++
-	_, err = file.WriteString(fmt.Sprint(seq))
+	newSec := seq + 1
+	_, err = file.WriteAt([]byte(fmt.Sprint(newSec)), 0)
 	if err != nil {
 		log.Fatalf("Cannot write seq file ! Error: %s", err)
 	}
 
-	fmt.Printf("Incremented seq: %d\n", seq)
-	return seq
+	//fmt.Printf("Incremented seq: %d => %d\n", seq, newSec)
+	return newSec
 }
 
 func testCount(uniqKey string) int {
@@ -291,17 +308,25 @@ func testAction(testSuite, name string, command []string, configs, rules []*Asse
 	context := loadConfig(uniqKey)
 	seq := incrementSeq(uniqKey)
 
+	_ = context
+
 	testName := name
 	if testSuite != "" {
 		testName = fmt.Sprintf("%s/%s", testSuite, name)
 	}
 
-	fmt.Printf("context: %v\n", context)
-	fmt.Printf("will execute cmd (%d): %s\n", seq, command)
-	stdPrinter.ColoredErrf(testColor, "Testing: [%s]... ", testName)
+	//fmt.Printf("context: %v\n", context)
+	//fmt.Printf("will execute cmd (%d): %s\n", seq, command)
+	stdPrinter.ColoredErrf(testColor, "Test #%02d: [%s]... ", seq, testName)
 	stdPrinter.Flush()
 
+	stdoutLog, stderrLog, reportLog := cmdLogFiles(uniqKey, seq)
+	defer stdoutLog.Close()
+	defer stderrLog.Close()
+	defer reportLog.Close()
+
 	cmd := cmdz.Cmd(command[0], command[1:]...)
+	cmd.SetOutputs(stdoutLog, stderrLog)
 	exitCode, err := cmd.BlockRun()
 
 	// TODO: merge configs
@@ -329,14 +354,22 @@ func testAction(testSuite, name string, command []string, configs, rules []*Asse
 		stdPrinter.ColoredErrf(successColor, "ok\n")
 	} else {
 		stdPrinter.ColoredErrf(failureColor, "ko\n")
+		stdout := cmd.StdoutRecord()
+		if stdout != "" {
+			stdPrinter.Errf("%s\n", stdout)
+		}
+		stderr := cmd.StderrRecord()
+		if stderr != "" {
+			stdPrinter.ColoredErrf(errorColor, "%s\n", stderr)
+		}
 	}
 	stdPrinter.Flush()
 
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
 	}
-	
-	fmt.Printf("ExitCode=%d\n", exitCode)
+
+	//fmt.Printf("ExitCode=%d\n", exitCode)
 	return
 }
 
