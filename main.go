@@ -17,6 +17,7 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
 	"log"
 	"math/rand"
 	"os"
@@ -88,6 +89,7 @@ type AssertionRule struct {
 }
 
 type Context struct {
+	Ignore        bool      `yaml:""`
 	StopOnFailure bool      `yaml:""`
 	LogOnSuccess  bool      `yaml:""`
 	Parallel      bool      `yaml:""`
@@ -109,7 +111,7 @@ var (
 
 	RuleFail    = RuleType("fail")
 	RuleSuccess = RuleType("success")
-	RuleRc      = RuleType("exit")
+	RuleExit    = RuleType("exit")
 	RuleStdout  = RuleType("stdout")
 	RuleStderr  = RuleType("stderr")
 	RuleExists  = RuleType("exists")
@@ -133,6 +135,7 @@ var (
 var stdPrinter printz.Printer
 
 var assertionRulePattern = regexp.MustCompile("^" + AssertionPrefix + "([a-zA-Z]+)([=~])?(.+)?$")
+var testSuiteNameSanitizerPatter = regexp.MustCompile("[^a-zA-Z0-9]")
 
 func buildRule(arg string) (rule *AssertionRule, err error) {
 	submatch := assertionRulePattern.FindStringSubmatch(arg)
@@ -141,21 +144,44 @@ func buildRule(arg string) (rule *AssertionRule, err error) {
 		operator := submatch[2]
 		value := submatch[3]
 
+		// check rule existance
+		switch typ {
+		case ActionTest, ActionInit, ActionReport:
+		case ConfigIgnore, ConfigStopOnFailure, ConfigLogOnSuccess, ConfigParallel:
+		case RuleSuccess, RuleFail, RuleExit, RuleStdout, RuleStderr, RuleExists:
+		default:
+			err = fmt.Errorf("assertion @%s does not exist", typ)
+			return
+		}
+
+		// Check rule operator
 		switch typ {
 		case RuleSuccess, RuleFail:
 			if operator != "" || value != "" {
-				err = fmt.Errorf("%s rule must have no value", typ)
+				err = fmt.Errorf("assertion @%s must have no value", typ)
 				return
+			}
+		case ConfigIgnore, ConfigStopOnFailure, ConfigLogOnSuccess, ConfigParallel:
+			if operator == "=" {
+				if value != "true" && value != "false" {
+					err = fmt.Errorf("config @%s only support 'true' and 'false' values", typ)
+				}
+			} else if operator == "~" {
+				err = fmt.Errorf("config @%s only support '=' operator", typ)
+			} else if operator == "" {
+				operator = "="
+				value = "true"
 			}
 		default:
 			if operator == "" {
-				err = fmt.Errorf("%s rule must have a value", typ)
+				err = fmt.Errorf("assertion @%s rmust have a value", typ)
 				return
 			}
 		}
 
+		// Check rule value
 		switch typ {
-		case RuleRc:
+		case RuleExit:
 			// assert rc rule value is an integer
 			var i int
 			i, err = strconv.Atoi(value)
@@ -165,6 +191,8 @@ func buildRule(arg string) (rule *AssertionRule, err error) {
 			}
 		}
 
+		// fix \n not correctly passed by shell
+		value = strings.ReplaceAll(value, "\\n", "\n")
 		rule = &AssertionRule{typ, operator, value, ""}
 	}
 	return
@@ -180,14 +208,14 @@ func forgeUniqKey(name string) string {
 
 func loadUniqKey(testSuite string) string {
 	for _, env := range os.Environ() {
-		if strings.HasPrefix(env, ContextEnvVarName+strings.ToUpper(testSuite)+"=") {
+		if strings.HasPrefix(env, ContextEnvVarName+strings.ToUpper(sanitizeTestSuiteName(testSuite))+"=") {
 			splitted := strings.Split(env, "=")
 			key := strings.Join(splitted[1:], "")
 			//fmt.Printf("Found key: %s", key)
 			return key
 		}
 	}
-	log.Fatalf("Cannot found context env var. You must export init action like this : eval $( cmdt @init )")
+	log.Fatalf("Cannot found context env var for test suite: [%s]. You must export init action like this : eval $( cmdt @init )", testSuite)
 	return ""
 }
 
@@ -205,17 +233,19 @@ func buildContext(rules []*AssertionRule) (config Context) {
 	for _, rule := range rules {
 		switch rule.Typ {
 		case ConfigStopOnFailure:
-			config.StopOnFailure = true
+			config.StopOnFailure = "true" == rule.Expected
 		case ConfigLogOnSuccess:
-			config.LogOnSuccess = true
+			config.LogOnSuccess = "true" == rule.Expected
 		case ConfigParallel:
-			config.Parallel = true
+			config.Parallel = "true" == rule.Expected
+		case ConfigIgnore:
+			config.Ignore = "true" == rule.Expected
 		}
 	}
 	return
 }
 
-func persistContext(uniqKey string, configRules []*AssertionRule) {
+func persistContext(uniqKey string, configRules []*AssertionRule) Context {
 	contextFilepath := testConfigFilepath(uniqKey)
 	context := buildContext(configRules)
 	//stdPrinter.Errf("Built context: %v\n", context)
@@ -228,6 +258,7 @@ func persistContext(uniqKey string, configRules []*AssertionRule) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	return context
 }
 
 func loadContext(uniqKey string) (context Context) {
@@ -243,9 +274,26 @@ func loadContext(uniqKey string) (context Context) {
 	return
 }
 
+func buildConfig(context Context, configs []*AssertionRule) Context {
+	config := context
+	for _, r := range configs {
+		switch r.Typ {
+		case ConfigIgnore:
+			config.Ignore = r.Expected == "true"
+		case ConfigStopOnFailure:
+			config.StopOnFailure = r.Expected == "true"
+		case ConfigLogOnSuccess:
+			config.LogOnSuccess = r.Expected == "true"
+		case ConfigParallel:
+			config.Parallel = r.Expected == "true"
+		}
+	}
+	return config
+}
+
 func cmdLogFiles(uniqKey string, seq int) (*os.File, *os.File, *os.File) {
 	tmpDir := tmpDirectoryPath(uniqKey)
-	testDir := filepath.Join(tmpDir, "test-"+fmt.Sprint(seq))
+	testDir := filepath.Join(tmpDir, "test-"+fmt.Sprintf("%06d", seq))
 	stdoutFilepath := filepath.Join(testDir, StdoutFilename)
 	stderrFilepath := filepath.Join(testDir, StderrFilename)
 	reportFilepath := filepath.Join(testDir, ReportFilename)
@@ -310,9 +358,49 @@ func incrementSeq(uniqKey string) (seq int) {
 	return newSec
 }
 
-func testCount(uniqKey string) int {
-	// TODO: return the count of test run
-	return -1
+func testCount(uniqKey string) (c int) {
+	// return the count of run test
+	tmpDir := tmpDirectoryPath(uniqKey)
+	seqFilepath := filepath.Join(tmpDir, SequenceFilename)
+
+	file, err := os.OpenFile(seqFilepath, os.O_RDWR|os.O_CREATE, 0600)
+	if err != nil {
+		log.Fatalf("Cannot open seq file ! Error: %s", err)
+	}
+	defer file.Close()
+	var strSeq string
+	_, err = fmt.Fscanln(file, &strSeq)
+	if err != nil {
+		log.Fatalf("cannot read seq file as an integer ! Error: %s", err)
+	}
+	c, err = strconv.Atoi(strSeq)
+	if err != nil {
+		log.Fatalf("cannot read seq file as an integer ! Error: %s", err)
+	}
+	return
+}
+
+func failureReports(uniqKey string) (reports []string) {
+	tmpDir := tmpDirectoryPath(uniqKey)
+	err := filepath.Walk(tmpDir, func(path string, info fs.FileInfo, err error) error {
+		if ReportFilename == info.Name() {
+			content, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			reports = append(reports, string(content))
+		}
+		return nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return
+}
+
+func sanitizeTestSuiteName(s string) string {
+	return testSuiteNameSanitizerPatter.ReplaceAllString(s, "_")
 }
 
 func initAction(testSuite string, configs []*AssertionRule) {
@@ -325,28 +413,40 @@ func initAction(testSuite string, configs []*AssertionRule) {
 		log.Fatalf("Unable to create temp dir: %s ! Error: %s", tmpDir, err)
 	}
 	// store config
-	persistContext(uniqKey, configs)
+	context := persistContext(uniqKey, configs)
 	initSeq(uniqKey)
 	// print export the key
-	fmt.Printf("export %s%s=%s\n", ContextEnvVarName, strings.ToUpper(testSuite), uniqKey)
+	fmt.Printf("export %s%s=%s\n", ContextEnvVarName, strings.ToUpper(sanitizeTestSuiteName(testSuite)), uniqKey)
 	if testSuite == "" {
 		testSuite = "default"
 	}
 	stdPrinter.ColoredErrf(messageColor, "Initialized new [%s] test suite.\n", testSuite)
 	stdPrinter.Errf("%s\n", tmpDir)
+	//stdPrinter.Errf("%s\n", context)
+	_ = context
 }
 
 func reportAction(testSuite string, configs []*AssertionRule) {
 	// load context
 	uniqKey := loadUniqKey(testSuite)
+	tmpDir := tmpDirectoryPath(uniqKey)
+	defer os.RemoveAll(tmpDir)
 	context := loadContext(uniqKey)
-	// TODO: print report
 	if testSuite == "" {
 		testSuite = "default"
 	}
 	stdPrinter.ColoredErrf(messageColor, "Reporting [%s] test suite ...\n", testSuite)
-	fmt.Printf("context: %v\n", context)
-	// TODO: clear context (tmp dir)
+	testCount := testCount(uniqKey)
+	failureReports := failureReports(uniqKey)
+	failedCount := len(failureReports)
+	if 0 == failedCount {
+		stdPrinter.ColoredErrf(successColor, "Successfuly ran %s test suite (%d test in %s)\n", testSuite, testCount, time.Since(context.StartTime))
+	} else {
+		stdPrinter.ColoredErrf(errorColor, "Failures in %s test suite (%d/%d test failed in %s)\n", testSuite, failedCount, testCount, time.Since(context.StartTime))
+		for _, report := range failureReports {
+			stdPrinter.ColoredErrf(testColor, "%s\n", report)
+		}
+	}
 }
 
 func testAction(testSuite, name string, command []string, configs, rules []*AssertionRule) (success bool) {
@@ -355,6 +455,8 @@ func testAction(testSuite, name string, command []string, configs, rules []*Asse
 	// load config
 	uniqKey := loadUniqKey(testSuite)
 	context := loadContext(uniqKey)
+	config := buildConfig(context, configs)
+
 	seq := incrementSeq(uniqKey)
 
 	testName := name
@@ -362,75 +464,105 @@ func testAction(testSuite, name string, command []string, configs, rules []*Asse
 		testName = fmt.Sprintf("%s/%s", testSuite, name)
 	}
 
+	cmd := cmdz.Cmd(command[0], command[1:]...)
+
+	if testName == "" {
+		testName = fmt.Sprintf("cmd: [%s]", cmd)
+	}
+
+	if config.Ignore {
+		fmt.Printf("Ignore test: %s\n", testName)
+		return true
+	}
+
 	stdoutLog, stderrLog, reportLog := cmdLogFiles(uniqKey, seq)
 	defer stdoutLog.Close()
 	defer stderrLog.Close()
 	defer reportLog.Close()
-
-	cmd := cmdz.Cmd(command[0], command[1:]...)
 	cmd.SetOutputs(stdoutLog, stderrLog)
 
-	//fmt.Printf("context: %v\n", context)
-	//fmt.Printf("will execute cmd (%d): %s\n", seq, command)
-	if testName == "" {
-		stdPrinter.ColoredErrf(testColor, "[%05d] Test cmd: [%s] #%02d... ", int(time.Since(context.StartTime).Milliseconds()), cmd, seq)
-	} else {
-		stdPrinter.ColoredErrf(testColor, "[%05d] Test %s #%02d... ", int(time.Since(context.StartTime).Milliseconds()), testName, seq)
-	}
+	testTitle := fmt.Sprintf("[%05d] Test %s #%02d", int(time.Since(context.StartTime).Milliseconds()), testName, seq)
+	stdPrinter.ColoredErrf(testColor, "%s... ", testTitle)
 	stdPrinter.Flush()
 
 	exitCode, err := cmd.BlockRun()
 	if err != nil {
 		//stdPrinter.ColoredErrf(errorColor, "Error: %s", err)
-		log.Fatalf("\nError: %s", err)
-	}
-
-	var failedRules []*AssertionRule
-	// TODO: merge configs
-	for _, rule := range rules {
-		switch rule.Typ {
-		case RuleSuccess:
-			success = exitCode == 0
-		case RuleFail:
-			success = exitCode > 0
-		case RuleRc:
-			expectedRc, _ := strconv.Atoi(rule.Expected)
-			success = exitCode == expectedRc
-			rule.Result = fmt.Sprintf("%d", exitCode)
-		case RuleStdout:
-			success = rule.Expected == cmd.StdoutRecord()
-			rule.Result = cmd.StdoutRecord()
-		case RuleStderr:
-			success = rule.Expected == cmd.StderrRecord()
-			rule.Result = cmd.StderrRecord()
-		case RuleExists:
-			log.Fatalf("assertion @%s not implemented yet", rule.Typ)
-		default:
-			log.Fatalf("assertion @%s does not exists", rule.Typ)
-		}
-		if !success {
-			failedRules = append(failedRules, rule)
-		}
-	}
-
-	testDuration := cmd.Duration()
-	if success {
-		stdPrinter.ColoredErrf(successColor, "ok")
-		stdPrinter.Errf(" (in %s)\n", testDuration)
+		stdPrinter.Errf("\n")
+		stdPrinter.ColoredErrf(errorColor, "error executing command: %s\n", err)
+		stdPrinter.Flush()
+		reportLog.WriteString(testTitle)
+		success = false
 	} else {
-		stdPrinter.ColoredErrf(failureColor, "ko")
-		stdPrinter.Errf(" (in %s)\n", testDuration)
-		stdPrinter.Errf("Failure calling: [%s]\n", cmd)
-		for _, rule := range failedRules {
-			if rule.Expected != rule.Result {
-				stdPrinter.Errf("Expected %s: [%s] but got: [%s]\n", rule.Typ, rule.Expected, rule.Result)
+		var failedRules []*AssertionRule
+		for _, rule := range rules {
+			switch rule.Typ {
+			case RuleSuccess:
+				success = exitCode == 0
+			case RuleFail:
+				success = exitCode > 0
+			case RuleExit:
+				expectedRc, _ := strconv.Atoi(rule.Expected)
+				success = exitCode == expectedRc
+				rule.Result = fmt.Sprintf("%d", exitCode)
+			case RuleStdout:
+				rule.Result = cmd.StdoutRecord()
+				if rule.Operator == "=" {
+					success = rule.Expected == cmd.StdoutRecord()
+				} else if rule.Operator == "~" {
+					success = strings.Contains(rule.Result, rule.Expected)
+				}
+			case RuleStderr:
+				rule.Result = cmd.StderrRecord()
+				if rule.Operator == "=" {
+					success = rule.Expected == cmd.StderrRecord()
+				} else if rule.Operator == "~" {
+					success = strings.Contains(rule.Result, rule.Expected)
+
+				}
+			case RuleExists:
+				log.Fatalf("assertion @%s not implemented yet", rule.Typ)
+			default:
+				log.Fatalf("assertion @%s does not exists", rule.Typ)
 			}
+			if !success {
+				failedRules = append(failedRules, rule)
+			}
+		}
+
+		testDuration := cmd.Duration()
+		if success {
+			stdPrinter.ColoredErrf(successColor, "ok")
+			stdPrinter.Errf(" (in %s)\n", testDuration)
+			defer os.Remove(reportLog.Name())
+			if config.LogOnSuccess {
+				stdPrinter.Out(cmd.StdoutRecord())
+				stdPrinter.Err(cmd.StderrRecord())
+			}
+		} else {
+			stdPrinter.ColoredErrf(failureColor, "ko")
+			stdPrinter.Errf(" (in %s)\n", testDuration)
+			stdPrinter.Errf("Failure calling: [%s]\n", cmd)
+			for _, rule := range failedRules {
+				if rule.Expected != rule.Result {
+					if rule.Operator == "=" {
+						stdPrinter.Errf("Expected @%s [%s] but got: [%s]\n", rule.Typ, rule.Expected, rule.Result)
+					} else if rule.Operator == "~" {
+						stdPrinter.Errf("Expected @%s to contains [%s] but got: [%s]\n", rule.Typ, rule.Expected, rule.Result)
+					}
+				}
+			}
+			failedAssertionsReport := ""
+			for _, rule := range failedRules {
+				failedAssertionsReport = "@" + string(rule.Typ)
+			}
+			reportLog.WriteString(testTitle + "  => " + failedAssertionsReport)
 		}
 	}
 	stdPrinter.Flush()
 
-	if err != nil {
-		fmt.Printf("Error: %s\n", err)
+	if config.StopOnFailure && !success {
+		reportAction(testSuite, nil)
 	}
 
 	//fmt.Printf("ExitCode=%d\n", exitCode)
@@ -455,22 +587,11 @@ func main() {
 
 	for _, arg := range os.Args[1:] {
 		switch arg {
+
 		case AssertionPrefix + string(ActionInit):
 			actionInit = true
 		case AssertionPrefix + string(ActionReport):
 			actionReport = true
-		case AssertionPrefix + string(ConfigStopOnFailure):
-			rule, err := buildRule(arg)
-			if err != nil {
-				log.Fatal(err)
-			}
-			configs = append(configs, rule)
-		case AssertionPrefix + string(ConfigStopOnFailure):
-			rule, err := buildRule(arg)
-			if err != nil {
-				log.Fatal(err)
-			}
-			configs = append(configs, rule)
 		default:
 			rule, err := buildRule(arg)
 			if err != nil {
@@ -480,6 +601,14 @@ func main() {
 				if rule.Typ == ActionTest {
 					actionTest = true
 					name = rule.Expected
+				} else if rule.Typ == ActionInit {
+					actionInit = true
+					name = rule.Expected
+				} else if rule.Typ == ActionReport {
+					actionReport = true
+					name = rule.Expected
+				} else if rule.Typ == ConfigStopOnFailure || rule.Typ == ConfigLogOnSuccess || rule.Typ == ConfigIgnore || rule.Typ == ConfigParallel {
+					configs = append(configs, rule)
 				} else {
 					rules = append(rules, rule)
 				}
