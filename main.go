@@ -24,9 +24,13 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"strconv"
 
+	"mby.fr/utils/cmdz"
 	"mby.fr/utils/collections"
 	"mby.fr/utils/trust"
+	"mby.fr/utils/printz"
+	"mby.fr/utils/ansi"
 )
 
 /**
@@ -66,14 +70,18 @@ Assertions:
 - cmdt <[testSuite/]testName> <myCommand> myArg1 ... myArgN @success @stdout="MyOut" @stderr="MyErr" @exists="MyFile,Perms,Owners"
 - cmdt [testSuite] @report
 
+## Improvements
+- Manage stdin
+- Manage stdout and stderr redirects (disable outputs override and report with another following command ?)
+
 */
 
-//type Assertion string
+type RuleType string
 
 type AssertionRule struct {
-	name     string
-	operator string
-	value    string
+	Typ      RuleType
+	Operator string
+	Value    string
 }
 
 var (
@@ -87,22 +95,30 @@ var (
 	ConfigLogOnSuccess  = "logOnSuccess"
 	ConfigParallel      = "parallel"
 
-	RuleFail    = "fail"
-	RuleSuccess = "success"
-	RuleRc      = "rc"
-	RuleStdout  = "stdout"
-	RuleStderr  = "stderr"
-	RuleExists  = "exists"
+	RuleFail    = RuleType("fail")
+	RuleSuccess = RuleType("success")
+	RuleRc      = RuleType("rc")
+	RuleStdout  = RuleType("stdout")
+	RuleStderr  = RuleType("stderr")
+	RuleExists  = RuleType("exists")
 
-	AssertFail    = &AssertionRule{name: RuleFail}
-	AssertSuccess = &AssertionRule{name: RuleSuccess}
+	AssertFail    = &AssertionRule{Typ: RuleFail}
+	AssertSuccess = &AssertionRule{Typ: RuleSuccess}
 
 	ConfigFilename   = "config.yaml"
 	SequenceFilename = "seq.txt"
 	StdoutFilename   = "stdout.log"
 	StderrFilename   = "stderr.log"
 	ReportFilename   = "report.log"
+
+	messageColor 	= ansi.Cyan
+	testColor 		= ansi.Yellow
+	successColor 	= ansi.Green
+	failureColor 	= ansi.Red
+	errorColor 		= ansi.Red
 )
+
+var stdPrinter printz.Printer
 
 // var assertionPattern = regexp.MustCompile("^@([a-zA-Z]+)$")
 var assertionRulePattern = regexp.MustCompile("^" + AssertionPrefix + "([a-zA-Z]+)(?:([=~])(.+))?$")
@@ -118,13 +134,24 @@ func buildAssertion(arg string) (assert Assertion) {
 }
 */
 
-func buildRule(arg string) (rule *AssertionRule) {
+func buildRule(arg string) (rule *AssertionRule, err error) {
 	submatch := assertionRulePattern.FindStringSubmatch(arg)
 	if submatch != nil {
-		name := submatch[1]
+		typ := RuleType(submatch[1])
 		operator := submatch[2]
 		value := submatch[3]
-		rule = &AssertionRule{name, operator, value}
+
+		switch typ {
+		case RuleRc:
+			// assert rc rule value is an integer
+			var i int
+			i, err = strconv.Atoi(value)
+			if err != nil || i < 0 || i > 255 {
+				err = fmt.Errorf("rc rule value must be an integer >= 0 && <= 255")
+				return
+			}
+		}
+		rule = &AssertionRule{typ, operator, value}
 	}
 	return
 }
@@ -237,6 +264,10 @@ func initAction(testSuite string, configs []*AssertionRule) {
 	initSeq(uniqKey)
 	// print export the key
 	fmt.Printf("export %s%s=%s\n", ContextEnvVarName, strings.ToUpper(testSuite), uniqKey)
+	if testSuite == "" {
+		testSuite = "default"
+	}
+	stdPrinter.ColoredErrf(messageColor, "Initialized new [%s] test suite.\n", testSuite)
 }
 
 func reportAction(testSuite string, configs []*AssertionRule) {
@@ -244,32 +275,77 @@ func reportAction(testSuite string, configs []*AssertionRule) {
 	uniqKey := loadUniqKey(testSuite)
 	context := loadConfig(uniqKey)
 	// TODO: print report
+	if testSuite == "" {
+		testSuite = "default"
+	}
+	stdPrinter.ColoredErrf(messageColor, "Reporting [%s] test suite ...\n", testSuite)
 	fmt.Printf("context: %v\n", context)
 	// TODO: clear context (tmp dir)
 }
 
-func testAction(testSuite, name string, command []string, configs, rules []*AssertionRule) {
+func testAction(testSuite, name string, command []string, configs, rules []*AssertionRule) (success bool) {
+	success = false
+
 	// load context
 	uniqKey := loadUniqKey(testSuite)
 	context := loadConfig(uniqKey)
 	seq := incrementSeq(uniqKey)
 
+	testName := name
+	if testSuite != "" {
+		testName = fmt.Sprintf("%s/%s", testSuite, name)
+	}
+
 	fmt.Printf("context: %v\n", context)
 	fmt.Printf("will execute cmd (%d): %s\n", seq, command)
+	stdPrinter.ColoredErrf(testColor, "Testing: [%s]... ", testName)
+	stdPrinter.Flush()
+
+	cmd := cmdz.Cmd(command[0], command[1:]...)
+	exitCode, err := cmd.BlockRun()
+
 	// TODO: merge configs
 	// TODO: launch command with config
 	// TODO: perform all assertions
 	for _, rule := range rules {
-		switch rule.name {
+		switch rule.Typ {
+		case RuleSuccess:
+			success = exitCode == 0
+		case RuleFail:
+			success = exitCode > 0
 		case RuleRc:
+			expectedRc, _ := strconv.Atoi(rule.Value)
+			success = exitCode == expectedRc
 		case RuleStdout:
+			success = rule.Value == cmd.StdoutRecord()
 		case RuleStderr:
+			success = rule.Value == cmd.StderrRecord()
 		case RuleExists:
+			// TODO
 		}
 	}
+
+	if success {
+		stdPrinter.ColoredErrf(successColor, "ok\n")
+	} else {
+		stdPrinter.ColoredErrf(failureColor, "ko\n")
+	}
+	stdPrinter.Flush()
+
+	if err != nil {
+		fmt.Printf("Error: %s\n", err)
+	}
+	
+	fmt.Printf("ExitCode=%d\n", exitCode)
+	return
 }
 
 func main() {
+	exitCode := 1
+	defer func() { os.Exit(exitCode) }()
+
+	stdPrinter = printz.NewStandard()
+	defer stdPrinter.Flush()
 	actionInit := false
 	actionReport := false
 
@@ -279,22 +355,33 @@ func main() {
 	name := ""
 	var cmdArgs []string
 
-	for pos, arg := range os.Args {
+	for pos, arg := range os.Args[1:] {
 		switch arg {
 		case AssertionPrefix + ActionInit:
 			actionInit = true
 		case AssertionPrefix + ActionReport:
 			actionReport = true
 		case AssertionPrefix + ConfigStopOnFailure:
-			configs = append(configs, buildRule(arg))
+			rule, err := buildRule(arg)
+			if err != nil {
+				log.Fatal(err)
+			}
+			configs = append(configs, rule)
 		case AssertionPrefix + ConfigStopOnFailure:
-			configs = append(configs, buildRule(arg))
+			rule, err := buildRule(arg)
+			if err != nil {
+				log.Fatal(err)
+			}
+			configs = append(configs, rule)
 		default:
-			rule := buildRule(arg)
+			rule, err := buildRule(arg)
+			if err != nil {
+				log.Fatal(err)
+			}
 			if rule != nil {
 				rules = append(rules, rule)
 
-			} else if pos == 1 {
+			} else if pos == 0 {
 				name = arg
 			} else {
 				cmdArgs = append(cmdArgs, arg)
@@ -348,7 +435,10 @@ func main() {
 	} else if actionReport {
 		reportAction(testSuiteName, configs)
 	} else if actionTest {
-		testAction(testSuiteName, testName, cmdArgs, configs, rules)
+		success := testAction(testSuiteName, testName, cmdArgs, configs, rules)
+		if success {
+			exitCode = 0
+		}
 	}
 
 }
