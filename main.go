@@ -109,8 +109,9 @@ type Context struct {
 }
 
 var (
-	AssertionPrefix   = "@"
-	ContextEnvVarName = "__CMDTEST_CONTEXT_KEY_"
+	AssertionPrefix      = "@"
+	ContextEnvVarName    = "__CMDTEST_CONTEXT_KEY_"
+	DefaultTestSuiteName = "_default"
 
 	ActionInit   = RuleType("init")
 	ActionReport = RuleType("report")
@@ -472,7 +473,7 @@ func initAction(testSuite string, configs []*AssertionRule) {
 	// print export the key
 	fmt.Printf("export %s%s=%s\n", ContextEnvVarName, strings.ToUpper(sanitizeTestSuiteName(testSuite)), uniqKey)
 	if testSuite == "" {
-		testSuite = "default"
+		testSuite = DefaultTestSuiteName
 	}
 	stdPrinter.ColoredErrf(messageColor, "Initialized new [%s] test suite.\n", testSuite)
 	stdPrinter.Errf("%s\n", tmpDir)
@@ -487,7 +488,7 @@ func reportAction(testSuite string, configs []*AssertionRule) {
 	defer os.RemoveAll(tmpDir)
 	context := loadContext(uniqKey)
 	if testSuite == "" {
-		testSuite = "default"
+		testSuite = DefaultTestSuiteName
 	}
 	stdPrinter.ColoredErrf(messageColor, "Reporting [%s] test suite ...\n", testSuite)
 	testCount := readSeq(uniqKey, TestSequenceFilename)
@@ -535,7 +536,7 @@ func testAction(testSuite, name string, command []string, configs, rules []*Asse
 	}
 
 	if config.Ignore {
-		stdPrinter.ColoredErrf(warningColor, "[%05d] Ignore test: %s\n", timecode, testName)
+		stdPrinter.ColoredErrf(warningColor, "[%05d] Ignored test: %s\n", timecode, testName)
 		incrementSeq(uniqKey, IgnoredSequenceFilename)
 		return true
 	}
@@ -568,6 +569,12 @@ func testAction(testSuite, name string, command []string, configs, rules []*Asse
 
 	testTitle := fmt.Sprintf("[%05d] Test %s #%02d", timecode, testName, seq)
 	stdPrinter.ColoredErrf(testColor, "%s... ", testTitle)
+
+	if config.KeepStdout || config.KeepStderr {
+		// NewLine because we expect cmd outputs
+		stdPrinter.Errf("\n")
+	}
+
 	stdPrinter.Flush()
 
 	exitCode, err := cmd.BlockRun()
@@ -616,6 +623,12 @@ func testAction(testSuite, name string, command []string, configs, rules []*Asse
 		}
 
 		testDuration := cmd.Duration()
+
+		if config.KeepStdout || config.KeepStderr {
+			// NewLine in printer to print test result in a new line
+			stdPrinter.Errf("        ")
+		}
+
 		if success {
 			stdPrinter.ColoredErrf(successColor, "ok")
 			stdPrinter.Errf(" (in %s)\n", testDuration)
@@ -638,7 +651,7 @@ func testAction(testSuite, name string, command []string, configs, rules []*Asse
 			}
 			failedAssertionsReport := ""
 			for _, rule := range failedRules {
-				failedAssertionsReport = "@" + string(rule.Typ)
+				failedAssertionsReport = "@" + string(rule.Typ) + string(rule.Operator) + string(rule.Expected)
 			}
 			reportLog.WriteString(testTitle + "  => " + failedAssertionsReport)
 		}
