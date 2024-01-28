@@ -119,16 +119,18 @@ var (
 	AssertFail    = &AssertionRule{Typ: RuleFail}
 	AssertSuccess = &AssertionRule{Typ: RuleSuccess}
 
-	ContextFilename  = "context.yaml"
-	SequenceFilename = "seq.txt"
-	StdoutFilename   = "stdout.log"
-	StderrFilename   = "stderr.log"
-	ReportFilename   = "report.log"
+	ContextFilename         = "context.yaml"
+	TestSequenceFilename    = "test-seq.txt"
+	IgnoredSequenceFilename = "ignored-seq.txt"
+	StdoutFilename          = "stdout.log"
+	StderrFilename          = "stderr.log"
+	ReportFilename          = "report.log"
 
 	messageColor = ansi.Cyan
 	testColor    = ansi.Yellow
 	successColor = ansi.Green
 	failureColor = ansi.Red
+	warningColor = ansi.Yellow
 	errorColor   = ansi.Red
 )
 
@@ -321,17 +323,22 @@ func cmdLogFiles(uniqKey string, seq int) (*os.File, *os.File, *os.File) {
 
 func initSeq(uniqKey string) {
 	tmpDir := tmpDirectoryPath(uniqKey)
-	seqFilepath := filepath.Join(tmpDir, SequenceFilename)
+	seqFilepath := filepath.Join(tmpDir, TestSequenceFilename)
 	err := os.WriteFile(seqFilepath, []byte("0"), 0600)
+	if err != nil {
+		log.Fatalf("Cannot initialize seq file ! Error: %s", err)
+	}
+	seqFilepath = filepath.Join(tmpDir, IgnoredSequenceFilename)
+	err = os.WriteFile(seqFilepath, []byte("0"), 0600)
 	if err != nil {
 		log.Fatalf("Cannot initialize seq file ! Error: %s", err)
 	}
 }
 
-func incrementSeq(uniqKey string) (seq int) {
+func incrementSeq(uniqKey, filename string) (seq int) {
 	// return an increment for test indexing
 	tmpDir := tmpDirectoryPath(uniqKey)
-	seqFilepath := filepath.Join(tmpDir, SequenceFilename)
+	seqFilepath := filepath.Join(tmpDir, filename)
 
 	file, err := os.OpenFile(seqFilepath, os.O_RDWR|os.O_CREATE, 0600)
 	if err != nil {
@@ -358,10 +365,10 @@ func incrementSeq(uniqKey string) (seq int) {
 	return newSec
 }
 
-func testCount(uniqKey string) (c int) {
+func readSeq(uniqKey, filename string) (c int) {
 	// return the count of run test
 	tmpDir := tmpDirectoryPath(uniqKey)
-	seqFilepath := filepath.Join(tmpDir, SequenceFilename)
+	seqFilepath := filepath.Join(tmpDir, filename)
 
 	file, err := os.OpenFile(seqFilepath, os.O_RDWR|os.O_CREATE, 0600)
 	if err != nil {
@@ -436,13 +443,23 @@ func reportAction(testSuite string, configs []*AssertionRule) {
 		testSuite = "default"
 	}
 	stdPrinter.ColoredErrf(messageColor, "Reporting [%s] test suite ...\n", testSuite)
-	testCount := testCount(uniqKey)
+	testCount := readSeq(uniqKey, TestSequenceFilename)
+	ignoredCount := readSeq(uniqKey, IgnoredSequenceFilename)
 	failureReports := failureReports(uniqKey)
 	failedCount := len(failureReports)
+
+	ignoredMessage := ""
+	if ignoredCount > 0 {
+		ignoredMessage = fmt.Sprintf(" (%d ignored)", ignoredCount)
+	}
 	if 0 == failedCount {
-		stdPrinter.ColoredErrf(successColor, "Successfuly ran %s test suite (%d test in %s)\n", testSuite, testCount, time.Since(context.StartTime))
+		stdPrinter.ColoredErrf(successColor, "Successfuly ran %s test suite (%d test in %s)", testSuite, testCount, time.Since(context.StartTime))
+		stdPrinter.ColoredErrf(warningColor, "%s", ignoredMessage)
+		stdPrinter.Errf("\n")
 	} else {
-		stdPrinter.ColoredErrf(errorColor, "Failures in %s test suite (%d/%d test failed in %s)\n", testSuite, failedCount, testCount, time.Since(context.StartTime))
+		stdPrinter.ColoredErrf(errorColor, "Failures in %s test suite (%d/%d test failed in %s)", testSuite, failedCount, testCount, time.Since(context.StartTime))
+		stdPrinter.ColoredErrf(warningColor, "%s", ignoredMessage)
+		stdPrinter.Errf("\n")
 		for _, report := range failureReports {
 			stdPrinter.ColoredErrf(testColor, "%s\n", report)
 		}
@@ -457,23 +474,26 @@ func testAction(testSuite, name string, command []string, configs, rules []*Asse
 	context := loadContext(uniqKey)
 	config := buildConfig(context, configs)
 
-	seq := incrementSeq(uniqKey)
+	timecode := int(time.Since(context.StartTime).Milliseconds())
+
+	cmd := cmdz.Cmd(command[0], command[1:]...)
+
+	if name == "" {
+		name = fmt.Sprintf("cmd: [%s]", cmd)
+	}
 
 	testName := name
 	if testSuite != "" {
 		testName = fmt.Sprintf("%s/%s", testSuite, name)
 	}
 
-	cmd := cmdz.Cmd(command[0], command[1:]...)
-
-	if testName == "" {
-		testName = fmt.Sprintf("cmd: [%s]", cmd)
-	}
-
 	if config.Ignore {
-		fmt.Printf("Ignore test: %s\n", testName)
+		fmt.Printf("[%05d] Ignore test: %s\n", timecode, testName)
+		incrementSeq(uniqKey, IgnoredSequenceFilename)
 		return true
 	}
+
+	seq := incrementSeq(uniqKey, TestSequenceFilename)
 
 	stdoutLog, stderrLog, reportLog := cmdLogFiles(uniqKey, seq)
 	defer stdoutLog.Close()
@@ -481,7 +501,15 @@ func testAction(testSuite, name string, command []string, configs, rules []*Asse
 	defer reportLog.Close()
 	cmd.SetOutputs(stdoutLog, stderrLog)
 
-	testTitle := fmt.Sprintf("[%05d] Test %s #%02d", int(time.Since(context.StartTime).Milliseconds()), testName, seq)
+	stat, _ := os.Stdin.Stat()
+	if (stat.Mode() & os.ModeCharDevice) == 0 {
+		cmd.SetInput(os.Stdin)
+	}
+
+	//fmt.Printf("%s", os.Environ())
+	cmd = cmd.AddEnviron(os.Environ())
+
+	testTitle := fmt.Sprintf("[%05d] Test %s #%02d", timecode, testName, seq)
 	stdPrinter.ColoredErrf(testColor, "%s... ", testTitle)
 	stdPrinter.Flush()
 
@@ -544,6 +572,9 @@ func testAction(testSuite, name string, command []string, configs, rules []*Asse
 			stdPrinter.Errf(" (in %s)\n", testDuration)
 			stdPrinter.Errf("Failure calling: [%s]\n", cmd)
 			for _, rule := range failedRules {
+				if rule.Typ == RuleSuccess || rule.Typ == RuleFail {
+					stdPrinter.Errf("Expected @%s\n", rule.Typ)
+				}
 				if rule.Expected != rule.Result {
 					if rule.Operator == "=" {
 						stdPrinter.Errf("Expected @%s [%s] but got: [%s]\n", rule.Typ, rule.Expected, rule.Result)
