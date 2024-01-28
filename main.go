@@ -17,6 +17,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"math/rand"
@@ -79,6 +80,16 @@ Assertions:
 
 */
 
+/*
+TODO:
+- usage
+- @fork=5 by default instead of @parallel. Fork = 5 increment and decrement a seq
+- change @ @directive= ??? attention à la sécurité ça pourrait etre galere
+- @exists= ???
+
+
+*/
+
 type RuleType string
 
 type AssertionRule struct {
@@ -91,8 +102,9 @@ type AssertionRule struct {
 type Context struct {
 	Ignore        bool      `yaml:""`
 	StopOnFailure bool      `yaml:""`
-	LogOnSuccess  bool      `yaml:""`
-	Parallel      bool      `yaml:""`
+	KeepStdout    bool      `yaml:""`
+	KeepStderr    bool      `yaml:""`
+	ForkCount     int       `yaml:""`
 	StartTime     time.Time `yaml:""`
 }
 
@@ -105,9 +117,11 @@ var (
 	ActionTest   = RuleType("test")
 
 	ConfigStopOnFailure = RuleType("stopOnFailure")
-	ConfigLogOnSuccess  = RuleType("logOnSuccess")
+	ConfigKeepStdout    = RuleType("keepStdout")
+	ConfigKeepStderr    = RuleType("keepStderr")
+	ConfigKeepOutputs   = RuleType("keepOutputs")
 	ConfigIgnore        = RuleType("ignore")
-	ConfigParallel      = RuleType("parallel")
+	ConfigFork          = RuleType("fork")
 
 	RuleFail    = RuleType("fail")
 	RuleSuccess = RuleType("success")
@@ -126,11 +140,12 @@ var (
 	StderrFilename          = "stderr.log"
 	ReportFilename          = "report.log"
 
-	messageColor = ansi.Cyan
-	testColor    = ansi.Yellow
-	successColor = ansi.Green
-	failureColor = ansi.Red
-	warningColor = ansi.Yellow
+	messageColor = ansi.HiPurple
+	testColor    = ansi.HiCyan
+	successColor = ansi.BoldGreen
+	failureColor = ansi.BoldRed
+	reportColor  = ansi.Yellow
+	warningColor = ansi.BoldHiYellow
 	errorColor   = ansi.Red
 )
 
@@ -138,6 +153,18 @@ var stdPrinter printz.Printer
 
 var assertionRulePattern = regexp.MustCompile("^" + AssertionPrefix + "([a-zA-Z]+)([=~])?(.+)?$")
 var testSuiteNameSanitizerPatter = regexp.MustCompile("[^a-zA-Z0-9]")
+
+func usage() {
+	cmd := os.Args[0]
+	stdPrinter.Errf("cmdtest tool is usefull to test various scripts cli and command behaviors.\n")
+	stdPrinter.Errf("You must initialize a test suite (%1s @init) before running tests and then report the test (%1s @report).\n", cmd)
+	stdPrinter.Errf("usage: \t%s @init[=TEST_SUITE_NAME] [@CONFIG_1] ... [@CONFIG_N] \n", cmd)
+	stdPrinter.Errf("usage: \t%s <COMMAND> [ARG_1] ... [ARG_N] [@CONFIG_1] ... [@CONFIG_N] [@ASSERTION_1] ... [@ASSERTION_N]\n", cmd)
+	stdPrinter.Errf("usage: \t%s @report[=TEST_SUITE_NAME] \n", cmd)
+	stdPrinter.Errf("\tCONFIG available: @ignore @stopOnFailure @keepStdout @keepStderr @keepOutputs @fork=N\n")
+	stdPrinter.Errf("\tCOMMAND and ARGs: the command on which to run tests\n")
+	stdPrinter.Errf("\tASSERTIONs available: @fail @success @exit=N @stdout= @stdout~ @stderr= @stderr~\n")
+}
 
 func buildRule(arg string) (rule *AssertionRule, err error) {
 	submatch := assertionRulePattern.FindStringSubmatch(arg)
@@ -149,7 +176,7 @@ func buildRule(arg string) (rule *AssertionRule, err error) {
 		// check rule existance
 		switch typ {
 		case ActionTest, ActionInit, ActionReport:
-		case ConfigIgnore, ConfigStopOnFailure, ConfigLogOnSuccess, ConfigParallel:
+		case ConfigIgnore, ConfigStopOnFailure, ConfigKeepOutputs, ConfigKeepStdout, ConfigKeepStderr, ConfigFork:
 		case RuleSuccess, RuleFail, RuleExit, RuleStdout, RuleStderr, RuleExists:
 		default:
 			err = fmt.Errorf("assertion @%s does not exist", typ)
@@ -163,7 +190,7 @@ func buildRule(arg string) (rule *AssertionRule, err error) {
 				err = fmt.Errorf("assertion @%s must have no value", typ)
 				return
 			}
-		case ConfigIgnore, ConfigStopOnFailure, ConfigLogOnSuccess, ConfigParallel:
+		case ConfigIgnore, ConfigStopOnFailure, ConfigKeepOutputs, ConfigKeepStdout, ConfigKeepStderr:
 			if operator == "=" {
 				if value != "true" && value != "false" {
 					err = fmt.Errorf("config @%s only support 'true' and 'false' values", typ)
@@ -173,6 +200,15 @@ func buildRule(arg string) (rule *AssertionRule, err error) {
 			} else if operator == "" {
 				operator = "="
 				value = "true"
+			}
+		case ConfigFork:
+			if operator != "=" || value == "" {
+				err = fmt.Errorf("assertion @%s must have a value", typ)
+				return
+			}
+			n, err2 := strconv.Atoi(value)
+			if err2 != nil || n < 1 || n > 20 {
+				err = fmt.Errorf("config @%s only support integer > 0 and <= 20", typ)
 			}
 		default:
 			if operator == "" {
@@ -232,19 +268,47 @@ func testConfigFilepath(uniqKey string) string {
 
 func buildContext(rules []*AssertionRule) (config Context) {
 	config.StartTime = time.Now()
+	config.ForkCount = 5
 	for _, rule := range rules {
 		switch rule.Typ {
 		case ConfigStopOnFailure:
 			config.StopOnFailure = "true" == rule.Expected
-		case ConfigLogOnSuccess:
-			config.LogOnSuccess = "true" == rule.Expected
-		case ConfigParallel:
-			config.Parallel = "true" == rule.Expected
+		case ConfigKeepOutputs:
+			config.KeepStdout = "true" == rule.Expected
+			config.KeepStderr = config.KeepStdout
+		case ConfigKeepStdout:
+			config.KeepStdout = "true" == rule.Expected
+		case ConfigKeepStderr:
+			config.KeepStderr = "true" == rule.Expected
+		case ConfigFork:
+			config.ForkCount, _ = strconv.Atoi(rule.Expected)
 		case ConfigIgnore:
 			config.Ignore = "true" == rule.Expected
 		}
 	}
 	return
+}
+
+func buildConfig(context Context, rules []*AssertionRule) Context {
+	config := context
+	for _, r := range rules {
+		switch r.Typ {
+		case ConfigIgnore:
+			config.Ignore = r.Expected == "true"
+		case ConfigStopOnFailure:
+			config.StopOnFailure = r.Expected == "true"
+		case ConfigKeepOutputs:
+			config.KeepStdout = r.Expected == "true"
+			config.KeepStderr = r.Expected == "true"
+		case ConfigKeepStdout:
+			config.KeepStdout = r.Expected == "true"
+		case ConfigKeepStderr:
+			config.KeepStderr = r.Expected == "true"
+		case ConfigFork:
+			config.ForkCount, _ = strconv.Atoi(r.Expected)
+		}
+	}
+	return config
 }
 
 func persistContext(uniqKey string, configRules []*AssertionRule) Context {
@@ -274,23 +338,6 @@ func loadContext(uniqKey string) (context Context) {
 		log.Fatal(err)
 	}
 	return
-}
-
-func buildConfig(context Context, configs []*AssertionRule) Context {
-	config := context
-	for _, r := range configs {
-		switch r.Typ {
-		case ConfigIgnore:
-			config.Ignore = r.Expected == "true"
-		case ConfigStopOnFailure:
-			config.StopOnFailure = r.Expected == "true"
-		case ConfigLogOnSuccess:
-			config.LogOnSuccess = r.Expected == "true"
-		case ConfigParallel:
-			config.Parallel = r.Expected == "true"
-		}
-	}
-	return config
 }
 
 func cmdLogFiles(uniqKey string, seq int) (*os.File, *os.File, *os.File) {
@@ -457,11 +504,11 @@ func reportAction(testSuite string, configs []*AssertionRule) {
 		stdPrinter.ColoredErrf(warningColor, "%s", ignoredMessage)
 		stdPrinter.Errf("\n")
 	} else {
-		stdPrinter.ColoredErrf(errorColor, "Failures in %s test suite (%d/%d test failed in %s)", testSuite, failedCount, testCount, time.Since(context.StartTime))
+		stdPrinter.ColoredErrf(failureColor, "Failures in %s test suite (%d/%d test failed in %s)", testSuite, failedCount, testCount, time.Since(context.StartTime))
 		stdPrinter.ColoredErrf(warningColor, "%s", ignoredMessage)
 		stdPrinter.Errf("\n")
 		for _, report := range failureReports {
-			stdPrinter.ColoredErrf(testColor, "%s\n", report)
+			stdPrinter.ColoredErrf(reportColor, "%s\n", report)
 		}
 	}
 }
@@ -488,7 +535,7 @@ func testAction(testSuite, name string, command []string, configs, rules []*Asse
 	}
 
 	if config.Ignore {
-		fmt.Printf("[%05d] Ignore test: %s\n", timecode, testName)
+		stdPrinter.ColoredErrf(warningColor, "[%05d] Ignore test: %s\n", timecode, testName)
 		incrementSeq(uniqKey, IgnoredSequenceFilename)
 		return true
 	}
@@ -499,7 +546,17 @@ func testAction(testSuite, name string, command []string, configs, rules []*Asse
 	defer stdoutLog.Close()
 	defer stderrLog.Close()
 	defer reportLog.Close()
-	cmd.SetOutputs(stdoutLog, stderrLog)
+
+	var stdout, stderr io.Writer
+	stdout = stdoutLog
+	if config.KeepStdout {
+		stdout = io.MultiWriter(os.Stdout, stdoutLog)
+	}
+	stderr = stdoutLog
+	if config.KeepStderr {
+		stderr = io.MultiWriter(os.Stderr, stderrLog)
+	}
+	cmd.SetOutputs(stdout, stderr)
 
 	stat, _ := os.Stdin.Stat()
 	if (stat.Mode() & os.ModeCharDevice) == 0 {
@@ -563,10 +620,6 @@ func testAction(testSuite, name string, command []string, configs, rules []*Asse
 			stdPrinter.ColoredErrf(successColor, "ok")
 			stdPrinter.Errf(" (in %s)\n", testDuration)
 			defer os.Remove(reportLog.Name())
-			if config.LogOnSuccess {
-				stdPrinter.Out(cmd.StdoutRecord())
-				stdPrinter.Err(cmd.StderrRecord())
-			}
 		} else {
 			stdPrinter.ColoredErrf(failureColor, "ko")
 			stdPrinter.Errf(" (in %s)\n", testDuration)
@@ -606,6 +659,12 @@ func main() {
 
 	stdPrinter = printz.NewStandard()
 	defer stdPrinter.Flush()
+
+	if len(os.Args) == 1 {
+		usage()
+		return
+	}
+
 	actionInit := false
 	actionReport := false
 	actionTest := false
@@ -638,7 +697,7 @@ func main() {
 				} else if rule.Typ == ActionReport {
 					actionReport = true
 					name = rule.Expected
-				} else if rule.Typ == ConfigStopOnFailure || rule.Typ == ConfigLogOnSuccess || rule.Typ == ConfigIgnore || rule.Typ == ConfigParallel {
+				} else if rule.Typ == ConfigStopOnFailure || rule.Typ == ConfigKeepOutputs || rule.Typ == ConfigKeepStdout || rule.Typ == ConfigKeepStderr || rule.Typ == ConfigIgnore || rule.Typ == ConfigFork {
 					configs = append(configs, rule)
 				} else {
 					rules = append(rules, rule)
