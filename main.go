@@ -82,7 +82,8 @@ Assertions:
 
 /*
 TODO:
-- usage
+- init without passing by env ?
+- add @timeout=S
 - @fork=5 by default instead of @parallel. Fork = 5 increment and decrement a seq
 - change @ @directive= ??? attention à la sécurité ça pourrait etre galere
 - @exists= ???
@@ -134,6 +135,7 @@ var (
 	AssertFail    = &AssertionRule{Typ: RuleFail}
 	AssertSuccess = &AssertionRule{Typ: RuleSuccess}
 
+	TempDirPrefix           = ".cmdtest."
 	ContextFilename         = "context.yaml"
 	TestSequenceFilename    = "test-seq.txt"
 	IgnoredSequenceFilename = "ignored-seq.txt"
@@ -245,22 +247,69 @@ func forgeUniqKey(name string) string {
 	return h
 }
 
-func loadUniqKey(testSuite string) string {
+func loadUniqKey(testSuite string) (key string, err error) {
+	// Search uniqKey in env
 	for _, env := range os.Environ() {
 		if strings.HasPrefix(env, ContextEnvVarName+strings.ToUpper(sanitizeTestSuiteName(testSuite))+"=") {
 			splitted := strings.Split(env, "=")
-			key := strings.Join(splitted[1:], "")
-			//fmt.Printf("Found key: %s", key)
-			return key
+			key = strings.Join(splitted[1:], "")
+			return key, nil
 		}
 	}
-	log.Fatalf("Cannot found context env var for test suite: [%s]. You must export init action like this : eval $( cmdt @init )", testSuite)
-	return ""
+	// Search uniqKey in tmp dir
+	lastTmpDir := lastTmpDirectoryPath()
+	lastUniqKey, ok := strings.CutPrefix(lastTmpDir, TempDirPrefix)
+	fmt.Printf("lastTmpDir: %s ; lastUniqKey: %s\n", lastTmpDir, lastUniqKey)
+	if ok {
+		return lastUniqKey, nil
+	}
+
+	err = fmt.Errorf("Cannot found context env var for test suite: [%s]. You must export init action like this : eval $( cmdt @init )", testSuite)
+	return
 }
 
 func tmpDirectoryPath(uniqKey string) string {
-	path := filepath.Join(os.TempDir(), "cmdtest."+uniqKey)
+	workDir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	path := filepath.Join(workDir, TempDirPrefix+uniqKey)
 	return path
+}
+
+func lastTmpDirectoryPath() string {
+	workDir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	var matchingDirs []fs.DirEntry
+	var lastMatchingDir *fs.DirEntry
+	err = filepath.WalkDir(workDir, func(path string, d fs.DirEntry, err error) error {
+		if d.IsDir() && strings.HasPrefix(d.Name(), TempDirPrefix) {
+			matchingDirs = append(matchingDirs, d)
+		}
+		return nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var lastModTime time.Time
+	for _, d := range matchingDirs {
+		info, err := d.Info()
+		if err != nil {
+			log.Fatal(err)
+		}
+		if lastMatchingDir == nil || info.ModTime().After(lastModTime) {
+			lastMatchingDir = &d
+		}
+
+	}
+	if lastMatchingDir != nil {
+		dirName := filepath.Base((*lastMatchingDir).Name())
+		return dirName
+	}
+	return ""
 }
 
 func testConfigFilepath(uniqKey string) string {
@@ -458,7 +507,7 @@ func sanitizeTestSuiteName(s string) string {
 	return testSuiteNameSanitizerPatter.ReplaceAllString(s, "_")
 }
 
-func initAction(testSuite string, configs []*AssertionRule) {
+func initAction(testSuite string, configs []*AssertionRule) string {
 	// forge a uniq key
 	uniqKey := forgeUniqKey(testSuite)
 	// init the tmp directory
@@ -479,11 +528,15 @@ func initAction(testSuite string, configs []*AssertionRule) {
 	stdPrinter.Errf("%s\n", tmpDir)
 	//stdPrinter.Errf("%s\n", context)
 	_ = context
+	return uniqKey
 }
 
 func reportAction(testSuite string, configs []*AssertionRule) {
 	// load context
-	uniqKey := loadUniqKey(testSuite)
+	uniqKey, err := loadUniqKey(testSuite)
+	if err != nil {
+		log.Fatal(err)
+	}
 	tmpDir := tmpDirectoryPath(uniqKey)
 	defer os.RemoveAll(tmpDir)
 	context := loadContext(uniqKey)
@@ -518,7 +571,10 @@ func testAction(testSuite, name string, command []string, configs, rules []*Asse
 	success = false
 
 	// load config
-	uniqKey := loadUniqKey(testSuite)
+	uniqKey, err := loadUniqKey(testSuite)
+	if err != nil {
+		uniqKey = initAction("", nil)
+	}
 	context := loadContext(uniqKey)
 	config := buildConfig(context, configs)
 
