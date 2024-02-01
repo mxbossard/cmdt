@@ -85,13 +85,13 @@ TODO:
 Bugs:
 
 Features :
-- add @timeout=N
-- @fork=5 by default instead of @parallel. Fork = 5 increment and decrement a seq
-- change @ @directive= ??? attention à la sécurité ça pourrait etre galere
-- @exists=
+- @timeout=N
+- @exists=FILEPATH,PERMS,OWNERS
+- @prefix= change @ char ??? attention à la sécurité ça pourrait etre galere
 - @runCount=N + @parallel=FORK_COUNT (min, max, median exec time)
-- @assert="CMD_WITH_ARGS_THAT_SHOULD_BE_OK_IF_OR_FAIL_TEST"
-- Use os temp dir and Clean old temp dir (older than 2 min ?)
+- @cmd="CMD_WITH_ARGS_THAT_SHOULD_BE_OK_IF_OR_FAIL_TEST"
+- @fork=5 global config only by default instead of @parallel. Fork = 5 increment and decrement a seq file
+- Clean old temp dir (older than 2 min ?)
 - mock des appels de commande
 - mock web spawning a web server
 - test port opening if daemon ; test sending data on port ???
@@ -106,15 +106,6 @@ type AssertionRule struct {
 	Result   string
 }
 
-type Context struct {
-	Ignore        bool      `yaml:""`
-	StopOnFailure bool      `yaml:""`
-	KeepStdout    bool      `yaml:""`
-	KeepStderr    bool      `yaml:""`
-	ForkCount     int       `yaml:""`
-	StartTime     time.Time `yaml:""`
-}
-
 var (
 	AssertionPrefix      = "@"
 	ContextEnvVarName    = "__CMDTEST_CONTEXT_KEY_"
@@ -124,12 +115,16 @@ var (
 	ActionReport = RuleType("report")
 	ActionTest   = RuleType("test")
 
+	GlobalFork   = RuleType("fork")
+	GlobalPrefix = RuleType("prefix")
+
 	ConfigStopOnFailure = RuleType("stopOnFailure")
 	ConfigKeepStdout    = RuleType("keepStdout")
 	ConfigKeepStderr    = RuleType("keepStderr")
 	ConfigKeepOutputs   = RuleType("keepOutputs")
 	ConfigIgnore        = RuleType("ignore")
-	ConfigFork          = RuleType("fork")
+	ConfigRunCount      = RuleType("runCount")
+	ConfigParallel      = RuleType("parallel")
 
 	RuleFail    = RuleType("fail")
 	RuleSuccess = RuleType("success")
@@ -137,6 +132,8 @@ var (
 	RuleStdout  = RuleType("stdout")
 	RuleStderr  = RuleType("stderr")
 	RuleExists  = RuleType("exists")
+	RuleTimeout = RuleType("timeout")
+	RuleCmd     = RuleType("cmd")
 
 	AssertFail    = &AssertionRule{Typ: RuleFail}
 	AssertSuccess = &AssertionRule{Typ: RuleSuccess}
@@ -159,8 +156,12 @@ var (
 )
 
 var stdPrinter printz.Printer
+
 var assertionRulePattern = regexp.MustCompile("^" + AssertionPrefix + "([a-zA-Z]+)([=~])?(.+)?$")
-var testSuiteNameSanitizerPatter = regexp.MustCompile("[^a-zA-Z0-9]")
+var existsRulePattern = regexp.MustCompile(".*")
+var cmdRulePattern = regexp.MustCompile(".*")
+var globalPrefixPattern = regexp.MustCompile(".*")
+var testSuiteNameSanitizerPattern = regexp.MustCompile("[^a-zA-Z0-9]")
 
 //var logger = logz.Default("cmdtest", 0)
 
@@ -186,8 +187,9 @@ func buildRule(arg string) (rule *AssertionRule, err error) {
 		// check rule existance
 		switch typ {
 		case ActionTest, ActionInit, ActionReport:
-		case ConfigIgnore, ConfigStopOnFailure, ConfigKeepOutputs, ConfigKeepStdout, ConfigKeepStderr, ConfigFork:
-		case RuleSuccess, RuleFail, RuleExit, RuleStdout, RuleStderr, RuleExists:
+		case GlobalFork, GlobalPrefix:
+		case ConfigIgnore, ConfigStopOnFailure, ConfigKeepOutputs, ConfigKeepStdout, ConfigKeepStderr, ConfigRunCount, ConfigParallel:
+		case RuleSuccess, RuleFail, RuleExit, RuleStdout, RuleStderr, RuleExists, RuleTimeout, RuleCmd:
 		default:
 			err = fmt.Errorf("assertion @%s does not exist", typ)
 			return
@@ -196,11 +198,13 @@ func buildRule(arg string) (rule *AssertionRule, err error) {
 		// Check rule operator
 		switch typ {
 		case RuleSuccess, RuleFail:
+			// No operator no value
 			if operator != "" || value != "" {
 				err = fmt.Errorf("assertion @%s must have no value", typ)
 				return
 			}
 		case ConfigIgnore, ConfigStopOnFailure, ConfigKeepOutputs, ConfigKeepStdout, ConfigKeepStderr:
+			// Optional boolean value
 			if operator == "=" {
 				if value != "true" && value != "false" {
 					err = fmt.Errorf("config @%s only support 'true' and 'false' values", typ)
@@ -211,14 +215,36 @@ func buildRule(arg string) (rule *AssertionRule, err error) {
 				operator = "="
 				value = "true"
 			}
-		case ConfigFork:
+		case GlobalFork, ConfigRunCount, ConfigParallel:
+			// Intger value
 			if operator != "=" || value == "" {
 				err = fmt.Errorf("assertion @%s must have a value", typ)
 				return
 			}
 			n, err2 := strconv.Atoi(value)
-			if err2 != nil || n < 1 || n > 20 {
-				err = fmt.Errorf("config @%s only support integer > 0 and <= 20", typ)
+			if err2 != nil {
+				if (typ == GlobalFork || typ == ConfigParallel) && (n < 1 || n > 20) {
+					err = fmt.Errorf("config @%s only support integer > 0 and <= 20", typ)
+				} else if typ == ConfigRunCount && n < 1 {
+					err = fmt.Errorf("config @%s only support integer > 0", typ)
+				}
+			}
+		case GlobalPrefix:
+			if !globalPrefixPattern.MatchString(value) {
+				err = fmt.Errorf("not supported config @%s value", typ)
+			}
+		case RuleTimeout:
+			_, err2 := time.ParseDuration(value)
+			if err2 != nil {
+				err = fmt.Errorf("cannot parse duration for assertion @%s : %w", typ, err2)
+			}
+		case RuleExists:
+			if !existsRulePattern.MatchString(value) {
+				err = fmt.Errorf("not supported assertion @%s value", typ)
+			}
+		case RuleCmd:
+			if !cmdRulePattern.MatchString(value) {
+				err = fmt.Errorf("not supported assertion @%s value", typ)
 			}
 		default:
 			if operator == "" {
@@ -339,6 +365,8 @@ func buildContext(rules []*AssertionRule) (config Context) {
 	config.ForkCount = 5
 	for _, rule := range rules {
 		switch rule.Typ {
+		case ConfigIgnore:
+			config.Ignore = rule.Expected == "true"
 		case ConfigStopOnFailure:
 			config.StopOnFailure = rule.Expected == "true"
 		case ConfigKeepOutputs:
@@ -348,10 +376,14 @@ func buildContext(rules []*AssertionRule) (config Context) {
 			config.KeepStdout = rule.Expected == "true"
 		case ConfigKeepStderr:
 			config.KeepStderr = rule.Expected == "true"
-		case ConfigFork:
+		case GlobalFork:
 			config.ForkCount, _ = strconv.Atoi(rule.Expected)
-		case ConfigIgnore:
-			config.Ignore = rule.Expected == "true"
+		case RuleTimeout:
+			config.Timeout, _ = time.ParseDuration(rule.Expected)
+		case ConfigRunCount:
+			config.RunCount, _ = strconv.Atoi(rule.Expected)
+		case ConfigParallel:
+			config.Parallel, _ = strconv.Atoi(rule.Expected)
 		}
 	}
 	return
@@ -372,8 +404,14 @@ func buildConfig(context Context, rules []*AssertionRule) Context {
 			config.KeepStdout = r.Expected == "true"
 		case ConfigKeepStderr:
 			config.KeepStderr = r.Expected == "true"
-		case ConfigFork:
+		case GlobalFork:
 			config.ForkCount, _ = strconv.Atoi(r.Expected)
+		case RuleTimeout:
+			config.Timeout, _ = time.ParseDuration(r.Expected)
+		case ConfigRunCount:
+			config.RunCount, _ = strconv.Atoi(r.Expected)
+		case ConfigParallel:
+			config.Parallel, _ = strconv.Atoi(r.Expected)
 		}
 	}
 	return config
@@ -524,7 +562,7 @@ func failureReports(testSuite, uniqKey string) (reports []string) {
 }
 
 func sanitizeTestSuiteName(s string) string {
-	return testSuiteNameSanitizerPatter.ReplaceAllString(s, "_")
+	return testSuiteNameSanitizerPattern.ReplaceAllString(s, "_")
 }
 
 func initAction(testSuite string, configs []*AssertionRule) string {
@@ -650,7 +688,10 @@ func testAction(testSuite, name string, command []string, configs, rules []*Asse
 	}
 
 	//fmt.Printf("%s", os.Environ())
-	cmd = cmd.AddEnviron(os.Environ())
+	cmd.AddEnviron(os.Environ())
+	if config.Timeout.Milliseconds() > 0 {
+		cmd.Timeout(int(config.Timeout.Milliseconds()))
+	}
 
 	testTitle := fmt.Sprintf("[%05d] Test %s #%02d", timecode, testName, seq)
 	stdPrinter.ColoredErrf(testColor, "%s... ", testTitle)
@@ -694,10 +735,11 @@ func testAction(testSuite, name string, command []string, configs, rules []*Asse
 					success = strings.Contains(rule.Result, rule.Expected)
 
 				}
-			case RuleExists:
-				log.Fatalf("assertion @%s not implemented yet", rule.Typ)
+			case RuleTimeout:
+				// nothing to do
+				success = true
 			default:
-				log.Fatalf("assertion @%s does not exists", rule.Typ)
+				log.Fatalf("assertion @%s not implemented yet", rule.Typ)
 			}
 			if !success {
 				failedRules = append(failedRules, rule)
@@ -799,7 +841,7 @@ func main() {
 				} else if rule.Typ == ActionReport {
 					actionReport = true
 					name = rule.Expected
-				} else if rule.Typ == ConfigStopOnFailure || rule.Typ == ConfigKeepOutputs || rule.Typ == ConfigKeepStdout || rule.Typ == ConfigKeepStderr || rule.Typ == ConfigIgnore || rule.Typ == ConfigFork {
+				} else if rule.Typ == ConfigStopOnFailure || rule.Typ == ConfigKeepOutputs || rule.Typ == ConfigKeepStdout || rule.Typ == ConfigKeepStderr || rule.Typ == ConfigIgnore || rule.Typ == GlobalFork {
 					configs = append(configs, rule)
 				} else {
 					rules = append(rules, rule)

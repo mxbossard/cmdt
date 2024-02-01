@@ -1,6 +1,8 @@
 package main
 
 import (
+	"time"
+
 	"mby.fr/utils/cmdz"
 )
 
@@ -21,6 +23,23 @@ const (
 	Suite                     // can be placed on suite init only
 	Test                      // can be placed on test or on suite to configure all tests
 )
+
+type Context struct {
+	TestSuite string `yaml:""`
+	TestName  string `yaml:""`
+	Action    Action `yaml:""`
+
+	StartTime     time.Time     `yaml:""`
+	SuiteTimeout  time.Duration `yaml:""`
+	Ignore        bool          `yaml:""`
+	StopOnFailure bool          `yaml:""`
+	KeepStdout    bool          `yaml:""`
+	KeepStderr    bool          `yaml:""`
+	ForkCount     int           `yaml:""`
+	Timeout       time.Duration `yaml:""`
+	RunCount      int           `yaml:""`
+	Parallel      int           `yaml:""`
+}
 
 type Config struct {
 	Name  string
