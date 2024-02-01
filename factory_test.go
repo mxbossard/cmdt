@@ -74,7 +74,7 @@ func TestApplyConfig(t *testing.T) {
 
 func TestBuildAssertion(t *testing.T) {
 	var ok bool
-	//var asrtr Asserter
+	var assertion Assertion
 	var err error
 
 	ok, _, err = BuildAssertion("foo")
@@ -85,19 +85,28 @@ func TestBuildAssertion(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, ok)
 
-	ok, _, err = BuildAssertion("@fail")
+	ok, assertion, err = BuildAssertion("@fail")
 	assert.NoError(t, err)
 	assert.True(t, ok)
+	assert.Equal(t, "fail", assertion.Name)
+	assert.Equal(t, "", assertion.Operator)
+	assert.Equal(t, "", assertion.Expected)
 
-	ok, _, err = BuildAssertion("@stdout=")
+	ok, assertion, err = BuildAssertion("@stdout=")
 	assert.NoError(t, err)
 	assert.True(t, ok)
+	assert.Equal(t, "stdout", assertion.Name)
+	assert.Equal(t, "=", assertion.Operator)
+	assert.Equal(t, "", assertion.Expected)
 
-	ok, _, err = BuildAssertion("@stdout~")
+	ok, assertion, err = BuildAssertion("@stdout~baz")
 	assert.NoError(t, err)
 	assert.True(t, ok)
+	assert.Equal(t, "stdout", assertion.Name)
+	assert.Equal(t, "~", assertion.Operator)
+	assert.Equal(t, "baz", assertion.Expected)
 
-	ok, _, err = BuildAssertion("@stdout+")
+	ok, assertion, err = BuildAssertion("@stdout+")
 	assert.Error(t, err)
 	assert.True(t, ok)
 }
@@ -105,14 +114,15 @@ func TestBuildAssertion(t *testing.T) {
 func TestParseArgs(t *testing.T) {
 	var cfg Context
 	var cmdAndArgs []string
-	var assertions []Asserter
+	var assertions []Assertion
 	var err error
 
 	// Parse command and args without config nor assertions
 	cfg, cmdAndArgs, assertions, err = ParseArgs([]string{"foo", "bar", "baz"})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"foo", "bar", "baz"}, cmdAndArgs)
-	assert.Equal(t, Context{}, cfg)
+	assert.Equal(t, "", cfg.TestSuite)
+	assert.Equal(t, "", cfg.TestName)
 	assert.Len(t, assertions, 0)
 
 	// Parse command and args with a not existing rule
@@ -120,10 +130,42 @@ func TestParseArgs(t *testing.T) {
 	assert.Error(t, err)
 
 	// Parse command and args with an existing rule
-	cfg, cmdAndArgs, assertions, err = ParseArgs([]string{"foo", "bar", "@fail"})
+	cfg, cmdAndArgs, assertions, err = ParseArgs([]string{"foo", "bar", "@fail", "@test=pif"})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"foo", "bar"}, cmdAndArgs)
-	assert.Equal(t, Context{}, cfg)
+	assert.Equal(t, "", cfg.TestSuite)
+	assert.Equal(t, "pif", cfg.TestName)
+	assert.Len(t, assertions, 1)
+
+	// Parse command and args with an existing rule
+	cfg, cmdAndArgs, assertions, err = ParseArgs([]string{"foo", "bar", "@fail", "@stdout=", "@test=paf/"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"foo", "bar"}, cmdAndArgs)
+	assert.Equal(t, "paf", cfg.TestSuite)
+	assert.Equal(t, "", cfg.TestName)
+	assert.Len(t, assertions, 2)
+
+	// Parse command and args with mutualy exclusive rules
+	cfg, cmdAndArgs, assertions, err = ParseArgs([]string{"foo", "bar", "@fail", "@success"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"foo", "bar"}, cmdAndArgs)
+	assert.Equal(t, "", cfg.TestSuite)
+	assert.Equal(t, "", cfg.TestName)
+	assert.Len(t, assertions, 2)
+
+	// Parse command and args with a test name
+	cfg, cmdAndArgs, assertions, err = ParseArgs([]string{"foo", "bar", "@test=foo", "@success"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"foo", "bar"}, cmdAndArgs)
+	assert.Equal(t, "foo", cfg.TestName)
+	assert.Len(t, assertions, 1)
+
+	// Parse command and args with an absolute test name
+	cfg, cmdAndArgs, assertions, err = ParseArgs([]string{"foo", "bar", "@test=bar/foo", "@success"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"foo", "bar"}, cmdAndArgs)
+	assert.Equal(t, "bar", cfg.TestSuite)
+	assert.Equal(t, "foo", cfg.TestName)
 	assert.Len(t, assertions, 1)
 
 }

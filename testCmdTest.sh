@@ -6,7 +6,7 @@ workspaceDir="/tmp/cmdtWorkspace"
 
 >&2 echo "##### Building cmdtest binary ..."
 export GOBIN="$scriptDir/bin"
-cd $scriptDir/src/mby.fr/cmdtest
+cd "$scriptDir"
 go install
 
 rm -rf -- "$workspaceDir"

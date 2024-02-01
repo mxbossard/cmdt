@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -11,13 +12,14 @@ import (
 )
 
 const (
-	NamePattern    = "[a-zA-Z][a-zA-Z0-9-_ .]*[a-zA-Z0-9]"
-	AbsNamePattern = "(?:(" + NamePattern + ")/)?" + NamePattern
+	NamePattern = "[a-zA-Z][^/]*[a-zA-Z0-9]"
 )
 
 var (
-	NameRegexp    = regexp.MustCompile(NamePattern)
-	AbsNameRegexp = regexp.MustCompile(AbsNamePattern)
+	DefaultTestTimeout, _ = time.ParseDuration("1000h")
+	AbsNamePattern        = fmt.Sprintf("(%s/)?(%s)?", NamePattern, NamePattern)
+	NameRegexp            = regexp.MustCompile("^" + NamePattern + "$")
+	AbsNameRegexp         = regexp.MustCompile("^" + AbsNamePattern + "$")
 )
 
 func IsRule(s string) bool {
@@ -38,8 +40,8 @@ func SplitRuleExpr(ruleExpr string) (ok bool, name string, operator string, valu
 	return
 }
 
-func NoMapper(s string) (v any, err error) {
-	return
+func DummyMapper(s string) (v string, err error) {
+	return s, nil
 }
 
 func IntMapper(s string) (v int, err error) {
@@ -61,6 +63,11 @@ func BoolMapper(s string) (v bool, err error) {
 
 func DurationMapper(s string) (v time.Duration, err error) {
 	return time.ParseDuration(s)
+}
+
+func FileContentMapper(s string) (v string, err error) {
+	v = strings.ReplaceAll(s, "\\n", "\n")
+	return
 }
 
 func IntValueValidater(min, max int) Validater[int] {
@@ -86,10 +93,17 @@ func EqualOperatorValidater[T any](rule, op string, v T) (err error) {
 	return
 }
 
+func EqualOrTildeOperatorValidater[T any](rule, op string, v T) (err error) {
+	if op != "=" && op != "~" {
+		err = fmt.Errorf("rule %s%s operator must be '=' or '~'", AssertionPrefix, rule)
+	}
+	return
+}
+
 func TestNameValidater(rule, op string, v string) (err error) {
 	switch rule {
 	case "init", "report":
-		if !NameRegexp.MatchString(v) {
+		if v != "" && !NameRegexp.MatchString(v) {
 			err = fmt.Errorf("name %s does not match expected pattern: %s", v, NamePattern)
 		}
 	case "test":
@@ -101,7 +115,9 @@ func TestNameValidater(rule, op string, v string) (err error) {
 }
 
 func BooleanValidater(rule, op string, v bool) (err error) {
-	err = EqualOperatorValidater(rule, op, v)
+	if op != "" && op != "=" {
+		err = fmt.Errorf("rule %s%s operator must be '='", AssertionPrefix, rule)
+	}
 	return
 }
 
@@ -125,41 +141,10 @@ func Translate[T any](rule, operator, value string, m Mapper[T], validaters ...V
 	return
 }
 
-/*
-func BuildAction(c *Context, ruleExpr string) (ok bool, a Action, err error) {
-	var name, operator, value string
-	ok, name, operator, value = SplitRuleExpr(ruleExpr)
-	if ok {
-		switch name {
-		case "init", "report":
-			err = Validate[string](name, operator, value, TestNameValidater)
-			a = Action(name)
-			if value != "" {
-				c.TestSuite = value
-			}
-		case "test":
-			err = Validate[string](name, operator, value, TestNameValidater)
-			a = Action(name)
-			if value != "" {
-				matches := AbsNameRegexp.FindStringSubmatch(value)
-				if len(matches) == 2 {
-					c.TestName = matches[1]
-				} else {
-					c.TestSuite = matches[1]
-					c.TestName = matches[2]
-				}
-			}
-		default:
-			ok = false
-		}
-	}
-	return
-}
-*/
-
 func ApplyConfig(c *Context, ruleExpr string) (ok bool, err error) {
 	var name, operator, value string
 	ok, name, operator, value = SplitRuleExpr(ruleExpr)
+	var boolVal bool
 	if ok {
 		switch name {
 		case "init", "report":
@@ -173,11 +158,22 @@ func ApplyConfig(c *Context, ruleExpr string) (ok bool, err error) {
 			c.Action = Action(name)
 			if value != "" {
 				matches := AbsNameRegexp.FindStringSubmatch(value)
+				log.Printf("Matching names: %v", matches)
 				if len(matches) == 2 {
-					c.TestName = matches[1]
-				} else {
-					c.TestSuite = matches[1]
+					name := matches[1]
+					if strings.HasSuffix(name, "/") {
+						c.TestSuite = name[0 : len(name)-1]
+					} else {
+						c.TestName = name
+					}
+				} else if len(matches) == 3 {
+					name := matches[1]
+					if strings.HasSuffix(name, "/") {
+						c.TestSuite = name[0 : len(name)-1]
+					}
 					c.TestName = matches[2]
+				} else {
+					err = fmt.Errorf("bad test name: [%s]", value)
 				}
 			}
 
@@ -189,18 +185,22 @@ func ApplyConfig(c *Context, ruleExpr string) (ok bool, err error) {
 		case "after":
 
 		case "ignore":
-			c.Ignore, err = Translate(name, operator, value, BoolMapper, BooleanValidater)
+			boolVal, err = Translate(name, operator, value, BoolMapper, BooleanValidater)
+			c.Ignore = &boolVal
 		case "stopOnFailure":
-			c.StopOnFailure, err = Translate(name, operator, value, BoolMapper, BooleanValidater)
+			boolVal, err = Translate(name, operator, value, BoolMapper, BooleanValidater)
+			c.StopOnFailure = &boolVal
 		case "keepStdout":
-			c.KeepStdout, err = Translate(name, operator, value, BoolMapper, BooleanValidater)
+			boolVal, err = Translate(name, operator, value, BoolMapper, BooleanValidater)
+			c.KeepStdout = &boolVal
 		case "keepStderr":
-			c.KeepStderr, err = Translate(name, operator, value, BoolMapper, BooleanValidater)
+			boolVal, err = Translate(name, operator, value, BoolMapper, BooleanValidater)
+			c.KeepStderr = &boolVal
 		case "keepOutputs":
 			var keepOutputs bool
 			keepOutputs, err = Translate(name, operator, value, BoolMapper, BooleanValidater)
-			c.KeepStdout = keepOutputs
-			c.KeepStderr = keepOutputs
+			c.KeepStdout = &keepOutputs
+			c.KeepStderr = &keepOutputs
 		case "timeout":
 			c.Timeout, err = Translate(name, operator, value, DurationMapper)
 		case "runCount":
@@ -213,23 +213,62 @@ func ApplyConfig(c *Context, ruleExpr string) (ok bool, err error) {
 	return
 }
 
-func BuildAssertion(ruleExpr string) (ok bool, a Asserter, err error) {
+func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 	var name, operator, value string
 	ok, name, operator, value = SplitRuleExpr(ruleExpr)
+	assertion = Assertion{Name: name, Operator: operator, Expected: value}
 	if ok {
 		switch name {
 		case "success":
-			_, err = Translate(name, operator, value, NoMapper, NoOperatorValidater[any])
-			a = func(cmd cmdz.Executer) (res AssertionResult, err error) {
-				assert := Assertion{Name: name, Operator: operator, Expected: value}
-				res = AssertionResult{Assertion: assert, Success: cmd.ExitCode() == 0}
+			_, err = Translate(name, operator, value, DummyMapper, NoOperatorValidater[string])
+			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+				res.Value = ""
+				res.Success = cmd.ExitCode() == 0
 				return
 			}
 		case "fail":
+			_, err = Translate(name, operator, value, DummyMapper, NoOperatorValidater[string])
+			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+				res.Value = ""
+				res.Success = cmd.ExitCode() > 0
+				return
+			}
 		case "exit":
+			var expectedExitCode int
+			expectedExitCode, err = Translate(name, operator, value, IntMapper, IntValueValidater(0, 255), EqualOperatorValidater[int])
+			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+				res.Value = cmd.ExitCode()
+				res.Success = cmd.ExitCode() == expectedExitCode
+				return
+			}
 		case "stdout":
+			var fileContent string
+			fileContent, err = Translate(name, operator, value, FileContentMapper, EqualOrTildeOperatorValidater[string])
+			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+				res.Value = cmd.StdoutRecord()
+				if operator == "=" {
+					res.Success = cmd.StdoutRecord() == fileContent
+				} else if operator == "~" {
+					res.Success = strings.Contains(cmd.StdoutRecord(), fileContent)
+				} else {
+					err = fmt.Errorf("rule %s%s must use an operator '=' or '~'", AssertionPrefix, name)
+				}
+				return
+			}
 		case "stderr":
-		case "timeout":
+			var fileContent string
+			fileContent, err = Translate(name, operator, value, FileContentMapper, EqualOrTildeOperatorValidater[string])
+			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+				res.Value = cmd.StderrRecord()
+				if operator == "=" {
+					res.Success = cmd.StderrRecord() == fileContent
+				} else if operator == "~" {
+					res.Success = strings.Contains(cmd.StderrRecord(), fileContent)
+				} else {
+					err = fmt.Errorf("rule %s%s must use an operator '=' or '~'", AssertionPrefix, name)
+				}
+				return
+			}
 		case "exists":
 
 		default:
@@ -239,19 +278,10 @@ func BuildAssertion(ruleExpr string) (ok bool, a Asserter, err error) {
 	return
 }
 
-func ParseArgs(args []string) (cfg Context, cmdAndArgs []string, assertions []Asserter, err error) {
+func ParseArgs(args []string) (cfg Context, cmdAndArgs []string, assertions []Assertion, err error) {
 	for _, arg := range args {
 		var ok bool
 		if IsRule(arg) {
-			/*
-				ok, action, err = BuildAction(&cfg, arg)
-				if err != nil {
-					return
-				}
-				if ok {
-					continue
-				}
-			*/
 			ok, err = ApplyConfig(&cfg, arg)
 			if err != nil {
 				return
@@ -259,26 +289,38 @@ func ParseArgs(args []string) (cfg Context, cmdAndArgs []string, assertions []As
 			if ok {
 				continue
 			}
-			var asserter Asserter
-			ok, asserter, err = BuildAssertion(arg)
+			var assertion Assertion
+			ok, assertion, err = BuildAssertion(arg)
 			if err != nil {
 				return
 			}
 			if ok {
-				assertions = append(assertions, asserter)
+				assertions = append(assertions, assertion)
 				continue
 			}
 			err = fmt.Errorf("rule %s%s does not exists", AssertionPrefix, arg)
+			return
 		} else {
 			cmdAndArgs = append(cmdAndArgs, arg)
 		}
 	}
+
+	if cfg.Action == Action("") {
+		// If no action supplied add implicit test rule.
+		_, err = ApplyConfig(&cfg, AssertionPrefix+"test")
+		if err != nil {
+			return
+		}
+	}
+
+	//log.Printf("Parsed config: %v", cfg)
 	return
 }
 
 func ValidateMutualyExclusiveRules(args []string) (err error) {
 	MutualyExclusiveRules := [][]string{
 		[]string{"init", "test", "report"},
+		[]string{"fail", "success", "exit"},
 		[]string{"keepOutputs", "keepStdout"},
 		[]string{"keepOutputs", "keepStderr"},
 		[]string{"test", "suiteTimeout"},
