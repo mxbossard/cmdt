@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -320,9 +319,6 @@ func ParseArgs(args []string) (cfg Context, cmdAndArgs []string, assertions []As
 	}
 
 	err = ValidateMutualyExclusiveRules(rules)
-	if err != nil {
-		log.Fatal(err)
-	}
 	//log.Printf("Parsed config: %v", cfg)
 	return
 }

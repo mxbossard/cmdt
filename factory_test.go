@@ -39,34 +39,34 @@ func TestApplyConfig(t *testing.T) {
 	var cfg Context
 	var err error
 
-	ok, err = ApplyConfig(&cfg, "foo")
+	ok, _, err = ApplyConfig(&cfg, "foo")
 	assert.NoError(t, err)
 	assert.False(t, ok)
 
-	ok, err = ApplyConfig(&cfg, "@foo")
+	ok, _, err = ApplyConfig(&cfg, "@foo")
 	assert.NoError(t, err)
 	assert.False(t, ok)
 
-	ok, err = ApplyConfig(&cfg, "@fork")
+	ok, _, err = ApplyConfig(&cfg, "@fork")
 	assert.Error(t, err)
 	assert.True(t, ok)
 
-	ok, err = ApplyConfig(&cfg, "@fork=")
+	ok, _, err = ApplyConfig(&cfg, "@fork=")
 	assert.Error(t, err)
 	assert.True(t, ok)
 
-	ok, err = ApplyConfig(&cfg, "@fork~")
+	ok, _, err = ApplyConfig(&cfg, "@fork~")
 	assert.Error(t, err)
 	assert.True(t, ok)
 
 	expectedFork := 3
-	ok, err = ApplyConfig(&cfg, fmt.Sprintf("@fork=%d", expectedFork))
+	ok, _, err = ApplyConfig(&cfg, fmt.Sprintf("@fork=%d", expectedFork))
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, expectedFork, cfg.ForkCount)
 
 	expectedFork = 7
-	ok, err = ApplyConfig(&cfg, fmt.Sprintf("@fork=%d", expectedFork))
+	ok, _, err = ApplyConfig(&cfg, fmt.Sprintf("@fork=%d", expectedFork))
 	assert.Error(t, err)
 	assert.True(t, ok)
 
@@ -147,7 +147,7 @@ func TestParseArgs(t *testing.T) {
 
 	// Parse command and args with mutualy exclusive rules
 	cfg, cmdAndArgs, assertions, err = ParseArgs([]string{"foo", "bar", "@fail", "@success"})
-	require.NoError(t, err)
+	require.Error(t, err)
 	assert.Equal(t, []string{"foo", "bar"}, cmdAndArgs)
 	assert.Equal(t, "", cfg.TestSuite)
 	assert.Equal(t, "", cfg.TestName)
