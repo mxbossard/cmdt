@@ -30,8 +30,8 @@ func LoadSuiteContext(testSuite, uniqKey string) (config Context, err error) {
 	contextFilepath := testConfigFilepath(testSuite, uniqKey)
 	content, err2 := os.ReadFile(contextFilepath)
 	if err2 != nil {
-		//log.Fatal(err)
-		err = buildNoTestToReportError(testSuite)
+		log.Fatal(err2)
+		//err = buildNoTestToReportError(testSuite)
 		return
 	}
 	err2 = yaml.Unmarshal(content, &config)

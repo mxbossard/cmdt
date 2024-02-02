@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"mby.fr/utils/cmdz"
+	"mby.fr/utils/collections"
 )
 
 const (
@@ -134,15 +135,15 @@ func Validate[T any](rule, operator string, val T, validaters ...Validater[T]) (
 func Translate[T any](rule, operator, value string, m Mapper[T], validaters ...Validater[T]) (val T, err error) {
 	val, err = m(value)
 	if err != nil {
-
+		err = fmt.Errorf("cannot map rule %s%s value: [%s] : %w", AssertionPrefix, rule, value, err)
 		return
 	}
 	err = Validate(rule, operator, val, validaters...)
 	return
 }
 
-func ApplyConfig(c *Context, ruleExpr string) (ok bool, err error) {
-	var name, operator, value string
+func ApplyConfig(c *Context, ruleExpr string) (ok bool, name string, err error) {
+	var operator, value string
 	ok, name, operator, value = SplitRuleExpr(ruleExpr)
 	var boolVal bool
 	if ok {
@@ -158,7 +159,7 @@ func ApplyConfig(c *Context, ruleExpr string) (ok bool, err error) {
 			c.Action = Action(name)
 			if value != "" {
 				matches := AbsNameRegexp.FindStringSubmatch(value)
-				log.Printf("Matching names: %v", matches)
+				//log.Printf("Matching names: %v", matches)
 				if len(matches) == 2 {
 					name := matches[1]
 					if strings.HasSuffix(name, "/") {
@@ -279,14 +280,17 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 }
 
 func ParseArgs(args []string) (cfg Context, cmdAndArgs []string, assertions []Assertion, err error) {
+	var rules []string
+	var rule string
 	for _, arg := range args {
 		var ok bool
 		if IsRule(arg) {
-			ok, err = ApplyConfig(&cfg, arg)
+			ok, rule, err = ApplyConfig(&cfg, arg)
 			if err != nil {
 				return
 			}
 			if ok {
+				rules = append(rules, rule)
 				continue
 			}
 			var assertion Assertion
@@ -296,6 +300,7 @@ func ParseArgs(args []string) (cfg Context, cmdAndArgs []string, assertions []As
 			}
 			if ok {
 				assertions = append(assertions, assertion)
+				rules = append(rules, assertion.Name)
 				continue
 			}
 			err = fmt.Errorf("rule %s%s does not exists", AssertionPrefix, arg)
@@ -307,28 +312,59 @@ func ParseArgs(args []string) (cfg Context, cmdAndArgs []string, assertions []As
 
 	if cfg.Action == Action("") {
 		// If no action supplied add implicit test rule.
-		_, err = ApplyConfig(&cfg, AssertionPrefix+"test")
+		_, rule, err = ApplyConfig(&cfg, AssertionPrefix+"test")
 		if err != nil {
 			return
 		}
+		rules = append(rules, rule)
 	}
 
+	err = ValidateMutualyExclusiveRules(rules)
+	if err != nil {
+		log.Fatal(err)
+	}
 	//log.Printf("Parsed config: %v", cfg)
+	return
+}
+
+func buildMutualyExclusiveCouples(rule string, exclusiveRules ...string) (res [][]string) {
+	for _, e := range exclusiveRules {
+		res = append(res, []string{rule, e})
+	}
 	return
 }
 
 func ValidateMutualyExclusiveRules(args []string) (err error) {
 	MutualyExclusiveRules := [][]string{
-		[]string{"init", "test", "report"},
-		[]string{"fail", "success", "exit"},
-		[]string{"keepOutputs", "keepStdout"},
-		[]string{"keepOutputs", "keepStderr"},
-		[]string{"test", "suiteTimeout"},
-		[]string{"test", "forkCount"},
+		{"init", "test", "report"},
+		{"fail", "success", "exit"},
+		{"keepOutputs", "keepStdout"},
+		{"keepOutputs", "keepStderr"},
 	}
 
+	exlusiveRules := MutualyExclusiveRules
 	// FIXME: init ne supporte aucune assertion
+	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples("init", "success", "fail", "exit", "stdout",
+		"stderr", "exists")...)
+	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples("test", "suiteTimeout", "forkCount")...)
 	// FIXME: report ne supporte aucune assertion ni aucune config
-	_ = MutualyExclusiveRules
+	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples("report", "fork", "suiteTimeout", "before",
+		"after", "ignore", "stopOnFailure", "keepStdout", "keepStderr", "keepOutputs", "timeout", "runCount", "parallel",
+		"success", "fail", "exit", "stdout", "stderr", "exists")...)
+
+	//log.Printf("args: %s\n", args)
+	for _, mer := range exlusiveRules {
+		matchCount := 0
+		for _, arg := range args {
+			if collections.Contains[string](&mer, arg) {
+				matchCount++
+			}
+		}
+		//log.Printf("%s rules => %d\n", mer, matchCount)
+		if matchCount > 1 {
+			err = fmt.Errorf("you can't use simultaneously following rules which are mutually exclusives: [%s]", strings.Join(mer, ","))
+		}
+	}
+
 	return
 }

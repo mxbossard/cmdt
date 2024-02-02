@@ -137,4 +137,19 @@ $cmd @report="another"
 >&2 echo should have 1 success
 $cmd @report="another one"
 
+>&2 echo "## Mutually exclusive rules @init"
+! $cmd @init @fail || false
+! $cmd @init @test || false
+
+>&2 echo "## Mutually exclusive rules @test"
+! $cmd true @fail @success || false
+! $cmd true @fail @success || false
+! $cmd true @fail @exit=0 || false
+! $cmd true @fail @suiteTimeout=1m || false
+
+>&2 echo "## Mutually exclusive rules @report"
+! $cmd @report @ignore || false
+! $cmd @report @test || false
+! $cmd @report @fail || false
+
 >&2 echo SUCCESS
