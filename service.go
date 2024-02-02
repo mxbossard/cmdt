@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -129,7 +130,17 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (succ
 	ctx = MergeContext(suiteContext, ctx)
 	timecode := int(time.Since(ctx.StartTime).Milliseconds())
 
-	cmd := cmdz.Cmd(cmdAndArgs[0])
+	c := context.Background()
+	/*
+		if ctx.Timeout.Milliseconds() > 0 {
+			//cmd.Timeout(int(ctx.Timeout.Milliseconds()))
+			var cancel context.CancelFunc
+			c, cancel = context.WithTimeout(context.Background(), ctx.Timeout)
+			defer cancel()
+		}
+	*/
+
+	cmd := cmdz.CmdCtx(c, cmdAndArgs[0])
 	if len(cmdAndArgs) == 0 {
 		log.Fatalf("no command supplied to test")
 	} else if len(cmdAndArgs) > 1 {
@@ -173,9 +184,6 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (succ
 
 	//fmt.Printf("%s", os.Environ())
 	cmd.AddEnviron(os.Environ())
-	if ctx.Timeout.Milliseconds() > 0 {
-		cmd.Timeout(int(ctx.Timeout.Milliseconds()))
-	}
 
 	testTitle := fmt.Sprintf("[%05d] Test %s #%02d", timecode, qulifiedName, seq)
 	stdPrinter.ColoredErrf(testColor, "%s... ", testTitle)
@@ -268,7 +276,7 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (succ
 	return
 }
 
-func DoSomething(allArgs []string) {
+func ProcessArgs(allArgs []string) {
 	exitCode := 1
 	defer func() { os.Exit(exitCode) }()
 

@@ -69,10 +69,6 @@ Assertions:
 - cmdt <[testSuite/]testName> <myCommand> myArg1 ... myArgN @success @stdout="MyOut" @stderr="MyErr" @exists="MyFile,Perms,Owners"
 - cmdt [testSuite] @report
 
-## Improvements
-- Manage stdin
-- Manage stdout and stderr redirects (disable outputs override and report with another following command ?)
-
 */
 
 /*
@@ -87,9 +83,28 @@ Features :
 - @cmd="CMD_WITH_ARGS_THAT_SHOULD_BE_OK_IF_OR_FAIL_TEST"
 - @fork=5 global config only by default instead of @parallel. Fork = 5 increment and decrement a seq file
 - Clean old temp dir (older than 2 min ?)
-- mock des appels de commande
-- mock web spawning a web server
+- @mock des appels de commande
+- @before=TEST_SUITE CMD ARG_1 ARG_2 ... ARG_N => execute CMD before each test
+- @after=TEST_SUITE CMD ARG_1 ARG_2 ... ARG_N => execute CMD after each test
+- Improve cmd log delimiting args:
+        no spaces: CMD ARG_1 ARG_2 ARG_N
+        some spaces: <[ CMD AVEC ESPACE, ARG_1, ARG AVEC ESPACE, ARG_N ]>
+        autre idée ??? CMD ARG_1 'ARG 2' ... <|ARG N|>  or 'CMD WITH SPACE' ARG_1 'ARG 2' ... ARG_N Possible separators: simple quotte ; <| |> ;
+- pass file content by filepath to @stdout @stderr : @stdout=@FILEPATH
+- possibilité de passer un scénario ligne à ligne dans le stdin de cmdtest
+- may chroot be interesting for tests ?
+- mock web spawning a web server ?
 - test port opening if daemon ; test sending data on port ???
+
+## Idées pour la commande de mock
+    insérer dans le $PATH un repertoire temp binMocked
+    Pour chaque commande mockée on place un lien symbolique de la commande mocké vers le mock dans le repertoire binMocked
+    il nous faut un programme mock qui consomme tous les args, compte les appels avec les args et répond de la manière dont il est configuré
+    mock config :
+        Exact call @mock="CMD,ARG_1,ARG_2,ARG_N;stdin=baz;exit=0;stdout=foo;stderr=bar" Must receive exactly stdin and specified args in order not more
+        Exact incomplete call @mock="CMD,ARG_1,ARG_2,ARG_N,*;stdin=baz;exit=0;stdout=foo;stderr=bar" Must receive exactly stdin and specified args in order then more args
+        Contains call @mock~"CMD,ARG_1,ARG_2,ARG_N;stdin=baz;exit=0;stdout=foo;stderr=bar" Must receive exactly stdin and specified args in various order not more
+        Default exit code @mock="CMD,*;exit=1"
 */
 
 type RuleType string
@@ -106,32 +121,34 @@ var (
 	ContextEnvVarName    = "__CMDTEST_CONTEXT_KEY_"
 	DefaultTestSuiteName = "_default"
 
-	ActionInit   = RuleType("init")
-	ActionReport = RuleType("report")
-	ActionTest   = RuleType("test")
+	/*
+		ActionInit   = RuleType("init")
+		ActionReport = RuleType("report")
+		ActionTest   = RuleType("test")
 
-	GlobalFork   = RuleType("fork")
-	GlobalPrefix = RuleType("prefix")
+		GlobalFork   = RuleType("fork")
+		GlobalPrefix = RuleType("prefix")
 
-	ConfigStopOnFailure = RuleType("stopOnFailure")
-	ConfigKeepStdout    = RuleType("keepStdout")
-	ConfigKeepStderr    = RuleType("keepStderr")
-	ConfigKeepOutputs   = RuleType("keepOutputs")
-	ConfigIgnore        = RuleType("ignore")
-	ConfigRunCount      = RuleType("runCount")
-	ConfigParallel      = RuleType("parallel")
+		ConfigStopOnFailure = RuleType("stopOnFailure")
+		ConfigKeepStdout    = RuleType("keepStdout")
+		ConfigKeepStderr    = RuleType("keepStderr")
+		ConfigKeepOutputs   = RuleType("keepOutputs")
+		ConfigIgnore        = RuleType("ignore")
+		ConfigRunCount      = RuleType("runCount")
+		ConfigParallel      = RuleType("parallel")
 
-	RuleFail    = RuleType("fail")
-	RuleSuccess = RuleType("success")
-	RuleExit    = RuleType("exit")
-	RuleStdout  = RuleType("stdout")
-	RuleStderr  = RuleType("stderr")
-	RuleExists  = RuleType("exists")
-	RuleTimeout = RuleType("timeout")
-	RuleCmd     = RuleType("cmd")
+		RuleFail    = RuleType("fail")
+		RuleSuccess = RuleType("success")
+		RuleExit    = RuleType("exit")
+		RuleStdout  = RuleType("stdout")
+		RuleStderr  = RuleType("stderr")
+		RuleExists  = RuleType("exists")
+		RuleTimeout = RuleType("timeout")
+		RuleCmd     = RuleType("cmd")
 
-	AssertFail    = &AssertionRule{Typ: RuleFail}
-	AssertSuccess = &AssertionRule{Typ: RuleSuccess}
+		AssertFail    = &AssertionRule{Typ: RuleFail}
+		AssertSuccess = &AssertionRule{Typ: RuleSuccess}
+	*/
 
 	TempDirPrefix           = "cmdtest"
 	ContextFilename         = "context.yaml"
@@ -378,5 +395,5 @@ func main() {
 	stdPrinter = printz.NewStandard()
 	defer stdPrinter.Flush()
 
-	DoSomething(os.Args)
+	ProcessArgs(os.Args)
 }

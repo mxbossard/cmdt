@@ -114,6 +114,8 @@ $cmd "@test=exported var" sh -c "export" @stdout~"foo='bar'\n"
 #alias foo=echo
 #$cmd "@test=alias" sh -c "foo bar" @stdout~"bar\n"
 
+>&2 echo "## Test @timeout"
+! $cmd sleep 1 @timeout=50ms || false
 
 >&2 echo "## Test @report"
 $cmd @report
