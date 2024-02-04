@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"log"
@@ -130,22 +129,16 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (succ
 	ctx = MergeContext(suiteContext, ctx)
 	timecode := int(time.Since(ctx.StartTime).Milliseconds())
 
-	//var cancel context.CancelFunc
-	c := context.Background()
-	if ctx.Timeout.Milliseconds() > 0 {
-		//cmd.Timeout(int(ctx.Timeout.Milliseconds()))
-		var cancel context.CancelFunc
-		log.Printf("timeout: %v\n", ctx.Timeout)
-		c, cancel = context.WithTimeout(context.Background(), ctx.Timeout)
-		defer cancel()
-	}
-
 	if len(cmdAndArgs) == 0 {
 		log.Fatalf("no command supplied to test")
 	}
-	cmd := cmdz.CmdCtx(c, cmdAndArgs[0])
+	cmd := cmdz.Cmd(cmdAndArgs[0])
 	if len(cmdAndArgs) > 1 {
 		cmd.AddArgs(cmdAndArgs[1:]...)
+	}
+
+	if ctx.Timeout.Milliseconds() > 0 {
+		cmd.Timeout(ctx.Timeout)
 	}
 
 	if testName == "" {
@@ -198,21 +191,11 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (succ
 
 	log.Printf("before run\n")
 	_, err = cmd.BlockRun()
-	if ctx.Timeout.Nanoseconds() > 0 {
-		select {
-		case <-c.Done():
-			err = c.Err()
-		}
-	}
-	//cancel()
 	log.Printf("after run\n")
 	var failedResults []AssertionResult
 	var testDuration time.Duration
 	success = false
-	log.Printf("run context: %v, %v\n", c, c.Err())
-	if c.Err() != nil {
-		err = c.Err()
-	}
+
 	if err == nil {
 		success = true
 		testDuration = cmd.Duration()

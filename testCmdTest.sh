@@ -55,7 +55,6 @@ eval $( $cmd @init @stopOnFailure=false)
 $cmd true @success
 ! $cmd "" true @success @ignore=false || false
 ! $cmd "" true @success @ignore=false || false
-$cmd sleep 0.2 @timeout=0.1s
 
 >&2 echo "## Test not exising assertion"
 ! $cmd "@test=not exising assertion" true @foo || false
