@@ -73,7 +73,11 @@ Done:
         some spaces: <[ CMD AVEC ESPACE, ARG_1, ARG AVEC ESPACE, ARG_N ]>
         autre idée ??? CMD ARG_1 'ARG 2' ... <|ARG N|>  or 'CMD WITH SPACE' ARG_1 'ARG 2' ... ARG_N Possible separators: simple quotte ; <| |> ;
 - pass file content by filepath to @stdout @stderr : @stdout=@FILEPATH
-
+- @prefix= change @ char ??? attention à la sécurité ça pourrait etre galere
+- tester cmdt avec cmdt ?
+	- cmdt @prefix=% cmdt true %success => should success
+	- cmdt @prefix=% cmdt false %fail => should success
+	- cmdt @prefix=% cmdt false @fail %success => should success
 
 TODO:
 Bugs:
@@ -82,11 +86,6 @@ Features :
 - possibilité de passer un scénario ligne à ligne dans le stdin de cmdtest
 	- cmdt cmd arg1 argN @scenario=filepath
 	- pour chaque ligne du scenario concat la ligne du scenario avec les arguments fournit en paramétre de cmdt
-- tester cmdt avec cmdt ?
-	- cmdt @prefix=% cmdt true %success => should success
-	- cmdt @prefix=% cmdt false %fail => should success
-	- cmdt @prefix=% cmdt false @fail %success => should success
-- @prefix= change @ char ??? attention à la sécurité ça pourrait etre galere
 
 - @mock des appels de commande
 - @before=TEST_SUITE CMD ARG_1 ARG_2 ... ARG_N => execute CMD before each test

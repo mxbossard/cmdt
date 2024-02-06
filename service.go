@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -427,7 +429,10 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (succ
 			result, err = assertion.Asserter(cmd)
 			result.Assertion = assertion
 			if err != nil {
-				log.Fatal(err)
+				//log.Fatal(err)
+				//stdPrinter.ColoredErrf(errorColor, "FAILED (error: %s) ", err)
+				result.Message = fmt.Sprintf("%s", err)
+				result.Success = false
 			}
 			if !result.Success {
 				failedResults = append(failedResults, result)
@@ -450,31 +455,49 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (succ
 		if err == nil {
 			stdPrinter.Errf(" (in %s)\n", testDuration)
 		} else {
-			stdPrinter.Errf(" (not executed)\n")
+			if errors.Is(err, context.DeadlineExceeded) {
+				stdPrinter.Errf(" (timed out after %s)\n", ctx.Timeout)
+				reportLog.WriteString(testTitle + "  =>  timed out")
+			} else {
+				stdPrinter.Errf(" (not executed)\n")
+				reportLog.WriteString(testTitle + "  =>  not executed")
+			}
 		}
-		stdPrinter.Errf("Failure calling: [%s]\n", cmd)
+		stdPrinter.Errf("Failure calling cmd: <|%s|>\n", cmd)
 		if err != nil {
-			stdPrinter.ColoredErrf(errorColor, "error executing command: \n%s\n", err)
-			reportLog.WriteString(testTitle + "  =>  not executed")
+			stdPrinter.ColoredErrf(errorColor, "%s\n", err)
 		} else {
 			for _, result := range failedResults {
 				//log.Printf("failedResult: %v\n", result)
+				assertPrefix := result.Assertion.Prefix
 				assertName := result.Assertion.Name
 				assertOp := result.Assertion.Operator
-
-				if assertName == "success" || assertName == "fail" {
-					stdPrinter.Errf("Expected %s%s\n", RulePrefix(), assertName)
-				}
 				expected := result.Assertion.Expected
 				got := result.Value
+
+				if result.Message != "" {
+					stdPrinter.ColoredErrf(errorColor, result.Message+"\n")
+				}
+
+				if assertName == "success" || assertName == "fail" {
+					stdPrinter.Errf("Expected %s%s\n", assertPrefix, assertName)
+					continue
+				} else if assertName == "cmd" {
+					stdPrinter.Errf("Expected %s%s=%s to succeed\n", assertPrefix, assertName, expected)
+					continue
+				} else if assertName == "exists" {
+					stdPrinter.Errf("Expected file %s%s=%s file to exists\n", assertPrefix, assertName, expected)
+					continue
+				}
+
 				if expected != got {
 					if assertOp == "=" {
-						stdPrinter.Errf("Expected %s%s to be: [%s] but got: [%v]\n", RulePrefix(), assertName, expected, got)
+						stdPrinter.Errf("Expected %s%s to be: [%s] but got: [%v]\n", assertPrefix, assertName, expected, got)
 					} else if assertOp == "~" {
-						stdPrinter.Errf("Expected %s%s to contains: [%s] but got: [%v]\n", RulePrefix(), assertName, expected, got)
+						stdPrinter.Errf("Expected %s%s to contains: [%s] but got: [%v]\n", assertPrefix, assertName, expected, got)
 					}
 				} else {
-					stdPrinter.Errf("assertion %s%s%s%s failed\n", RulePrefix(), assertName, assertOp, expected)
+					stdPrinter.Errf("assertion %s%s%s%s failed\n", assertPrefix, assertName, assertOp, expected)
 				}
 			}
 			failedAssertionsReport := ""
@@ -523,7 +546,7 @@ func ProcessArgs(allArgs []string) {
 	case "report":
 		ReportTestSuite(config)
 	default:
-		log.Fatalf("action: %s not known", config.Action)
+		log.Fatalf("action: [%s] not known", config.Action)
 	}
 	exitCode = 0
 }

@@ -10,28 +10,28 @@ import (
 
 func TestSplitRuleExpr(t *testing.T) {
 	var ok bool
-	var name, operator, value string
+	var rule Rule
 
-	ok, _, _, _ = SplitRuleExpr("foo")
+	ok, _ = SplitRuleExpr("foo")
 	assert.False(t, ok)
 
-	ok, name, operator, value = SplitRuleExpr("@foo")
+	ok, rule = SplitRuleExpr("@foo")
 	assert.True(t, ok)
-	assert.Equal(t, "foo", name)
-	assert.Equal(t, "", operator)
-	assert.Equal(t, "", value)
+	assert.Equal(t, "foo", rule.Name)
+	assert.Equal(t, "", rule.Operator)
+	assert.Equal(t, "", rule.Expected)
 
-	ok, name, operator, value = SplitRuleExpr("@bar=")
+	ok, rule = SplitRuleExpr("@bar=")
 	assert.True(t, ok)
-	assert.Equal(t, "bar", name)
-	assert.Equal(t, "=", operator)
-	assert.Equal(t, "", value)
+	assert.Equal(t, "bar", rule.Name)
+	assert.Equal(t, "=", rule.Operator)
+	assert.Equal(t, "", rule.Expected)
 
-	ok, name, operator, value = SplitRuleExpr("@baz~pif")
+	ok, rule = SplitRuleExpr("@baz~pif")
 	assert.True(t, ok)
-	assert.Equal(t, "baz", name)
-	assert.Equal(t, "~", operator)
-	assert.Equal(t, "pif", value)
+	assert.Equal(t, "baz", rule.Name)
+	assert.Equal(t, "~", rule.Operator)
+	assert.Equal(t, "pif", rule.Expected)
 }
 
 func TestApplyConfig(t *testing.T) {
@@ -123,7 +123,7 @@ func TestParseArgs(t *testing.T) {
 	assert.Equal(t, []string{"foo", "bar", "baz"}, cmdAndArgs)
 	assert.Equal(t, "", cfg.TestSuite)
 	assert.Equal(t, "", cfg.TestName)
-	assert.Len(t, assertions, 0)
+	assert.Len(t, assertions, 1)
 
 	// Parse command and args with a not existing rule
 	_, _, _, err = ParseArgs([]string{"foo", "bar", "@foo"})

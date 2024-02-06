@@ -11,7 +11,7 @@ type Action string
 
 type Mapper[T any] func(expr string) (T, error)
 
-type Validater[T any] func(rule, operator string, value T) error
+type Validater[T any] func(rule Rule, value T) error
 
 type Configurer func(ctx Context) (Context, error)
 
@@ -28,6 +28,13 @@ const (
 	Suite                     // can be placed on suite init only
 	Test                      // can be placed on test or on suite to configure all tests
 )
+
+type Rule struct {
+	Prefix   string
+	Name     string
+	Operator string
+	Expected string
+}
 
 type Context struct {
 	// TestSuite only
@@ -56,9 +63,7 @@ type Config struct {
 }
 
 type Assertion struct {
-	Name     string
-	Operator string
-	Expected string
+	Rule
 	Asserter Asserter
 }
 
