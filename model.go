@@ -20,32 +20,18 @@ type Asserter func(cmdz.Executer) (AssertionResult, error)
 type ConfigScope int
 
 const (
+	DefaultRulePrefix = "@"
+)
+
+const (
 	Global ConfigScope = iota // How to use this ?
 	Suite                     // can be placed on suite init only
 	Test                      // can be placed on test or on suite to configure all tests
 )
 
-type Context0 struct {
-	// TestSuite only
-	TestSuite    string        `yaml:""`
-	TestName     string        `yaml:""`
-	Action       Action        `yaml:""`
-	StartTime    time.Time     `yaml:""`
-	SuiteTimeout time.Duration `yaml:""`
-	ForkCount    int           `yaml:""`
-
-	// Test or TestSuite
-	Ignore        bool          `yaml:""`
-	StopOnFailure bool          `yaml:""`
-	KeepStdout    bool          `yaml:""`
-	KeepStderr    bool          `yaml:""`
-	Timeout       time.Duration `yaml:""`
-	RunCount      int           `yaml:""`
-	Parallel      int           `yaml:""`
-}
-
 type Context struct {
 	// TestSuite only
+	Prefix       string        `yaml:""`
 	TestSuite    string        `yaml:""`
 	TestName     string        `yaml:""`
 	Action       Action        `yaml:""`

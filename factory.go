@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"regexp"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/collections"
+	"mby.fr/utils/filez"
 )
 
 const (
@@ -25,12 +27,12 @@ var (
 )
 
 func IsRule(s string) bool {
-	return strings.HasPrefix(s, AssertionPrefix)
+	return strings.HasPrefix(s, RulePrefix())
 }
 
 func SplitRuleExpr(ruleExpr string) (ok bool, name string, operator string, value string) {
 	ok = false
-	//if IsRule(ruleExpr) {
+	assertionRulePattern := regexp.MustCompile("^" + RulePrefix() + "([a-zA-Z]+)([=~])?(.+)?$")
 	submatch := assertionRulePattern.FindStringSubmatch(ruleExpr)
 	if submatch != nil {
 		ok = true
@@ -38,7 +40,6 @@ func SplitRuleExpr(ruleExpr string) (ok bool, name string, operator string, valu
 		operator = submatch[2]
 		value = submatch[3]
 	}
-	//}
 	return
 }
 
@@ -68,7 +69,14 @@ func DurationMapper(s string) (v time.Duration, err error) {
 }
 
 func FileContentMapper(s string) (v string, err error) {
-	v = strings.ReplaceAll(s, "\\n", "\n")
+	if strings.HasPrefix(s, "@") {
+		// treat supplied value as a filepath
+		path := s[1:]
+		v, err = filez.ReadString(path)
+		log.Printf("Reading file: %s => [%s]\n", path, v)
+	} else {
+		v = strings.ReplaceAll(s, "\\n", "\n")
+	}
 	return
 }
 
@@ -96,7 +104,7 @@ func ExistsMapper(s string) (v []string, err error) {
 func IntValueValidater(min, max int) Validater[int] {
 	return func(rule, op string, n int) (err error) {
 		if n < min || n > max {
-			err = fmt.Errorf("rule %s%s value must be an integer >= %d and <= %d", AssertionPrefix, rule, min, max)
+			err = fmt.Errorf("rule %s%s value must be an integer >= %d and <= %d", RulePrefix(), rule, min, max)
 		}
 		return
 	}
@@ -104,28 +112,28 @@ func IntValueValidater(min, max int) Validater[int] {
 
 func NoOperatorValidater[T any](rule, op string, v T) (err error) {
 	if op != "" {
-		err = fmt.Errorf("rule %s%s cannot have a value nor an operator", AssertionPrefix, rule)
+		err = fmt.Errorf("rule %s%s cannot have a value nor an operator", RulePrefix(), rule)
 	}
 	return
 }
 
 func EqualOperatorValidater[T any](rule, op string, v T) (err error) {
 	if op != "=" {
-		err = fmt.Errorf("rule %s%s operator must be '='", AssertionPrefix, rule)
+		err = fmt.Errorf("rule %s%s operator must be '='", RulePrefix(), rule)
 	}
 	return
 }
 
 func EqualOrTildeOperatorValidater[T any](rule, op string, v T) (err error) {
 	if op != "=" && op != "~" {
-		err = fmt.Errorf("rule %s%s operator must be '=' or '~'", AssertionPrefix, rule)
+		err = fmt.Errorf("rule %s%s operator must be '=' or '~'", RulePrefix(), rule)
 	}
 	return
 }
 
 func CmdValidater(rule, op string, v []string) (err error) {
 	if len(v) == 0 {
-		err = fmt.Errorf("rule %s%s value must be an executable command", AssertionPrefix, rule)
+		err = fmt.Errorf("rule %s%s value must be an executable command", RulePrefix(), rule)
 	}
 
 	return
@@ -133,7 +141,7 @@ func CmdValidater(rule, op string, v []string) (err error) {
 
 func ExistsValidater(rule, op string, v []string) (err error) {
 	if len(v) == 0 || len(v[0]) == 0 {
-		err = fmt.Errorf("rule %s%s value must have a filepath", AssertionPrefix, rule)
+		err = fmt.Errorf("rule %s%s value must have a filepath", RulePrefix(), rule)
 	}
 
 	return
@@ -155,7 +163,7 @@ func TestNameValidater(rule, op string, v string) (err error) {
 
 func BooleanValidater(rule, op string, v bool) (err error) {
 	if op != "" && op != "=" {
-		err = fmt.Errorf("rule %s%s operator must be '='", AssertionPrefix, rule)
+		err = fmt.Errorf("rule %s%s operator must be '='", RulePrefix(), rule)
 	}
 	return
 }
@@ -173,7 +181,7 @@ func Validate[T any](rule, operator string, val T, validaters ...Validater[T]) (
 func Translate[T any](rule, operator, value string, m Mapper[T], validaters ...Validater[T]) (val T, err error) {
 	val, err = m(value)
 	if err != nil {
-		err = fmt.Errorf("cannot map rule %s%s value: [%s] : %w", AssertionPrefix, rule, value, err)
+		err = fmt.Errorf("cannot map rule %s%s value: [%s] : %w", RulePrefix(), rule, value, err)
 		return
 	}
 	err = Validate(rule, operator, val, validaters...)
@@ -244,6 +252,11 @@ func ApplyConfig(c *Context, ruleExpr string) (ok bool, name string, err error) 
 			c.Timeout, err = Translate(name, operator, value, DurationMapper)
 		case "runCount":
 			c.RunCount, err = Translate(name, operator, value, IntMapper, EqualOperatorValidater[int], IntValueValidater(1, 1000))
+		case "prefix":
+			c.Prefix, err = Translate(name, operator, value, DummyMapper, EqualOperatorValidater[string])
+			if err == nil {
+				SetRulePrefix(c.Prefix)
+			}
 		case "parallel":
 		default:
 			ok = false
@@ -260,6 +273,9 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 		switch name {
 		case "success":
 			_, err = Translate(name, operator, value, DummyMapper, NoOperatorValidater[string])
+			if err != nil {
+				return
+			}
 			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
 				res.Value = ""
 				res.Success = cmd.ExitCode() == 0
@@ -267,6 +283,9 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 			}
 		case "fail":
 			_, err = Translate(name, operator, value, DummyMapper, NoOperatorValidater[string])
+			if err != nil {
+				return
+			}
 			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
 				res.Value = ""
 				res.Success = cmd.ExitCode() > 0
@@ -275,6 +294,9 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 		case "exit":
 			var expectedExitCode int
 			expectedExitCode, err = Translate(name, operator, value, IntMapper, IntValueValidater(0, 255), EqualOperatorValidater[int])
+			if err != nil {
+				return
+			}
 			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
 				res.Value = cmd.ExitCode()
 				res.Success = cmd.ExitCode() == expectedExitCode
@@ -283,6 +305,10 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 		case "stdout":
 			var fileContent string
 			fileContent, err = Translate(name, operator, value, FileContentMapper, EqualOrTildeOperatorValidater[string])
+			if err != nil {
+				return
+			}
+			assertion.Expected = fileContent
 			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
 				res.Value = cmd.StdoutRecord()
 				if operator == "=" {
@@ -290,13 +316,17 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 				} else if operator == "~" {
 					res.Success = strings.Contains(cmd.StdoutRecord(), fileContent)
 				} else {
-					err = fmt.Errorf("rule %s%s must use an operator '=' or '~'", AssertionPrefix, name)
+					err = fmt.Errorf("rule %s%s must use an operator '=' or '~'", RulePrefix(), name)
 				}
 				return
 			}
 		case "stderr":
 			var fileContent string
 			fileContent, err = Translate(name, operator, value, FileContentMapper, EqualOrTildeOperatorValidater[string])
+			if err != nil {
+				return
+			}
+			assertion.Expected = fileContent
 			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
 				res.Value = cmd.StderrRecord()
 				if operator == "=" {
@@ -304,7 +334,7 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 				} else if operator == "~" {
 					res.Success = strings.Contains(cmd.StderrRecord(), fileContent)
 				} else {
-					err = fmt.Errorf("rule %s%s must use an operator '=' or '~'", AssertionPrefix, name)
+					err = fmt.Errorf("rule %s%s must use an operator '=' or '~'", RulePrefix(), name)
 				}
 				return
 			}
@@ -376,9 +406,16 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 func ParseArgs(args []string) (cfg Context, cmdAndArgs []string, assertions []Assertion, err error) {
 	var rules []string
 	var rule string
+	parseRules := true
 	for _, arg := range args {
 		var ok bool
-		if IsRule(arg) {
+		if len(cmdAndArgs) == 0 && arg == "--" {
+			// If no command found yet first -- param is interpreted as a rule parsing stopper
+			// stop parsing rules
+			parseRules = false
+			continue
+		}
+		if parseRules && IsRule(arg) {
 			ok, rule, err = ApplyConfig(&cfg, arg)
 			if err != nil {
 				return
@@ -397,16 +434,26 @@ func ParseArgs(args []string) (cfg Context, cmdAndArgs []string, assertions []As
 				rules = append(rules, assertion.Name)
 				continue
 			}
-			err = fmt.Errorf("rule %s%s does not exists", AssertionPrefix, arg)
+			err = fmt.Errorf("rule %s%s does not exists", RulePrefix(), arg)
 			return
 		} else {
 			cmdAndArgs = append(cmdAndArgs, arg)
 		}
 	}
 
+	statusAssertionFound := false
+	for _, a := range assertions {
+		// If no status assertion found add an implicit success rule
+		statusAssertionFound = statusAssertionFound || a.Name == "success" || a.Name == "fail" || a.Name == "exit"
+	}
+	if !statusAssertionFound {
+		_, successAssertion, _ := BuildAssertion(RulePrefix() + "success")
+		assertions = append(assertions, successAssertion)
+	}
+
 	if cfg.Action == Action("") {
 		// If no action supplied add implicit test rule.
-		_, rule, err = ApplyConfig(&cfg, AssertionPrefix+"test")
+		_, rule, err = ApplyConfig(&cfg, RulePrefix()+"test")
 		if err != nil {
 			return
 		}

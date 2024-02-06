@@ -72,24 +72,32 @@ Done:
         no spaces: CMD ARG_1 ARG_2 ARG_N
         some spaces: <[ CMD AVEC ESPACE, ARG_1, ARG AVEC ESPACE, ARG_N ]>
         autre idée ??? CMD ARG_1 'ARG 2' ... <|ARG N|>  or 'CMD WITH SPACE' ARG_1 'ARG 2' ... ARG_N Possible separators: simple quotte ; <| |> ;
+- pass file content by filepath to @stdout @stderr : @stdout=@FILEPATH
 
 
 TODO:
 Bugs:
 
 Features :
+- possibilité de passer un scénario ligne à ligne dans le stdin de cmdtest
+	- cmdt cmd arg1 argN @scenario=filepath
+	- pour chaque ligne du scenario concat la ligne du scenario avec les arguments fournit en paramétre de cmdt
+- tester cmdt avec cmdt ?
+	- cmdt @prefix=% cmdt true %success => should success
+	- cmdt @prefix=% cmdt false %fail => should success
+	- cmdt @prefix=% cmdt false @fail %success => should success
 - @prefix= change @ char ??? attention à la sécurité ça pourrait etre galere
-- @runCount=N + @parallel=FORK_COUNT (min, max, median exec time)
-- pass file content by filepath to @stdout @stderr : @stdout=@FILEPATH
+
 - @mock des appels de commande
 - @before=TEST_SUITE CMD ARG_1 ARG_2 ... ARG_N => execute CMD before each test
 - @after=TEST_SUITE CMD ARG_1 ARG_2 ... ARG_N => execute CMD after each test
+
+- @runCount=N + @parallel=FORK_COUNT (min, max, median exec time) run in separate context or in same context (before/after) ?
 
 - @fork=5 global config only by default instead of @parallel. Fork = 5 increment and decrement a seq file
 - Clean old temp dir (older than 2 min ?)
 - Run en option les tests dans un conteneur => plus facile de mocké, meilleur reproductibilité des tests
 
-- possibilité de passer un scénario ligne à ligne dans le stdin de cmdtest
 - may chroot be interesting for tests ?
 - mock web spawning a web server ?
 - test port opening if daemon ; test sending data on port ???
@@ -115,7 +123,7 @@ type AssertionRule struct {
 }
 
 var (
-	AssertionPrefix      = "@"
+	//AssertionPrefix      = "@"
 	ContextEnvVarName    = "__CMDTEST_CONTEXT_KEY_"
 	DefaultTestSuiteName = "_default"
 
@@ -167,7 +175,7 @@ var (
 
 var stdPrinter printz.Printer
 
-var assertionRulePattern = regexp.MustCompile("^" + AssertionPrefix + "([a-zA-Z]+)([=~])?(.+)?$")
+// var assertionRulePattern = regexp.MustCompile("^" + AssertionPrefix + "([a-zA-Z]+)([=~])?(.+)?$")
 var testSuiteNameSanitizerPattern = regexp.MustCompile("[^a-zA-Z0-9]")
 
 //var logger = logz.Default("cmdtest", 0)

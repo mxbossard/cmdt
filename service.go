@@ -18,6 +18,18 @@ import (
 	"mby.fr/utils/trust"
 )
 
+var rulePrefix = DefaultRulePrefix
+
+func RulePrefix() string {
+	return rulePrefix
+}
+
+func SetRulePrefix(prefix string) {
+	if prefix != "" {
+		rulePrefix = prefix
+	}
+}
+
 func forgeUniqKey(name string) string {
 	h, err := trust.SignStrings(strings.ToUpper(name), time.Now().String(), fmt.Sprint(rand.Int()))
 	if err != nil {
@@ -249,6 +261,8 @@ func LoadSuiteContext(testSuite, uniqKey string) (config Context, err error) {
 	if err2 != nil {
 		log.Fatal(err2)
 	}
+
+	SetRulePrefix(config.Prefix)
 	return
 }
 
@@ -449,18 +463,18 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (succ
 				assertOp := result.Assertion.Operator
 
 				if assertName == "success" || assertName == "fail" {
-					stdPrinter.Errf("Expected %s%s\n", AssertionPrefix, assertName)
+					stdPrinter.Errf("Expected %s%s\n", RulePrefix(), assertName)
 				}
 				expected := result.Assertion.Expected
 				got := result.Value
 				if expected != got {
 					if assertOp == "=" {
-						stdPrinter.Errf("Expected %s%s to be: [%s] but got: [%s]\n", AssertionPrefix, assertName, expected, got)
+						stdPrinter.Errf("Expected %s%s to be: [%s] but got: [%v]\n", RulePrefix(), assertName, expected, got)
 					} else if assertOp == "~" {
-						stdPrinter.Errf("Expected %s%s to contains: [%s] but got: [%s]\n", AssertionPrefix, assertName, expected, got)
+						stdPrinter.Errf("Expected %s%s to contains: [%s] but got: [%v]\n", RulePrefix(), assertName, expected, got)
 					}
 				} else {
-					stdPrinter.Errf("assertion %s%s%s%s failed\n", AssertionPrefix, assertName, assertOp, expected)
+					stdPrinter.Errf("assertion %s%s%s%s failed\n", RulePrefix(), assertName, assertOp, expected)
 				}
 			}
 			failedAssertionsReport := ""
@@ -468,7 +482,7 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (succ
 				assertName := result.Assertion.Name
 				assertOp := result.Assertion.Operator
 				expected := result.Assertion.Expected
-				failedAssertionsReport = AssertionPrefix + string(assertName) + string(assertOp) + string(expected)
+				failedAssertionsReport = RulePrefix() + string(assertName) + string(assertOp) + string(expected)
 			}
 			reportLog.WriteString(testTitle + "  => " + failedAssertionsReport)
 		}

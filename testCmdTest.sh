@@ -86,6 +86,10 @@ $cmd "@test=empty stdout ok" true @stdout=
 
 $cmd "@test=stdout= ok" echo foo "bar baz" @stdout="foo bar baz\n"
 ! $cmd "@test=stdout= ko" echo foo "bar baz" @stdout="foo barbaz" || false
+echo foo > /tmp/mystdoutcontent
+$cmd "@test=stdout=@file ok" echo foo @stdout=@/tmp/mystdoutcontent
+! $cmd "@test=stdout=@file not exists" echo foo @stdout=@/tmp/doNotExistsFile1234 || false
+
 
 >&2 echo "## Test suite @stdout~"
 $cmd "@test=stdout~ ok" echo foo "bar baz" @stdout~"bar"
@@ -99,8 +103,8 @@ $cmd "@test=stderr= ok" sh -c ">&2 echo foo" @stderr="foo\n"
 ! $cmd "@test=stderr= ko" sh foo @stderr="foo" || false
 
 >&2 echo "## Test suite @stderr~"
-$cmd "@test=stderr~ ok" ls /notExist @stderr~"otExi"
-! $cmd "@test=stderr~ ko" ls /notExist @stderr~"foo" || false
+$cmd "@test=stderr~ ok" ls /notExist @stderr~"otExi" @fail
+! $cmd "@test=stderr~ ko" ls /notExist @stderr~"foo" @fail || false
 
 >&2 echo "## Test stdin"
 echo foo | $cmd "@test=stdin" cat @stdout="foo\n"
@@ -118,7 +122,8 @@ $cmd "@test=exported var" sh -c "export" @stdout~"foo='bar'\n"
 
 
 >&2 echo "## Test @cmd"
-$cmd false @cmd="true"
+$cmd false @cmd="true" @fail
+! $cmd false @cmd="false" @fail || false
 ! $cmd true @cmd="false" || false
 ! $cmd true @cmd= || false
 ! $cmd true @cmd=notExist || false
@@ -127,6 +132,24 @@ $cmd false @cmd="true"
 ! $cmd echo "test non existance" @exists=/tmp/donotexistsmbd123 || false
 $cmd touch /tmp/existsmbd123 @exists=/tmp/existsmbd123
 ! $cmd true @exists= || false
+
+>&2 echo "## Change rule prefix"
+$cmd @prefix=% %fail false
+! $cmd @prefix=% %success false || false
+
+>&2 echo "## Rules parsing stopper --"
+$cmd @stdout="foo @success\n" -- echo foo @success
+
+>&2 echo "## cmdt Meta Test"
+# -- rules parsing stopper version
+$cmd @keepOutputs @test=meta1/ @success -- $cmd @test=sub/ false @fail
+$cmd @keepOutputs @test=meta1/ @fail -- $cmd @test=sub/ false @success
+$cmd @keepOutputs @test=meta1/ @fail -- $cmd @test=sub/ false
+
+# @prefix= version
+$cmd @prefix=% %keepOutputs %test=meta2/ %success $cmd @test=sub/ false @fail
+$cmd @prefix=% %keepOutputs %test=meta2/ %fail $cmd @test=sub/ false @success
+$cmd @prefix=% %keepOutputs %test=meta2/ %fail $cmd @test=sub/ false
 
 >&2 echo "## Test @report"
 $cmd @report
@@ -164,5 +187,6 @@ $cmd @report="another one"
 ! $cmd @report @ignore || false
 ! $cmd @report @test || false
 ! $cmd @report @fail || false
+
 
 >&2 echo SUCCESS
