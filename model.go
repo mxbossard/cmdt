@@ -80,6 +80,7 @@ type AssertionResult struct {
 	Assertion Assertion
 	Success   bool
 	Value     any
+	Message   string
 }
 
 func MergeContext(suiteContext, testContext Context) Context {

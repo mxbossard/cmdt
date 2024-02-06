@@ -116,6 +116,18 @@ $cmd "@test=exported var" sh -c "export" @stdout~"foo='bar'\n"
 >&2 echo "## Test @timeout"
 ! $cmd sleep 1 @timeout=50ms || false
 
+
+>&2 echo "## Test @cmd"
+$cmd false @cmd="true"
+! $cmd true @cmd="false" || false
+! $cmd true @cmd= || false
+! $cmd true @cmd=notExist || false
+
+>&2 echo "## Test @exists"
+! $cmd true @exists=/tmp/donotexistsmbd123 || false
+$cmd touch /tmp/existsmbd123 @exists=/tmp/existsmbd123
+! $cmd true @exists= || false
+
 >&2 echo "## Test @report"
 $cmd @report
 

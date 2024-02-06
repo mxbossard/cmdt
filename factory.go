@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -70,6 +72,27 @@ func FileContentMapper(s string) (v string, err error) {
 	return
 }
 
+func CmdMapper(s string) (v []string, err error) {
+	// FIXME: should leverage simple and double quottes to split args
+	if len(s) > 1 {
+		separator := " "
+		if s[0] == ',' || s[0] == ':' || s[0] == '|' {
+			separator = s[0:1]
+			s = s[1:]
+		}
+		v = strings.Split(s, separator)
+		//log.Printf("CMD: [%v]", v)
+	}
+	return
+}
+
+func ExistsMapper(s string) (v []string, err error) {
+	// @exists=FILEPATH,PERMS,OWNERS
+	v = strings.Split(s, ",")
+	//log.Printf("EXISTS: [%v]", v)
+	return
+}
+
 func IntValueValidater(min, max int) Validater[int] {
 	return func(rule, op string, n int) (err error) {
 		if n < min || n > max {
@@ -97,6 +120,22 @@ func EqualOrTildeOperatorValidater[T any](rule, op string, v T) (err error) {
 	if op != "=" && op != "~" {
 		err = fmt.Errorf("rule %s%s operator must be '=' or '~'", AssertionPrefix, rule)
 	}
+	return
+}
+
+func CmdValidater(rule, op string, v []string) (err error) {
+	if len(v) == 0 {
+		err = fmt.Errorf("rule %s%s value must be an executable command", AssertionPrefix, rule)
+	}
+
+	return
+}
+
+func ExistsValidater(rule, op string, v []string) (err error) {
+	if len(v) == 0 || len(v[0]) == 0 {
+		err = fmt.Errorf("rule %s%s value must have a filepath", AssertionPrefix, rule)
+	}
+
 	return
 }
 
@@ -269,7 +308,63 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 				}
 				return
 			}
+		case "cmd":
+			var cmdAndArgs []string
+			cmdAndArgs, err = Translate(name, operator, value, CmdMapper, EqualOperatorValidater[[]string], CmdValidater)
+			if err != nil {
+				return
+			}
+			assertionCmd := cmdz.Cmd(cmdAndArgs...).Timeout(10 * time.Second)
+			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+				res.Value = 0
+				exitCode := -1
+				exitCode, err = assertionCmd.BlockRun()
+				res.Value = exitCode
+				res.Success = exitCode == 0
+				return
+			}
 		case "exists":
+			var filepathRules []string
+			filepathRules, err = Translate(name, operator, value, ExistsMapper, EqualOperatorValidater[[]string], ExistsValidater)
+			if err != nil {
+				return
+			}
+			var path, permissions, owners string
+			if len(filepathRules) > 0 {
+				path = filepathRules[0]
+			}
+			if len(filepathRules) > 1 {
+				permissions = filepathRules[1]
+			}
+			if len(filepathRules) > 2 {
+				owners = filepathRules[2]
+			}
+
+			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+				var stat os.FileInfo
+				stat, err = os.Stat(path)
+				if errors.Is(err, os.ErrNotExist) {
+					res.Success = false
+					res.Message = fmt.Sprintf("file %s does not exists", path)
+					err = nil
+					return
+				} else if err != nil {
+					return
+				}
+				if permissions != "" {
+					if permissions != stat.Mode().String() {
+						res.Success = false
+						res.Value = stat.Mode().String()
+						res.Message = fmt.Sprintf("file %s have wrong permissions", path)
+						return
+					}
+				}
+				if owners != "" {
+					// FIXME: how to checke file owners ?
+				}
+				res.Success = true
+				return
+			}
 
 		default:
 			ok = false
