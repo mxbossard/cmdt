@@ -353,7 +353,7 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (succ
 	}
 
 	if testName == "" {
-		testName = fmt.Sprintf("cmd: [%s]", cmd)
+		testName = fmt.Sprintf("cmd: <|%s|>", cmd)
 	}
 
 	qulifiedName := testName

@@ -124,7 +124,7 @@ $cmd false @cmd="true"
 ! $cmd true @cmd=notExist || false
 
 >&2 echo "## Test @exists"
-! $cmd true @exists=/tmp/donotexistsmbd123 || false
+! $cmd echo "test non existance" @exists=/tmp/donotexistsmbd123 || false
 $cmd touch /tmp/existsmbd123 @exists=/tmp/existsmbd123
 ! $cmd true @exists= || false
 

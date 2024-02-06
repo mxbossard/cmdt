@@ -68,6 +68,11 @@ Done:
 - @timeout=N
 - @cmd="CMD_WITH_ARGS_THAT_SHOULD_BE_OK_IF_OR_FAIL_TEST"
 - @exists=FILEPATH,PERMS,OWNERS
+- Improve cmd log delimiting args:
+        no spaces: CMD ARG_1 ARG_2 ARG_N
+        some spaces: <[ CMD AVEC ESPACE, ARG_1, ARG AVEC ESPACE, ARG_N ]>
+        autre idée ??? CMD ARG_1 'ARG 2' ... <|ARG N|>  or 'CMD WITH SPACE' ARG_1 'ARG 2' ... ARG_N Possible separators: simple quotte ; <| |> ;
+
 
 TODO:
 Bugs:
@@ -75,10 +80,6 @@ Bugs:
 Features :
 - @prefix= change @ char ??? attention à la sécurité ça pourrait etre galere
 - @runCount=N + @parallel=FORK_COUNT (min, max, median exec time)
-- Improve cmd log delimiting args:
-        no spaces: CMD ARG_1 ARG_2 ARG_N
-        some spaces: <[ CMD AVEC ESPACE, ARG_1, ARG AVEC ESPACE, ARG_N ]>
-        autre idée ??? CMD ARG_1 'ARG 2' ... <|ARG N|>  or 'CMD WITH SPACE' ARG_1 'ARG 2' ... ARG_N Possible separators: simple quotte ; <| |> ;
 - pass file content by filepath to @stdout @stderr : @stdout=@FILEPATH
 - @mock des appels de commande
 - @before=TEST_SUITE CMD ARG_1 ARG_2 ... ARG_N => execute CMD before each test
