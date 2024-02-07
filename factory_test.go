@@ -169,3 +169,23 @@ func TestParseArgs(t *testing.T) {
 	assert.Len(t, assertions, 1)
 
 }
+
+func TestValidateOnceOnlyDefinedRule(t *testing.T) {
+	var err error
+
+	err = ValidateOnceOnlyDefinedRule([]Rule{{Name: "init", Operator: "="}, {Name: "timeout", Operator: "="}})
+	assert.NoError(t, err)
+
+	err = ValidateOnceOnlyDefinedRule([]Rule{{Name: "init", Operator: "="}, {Name: "report", Operator: "="}})
+	assert.NoError(t, err)
+
+	err = ValidateOnceOnlyDefinedRule([]Rule{{Name: "stdout", Operator: "="}, {Name: "stdout", Operator: "~"}})
+	assert.NoError(t, err)
+
+	err = ValidateOnceOnlyDefinedRule([]Rule{{Name: "stdout", Operator: "~"}, {Name: "stdout", Operator: "~"}})
+	assert.NoError(t, err)
+
+	err = ValidateOnceOnlyDefinedRule([]Rule{{Name: "stdout", Operator: "="}, {Name: "stdout", Operator: "="}})
+	assert.Error(t, err)
+
+}

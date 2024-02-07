@@ -461,46 +461,100 @@ func ParseArgs(args []string) (cfg Context, cmdAndArgs []string, assertions []As
 	}
 
 	err = ValidateMutualyExclusiveRules(rules)
-	//log.Printf("Parsed config: %v", cfg)
+	if err != nil {
+		return
+	}
+	err = ValidateOnceOnlyDefinedRule(rules)
+
 	return
 }
 
-func buildMutualyExclusiveCouples(rule string, exclusiveRules ...string) (res [][]string) {
+func buildMutualyExclusiveCouples(rule RuleKey, exclusiveRules ...RuleKey) (res [][]RuleKey) {
 	for _, e := range exclusiveRules {
-		res = append(res, []string{rule, e})
+		res = append(res, []RuleKey{rule, e})
+	}
+	return
+}
+
+// Exclusion mutuelles ruleName + roleOperator en option
+// rule1 and rule2 ME
+// rule1= and rule1~ ME
+// rule1 and rule1 ME
+
+type RuleKey struct {
+	Name, Op string
+}
+
+func (r RuleKey) String() string {
+	return fmt.Sprintf("%s%s", r.Name, r.Op)
+}
+func ruleKey(s ...string) (r RuleKey) {
+	r.Name = s[0]
+	if len(s) > 1 {
+		r.Op = s[1]
+	}
+	return
+}
+
+// ValidateOnceOnlyDefinedRule => verify rules which cannot be defined multiple times are not defined twice or more
+func ValidateOnceOnlyDefinedRule(rules []Rule) (err error) {
+	multiDefinedRules := []RuleKey{
+		{"stdout", "~"}, {"stderr", "~"},
+	}
+	matches := map[RuleKey][]Rule{}
+	for _, rule := range rules {
+		key := RuleKey{rule.Name, rule.Operator}
+		matches[key] = append(matches[key], rule)
+	}
+
+	for key, matchedRules := range matches {
+		if len(matchedRules) > 1 && !collections.Contains(&multiDefinedRules, key) {
+			// This rule is defined more than once and shouldnt
+			err = fmt.Errorf("rule: %s is defined more than once", key.Name)
+		}
 	}
 	return
 }
 
 func ValidateMutualyExclusiveRules(rules []Rule) (err error) {
-	MutualyExclusiveRules := [][]string{
-		{"init", "test", "report"},
-		{"fail", "success", "exit"},
-		{"keepOutputs", "keepStdout"},
-		{"keepOutputs", "keepStderr"},
+	// FIXME: stdout= and stdout~ are ME ; stdout= and stdout= are ME but stdout~ and stdout~ are not ME
+	MutualyExclusiveRules := [][]RuleKey{
+		{{Name: "init"}, {Name: "test"}, {Name: "report"}},
+		{{Name: "fail"}, {Name: "success"}, {Name: "exit"}},
+		{{"stdout", "="}, {"stdout", "~"}},
+		{{"stderr", "="}, {"stderr", "~"}},
 	}
 
 	exlusiveRules := MutualyExclusiveRules
-	// FIXME: init ne supporte aucune assertion
-	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples("init", "success", "fail", "exit", "stdout",
-		"stderr", "exists")...)
-	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples("test", "suiteTimeout", "forkCount")...)
-	// FIXME: report ne supporte aucune assertion ni aucune config
-	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples("report", "fork", "suiteTimeout", "before",
-		"after", "ignore", "stopOnFailure", "keepStdout", "keepStderr", "keepOutputs", "timeout", "runCount", "parallel",
-		"success", "fail", "exit", "stdout", "stderr", "exists")...)
+	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{Name: "init"}, RuleKey{Name: "success"}, RuleKey{Name: "fail"}, RuleKey{Name: "exit"}, RuleKey{Name: "stdout"},
+		RuleKey{Name: "stderr"}, RuleKey{Name: "exists"})...)
+	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{Name: "test"}, RuleKey{Name: "suiteTimeout"}, RuleKey{Name: "forkCount"})...)
+	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{Name: "report"}, RuleKey{Name: "fork"}, RuleKey{Name: "suiteTimeout"}, RuleKey{Name: "before"},
+		ruleKey("after"), ruleKey("ignore"), ruleKey("stopOnFailure"), ruleKey("keepStdout"), ruleKey("keepStderr"), ruleKey("keepOutputs"), ruleKey("timeout"),
+		ruleKey("runCount"), ruleKey("parallel"), ruleKey("success"), ruleKey("fail"), ruleKey("exit"), ruleKey("stdout"), ruleKey("stderr"), ruleKey("exists"))...)
+	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("keepOutputs"), ruleKey("keepStdout"), ruleKey("keepStderr"))...)
 
-	//log.Printf("args: %s\n", args)
+	// Compter le nombre de match pour chaque key
+	// Pour chaque MER compter le nombre de key
+	matches := map[RuleKey][]Rule{}
+	for _, rule := range rules {
+		key := RuleKey{rule.Name, rule.Operator}
+		matches[key] = append(matches[key], rule)
+	}
+
 	for _, mer := range exlusiveRules {
+		// foreach MER
 		matchCount := 0
-		for _, rule := range rules {
-			if collections.Contains[string](&mer, rule.Name) {
-				matchCount++
+		for _, key := range mer {
+			// foreach rule ine MER
+			for matchedKey := range matches {
+				if key == matchedKey {
+					matchCount++
+				}
 			}
 		}
-		//log.Printf("%s rules => %d\n", mer, matchCount)
 		if matchCount > 1 {
-			err = fmt.Errorf("you can't use simultaneously following rules which are mutually exclusives: [%s]", strings.Join(mer, ","))
+			err = fmt.Errorf("you can't use simultaneously following rules which are mutually exclusives: [%s]", mer)
 		}
 	}
 

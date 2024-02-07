@@ -294,7 +294,8 @@ func InitTestSuite(ctx Context) string {
 	return uniqKey
 }
 
-func ReportTestSuite(ctx Context) {
+func ReportTestSuite(ctx Context) (exitCode int) {
+	exitCode = 1
 	testSuite := ctx.TestSuite
 	// load context
 	uniqKey, err := loadUniqKey(testSuite)
@@ -324,6 +325,7 @@ func ReportTestSuite(ctx Context) {
 		ignoredMessage = fmt.Sprintf(" (%d ignored)", ignoredCount)
 	}
 	if failedCount == 0 {
+		exitCode = 0
 		stdPrinter.ColoredErrf(successColor, "Successfuly ran %s test suite (%d tests in %s)", testSuite, testCount, time.Since(ctx.StartTime))
 		stdPrinter.ColoredErrf(warningColor, "%s", ignoredMessage)
 		stdPrinter.Errf("\n")
@@ -337,6 +339,7 @@ func ReportTestSuite(ctx Context) {
 		}
 	}
 	stdPrinter.Flush()
+	return
 }
 
 func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (success bool) {
@@ -369,7 +372,13 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (succ
 	}
 
 	if testName == "" {
-		testName = fmt.Sprintf("cmd: <|%s|>", cmd)
+		cmdNameParts := strings.Split(cmd.String(), " ")
+		shortenedCmd := filepath.Base(cmdNameParts[0])
+		shortenCmdNameParts := cmdNameParts
+		shortenCmdNameParts[0] = shortenedCmd
+		cmdName := strings.Join(shortenCmdNameParts, " ")
+		//testName = fmt.Sprintf("cmd: <|%s|>", cmdName)
+		testName = fmt.Sprintf("<|%s|>", cmdName)
 	}
 
 	qulifiedName := testName
@@ -513,10 +522,14 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (succ
 
 	stdPrinter.Flush()
 
-	if *ctx.StopOnFailure && !success {
+	if ctx.StopOnFailure == nil || *ctx.StopOnFailure && !success {
 		ReportTestSuite(ctx)
 	}
-
+	
+	if ctx.StopOnFailure == nil || !*ctx.StopOnFailure {
+		// FIXME: Do not return a success to let test continue
+		success=true
+	}
 	return
 }
 
@@ -539,14 +552,15 @@ func ProcessArgs(allArgs []string) {
 	switch config.Action {
 	case "init":
 		InitTestSuite(config)
+		exitCode = 0
 	case "test":
 		if !PerformTest(config, cmdAndArgs, assertions) {
 			return
 		}
+		exitCode = 0
 	case "report":
-		ReportTestSuite(config)
+		exitCode = ReportTestSuite(config)
 	default:
 		log.Fatalf("action: [%s] not known", config.Action)
 	}
-	exitCode = 0
 }
