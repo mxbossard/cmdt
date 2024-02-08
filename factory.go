@@ -32,7 +32,7 @@ func IsRule(s string) bool {
 
 func SplitRuleExpr(ruleExpr string) (ok bool, r Rule) {
 	ok = false
-	assertionRulePattern := regexp.MustCompile("^" + RulePrefix() + "([a-zA-Z]+)([=~])?(.+)?$")
+	assertionRulePattern := regexp.MustCompile("^" + RulePrefix() + "([a-zA-Z]+)([=~!]{1,2})?(.+)?$")
 	submatch := assertionRulePattern.FindStringSubmatch(ruleExpr)
 	if submatch != nil {
 		ok = true
@@ -120,30 +120,18 @@ func OperatorValidater[T any](ops ...string) Validater[T] {
 	}
 }
 
+func NotEmptyForOpValidater[T any](ops ...string) Validater[T] {
+	return func(rule Rule, v T) (err error) {
+		if collections.Contains[string](&ops, rule.Op) && rule.Expected == "" {
+			err = fmt.Errorf("rule %s%s%s must have a value", rule.Prefix, rule.Name, rule.Op)
+		}
+		return
+	}
+}
+
 func NotEmptyValidater[T any](rule Rule, v T) (err error) {
-	if fmt.Sprintf("%s", v) == "" {
+	if fmt.Sprintf("%v", v) == "" {
 		err = fmt.Errorf("rule %s%s%s must have a value", rule.Prefix, rule.Name, rule.Op)
-	}
-	return
-}
-
-func NoOperatorValidater0[T any](rule Rule, v T) (err error) {
-	if rule.Op != "" {
-		err = fmt.Errorf("rule %s%s cannot have a value nor an operator", rule.Prefix, rule.Name)
-	}
-	return
-}
-
-func EqualOperatorValidater0[T any](rule Rule, v T) (err error) {
-	if rule.Op != "=" {
-		err = fmt.Errorf("rule %s%s operator must be '='", rule.Prefix, rule.Name)
-	}
-	return
-}
-
-func EqualOrTildeOperatorValidater0[T any](rule Rule, v T) (err error) {
-	if rule.Op != "=" && rule.Op != "~" {
-		err = fmt.Errorf("rule %s%s operator must be '=' or '~'", rule.Prefix, rule.Name)
 	}
 	return
 }
@@ -338,7 +326,7 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 			}
 		case "stdout":
 			var fileContent string
-			fileContent, err = Translate(assertion.Rule, FileContentMapper, OperatorValidater[string]("=", "~"))
+			fileContent, err = Translate(assertion.Rule, FileContentMapper, OperatorValidater[string]("=", "~", "!=", "!~"), NotEmptyForOpValidater[string]("~", "!~"))
 			if err != nil {
 				return
 			}
@@ -349,6 +337,10 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 					res.Success = cmd.StdoutRecord() == fileContent
 				} else if assertion.Rule.Op == "~" {
 					res.Success = strings.Contains(cmd.StdoutRecord(), fileContent)
+				} else if assertion.Rule.Op == "!=" {
+					res.Success = cmd.StdoutRecord() != fileContent
+				} else if assertion.Rule.Op == "!~" {
+					res.Success = !strings.Contains(cmd.StdoutRecord(), fileContent)
 				} else {
 					err = fmt.Errorf("rule %s%s must use an operator '=' or '~'", assertion.Rule.Prefix, assertion.Rule.Name)
 				}
@@ -356,7 +348,7 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 			}
 		case "stderr":
 			var fileContent string
-			fileContent, err = Translate(assertion.Rule, FileContentMapper, OperatorValidater[string]("=", "~"))
+			fileContent, err = Translate(assertion.Rule, FileContentMapper, OperatorValidater[string]("=", "~", "!=", "!~"), NotEmptyForOpValidater[string]("~", "!~"))
 			if err != nil {
 				return
 			}
@@ -367,6 +359,10 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 					res.Success = cmd.StderrRecord() == fileContent
 				} else if assertion.Rule.Op == "~" {
 					res.Success = strings.Contains(cmd.StderrRecord(), fileContent)
+				} else if assertion.Rule.Op == "!=" {
+					res.Success = cmd.StderrRecord() != fileContent
+				} else if assertion.Rule.Op == "!~" {
+					res.Success = !strings.Contains(cmd.StderrRecord(), fileContent)
 				} else {
 					err = fmt.Errorf("rule %s%s must use an operator '=' or '~'", assertion.Rule.Prefix, assertion.Rule.Name)
 				}
@@ -498,11 +494,16 @@ func ParseArgs(args []string) (cfg Context, cmdAndArgs []string, assertions []As
 		cfg.TestSuite = DefaultTestSuiteName
 	}
 
-	err = ValidateMutualyExclusiveRules(rules)
+	if (cfg.Action == "init" || cfg.Action == "report") && len(cmdAndArgs) > 0 {
+		err = fmt.Errorf("you cannot run commands with action %s%s", cfg.Prefix, cfg.Action)
+		return
+	}
+
+	err = ValidateMutualyExclusiveRules(rules...)
 	if err != nil {
 		return
 	}
-	err = ValidateOnceOnlyDefinedRule(rules)
+	err = ValidateOnceOnlyDefinedRule(rules...)
 
 	return
 }
@@ -526,9 +527,9 @@ func ruleKey(s ...string) (r RuleKey) {
 }
 
 // ValidateOnceOnlyDefinedRule => verify rules which cannot be defined multiple times are not defined twice or more
-func ValidateOnceOnlyDefinedRule(rules []Rule) (err error) {
+func ValidateOnceOnlyDefinedRule(rules ...Rule) (err error) {
 	multiDefinedRules := []RuleKey{
-		{"stdout", "~"}, {"stderr", "~"},
+		{"stdout", "~"}, {"stderr", "~"}, {"stdout", "!~"}, {"stderr", "!~"}, {"stdout", "!="}, {"stderr", "!="},
 	}
 	matches := map[RuleKey][]Rule{}
 	for _, rule := range rules {
@@ -545,25 +546,25 @@ func ValidateOnceOnlyDefinedRule(rules []Rule) (err error) {
 	return
 }
 
-func ValidateMutualyExclusiveRules(rules []Rule) (err error) {
+func ValidateMutualyExclusiveRules(rules ...Rule) (err error) {
 	// FIXME: stdout= and stdout~ are ME ; stdout= and stdout= are ME but stdout~ and stdout~ are not ME
 	MutualyExclusiveRules := [][]RuleKey{
 		{{"init", "all"}, {"test", "all"}, {"report", "all"}},
 		{{"fail", "all"}, {"success", "all"}, {"exit", "all"}},
-		{{"stdout", "="}, {"stdout", "~"}},
-		{{"stderr", "="}, {"stderr", "~"}},
 		{{"test", "all"}, {"token", ""}},
 		{{"report", "all"}, {"token", ""}},
 	}
 
 	exlusiveRules := MutualyExclusiveRules
-	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{Name: "init"}, RuleKey{Name: "success"}, RuleKey{Name: "fail"}, RuleKey{Name: "exit"}, RuleKey{Name: "stdout"},
-		RuleKey{Name: "stderr"}, RuleKey{Name: "exists"})...)
-	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{Name: "test"}, RuleKey{Name: "suiteTimeout"}, RuleKey{Name: "forkCount"})...)
-	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{Name: "report"}, RuleKey{Name: "fork"}, RuleKey{Name: "suiteTimeout"}, RuleKey{Name: "before"},
+	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{"init", "all"}, RuleKey{"success", "all"}, RuleKey{"fail", "all"}, RuleKey{"exit", "all"}, RuleKey{"stdout", "all"},
+		RuleKey{"stderr", "all"}, RuleKey{"exists", "all"})...)
+	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{"test", "all"}, RuleKey{"suiteTimeout", "all"}, RuleKey{"forkCount", "all"})...)
+	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{"report", "all"}, RuleKey{"fork", "all"}, RuleKey{"suiteTimeout", "all"}, RuleKey{"before", "all"},
 		ruleKey("after"), ruleKey("ignore"), ruleKey("stopOnFailure"), ruleKey("keepStdout"), ruleKey("keepStderr"), ruleKey("keepOutputs"), ruleKey("timeout"),
 		ruleKey("runCount"), ruleKey("parallel"), ruleKey("success"), ruleKey("fail"), ruleKey("exit"), ruleKey("stdout"), ruleKey("stderr"), ruleKey("exists"))...)
 	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("keepOutputs"), ruleKey("keepStdout"), ruleKey("keepStderr"))...)
+	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("stdout", "="), ruleKey("stdout", "~"), ruleKey("stdout", "!~"), ruleKey("stdout", "!="))...)
+	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("stderr", "="), ruleKey("stderr", "~"), ruleKey("stderr", "!~"), ruleKey("stderr", "!="))...)
 
 	// Compter le nombre de match pour chaque key
 	// Pour chaque MER compter le nombre de key

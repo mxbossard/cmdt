@@ -121,7 +121,7 @@ func TestParseArgs(t *testing.T) {
 	cfg, cmdAndArgs, assertions, err = ParseArgs([]string{"foo", "bar", "baz"})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"foo", "bar", "baz"}, cmdAndArgs)
-	assert.Equal(t, "", cfg.TestSuite)
+	assert.Equal(t, DefaultTestSuiteName, cfg.TestSuite)
 	assert.Equal(t, "", cfg.TestName)
 	assert.Len(t, assertions, 1)
 
@@ -133,7 +133,7 @@ func TestParseArgs(t *testing.T) {
 	cfg, cmdAndArgs, assertions, err = ParseArgs([]string{"foo", "bar", "@fail", "@test=pif"})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"foo", "bar"}, cmdAndArgs)
-	assert.Equal(t, "", cfg.TestSuite)
+	assert.Equal(t, DefaultTestSuiteName, cfg.TestSuite)
 	assert.Equal(t, "pif", cfg.TestName)
 	assert.Len(t, assertions, 1)
 
@@ -149,7 +149,7 @@ func TestParseArgs(t *testing.T) {
 	cfg, cmdAndArgs, assertions, err = ParseArgs([]string{"foo", "bar", "@fail", "@success"})
 	require.Error(t, err)
 	assert.Equal(t, []string{"foo", "bar"}, cmdAndArgs)
-	assert.Equal(t, "", cfg.TestSuite)
+	assert.Equal(t, DefaultTestSuiteName, cfg.TestSuite)
 	assert.Equal(t, "", cfg.TestName)
 	assert.Len(t, assertions, 2)
 
@@ -170,22 +170,65 @@ func TestParseArgs(t *testing.T) {
 
 }
 
+func buildRule(name, op string) (r Rule) {
+	r.Name = name
+	r.Op = op
+	return
+}
+
 func TestValidateOnceOnlyDefinedRule(t *testing.T) {
 	var err error
 
-	err = ValidateOnceOnlyDefinedRule([]Rule{{Name: "init", Op: "="}, {Name: "timeout", Op: "="}})
+	err = ValidateOnceOnlyDefinedRule(buildRule("init", "="), buildRule("timeout", "="))
 	assert.NoError(t, err)
 
-	err = ValidateOnceOnlyDefinedRule([]Rule{{Name: "init", Op: "="}, {Name: "report", Op: "="}})
+	err = ValidateOnceOnlyDefinedRule(buildRule("init", "="), buildRule("report", "="))
 	assert.NoError(t, err)
 
-	err = ValidateOnceOnlyDefinedRule([]Rule{{Name: "stdout", Op: "="}, {Name: "stdout", Op: "~"}})
+	err = ValidateOnceOnlyDefinedRule(buildRule("stdout", "~"), buildRule("stdout", "~"))
 	assert.NoError(t, err)
 
-	err = ValidateOnceOnlyDefinedRule([]Rule{{Name: "stdout", Op: "~"}, {Name: "stdout", Op: "~"}})
+	err = ValidateOnceOnlyDefinedRule(buildRule("stdout", "~"), buildRule("stdout", "!~"))
 	assert.NoError(t, err)
 
-	err = ValidateOnceOnlyDefinedRule([]Rule{{Name: "stdout", Op: "="}, {Name: "stdout", Op: "="}})
+	err = ValidateOnceOnlyDefinedRule(buildRule("stdout", "~"), buildRule("stdout", "!="))
+	assert.NoError(t, err)
+
+	err = ValidateOnceOnlyDefinedRule(buildRule("stdout", "~"), buildRule("stdout", "!~"), buildRule("stdout", "!="))
+	assert.NoError(t, err)
+
+	err = ValidateOnceOnlyDefinedRule(buildRule("stdout", "="), buildRule("stdout", "~"))
+	assert.NoError(t, err)
+
+	err = ValidateOnceOnlyDefinedRule(buildRule("stdout", "="), buildRule("stdout", "!~"))
+	assert.NoError(t, err)
+
+	err = ValidateOnceOnlyDefinedRule(buildRule("stdout", "="), buildRule("stdout", "!="))
+	assert.NoError(t, err)
+
+	err = ValidateOnceOnlyDefinedRule(buildRule("stdout", "="), buildRule("stdout", "="))
 	assert.Error(t, err)
 
+}
+
+func TestValidateMutualyExclusiveRules(t *testing.T) {
+	var err error
+
+	err = ValidateMutualyExclusiveRules(buildRule("stdout", "!="), buildRule("stdout", "~"))
+	assert.NoError(t, err)
+
+	err = ValidateMutualyExclusiveRules(buildRule("stdout", "!="), buildRule("stdout", "!~"))
+	assert.NoError(t, err)
+
+	err = ValidateMutualyExclusiveRules(buildRule("stdout", "!="), buildRule("stdout", "~"), buildRule("stdout", "!~"))
+	assert.NoError(t, err)
+
+	err = ValidateMutualyExclusiveRules(buildRule("stdout", "="), buildRule("stdout", "~"))
+	assert.Error(t, err)
+
+	err = ValidateMutualyExclusiveRules(buildRule("stdout", "="), buildRule("stdout", "!~"))
+	assert.Error(t, err)
+
+	err = ValidateMutualyExclusiveRules(buildRule("stdout", "="), buildRule("stdout", "!="))
+	assert.Error(t, err)
 }

@@ -154,82 +154,109 @@ $cmdt @test=meta/ @stderr~"PASSED" -- $cmdt sh -c ">&2 echo foo bar" @stderr~foo
 $cmdt @test=meta/ @stderr~"FAILED" -- $cmdt sh -c ">&2 echo foo bar" @stderr~baz @stderr~bar @stdout=
 $cmdt @test=meta/ @stderr~"FAILED" -- $cmdt sh -c ">&2 echo foo bar" @stderr~foo @stderr~baz @stdout=
 
+
+## Forge a token for remaining tests
+eval $( $cmdt @test=meta/ @keepStdout -- $cmdt @init=t1 @exportToken)
+
 >&2 echo
 >&2 echo "## Test assertions outputs"
 # Init the context used in t1 test suite
-eval $( $cmdt @test=meta/ @keepStdout -- $cmdt @init=t1 @exportToken)
 $cmdt @test=meta/ @stderr~"#01..." @stderr~"PASSED" -- $cmdt true @test=t1/
 $cmdt @test=meta/ @stderr~"#02..." @stderr~"PASSED" -- $cmdt true @test=t1/
 $cmdt @test=meta/ @stderr~"#03..." @stderr~"FAILED" -- $cmdt false @test=t1/
 $cmdt @test=meta/ @stderr~"#04..." @stderr~"PASSED" -- $cmdt false @fail @test=t1/
 $cmdt @test=meta/ @fail @stderr~"Failures in t1 test suite (3 success, 1 failures, 4 tests in" -- $cmdt @report=t1
 
+
+>&2 echo
+>&2 echo "## Test namings"
+$cmdt @test=naming/ @stderr~"Test [main]/name1 #01..." @stderr~"PASSED" -- $cmdt true @test=name1
+$cmdt @test=naming/ @stderr~"Test [main]/name2 #02..." @stderr~"PASSED" -- $cmdt true @test=name2
+$cmdt @test=naming/ @stderr~"Test [main]/" @stderr~"true" @stderr~"#03..." @stderr~"PASSED" -- $cmdt true
+$cmdt @test=naming/ @stderr~"Test [main]/" @stderr~"true" @stderr~"#04..." @stderr~"PASSED" -- $cmdt true
+$cmdt @test=naming/ @stderr~"Test [suite1]/name1 #01..." @stderr~"PASSED" -- $cmdt true @test=suite1/name1
+$cmdt @test=naming/ @stderr~"Test [suite1]/name2 #02..." @stderr~"PASSED" -- $cmdt true @test=suite1/name2
+$cmdt @test=naming/ @stderr~"Test [suite2]/" @stderr~"#01..." @stderr~"PASSED" -- $cmdt true @test=suite2/
+$cmdt @test=naming/ @stderr~"Test [suite2]/" @stderr~"#02..." @stderr~"PASSED" -- $cmdt true @test=suite2/
+$cmdt @test=naming/ @stderr~"Successfuly ran suite1 test suite" -- $cmdt  @report=suite1
+$cmdt @test=naming/ @stderr~"Successfuly ran suite2 test suite" -- $cmdt @report=suite2
+$cmdt @test=naming/ @stderr~"Successfuly ran main test suite" -- $cmdt @report=main
+
+
+>&2 echo
+>&2 echo "## Test rules missusage"
+$cmdt @test=failing_rule_missusage/ @fail -- $cmdt @init true
+$cmdt @test=failing_rule_missusage/ @fail -- $cmdt @init @test
+$cmdt @test=failing_rule_missusage/ @fail -- $cmdt @init @report
+$cmdt @test=failing_rule_missusage/ @fail -- $cmdt @test @report true
+$cmdt @test=failing_rule_missusage/ @fail -- $cmdt @init @test true
+$cmdt @test=failing_rule_missusage/ @fail -- $cmdt @init @test true
+$cmdt @test=failing_rule_missusage/ @fail -- $cmdt @init @fail
+$cmdt @test=failing_rule_missusage/ @fail -- $cmdt @init @success
+$cmdt @test=failing_rule_missusage/ @fail -- $cmdt @init @exit=0
+$cmdt @test=failing_rule_missusage/ @fail -- $cmdt true @fail @success
+$cmdt @test=failing_rule_missusage/ @fail -- $cmdt true @fail @exit=0
+$cmdt @test=failing_rule_missusage/ @fail -- $cmdt true @success @exit=0
+$cmdt @test=failing_rule_missusage/ @fail -- $cmdt @report @fail
+$cmdt @test=failing_rule_missusage/ @fail -- $cmdt @report @success
+$cmdt @test=failing_rule_missusage/ @fail -- $cmdt @report @exit=0
+$cmdt @test=failing_rule_missusage/ @fail @stderr~donotexist -- $cmdt true @donotexist
+$cmdt @test=failing_rule_missusage/ @fail @stderr~donotexist -- $cmdt true @donotexist
+
+
+>&2 echo
+>&2 echo "## Test assertion"
+$cmdt @test=assertion/ @stderr~PASSED -- $cmdt true
+$cmdt @test=assertion/ @stderr~PASSED -- $cmdt true @success
+$cmdt @test=assertion/ @stderr~FAILED -- $cmdt true @fail
+
+$cmdt @test=assertion/ @stderr~FAILED -- $cmdt false
+$cmdt @test=assertion/ @stderr~FAILED -- $cmdt false @success
+$cmdt @test=assertion/ @stderr~PASSED -- $cmdt false @fail
+
+$cmdt @test=assertion/ @stderr~PASSED -- $cmdt true @exit=0
+$cmdt @test=assertion/ @stderr~FAILED -- $cmdt true @exit=1
+
+$cmdt @test=assertion/ @stderr~FAILED -- $cmdt false @exit=0
+$cmdt @test=assertion/ @stderr~PASSED -- $cmdt false @exit=1
+
+$cmdt @test=assertion/ @stderr~PASSED -- $cmdt echo foo bar @stdout="foo bar\n"
+$cmdt @test=assertion/ @stderr~PASSED -- $cmdt echo foo bar @stdout~foo
+$cmdt @test=assertion/ @stderr~PASSED -- $cmdt echo foo bar @stdout~bar
+$cmdt @test=assertion/ @stderr~PASSED -- $cmdt echo foo bar @stderr=
+$cmdt @test=assertion/ @stderr~FAILED -- $cmdt echo foo bar @stdout="foo bar"
+$cmdt @test=assertion/ @stderr~FAILED -- $cmdt echo foo bar @stdout=
+$cmdt @test=assertion/ @fail -- $cmdt echo foo bar @stdout~
+$cmdt @test=assertion/ @stderr~FAILED -- $cmdt echo foo bar @stdout~baz
+$cmdt @test=assertion/ @fail -- $cmdt echo foo bar @stderr~
+
+$cmdt @test=assertion/ @stderr~PASSED -- $cmdt sh -c ">&2 echo foo bar" @stderr="foo bar\n"
+$cmdt @test=assertion/ @stderr~PASSED -- $cmdt sh -c ">&2 echo foo bar" @stderr~foo
+$cmdt @test=assertion/ @stderr~PASSED -- $cmdt sh -c ">&2 echo foo bar" @stderr~bar
+$cmdt @test=assertion/ @stderr~PASSED -- $cmdt sh -c ">&2 echo foo bar" @stdout=
+$cmdt @test=assertion/ @stderr~FAILED -- $cmdt sh -c ">&2 echo foo bar" @stderr="foo bar"
+$cmdt @test=assertion/ @stderr~FAILED -- $cmdt sh -c ">&2 echo foo bar" @stderr=
+$cmdt @test=assertion/ @fail -- $cmdt sh -c ">&2 echo foo bar" @stderr~
+$cmdt @test=assertion/ @stderr~FAILED -- $cmdt sh -c ">&2 echo foo bar" @stderr~baz
+$cmdt @test=assertion/ @fail -- $cmdt sh -c ">&2 echo foo bar" @stdout~
+
+# TODO: @exists, @cmd
+
+$cmdt @test=assertion/ @fail -- $cmdt @report=main 
+
+
+>&2 echo
+>&2 echo "## Test config"
+$cmdt @test=test_config/ @stderr~Ignore -- $cmdt true @ignore
+$cmdt @test=test_config/ @stderr~Ignore @stderr!~FAILED @stderr!~PASSED -- $cmdt true @ignore
+
+>&2 echo
+>&2 echo "## Test suite config"
+
 $cmdt @report= ; >&2 echo SUCCESS ; exit 0
-
-
-
-
-
->&2 $cmd @init
->&2 echo "## Test suite @init"
-#eval $( $cmd @init @ignore )
-eval $( $cmd @init @stopOnFailure=false)
-eval $( $cmd @init @stopOnFailure=false)
-
->&2 echo "## Test without name"
-$cmd true @success
-! $cmd "" true @success @ignore=false || false
-! $cmd "" true @success @ignore=false || false
-
->&2 echo "## Test not exising assertion"
-! $cmd "@test=not exising assertion" true @foo || false
-
->&2 echo "## Test without assertion"
-$cmd "@test=without assertion" true
-
->&2 echo "## Test suite @success"
-$cmd "@test=succes ok" true @success
-! $cmd "@test=success ko" false @success || false
-
->&2 echo "## Test suite @fail"
-$cmd "@test=fail ok" false @fail
-! $cmd "@test=fail ko" true @fail || false
-
->&2 echo "## Test suite @exit="
-$cmd "@test=rc=0 ok" true @exit=0
-! $cmd "@test=rc=0 ko" false @exit=0 || false
-
-$cmd "@test=rc=1 ok" false @exit=1
-! $cmd "@test=rc=1 ko" true @exit=1 || false
 
 >&2 echo "## Test sleep"
 $cmd sleep 0.3
-
->&2 echo "## Test suite @stdout="
-$cmd "@test=empty stdout ok" true @stdout=
-! $cmd "@test=empty stdout ko" echo "bar" @stdout= || false
-
-$cmd "@test=stdout= ok" echo foo "bar baz" @stdout="foo bar baz\n"
-! $cmd "@test=stdout= ko" echo foo "bar baz" @stdout="foo barbaz" || false
-echo foo > /tmp/mystdoutcontent
-$cmd "@test=stdout=@file ok" echo foo @stdout=@/tmp/mystdoutcontent
-! $cmd "@test=stdout=@file not exists" echo foo @stdout=@/tmp/doNotExistsFile1234 || false
-
-
->&2 echo "## Test suite @stdout~"
-$cmd "@test=stdout~ ok" echo foo "bar baz" @stdout~"bar"
-! $cmd "@test=stdout~ ko" echo foo "bar baz" @stdout~"pif" || false
-
->&2 echo "## Test suite @stderr="
-$cmd "@test=empty stderr" true @stderr=
-! $cmd "@test=empty stderr" notExist @stderr= || false
-
-$cmd "@test=stderr= ok" sh -c ">&2 echo foo" @stderr="foo\n"
-! $cmd "@test=stderr= ko" sh foo @stderr="foo" || false
-
->&2 echo "## Test suite @stderr~"
-$cmd "@test=stderr~ ok" ls /notExist @stderr~"otExi" @fail
-! $cmd "@test=stderr~ ko" ls /notExist @stderr~"foo" @fail || false
 
 >&2 echo "## Test stdin"
 echo foo | $cmd "@test=stdin" cat @stdout="foo\n"
