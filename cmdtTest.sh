@@ -1,5 +1,5 @@
 #! /bin/bash
-set -e
+set -e -o pipefail
 scriptDir=$( dirname $( readlink -f $0 ) )
 
 workspaceDir="/tmp/cmdtWorkspace"
@@ -39,6 +39,7 @@ die() {
 # - Il est facile de sortir un test de la bonne test suite, et ce test ne sera jamais report !
 # => Should @report report all opened tests suites by default ?
 
+>&2 echo
 >&2 echo "## Test cmdt basic assertions should passed"
 $cmdt @init=should_succeed @stopOnFailure=false
 
@@ -58,6 +59,7 @@ $cmdt @test=should_succeed/ sh -c ">&2 echo foo bar" @stderr~bar @stdout=
 $cmdt @test=should_succeed/ sh -c ">&2 echo foo bar" @stderr~foo @stderr~bar @stdout=
 $cmdt @test=should_succeed/ sh -c ">&2 echo foo bar" @stderr="foo bar\n" @stdout=
 
+>&2 echo
 >&2 echo "## Test cmdt basic assertions should failed"
 $cmdt @init=should_fail @stopOnFailure=false
 
@@ -82,16 +84,52 @@ $cmdt @test=should_fail/ sh -c ">&2 echo foo bar" @stderr~foo @stderr~baz
 $cmdt @test=should_fail/ sh -c ">&2 echo foo bar" @stdout~foo
 
 $cmdt @report=should_succeed
-$cmdt @report=should_fail 2>&1 | grep "0 success" || die "should_fail test suite should have no success"
+! $cmdt @report=should_fail 2>&1 | grep "0 success" || die "should_fail test suite should have no success"
 
+
+>&2 echo
+>&2 echo "## Test @report without test"
+expectedNothingToReportStderr="you must perform some test prior to report"
+$cmdt @test=meta1/ @fail @stderr~"$expectedNothingToReportStderr" -- $cmdt @report=foo
+$cmdt @test=meta1/ @fail @stderr~"$expectedNothingToReportStderr" -- $cmdt @report=foo
+
+>&2 echo
+>&2 echo "## Met1a test context not shared without token"
+$cmdt @test=meta1/ @stderr~"PASSED" @stderr~"#01" -- $cmdt true
+$cmdt @test=meta1/ @stderr~"PASSED" @stderr~"#01" -- $cmdt true
+$cmdt @test=meta1/ @fail -- $cmdt @report
+
+>&2 echo
+>&2 echo "## Test printed token"
+tk0=$( $cmdt @init @printToken )
+>&2 echo "token: $tk0"
+$cmdt @test=meta2/ @stderr~"PASSED" @stderr~"#01" -- $cmdt true @token=$tk0
+$cmdt @test=meta2/ @stderr~"PASSED" @stderr~"#02" -- $cmdt true @token=$tk0
+$cmdt @test=meta2/ @fail -- $cmdt @report
+$cmdt @test=meta2/ @stderr~"Successfuly ran" -- $cmdt @report @token=$tk0
+$cmdt @report 2>&1 | grep -v "Failures"
+
+>&2 echo
+>&2 echo "## Test exported token"
+eval $( $cmdt @init @exportToken )
+>&2 echo "token: $__CMDT_TOKEN"
+$cmdt @test=meta3/ @stderr~"PASSED" @stderr~"#01" -- $cmdt true
+$cmdt @test=meta3/ @stderr~"PASSED" @stderr~"#02" -- $cmdt true
+$cmdt @test=meta3/ @stderr~"Successfuly ran" -- $cmdt @report=main
+$cmdt @test=meta3/ @fail @stderr~"$expectedNothingToReportStderr" -- $cmdt @report @token=$tk0
+
+$cmdt @test=meta4/ @stderr~"PASSED" @stderr~"#01" -- $cmdt @test=sub4/ true
+$cmdt @test=meta4/ @stderr~"PASSED" @stderr~"#02" -- $cmdt @test=sub4/ true
+$cmdt @test=meta4/ @stderr~"Successfuly ran" -- $cmdt @report=sub4
+$cmdt @test=meta4/ @fail @stderr~"$expectedNothingToReportStderr" -- $cmdt @report=sub4 @token=$tk0
+$cmdt @report 2>&1 | grep -v "Failures"
+export -n __CMDT_TOKEN
+
+>&2 echo
 >&2 echo "## Test usage"
 $cmdt @test=meta/ @fail @stderr~"usage:" -- $cmdt
 
->&2 echo "## Test @report without test"
-expectedStderr="You must perform some test before reporting"
-$cmdt @test=meta/ @fail @stderr~"$expectedStderr" -- $cmdt @report=foo
-$cmdt @test=meta/ @fail @stderr~"$expectedStderr" -- $cmdt @report=foo
-
+>&2 echo
 >&2 echo "## Test cmdt basic assertions"
 $cmdt @test=meta/ @stderr~"PASSED" -- $cmdt true
 $cmdt @test=meta/ @stderr~"FAILED" -- $cmdt false
@@ -116,14 +154,20 @@ $cmdt @test=meta/ @stderr~"PASSED" -- $cmdt sh -c ">&2 echo foo bar" @stderr~foo
 $cmdt @test=meta/ @stderr~"FAILED" -- $cmdt sh -c ">&2 echo foo bar" @stderr~baz @stderr~bar @stdout=
 $cmdt @test=meta/ @stderr~"FAILED" -- $cmdt sh -c ">&2 echo foo bar" @stderr~foo @stderr~baz @stdout=
 
+>&2 echo
 >&2 echo "## Test assertions outputs"
-$cmdt @test=meta/ @stderr~"Initialized new [t1] test suite" @stderr~"PASSED" -- $cmdt true @test=t1/
-$cmdt @test=meta/ @stderr~"PASSED" -- $cmdt true @test=t1/
-$cmdt @test=meta/ @stderr~"FAILED" -- $cmdt false @test=t1/
-$cmdt @test=meta/ @stderr~"PASSED" -- $cmdt false @fail @test=t1/
-$cmdt @test=meta/ @stderr~"Failures in _default test suite (2 success, 1 failures, 3 tests in" -- $cmdt @report=t1
+# Init the context used in t1 test suite
+eval $( $cmdt @test=meta/ @keepStdout -- $cmdt @init=t1 @exportToken)
+$cmdt @test=meta/ @stderr~"#01..." @stderr~"PASSED" -- $cmdt true @test=t1/
+$cmdt @test=meta/ @stderr~"#02..." @stderr~"PASSED" -- $cmdt true @test=t1/
+$cmdt @test=meta/ @stderr~"#03..." @stderr~"FAILED" -- $cmdt false @test=t1/
+$cmdt @test=meta/ @stderr~"#04..." @stderr~"PASSED" -- $cmdt false @fail @test=t1/
+$cmdt @test=meta/ @fail @stderr~"Failures in t1 test suite (3 success, 1 failures, 4 tests in" -- $cmdt @report=t1
 
-$cmdt @report=meta ; >&2 echo SUCCESS ; exit 0
+$cmdt @report= ; >&2 echo SUCCESS ; exit 0
+
+
+
 
 
 >&2 $cmd @init

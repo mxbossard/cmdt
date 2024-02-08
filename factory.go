@@ -38,7 +38,7 @@ func SplitRuleExpr(ruleExpr string) (ok bool, r Rule) {
 		ok = true
 		r.Prefix = RulePrefix()
 		r.Name = submatch[1]
-		r.Operator = submatch[2]
+		r.Op = submatch[2]
 		r.Expected = submatch[3]
 	}
 	return
@@ -111,22 +111,38 @@ func IntValueValidater(min, max int) Validater[int] {
 	}
 }
 
-func NoOperatorValidater[T any](rule Rule, v T) (err error) {
-	if rule.Operator != "" {
+func OperatorValidater[T any](ops ...string) Validater[T] {
+	return func(rule Rule, v T) (err error) {
+		if !collections.Contains[string](&ops, rule.Op) {
+			err = fmt.Errorf("rule %s%s operator must be one of: [%s]", rule.Prefix, rule.Name, ops)
+		}
+		return
+	}
+}
+
+func NotEmptyValidater[T any](rule Rule, v T) (err error) {
+	if fmt.Sprintf("%s", v) == "" {
+		err = fmt.Errorf("rule %s%s%s must have a value", rule.Prefix, rule.Name, rule.Op)
+	}
+	return
+}
+
+func NoOperatorValidater0[T any](rule Rule, v T) (err error) {
+	if rule.Op != "" {
 		err = fmt.Errorf("rule %s%s cannot have a value nor an operator", rule.Prefix, rule.Name)
 	}
 	return
 }
 
-func EqualOperatorValidater[T any](rule Rule, v T) (err error) {
-	if rule.Operator != "=" {
+func EqualOperatorValidater0[T any](rule Rule, v T) (err error) {
+	if rule.Op != "=" {
 		err = fmt.Errorf("rule %s%s operator must be '='", rule.Prefix, rule.Name)
 	}
 	return
 }
 
-func EqualOrTildeOperatorValidater[T any](rule Rule, v T) (err error) {
-	if rule.Operator != "=" && rule.Operator != "~" {
+func EqualOrTildeOperatorValidater0[T any](rule Rule, v T) (err error) {
+	if rule.Op != "=" && rule.Op != "~" {
 		err = fmt.Errorf("rule %s%s operator must be '=' or '~'", rule.Prefix, rule.Name)
 	}
 	return
@@ -162,9 +178,16 @@ func TestNameValidater(rule Rule, v string) (err error) {
 	return
 }
 
+func StringOrNotingValidater(rule Rule, v string) (err error) {
+	if rule.Op == "=" && v == "" {
+		err = fmt.Errorf("rule %s%s= must have a value", rule.Prefix, rule.Name)
+	}
+	return
+}
+
 func BooleanValidater(rule Rule, v bool) (err error) {
-	if rule.Operator != "" && rule.Operator != "=" {
-		err = fmt.Errorf("rule %s%s operator must be '='", RulePrefix(), rule)
+	if rule.Op != "" && rule.Op != "=" {
+		err = fmt.Errorf("rule %s%s operator must be '='", rule.Prefix, rule.Name)
 	}
 	return
 }
@@ -201,6 +224,9 @@ func ApplyConfig(c *Context, ruleExpr string) (ok bool, rule Rule, err error) {
 			if suiteName != "" {
 				c.TestSuite = suiteName
 			}
+			if rule.Name == "report" && rule.Expected == "" {
+				c.ReportAll = true
+			}
 		case "test":
 			testName := rule.Expected
 			err = Validate[string](rule, testName, TestNameValidater)
@@ -227,7 +253,7 @@ func ApplyConfig(c *Context, ruleExpr string) (ok bool, rule Rule, err error) {
 			}
 
 		case "fork":
-			c.ForkCount, err = Translate(rule, IntMapper, EqualOperatorValidater[int], IntValueValidater(1, 5))
+			c.ForkCount, err = Translate(rule, IntMapper, OperatorValidater[int]("="), IntValueValidater(1, 5))
 		case "suiteTimeout":
 			c.SuiteTimeout, err = Translate(rule, DurationMapper)
 		case "before":
@@ -253,12 +279,20 @@ func ApplyConfig(c *Context, ruleExpr string) (ok bool, rule Rule, err error) {
 		case "timeout":
 			c.Timeout, err = Translate(rule, DurationMapper)
 		case "runCount":
-			c.RunCount, err = Translate(rule, IntMapper, EqualOperatorValidater[int], IntValueValidater(1, 1000))
+			c.RunCount, err = Translate(rule, IntMapper, OperatorValidater[int]("="), IntValueValidater(1, 1000))
 		case "prefix":
-			c.Prefix, err = Translate(rule, DummyMapper, EqualOperatorValidater[string])
+			c.Prefix, err = Translate(rule, DummyMapper, OperatorValidater[string]("="))
 			if err == nil {
 				SetRulePrefix(c.Prefix)
 			}
+		case "token":
+			c.Token, err = Translate(rule, DummyMapper, OperatorValidater[string]("="), NotEmptyValidater[string])
+		case "printToken":
+			boolVal, err = Translate(rule, BoolMapper, BooleanValidater)
+			c.PrintToken = boolVal
+		case "exportToken":
+			boolVal, err = Translate(rule, BoolMapper, BooleanValidater)
+			c.ExportToken = boolVal
 		case "parallel":
 		default:
 			ok = false
@@ -272,7 +306,7 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 	if ok {
 		switch assertion.Rule.Name {
 		case "success":
-			_, err = Translate(assertion.Rule, DummyMapper, NoOperatorValidater[string])
+			_, err = Translate(assertion.Rule, DummyMapper, OperatorValidater[string](""))
 			if err != nil {
 				return
 			}
@@ -282,7 +316,7 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 				return
 			}
 		case "fail":
-			_, err = Translate(assertion.Rule, DummyMapper, NoOperatorValidater[string])
+			_, err = Translate(assertion.Rule, DummyMapper, OperatorValidater[string](""))
 			if err != nil {
 				return
 			}
@@ -293,7 +327,7 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 			}
 		case "exit":
 			var expectedExitCode int
-			expectedExitCode, err = Translate(assertion.Rule, IntMapper, IntValueValidater(0, 255), EqualOperatorValidater[int])
+			expectedExitCode, err = Translate(assertion.Rule, IntMapper, IntValueValidater(0, 255), OperatorValidater[int]("="))
 			if err != nil {
 				return
 			}
@@ -304,16 +338,16 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 			}
 		case "stdout":
 			var fileContent string
-			fileContent, err = Translate(assertion.Rule, FileContentMapper, EqualOrTildeOperatorValidater[string])
+			fileContent, err = Translate(assertion.Rule, FileContentMapper, OperatorValidater[string]("=", "~"))
 			if err != nil {
 				return
 			}
 			assertion.Expected = fileContent
 			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
 				res.Value = cmd.StdoutRecord()
-				if assertion.Rule.Operator == "=" {
+				if assertion.Rule.Op == "=" {
 					res.Success = cmd.StdoutRecord() == fileContent
-				} else if assertion.Rule.Operator == "~" {
+				} else if assertion.Rule.Op == "~" {
 					res.Success = strings.Contains(cmd.StdoutRecord(), fileContent)
 				} else {
 					err = fmt.Errorf("rule %s%s must use an operator '=' or '~'", assertion.Rule.Prefix, assertion.Rule.Name)
@@ -322,16 +356,16 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 			}
 		case "stderr":
 			var fileContent string
-			fileContent, err = Translate(assertion.Rule, FileContentMapper, EqualOrTildeOperatorValidater[string])
+			fileContent, err = Translate(assertion.Rule, FileContentMapper, OperatorValidater[string]("=", "~"))
 			if err != nil {
 				return
 			}
 			assertion.Expected = fileContent
 			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
 				res.Value = cmd.StderrRecord()
-				if assertion.Rule.Operator == "=" {
+				if assertion.Rule.Op == "=" {
 					res.Success = cmd.StderrRecord() == fileContent
-				} else if assertion.Rule.Operator == "~" {
+				} else if assertion.Rule.Op == "~" {
 					res.Success = strings.Contains(cmd.StderrRecord(), fileContent)
 				} else {
 					err = fmt.Errorf("rule %s%s must use an operator '=' or '~'", assertion.Rule.Prefix, assertion.Rule.Name)
@@ -340,7 +374,7 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 			}
 		case "cmd":
 			var cmdAndArgs []string
-			cmdAndArgs, err = Translate(assertion.Rule, CmdMapper, EqualOperatorValidater[[]string], CmdValidater)
+			cmdAndArgs, err = Translate(assertion.Rule, CmdMapper, OperatorValidater[[]string]("="), CmdValidater)
 			if err != nil {
 				return
 			}
@@ -355,7 +389,7 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 			}
 		case "exists":
 			var filepathRules []string
-			filepathRules, err = Translate(assertion.Rule, ExistsMapper, EqualOperatorValidater[[]string], ExistsValidater)
+			filepathRules, err = Translate(assertion.Rule, ExistsMapper, OperatorValidater[[]string]("="), ExistsValidater)
 			if err != nil {
 				return
 			}
@@ -460,6 +494,10 @@ func ParseArgs(args []string) (cfg Context, cmdAndArgs []string, assertions []As
 		rules = append(rules, rule)
 	}
 
+	if cfg.TestSuite == "" {
+		cfg.TestSuite = DefaultTestSuiteName
+	}
+
 	err = ValidateMutualyExclusiveRules(rules)
 	if err != nil {
 		return
@@ -474,15 +512,6 @@ func buildMutualyExclusiveCouples(rule RuleKey, exclusiveRules ...RuleKey) (res 
 		res = append(res, []RuleKey{rule, e})
 	}
 	return
-}
-
-// Exclusion mutuelles ruleName + roleOperator en option
-// rule1 and rule2 ME
-// rule1= and rule1~ ME
-// rule1 and rule1 ME
-
-type RuleKey struct {
-	Name, Op string
 }
 
 func (r RuleKey) String() string {
@@ -503,7 +532,7 @@ func ValidateOnceOnlyDefinedRule(rules []Rule) (err error) {
 	}
 	matches := map[RuleKey][]Rule{}
 	for _, rule := range rules {
-		key := RuleKey{rule.Name, rule.Operator}
+		key := RuleKey{rule.Name, rule.Op}
 		matches[key] = append(matches[key], rule)
 	}
 
@@ -519,10 +548,12 @@ func ValidateOnceOnlyDefinedRule(rules []Rule) (err error) {
 func ValidateMutualyExclusiveRules(rules []Rule) (err error) {
 	// FIXME: stdout= and stdout~ are ME ; stdout= and stdout= are ME but stdout~ and stdout~ are not ME
 	MutualyExclusiveRules := [][]RuleKey{
-		{{Name: "init"}, {Name: "test"}, {Name: "report"}},
-		{{Name: "fail"}, {Name: "success"}, {Name: "exit"}},
+		{{"init", "all"}, {"test", "all"}, {"report", "all"}},
+		{{"fail", "all"}, {"success", "all"}, {"exit", "all"}},
 		{{"stdout", "="}, {"stdout", "~"}},
 		{{"stderr", "="}, {"stderr", "~"}},
+		{{"test", "all"}, {"token", ""}},
+		{{"report", "all"}, {"token", ""}},
 	}
 
 	exlusiveRules := MutualyExclusiveRules
@@ -538,17 +569,17 @@ func ValidateMutualyExclusiveRules(rules []Rule) (err error) {
 	// Pour chaque MER compter le nombre de key
 	matches := map[RuleKey][]Rule{}
 	for _, rule := range rules {
-		key := RuleKey{rule.Name, rule.Operator}
+		key := RuleKey{rule.Name, rule.Op}
 		matches[key] = append(matches[key], rule)
 	}
 
 	for _, mer := range exlusiveRules {
 		// foreach MER
 		matchCount := 0
-		for _, key := range mer {
+		for _, merKey := range mer {
 			// foreach rule ine MER
 			for matchedKey := range matches {
-				if key == matchedKey {
+				if merKey == matchedKey || merKey.Op == "all" && merKey.Name == matchedKey.Name {
 					matchCount++
 				}
 			}

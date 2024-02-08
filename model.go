@@ -20,7 +20,9 @@ type Asserter func(cmdz.Executer) (AssertionResult, error)
 type ConfigScope int
 
 const (
-	DefaultRulePrefix = "@"
+	DefaultRulePrefix      = "@"
+	ContextTokenEnvVarName = "__CMDT_TOKEN"
+	DefaultTestSuiteName   = "main"
 )
 
 const (
@@ -32,12 +34,17 @@ const (
 type Rule struct {
 	Prefix   string
 	Name     string
-	Operator string
+	Op       string
 	Expected string
+}
+
+type RuleKey struct {
+	Name, Op string
 }
 
 type Context struct {
 	// TestSuite only
+	Token        string        `yaml:""`
 	Prefix       string        `yaml:""`
 	TestSuite    string        `yaml:""`
 	TestName     string        `yaml:""`
@@ -47,6 +54,9 @@ type Context struct {
 	ForkCount    int           `yaml:""`
 
 	// Test or TestSuite
+	PrintToken    bool
+	ExportToken   bool
+	ReportAll     bool
 	Ignore        *bool         `yaml:""`
 	StopOnFailure *bool         `yaml:""`
 	KeepStdout    *bool         `yaml:""`

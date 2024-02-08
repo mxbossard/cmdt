@@ -78,11 +78,35 @@ Done:
 	- cmdt @prefix=% cmdt true %success => should success
 	- cmdt @prefix=% cmdt false %fail => should success
 	- cmdt @prefix=% cmdt false @fail %success => should success
+- TestSuite context resolving
+	- DO WE NEED to init a tmpdir to store testsuite context ?
+		- multiples test suites share a tmpdir
+		- a testsuite can be inited with first test
+		- init clear all previous context => easiest context resolution
+		- without init may have multiple matching context (same workspace )
+	- matching test suite context should be in workspace, touched recently, (and share the ppid ?)
+	- for specific use case (if tests does not share ppid or workspace dir) can pass a uniq token to identify a test suite
+	    - NEW tk=$( cmdt @init @token ) => print an uniq token on stdout
+		- @init=foo @token=$tk => init a foo test suite with tk token identifier
+		- @test=foo @token=$tk => test in suite within token tk context
+		- @report=foo @token=$tk
+		- NEW eval $( @token @export ) => print the uniq token export on stdout to be supplied to all following cmdt call
+		- tokened context is uniq accross all workspace dirs (can change workspace or ppid during test)
+	- which tmpdir ?
+	    - global tmp => to mitigate the risk of test suite mixing should hash the workspace dir path and put it into tmp dir
+		- share a tmpdir between multiple test suites => init only tmp dir and report all tmp dir
+		- By default build tmp dir with workspace + PPID + TIMESTAMP
+		- If workspace dir change or ppid change => can use a token
+- @init=testsuite => clear all matching testsuite
+- @test=testsuite => find a matching testsuite. If none => init a new one. If muliple => fail
 
 TODO:
 Bugs:
 
 Features :
+- @report => by default report all testsuites
+- Rules as constants sorted by type in collections => if rule not in collection fail
+
 - possibilité de passer un scénario ligne à ligne dans le stdin de cmdtest
 	- cmdt cmd arg1 argN @scenario=filepath
 	- pour chaque ligne du scenario concat la ligne du scenario avec les arguments fournit en paramétre de cmdt
@@ -123,8 +147,6 @@ type AssertionRule struct {
 
 var (
 	//AssertionPrefix      = "@"
-	ContextEnvVarName    = "__CMDTEST_CONTEXT_KEY_"
-	DefaultTestSuiteName = "_default"
 
 	/*
 		ActionInit   = RuleType("init")
@@ -189,6 +211,7 @@ func usage() {
 	stdPrinter.Errf("\tCONFIG available: @ignore @stopOnFailure @keepStdout @keepStderr @keepOutputs @timeout=Duration @fork=N\n")
 	stdPrinter.Errf("\tCOMMAND and ARGs: the command on which to run tests\n")
 	stdPrinter.Errf("\tASSERTIONs available: @fail @success @exit=N @stdout= @stdout~ @stderr= @stderr~ @cmd= @exists=\n")
+	stdPrinter.Errf("In complex cases assertions must be correlated by a token. You can generate a token with @init @printToken or @init @exportToken and supply it with @token=\n")
 }
 
 func main() {

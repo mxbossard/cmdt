@@ -18,19 +18,19 @@ func TestSplitRuleExpr(t *testing.T) {
 	ok, rule = SplitRuleExpr("@foo")
 	assert.True(t, ok)
 	assert.Equal(t, "foo", rule.Name)
-	assert.Equal(t, "", rule.Operator)
+	assert.Equal(t, "", rule.Op)
 	assert.Equal(t, "", rule.Expected)
 
 	ok, rule = SplitRuleExpr("@bar=")
 	assert.True(t, ok)
 	assert.Equal(t, "bar", rule.Name)
-	assert.Equal(t, "=", rule.Operator)
+	assert.Equal(t, "=", rule.Op)
 	assert.Equal(t, "", rule.Expected)
 
 	ok, rule = SplitRuleExpr("@baz~pif")
 	assert.True(t, ok)
 	assert.Equal(t, "baz", rule.Name)
-	assert.Equal(t, "~", rule.Operator)
+	assert.Equal(t, "~", rule.Op)
 	assert.Equal(t, "pif", rule.Expected)
 }
 
@@ -89,21 +89,21 @@ func TestBuildAssertion(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, "fail", assertion.Name)
-	assert.Equal(t, "", assertion.Operator)
+	assert.Equal(t, "", assertion.Op)
 	assert.Equal(t, "", assertion.Expected)
 
 	ok, assertion, err = BuildAssertion("@stdout=")
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, "stdout", assertion.Name)
-	assert.Equal(t, "=", assertion.Operator)
+	assert.Equal(t, "=", assertion.Op)
 	assert.Equal(t, "", assertion.Expected)
 
 	ok, assertion, err = BuildAssertion("@stdout~baz")
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, "stdout", assertion.Name)
-	assert.Equal(t, "~", assertion.Operator)
+	assert.Equal(t, "~", assertion.Op)
 	assert.Equal(t, "baz", assertion.Expected)
 
 	ok, assertion, err = BuildAssertion("@stdout+")
@@ -173,19 +173,19 @@ func TestParseArgs(t *testing.T) {
 func TestValidateOnceOnlyDefinedRule(t *testing.T) {
 	var err error
 
-	err = ValidateOnceOnlyDefinedRule([]Rule{{Name: "init", Operator: "="}, {Name: "timeout", Operator: "="}})
+	err = ValidateOnceOnlyDefinedRule([]Rule{{Name: "init", Op: "="}, {Name: "timeout", Op: "="}})
 	assert.NoError(t, err)
 
-	err = ValidateOnceOnlyDefinedRule([]Rule{{Name: "init", Operator: "="}, {Name: "report", Operator: "="}})
+	err = ValidateOnceOnlyDefinedRule([]Rule{{Name: "init", Op: "="}, {Name: "report", Op: "="}})
 	assert.NoError(t, err)
 
-	err = ValidateOnceOnlyDefinedRule([]Rule{{Name: "stdout", Operator: "="}, {Name: "stdout", Operator: "~"}})
+	err = ValidateOnceOnlyDefinedRule([]Rule{{Name: "stdout", Op: "="}, {Name: "stdout", Op: "~"}})
 	assert.NoError(t, err)
 
-	err = ValidateOnceOnlyDefinedRule([]Rule{{Name: "stdout", Operator: "~"}, {Name: "stdout", Operator: "~"}})
+	err = ValidateOnceOnlyDefinedRule([]Rule{{Name: "stdout", Op: "~"}, {Name: "stdout", Op: "~"}})
 	assert.NoError(t, err)
 
-	err = ValidateOnceOnlyDefinedRule([]Rule{{Name: "stdout", Operator: "="}, {Name: "stdout", Operator: "="}})
+	err = ValidateOnceOnlyDefinedRule([]Rule{{Name: "stdout", Op: "="}, {Name: "stdout", Op: "="}})
 	assert.Error(t, err)
 
 }
