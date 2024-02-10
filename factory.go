@@ -421,6 +421,8 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 				}
 				if owners != "" {
 					// FIXME: how to checke file owners ?
+					err = fmt.Errorf("exists assertion owner part not implemented yet")
+					return
 				}
 				res.Success = true
 				return
@@ -568,27 +570,38 @@ func ValidateMutualyExclusiveRules(rules ...Rule) (err error) {
 
 	// Compter le nombre de match pour chaque key
 	// Pour chaque MER compter le nombre de key
-	matches := map[RuleKey][]Rule{}
-	for _, rule := range rules {
-		key := RuleKey{rule.Name, rule.Op}
-		matches[key] = append(matches[key], rule)
-	}
+	//matches := map[RuleKey][]Rule{}
+	matchingMers := [][]RuleKey{}
+	for i, rule1 := range rules {
+		ruleKey1 := ruleKey(rule1.Name, rule1.Op)
+		for j, rule2 := range rules {
+			if i == j {
+				continue
+			}
+			ruleKey2 := ruleKey(rule2.Name, rule2.Op)
+			// check all rule couples against MER
+			for _, mer := range exlusiveRules {
+				for _, k := range mer {
+					for _, l := range mer {
+						if k == l {
+							continue
+						}
 
-	for _, mer := range exlusiveRules {
-		// foreach MER
-		matchCount := 0
-		for _, merKey := range mer {
-			// foreach rule ine MER
-			for matchedKey := range matches {
-				if merKey == matchedKey || merKey.Op == "all" && merKey.Name == matchedKey.Name {
-					matchCount++
+						if (ruleKey1 == k || k.Op == "all" && ruleKey1.Name == k.Name) &&
+							(ruleKey2 == l || l.Op == "all" && ruleKey2.Name == l.Name) {
+							matchingMers = append(matchingMers, mer)
+						}
+
+					}
 				}
 			}
 		}
-		if matchCount > 1 {
-			err = fmt.Errorf("you can't use simultaneously following rules which are mutually exclusives: [%s]", mer)
-		}
 	}
 
+	//log.Printf("matchingMers: %v\n", matchingMers)
+	for _, mer := range matchingMers {
+		err = fmt.Errorf("you can't use simultaneously following rules which are mutually exclusives: [%s]", mer)
+		return
+	}
 	return
 }

@@ -147,12 +147,16 @@ $cmdt @test=meta/ @stderr~"FAILED" -- $cmdt echo foo bar @stdout~baz @stderr=
 $cmdt @test=meta/ @stderr~"PASSED" -- $cmdt echo foo bar @stdout~foo @stdout~bar @stderr=
 $cmdt @test=meta/ @stderr~"FAILED" -- $cmdt echo foo bar @stdout~baz @stdout~bar @stderr=
 $cmdt @test=meta/ @stderr~"FAILED" -- $cmdt echo foo bar @stdout~foo @stdout~baz @stderr=
+$cmdt @test=meta/ @stderr~"FAILED" -- $cmdt echo foo bar @stdout!~foo
+$cmdt @test=meta/ @stderr~"PASSED" -- $cmdt echo foo bar @stdout!=foo @stdout~bar @stdout!~baz
 
 $cmdt @test=meta/ @stderr~"PASSED" -- $cmdt sh -c ">&2 echo foo bar" @stderr~foo @stdout=
 $cmdt @test=meta/ @stderr~"FAILED" -- $cmdt sh -c ">&2 echo foo bar" @stderr~baz @stdout=
 $cmdt @test=meta/ @stderr~"PASSED" -- $cmdt sh -c ">&2 echo foo bar" @stderr~foo @stderr~bar @stdout=
 $cmdt @test=meta/ @stderr~"FAILED" -- $cmdt sh -c ">&2 echo foo bar" @stderr~baz @stderr~bar @stdout=
 $cmdt @test=meta/ @stderr~"FAILED" -- $cmdt sh -c ">&2 echo foo bar" @stderr~foo @stderr~baz @stdout=
+$cmdt @test=meta/ @stderr~"FAILED" -- $cmdt sh -c ">&2 echo foo bar" @stderr!~foo
+$cmdt @test=meta/ @stderr~"PASSED" -- $cmdt sh -c ">&2 echo foo bar" @stderr!=foo @stderr~bar @stderr!~baz
 
 
 ## Forge a token for remaining tests
@@ -239,21 +243,32 @@ $cmdt @test=assertion/ @stderr~FAILED -- $cmdt sh -c ">&2 echo foo bar" @stderr=
 $cmdt @test=assertion/ @fail -- $cmdt sh -c ">&2 echo foo bar" @stderr~
 $cmdt @test=assertion/ @stderr~FAILED -- $cmdt sh -c ">&2 echo foo bar" @stderr~baz
 $cmdt @test=assertion/ @fail -- $cmdt sh -c ">&2 echo foo bar" @stdout~
-
 # TODO: @exists, @cmd
-
 $cmdt @test=assertion/ @fail -- $cmdt @report=main 
 
 
 >&2 echo
->&2 echo "## Test config"
+>&2 echo "## Test @ignore"
 $cmdt @test=test_config/ @stderr~Ignore -- $cmdt true @ignore
 $cmdt @test=test_config/ @stderr~Ignore @stderr!~FAILED @stderr!~PASSED -- $cmdt true @ignore
+$cmdt @test=test_config/ @stderr~Ignore @stderr!~FAILED @stderr!~PASSED -- $cmdt false @ignore
+
+$cmdt @test=assertion/ -- $cmdt @report=main 
+
+
+>&2 echo
+>&2 echo "## Test config"
 
 >&2 echo
 >&2 echo "## Test suite config"
 
 $cmdt @report= ; >&2 echo SUCCESS ; exit 0
+
+
+
+
+
+
 
 >&2 echo "## Test sleep"
 $cmd sleep 0.3

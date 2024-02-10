@@ -214,6 +214,15 @@ func TestValidateOnceOnlyDefinedRule(t *testing.T) {
 func TestValidateMutualyExclusiveRules(t *testing.T) {
 	var err error
 
+	err = ValidateMutualyExclusiveRules(buildRule("init", ""), buildRule("timeout", "="))
+	assert.NoError(t, err)
+
+	err = ValidateMutualyExclusiveRules(buildRule("stdout", "="), buildRule("stderr", "~"))
+	assert.NoError(t, err)
+
+	err = ValidateMutualyExclusiveRules(buildRule("init", "="), buildRule("report", ""))
+	assert.Error(t, err)
+
 	err = ValidateMutualyExclusiveRules(buildRule("stdout", "!="), buildRule("stdout", "~"))
 	assert.NoError(t, err)
 

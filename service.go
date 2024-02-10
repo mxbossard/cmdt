@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/fs"
 	"log"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,82 +29,6 @@ func SetRulePrefix(prefix string) {
 	if prefix != "" {
 		rulePrefix = prefix
 	}
-}
-
-func forgeUniqKey0(name string) string {
-	h, err := trust.SignStrings(strings.ToUpper(name), time.Now().String(), fmt.Sprint(rand.Int()))
-	if err != nil {
-		log.Fatalf("Cannot forge a uniq key ! Error: %s", err)
-	}
-	return h
-}
-
-func buildNoTestToReportError(testSuite string) error {
-	if testSuite == "" {
-		testSuite = DefaultTestSuiteName
-	}
-	return fmt.Errorf("cannot found context env var for test suite: [%s]. You must perform some test before reporting", testSuite)
-}
-
-func loadUniqKey0(testSuite string) (key string, err error) {
-	// Search uniqKey in env
-	for _, env := range os.Environ() {
-		if strings.HasPrefix(env, ContextTokenEnvVarName+strings.ToUpper(sanitizeTestSuiteName(testSuite))+"=") {
-			splitted := strings.Split(env, "=")
-			key = strings.Join(splitted[1:], "")
-			//log.Printf("Laoded uniqKey from env: %s", key)
-			return key, nil
-		}
-	}
-	// Search uniqKey in tmp dir
-	lastTmpDir := lastTmpDirectoryPath0(testSuite)
-	if lastTmpDir != "" {
-		key = filepath.Base(lastTmpDir)
-		//log.Printf("Laoded uniqKey from tmp dir: %s", key)
-		return key, nil
-	}
-
-	//err = fmt.Errorf("cannot found context env var for test suite: [%s]. You must export init action like this : eval $( cmdt @init )", testSuite)
-	err = buildNoTestToReportError(testSuite)
-	return
-}
-
-func tmpDirectoryPath0(testSuite string) string {
-	return "FIXME"
-}
-
-func lastTmpDirectoryPath0(testSuite string) string {
-	var matchingDirs []fs.DirEntry
-	var lastMatchingDir *fs.DirEntry
-	rootPath := tmpDirectoryPath0(testSuite)
-	err := filepath.WalkDir(rootPath, func(path string, d fs.DirEntry, err error) error {
-		matcher := rootPath + string(filepath.Separator)
-		//log.Printf("%s / %s", path, matcher)
-		if d.IsDir() && strings.HasPrefix(path, matcher) {
-			matchingDirs = append(matchingDirs, d)
-			return filepath.SkipDir
-		}
-		return nil
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	var lastModTime time.Time
-	for _, d := range matchingDirs {
-		info, err2 := d.Info()
-		if err2 != nil {
-			log.Fatal(err2)
-		}
-		if lastMatchingDir == nil || info.ModTime().After(lastModTime) {
-			lastMatchingDir = &d
-		}
-
-	}
-	if lastMatchingDir != nil {
-		dirName := filepath.Base((*lastMatchingDir).Name())
-		return dirName
-	}
-	return ""
 }
 
 func readEnvToken() (token string) {
@@ -270,11 +193,13 @@ func UniqToken() string {
 	uuid := fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 	return uuid
 
-	h, err := trust.SignStrings(uuid)
-	if err != nil {
-		log.Fatalf("cannot forge a uniq token: %s", err)
-	}
-	return h
+	/*
+		h, err := trust.SignStrings(uuid)
+		if err != nil {
+			log.Fatalf("cannot forge a uniq token: %s", err)
+		}
+		return h
+	*/
 }
 
 func InitWorkspace0(ctx Context) {
@@ -413,6 +338,8 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 			if exitCode > 0 {
 				return
 			}
+			// Recursive call once test suite initialized
+			return PerformTest(ctx, cmdAndArgs, assertions)
 		} else {
 			log.Fatalf("cannot load context: %s", err)
 		}

@@ -99,27 +99,34 @@ Done:
 		- If workspace dir change or ppid change => can use a token
 - @init=testsuite => clear all matching testsuite
 - @test=testsuite => find a matching testsuite. If none => init a new one. If muliple => fail
+- @report => by default report all testsuites
+
 
 TODO:
 Bugs:
 
 Features :
-- @report => by default report all testsuites
+- New operators != "not match exactly" !~ "not contains"
+- New regex matching with new operators :
+	- =/PATTERN/FLAGS "exactly match regexp"
+	- ~/PATTERN/FLAGS "contains match regexp"
+	- !/PATTERN/FLAGS "not match regexp"
+- @silent config hide success
 - Rules as constants sorted by type in collections => if rule not in collection fail
+- @mock des appels de commande
+- @before=TEST_SUITE CMD ARG_1 ARG_2 ... ARG_N => execute CMD before each test
+- @after=TEST_SUITE CMD ARG_1 ARG_2 ... ARG_N => execute CMD after each test
+- Run en option les tests dans un conteneur => plus facile de mocké, meilleur reproductibilité des tests
 
 - possibilité de passer un scénario ligne à ligne dans le stdin de cmdtest
 	- cmdt cmd arg1 argN @scenario=filepath
 	- pour chaque ligne du scenario concat la ligne du scenario avec les arguments fournit en paramétre de cmdt
 
-- @mock des appels de commande
-- @before=TEST_SUITE CMD ARG_1 ARG_2 ... ARG_N => execute CMD before each test
-- @after=TEST_SUITE CMD ARG_1 ARG_2 ... ARG_N => execute CMD after each test
-
 - @runCount=N + @parallel=FORK_COUNT (min, max, median exec time) run in separate context or in same context (before/after) ?
 
 - @fork=5 global config only by default instead of @parallel. Fork = 5 increment and decrement a seq file
 - Clean old temp dir (older than 2 min ?)
-- Run en option les tests dans un conteneur => plus facile de mocké, meilleur reproductibilité des tests
+
 
 - may chroot be interesting for tests ?
 - mock web spawning a web server ?
