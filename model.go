@@ -57,6 +57,7 @@ type Context struct {
 	PrintToken    bool
 	ExportToken   bool
 	ReportAll     bool
+	Silent        *bool         `yaml:""`
 	Ignore        *bool         `yaml:""`
 	StopOnFailure *bool         `yaml:""`
 	KeepStdout    *bool         `yaml:""`

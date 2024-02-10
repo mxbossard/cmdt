@@ -237,6 +237,11 @@ func ApplyConfig(c *Context, ruleExpr string) (ok bool, rule Rule, err error) {
 	var boolVal bool
 	if ok {
 		switch rule.Name {
+		case "global":
+			c.Action = Action(rule.Name)
+			if rule.Op != "" || rule.Expected != "" {
+				err = fmt.Errorf("rule %s%s does not accept an operator nor a value", rule.Prefix, rule.Name)
+			}
 		case "init", "report":
 			suiteName := rule.Expected
 			err = Validate[string](rule, suiteName, TestNameValidater)
@@ -625,19 +630,21 @@ func ValidateOnceOnlyDefinedRule(rules ...Rule) (err error) {
 func ValidateMutualyExclusiveRules(rules ...Rule) (err error) {
 	// FIXME: stdout= and stdout~ are ME ; stdout= and stdout= are ME but stdout~ and stdout~ are not ME
 	MutualyExclusiveRules := [][]RuleKey{
-		{{"init", "all"}, {"test", "all"}, {"report", "all"}},
+		{{"init", "all"}, {"test", "all"}, {"report", "all"}, {"global", "all"}},
 		{{"fail", "all"}, {"success", "all"}, {"exit", "all"}},
 		{{"test", "all"}, {"token", ""}},
 		{{"report", "all"}, {"token", ""}},
 	}
 
 	exlusiveRules := MutualyExclusiveRules
+	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{"global", "all"}, RuleKey{"success", "all"}, RuleKey{"fail", "all"}, RuleKey{"exit", "all"}, RuleKey{"stdout", "all"},
+		RuleKey{"stderr", "all"}, RuleKey{"exists", "all"}, RuleKey{"exists", "cmd"})...)
 	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{"init", "all"}, RuleKey{"success", "all"}, RuleKey{"fail", "all"}, RuleKey{"exit", "all"}, RuleKey{"stdout", "all"},
-		RuleKey{"stderr", "all"}, RuleKey{"exists", "all"})...)
+		RuleKey{"stderr", "all"}, RuleKey{"exists", "all"}, RuleKey{"exists", "cmd"})...)
 	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{"test", "all"}, RuleKey{"suiteTimeout", "all"}, RuleKey{"forkCount", "all"})...)
 	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{"report", "all"}, RuleKey{"fork", "all"}, RuleKey{"suiteTimeout", "all"}, RuleKey{"before", "all"},
 		ruleKey("after"), ruleKey("ignore"), ruleKey("stopOnFailure"), ruleKey("keepStdout"), ruleKey("keepStderr"), ruleKey("keepOutputs"), ruleKey("timeout"),
-		ruleKey("runCount"), ruleKey("parallel"), ruleKey("success"), ruleKey("fail"), ruleKey("exit"), ruleKey("stdout"), ruleKey("stderr"), ruleKey("exists"))...)
+		ruleKey("runCount"), ruleKey("parallel"), ruleKey("success"), ruleKey("fail"), ruleKey("exit"), ruleKey("stdout"), ruleKey("stderr"), ruleKey("exists"), RuleKey{"exists", "cmd"})...)
 	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("keepOutputs"), ruleKey("keepStdout"), ruleKey("keepStderr"))...)
 	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("stdout", "="), ruleKey("stdout", "~"), ruleKey("stdout", "!~"), ruleKey("stdout", "!="), ruleKey("stdout", ":"), ruleKey("stdout", "!:"))...)
 	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("stderr", "="), ruleKey("stderr", "~"), ruleKey("stderr", "!~"), ruleKey("stderr", "!="), ruleKey("stderr", ":"), ruleKey("stderr", "!:"))...)

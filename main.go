@@ -110,6 +110,7 @@ TODO:
 Bugs:
 
 Features :
+- @global action for global config (config for all test suites)
 - @silent config hide success
 - Rules as constants sorted by type in collections => if rule not in collection fail
 - @mock des appels de commande

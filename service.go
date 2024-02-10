@@ -217,6 +217,12 @@ func InitWorkspace0(ctx Context) {
 	stdPrinter.Flush()
 }
 
+func GlobalConfig(ctx Context) (exitCode int) {
+	// TODO: persist global config outside a test suite
+	// TDOD: merge global config on testsuite loadingg config
+	return
+}
+
 func InitTestSuite(ctx Context) (exitCode int) {
 	exitCode = 0
 	token := ctx.Token
@@ -546,6 +552,8 @@ func ProcessArgs(allArgs []string) {
 	}
 
 	switch config.Action {
+	case "global":
+		exitCode = GlobalConfig(config)
 	case "init":
 		exitCode = InitTestSuite(config)
 	case "test":
