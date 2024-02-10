@@ -99,12 +99,25 @@ func TestBuildAssertion(t *testing.T) {
 	assert.Equal(t, "=", assertion.Op)
 	assert.Equal(t, "", assertion.Expected)
 
-	ok, assertion, err = BuildAssertion("@stdout~baz")
+	ok, assertion, err = BuildAssertion("@stdout:baz")
+	assert.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, "stdout", assertion.Name)
+	assert.Equal(t, ":", assertion.Op)
+	assert.Equal(t, "baz", assertion.Expected)
+
+	ok, assertion, err = BuildAssertion("@stdout~/baz/i")
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, "stdout", assertion.Name)
 	assert.Equal(t, "~", assertion.Op)
-	assert.Equal(t, "baz", assertion.Expected)
+	assert.Equal(t, "(?i)baz", assertion.Expected)
+
+	ok, assertion, err = BuildAssertion("@stdout~/baz")
+	assert.Error(t, err)
+
+	ok, assertion, err = BuildAssertion("@stdout~")
+	assert.Error(t, err)
 
 	ok, assertion, err = BuildAssertion("@stdout+")
 	assert.Error(t, err)

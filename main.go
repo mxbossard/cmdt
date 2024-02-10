@@ -100,24 +100,27 @@ Done:
 - @init=testsuite => clear all matching testsuite
 - @test=testsuite => find a matching testsuite. If none => init a new one. If muliple => fail
 - @report => by default report all testsuites
-
+- New operators != "not match exactly" !~ "not contains"
+- New regex matching with new operators :
+	- replace ~ used in contains by :
+	- ~/PATTERN/FLAGS "contains match regexp"
+	- !~/PATTERN/FLAGS "not match regexp"
 
 TODO:
 Bugs:
 
 Features :
-- New operators != "not match exactly" !~ "not contains"
-- New regex matching with new operators :
-	- =/PATTERN/FLAGS "exactly match regexp"
-	- ~/PATTERN/FLAGS "contains match regexp"
-	- !/PATTERN/FLAGS "not match regexp"
 - @silent config hide success
 - Rules as constants sorted by type in collections => if rule not in collection fail
 - @mock des appels de commande
 - @before=TEST_SUITE CMD ARG_1 ARG_2 ... ARG_N => execute CMD before each test
 - @after=TEST_SUITE CMD ARG_1 ARG_2 ... ARG_N => execute CMD after each test
+- move seq into utils module
 - Run en option les tests dans un conteneur => plus facile de mocké, meilleur reproductibilité des tests
-
+	- Fournir une image pour tester l'éxecution dans cette image
+	- Reset l'image à chaque test suite ou à chaque test en option
+	- Mock les executable avec un chemin absolu
+	- Utiliser une image par défaut pour les cas d'usage simples
 - possibilité de passer un scénario ligne à ligne dans le stdin de cmdtest
 	- cmdt cmd arg1 argN @scenario=filepath
 	- pour chaque ligne du scenario concat la ligne du scenario avec les arguments fournit en paramétre de cmdt

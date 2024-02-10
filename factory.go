@@ -32,7 +32,7 @@ func IsRule(s string) bool {
 
 func SplitRuleExpr(ruleExpr string) (ok bool, r Rule) {
 	ok = false
-	assertionRulePattern := regexp.MustCompile("^" + RulePrefix() + "([a-zA-Z]+)([=~!]{1,2})?(.+)?$")
+	assertionRulePattern := regexp.MustCompile("^" + RulePrefix() + "([a-zA-Z]+)([=~:!]{1,2})?(.+)?$")
 	submatch := assertionRulePattern.FindStringSubmatch(ruleExpr)
 	if submatch != nil {
 		ok = true
@@ -102,6 +102,38 @@ func ExistsMapper(s string) (v []string, err error) {
 	return
 }
 
+func RegexpPatternMapper(s string) (c *regexp.Regexp, err error) {
+	if len(s) < 2 {
+		err = fmt.Errorf("regexp pattern must be of form /PATTERN/FLAGS")
+		return
+	}
+	separator := s[0:1] // First char is the spearator
+	sepCount := strings.Count(s, separator)
+	if sepCount != 2 {
+		err = fmt.Errorf("regexp pattern must be of form /PATTERN/FLAGS")
+		return
+	}
+	splitted := strings.Split(s, separator)
+	pattern := splitted[1]
+	flags := splitted[2]
+	for _, flag := range flags {
+		switch flag {
+		case 'i', 'm', 's', 'u':
+		default:
+			err = fmt.Errorf("flag: %v is not supported. valid flags are: i m s u", flag)
+			return
+		}
+	}
+	if len(flags) > 0 {
+		flags = "(?" + flags + ")"
+	}
+	c, err = regexp.Compile(flags + pattern)
+	if err != nil {
+		return
+	}
+	return
+}
+
 func IntValueValidater(min, max int) Validater[int] {
 	return func(rule Rule, n int) (err error) {
 		if n < min || n > max {
@@ -114,7 +146,7 @@ func IntValueValidater(min, max int) Validater[int] {
 func OperatorValidater[T any](ops ...string) Validater[T] {
 	return func(rule Rule, v T) (err error) {
 		if !collections.Contains[string](&ops, rule.Op) {
-			err = fmt.Errorf("rule %s%s operator must be one of: [%s]", rule.Prefix, rule.Name, ops)
+			err = fmt.Errorf("rule %s%s%s bad operator. Must be one of: [%s]", rule.Prefix, rule.Name, rule.Op, ops)
 		}
 		return
 	}
@@ -325,48 +357,88 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 				return
 			}
 		case "stdout":
-			var fileContent string
-			fileContent, err = Translate(assertion.Rule, FileContentMapper, OperatorValidater[string]("=", "~", "!=", "!~"), NotEmptyForOpValidater[string]("~", "!~"))
-			if err != nil {
-				return
-			}
-			assertion.Expected = fileContent
-			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
-				res.Value = cmd.StdoutRecord()
-				if assertion.Rule.Op == "=" {
-					res.Success = cmd.StdoutRecord() == fileContent
-				} else if assertion.Rule.Op == "~" {
-					res.Success = strings.Contains(cmd.StdoutRecord(), fileContent)
-				} else if assertion.Rule.Op == "!=" {
-					res.Success = cmd.StdoutRecord() != fileContent
-				} else if assertion.Rule.Op == "!~" {
-					res.Success = !strings.Contains(cmd.StdoutRecord(), fileContent)
-				} else {
-					err = fmt.Errorf("rule %s%s must use an operator '=' or '~'", assertion.Rule.Prefix, assertion.Rule.Name)
+			if assertion.Op == "~" || assertion.Op == "!~" {
+				var regexpPattern *regexp.Regexp
+				regexpPattern, err = Translate(assertion.Rule, RegexpPatternMapper, OperatorValidater[*regexp.Regexp]("~", "!~"), NotEmptyValidater[*regexp.Regexp])
+				if err != nil {
+					return
 				}
-				return
+				assertion.Expected = regexpPattern.String()
+				assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+					res.Value = cmd.StdoutRecord()
+					if assertion.Rule.Op == "~" {
+						res.Success = regexpPattern.MatchString(cmd.StdoutRecord())
+					} else if assertion.Rule.Op == "!~" {
+						res.Success = !regexpPattern.MatchString(cmd.StdoutRecord())
+					} else {
+						err = fmt.Errorf("rule %s%s must use an operator '~' or '!~'", assertion.Rule.Prefix, assertion.Rule.Name)
+					}
+					return
+				}
+			} else {
+				var fileContent string
+				fileContent, err = Translate(assertion.Rule, FileContentMapper, OperatorValidater[string]("=", ":", "!=", "!:"), NotEmptyForOpValidater[string](":", "!:"))
+				if err != nil {
+					return
+				}
+				assertion.Expected = fileContent
+				assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+					res.Value = cmd.StdoutRecord()
+					if assertion.Rule.Op == "=" {
+						res.Success = cmd.StdoutRecord() == fileContent
+					} else if assertion.Rule.Op == ":" {
+						res.Success = strings.Contains(cmd.StdoutRecord(), fileContent)
+					} else if assertion.Rule.Op == "!=" {
+						res.Success = cmd.StdoutRecord() != fileContent
+					} else if assertion.Rule.Op == "!:" {
+						res.Success = !strings.Contains(cmd.StdoutRecord(), fileContent)
+					} else {
+						err = fmt.Errorf("rule %s%s must use an operator '=' or ':'", assertion.Rule.Prefix, assertion.Rule.Name)
+					}
+					return
+				}
 			}
 		case "stderr":
-			var fileContent string
-			fileContent, err = Translate(assertion.Rule, FileContentMapper, OperatorValidater[string]("=", "~", "!=", "!~"), NotEmptyForOpValidater[string]("~", "!~"))
-			if err != nil {
-				return
-			}
-			assertion.Expected = fileContent
-			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
-				res.Value = cmd.StderrRecord()
-				if assertion.Rule.Op == "=" {
-					res.Success = cmd.StderrRecord() == fileContent
-				} else if assertion.Rule.Op == "~" {
-					res.Success = strings.Contains(cmd.StderrRecord(), fileContent)
-				} else if assertion.Rule.Op == "!=" {
-					res.Success = cmd.StderrRecord() != fileContent
-				} else if assertion.Rule.Op == "!~" {
-					res.Success = !strings.Contains(cmd.StderrRecord(), fileContent)
-				} else {
-					err = fmt.Errorf("rule %s%s must use an operator '=' or '~'", assertion.Rule.Prefix, assertion.Rule.Name)
+			if assertion.Op == "~" || assertion.Op == "!~" {
+				var regexpPattern *regexp.Regexp
+				regexpPattern, err = Translate(assertion.Rule, RegexpPatternMapper, OperatorValidater[*regexp.Regexp]("~", "!~"), NotEmptyValidater[*regexp.Regexp])
+				if err != nil {
+					return
 				}
-				return
+				assertion.Expected = regexpPattern.String()
+				assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+					res.Value = cmd.StderrRecord()
+					if assertion.Rule.Op == "~" {
+						res.Success = regexpPattern.MatchString(cmd.StderrRecord())
+					} else if assertion.Rule.Op == "!~" {
+						res.Success = !regexpPattern.MatchString(cmd.StderrRecord())
+					} else {
+						err = fmt.Errorf("rule %s%s must use an operator '~' or '!~'", assertion.Rule.Prefix, assertion.Rule.Name)
+					}
+					return
+				}
+			} else {
+				var fileContent string
+				fileContent, err = Translate(assertion.Rule, FileContentMapper, OperatorValidater[string]("=", ":", "!=", "!:"), NotEmptyForOpValidater[string](":", "!:"))
+				if err != nil {
+					return
+				}
+				assertion.Expected = fileContent
+				assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+					res.Value = cmd.StderrRecord()
+					if assertion.Rule.Op == "=" {
+						res.Success = cmd.StderrRecord() == fileContent
+					} else if assertion.Rule.Op == ":" {
+						res.Success = strings.Contains(cmd.StderrRecord(), fileContent)
+					} else if assertion.Rule.Op == "!=" {
+						res.Success = cmd.StderrRecord() != fileContent
+					} else if assertion.Rule.Op == "!:" {
+						res.Success = !strings.Contains(cmd.StderrRecord(), fileContent)
+					} else {
+						err = fmt.Errorf("rule %s%s must use an operator '=' or '~'", assertion.Rule.Prefix, assertion.Rule.Name)
+					}
+					return
+				}
 			}
 		case "cmd":
 			var cmdAndArgs []string
@@ -531,7 +603,9 @@ func ruleKey(s ...string) (r RuleKey) {
 // ValidateOnceOnlyDefinedRule => verify rules which cannot be defined multiple times are not defined twice or more
 func ValidateOnceOnlyDefinedRule(rules ...Rule) (err error) {
 	multiDefinedRules := []RuleKey{
-		{"stdout", "~"}, {"stderr", "~"}, {"stdout", "!~"}, {"stderr", "!~"}, {"stdout", "!="}, {"stderr", "!="},
+		{"stdout", "~"}, {"stderr", "~"}, {"stdout", "!~"}, {"stderr", "!~"},
+		{"stdout", "!="}, {"stderr", "!="},
+		{"stdout", ":"}, {"stderr", ":"}, {"stdout", "!:"}, {"stderr", "!:"},
 	}
 	matches := map[RuleKey][]Rule{}
 	for _, rule := range rules {
@@ -565,8 +639,8 @@ func ValidateMutualyExclusiveRules(rules ...Rule) (err error) {
 		ruleKey("after"), ruleKey("ignore"), ruleKey("stopOnFailure"), ruleKey("keepStdout"), ruleKey("keepStderr"), ruleKey("keepOutputs"), ruleKey("timeout"),
 		ruleKey("runCount"), ruleKey("parallel"), ruleKey("success"), ruleKey("fail"), ruleKey("exit"), ruleKey("stdout"), ruleKey("stderr"), ruleKey("exists"))...)
 	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("keepOutputs"), ruleKey("keepStdout"), ruleKey("keepStderr"))...)
-	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("stdout", "="), ruleKey("stdout", "~"), ruleKey("stdout", "!~"), ruleKey("stdout", "!="))...)
-	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("stderr", "="), ruleKey("stderr", "~"), ruleKey("stderr", "!~"), ruleKey("stderr", "!="))...)
+	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("stdout", "="), ruleKey("stdout", "~"), ruleKey("stdout", "!~"), ruleKey("stdout", "!="), ruleKey("stdout", ":"), ruleKey("stdout", "!:"))...)
+	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("stderr", "="), ruleKey("stderr", "~"), ruleKey("stderr", "!~"), ruleKey("stderr", "!="), ruleKey("stderr", ":"), ruleKey("stderr", "!:"))...)
 
 	// Compter le nombre de match pour chaque key
 	// Pour chaque MER compter le nombre de key

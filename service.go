@@ -491,8 +491,10 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 				if expected != got {
 					if assertOp == "=" {
 						stdPrinter.Errf("Expected %s%s to be: [%s] but got: [%v]\n", assertPrefix, assertName, expected, got)
-					} else if assertOp == "~" {
+					} else if assertOp == ":" {
 						stdPrinter.Errf("Expected %s%s to contains: [%s] but got: [%v]\n", assertPrefix, assertName, expected, got)
+					} else if assertOp == "~" {
+						stdPrinter.Errf("Expected %s%s to match: [%s] but got: [%v]\n", assertPrefix, assertName, expected, got)
 					}
 				} else {
 					stdPrinter.Errf("assertion %s%s%s%s failed\n", assertPrefix, assertName, assertOp, expected)
