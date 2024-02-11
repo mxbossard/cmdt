@@ -39,9 +39,11 @@ die() {
 # - Il est facile de sortir un test de la bonne test suite, et ce test ne sera jamais report !
 # => Should @report report all opened tests suites by default ?
 
+#$cmdt @global @silent
+
 >&2 echo
 >&2 echo "## Test cmdt basic assertions should passed"
-$cmdt @init=should_succeed @stopOnFailure=false
+$cmdt @init=should_succeed @stopOnFailure=false @silent
 
 $cmdt @test=should_succeed/ true
 $cmdt @test=should_succeed/ true @success
@@ -76,7 +78,7 @@ $cmdt @test=should_succeed/ sh -c ">&2 echo foo bar" @stderr="foo bar\n" @stdout
 
 >&2 echo
 >&2 echo "## Test cmdt basic assertions should failed"
-$cmdt @init=should_fail @stopOnFailure=false
+$cmdt @init=should_fail @stopOnFailure=false @silent
 
 $cmdt @test=should_fail/ false
 $cmdt @test=should_fail/ true @fail
@@ -105,6 +107,7 @@ $cmdt @report=should_succeed
 >&2 echo
 >&2 echo "## Test @report without test"
 expectedNothingToReportStderr="you must perform some test prior to report"
+$cmdt @init=meta1 @silent
 $cmdt @test=meta1/ @fail @stderr:"$expectedNothingToReportStderr" -- $cmdt @report=foo
 $cmdt @test=meta1/ @fail @stderr:"$expectedNothingToReportStderr" -- $cmdt @report=foo
 
@@ -118,6 +121,7 @@ $cmdt @test=meta1/ @fail -- $cmdt @report
 >&2 echo "## Test printed token"
 tk0=$( $cmdt @init @printToken )
 >&2 echo "token: $tk0"
+$cmdt @init=meta2 @silent
 $cmdt @test=meta2/ @stderr:"PASSED" @stderr:"#01" -- $cmdt true @token=$tk0
 $cmdt @test=meta2/ @stderr:"PASSED" @stderr:"#02" -- $cmdt true @token=$tk0
 $cmdt @test=meta2/ @fail -- $cmdt @report
@@ -128,11 +132,13 @@ $cmdt @report 2>&1 | grep -v "Failures"
 >&2 echo "## Test exported token"
 eval $( $cmdt @init @exportToken )
 >&2 echo "token: $__CMDT_TOKEN"
+$cmdt @init=meta3 @silent
 $cmdt @test=meta3/ @stderr:"PASSED" @stderr:"#01" -- $cmdt true
 $cmdt @test=meta3/ @stderr:"PASSED" @stderr:"#02" -- $cmdt true
 $cmdt @test=meta3/ @stderr:"Successfuly ran" -- $cmdt @report=main
 $cmdt @test=meta3/ @fail @stderr:"$expectedNothingToReportStderr" -- $cmdt @report @token=$tk0
 
+$cmdt @init=meta4 @silent
 $cmdt @test=meta4/ @stderr:"PASSED" @stderr:"#01" -- $cmdt @test=sub4/ true
 $cmdt @test=meta4/ @stderr:"PASSED" @stderr:"#02" -- $cmdt @test=sub4/ true
 $cmdt @test=meta4/ @stderr:"Successfuly ran" -- $cmdt @report=sub4
@@ -142,6 +148,7 @@ export -n __CMDT_TOKEN
 
 >&2 echo
 >&2 echo "## Test usage"
+$cmdt @init=meta @silent
 $cmdt @test=meta/ @fail @stderr:"usage:" -- $cmdt
 
 >&2 echo
@@ -180,15 +187,17 @@ eval $( $cmdt @test=meta/ @keepStdout -- $cmdt @init=t1 @exportToken)
 >&2 echo
 >&2 echo "## Test assertions outputs"
 # Init the context used in t1 test suite
+$cmdt @init=meta @silent
 $cmdt @test=meta/ @stderr:"#01..." @stderr:"PASSED" -- $cmdt true @test=t1/
 $cmdt @test=meta/ @stderr:"#02..." @stderr:"PASSED" -- $cmdt true @test=t1/
 $cmdt @test=meta/ @stderr:"#03..." @stderr:"FAILED" -- $cmdt false @test=t1/
 $cmdt @test=meta/ @stderr:"#04..." @stderr:"PASSED" -- $cmdt false @fail @test=t1/
-$cmdt @test=meta/ @fail @stderr:"Failures in t1 test suite (3 success, 1 failures, 4 tests in" -- $cmdt @report=t1
+$cmdt @test=meta/ @fail @stderr:"Failures in [t1] test suite (3 success, 1 failures, 4 tests in" -- $cmdt @report=t1
 
 
 >&2 echo
 >&2 echo "## Test namings"
+$cmdt @init=naming @silent
 $cmdt @test=naming/ @stderr:"Test [main]/name1 #01..." @stderr:"PASSED" -- $cmdt true @test=name1
 $cmdt @test=naming/ @stderr:"Test [main]/name2 #02..." @stderr:"PASSED" -- $cmdt true @test=name2
 $cmdt @test=naming/ @stderr:"Test [main]/" @stderr:"true" @stderr:"#03..." @stderr:"PASSED" -- $cmdt true
@@ -197,13 +206,14 @@ $cmdt @test=naming/ @stderr:"Test [suite1]/name1 #01..." @stderr:"PASSED" -- $cm
 $cmdt @test=naming/ @stderr:"Test [suite1]/name2 #02..." @stderr:"PASSED" -- $cmdt true @test=suite1/name2
 $cmdt @test=naming/ @stderr:"Test [suite2]/" @stderr:"#01..." @stderr:"PASSED" -- $cmdt true @test=suite2/
 $cmdt @test=naming/ @stderr:"Test [suite2]/" @stderr:"#02..." @stderr:"PASSED" -- $cmdt true @test=suite2/
-$cmdt @test=naming/ @stderr:"Successfuly ran suite1 test suite" -- $cmdt  @report=suite1
-$cmdt @test=naming/ @stderr:"Successfuly ran suite2 test suite" -- $cmdt @report=suite2
-$cmdt @test=naming/ @stderr:"Successfuly ran main test suite" -- $cmdt @report=main
+$cmdt @test=naming/ @stderr:"Successfuly ran [suite1] test suite" -- $cmdt  @report=suite1
+$cmdt @test=naming/ @stderr:"Successfuly ran [suite2] test suite" -- $cmdt @report=suite2
+$cmdt @test=naming/ @stderr:"Successfuly ran [main] test suite" -- $cmdt @report=main
 
 
 >&2 echo
 >&2 echo "## Test rules missusage"
+$cmdt @init=failing_rule_missusage @silent
 $cmdt @test=failing_rule_missusage/ @fail -- $cmdt @init true
 $cmdt @test=failing_rule_missusage/ @fail -- $cmdt @init @test
 $cmdt @test=failing_rule_missusage/ @fail -- $cmdt @init @report
@@ -225,6 +235,7 @@ $cmdt @test=failing_rule_missusage/ @fail @stderr:donotexist -- $cmdt true @dono
 
 >&2 echo
 >&2 echo "## Test assertion"
+$cmdt @init=assertion @silent
 $cmdt @test=assertion/ @stderr:PASSED -- $cmdt true
 $cmdt @test=assertion/ @stderr:PASSED -- $cmdt true @success
 $cmdt @test=assertion/ @stderr:FAILED -- $cmdt true @fail
@@ -264,11 +275,12 @@ $cmdt @test=assertion/ @fail -- $cmdt @report=main
 
 >&2 echo
 >&2 echo "## Test @ignore"
+$cmdt @init=test_config @silent
 $cmdt @test=test_config/ @stderr:Ignore -- $cmdt true @ignore
 $cmdt @test=test_config/ @stderr:Ignore @stderr!:FAILED @stderr!:PASSED -- $cmdt true @ignore
 $cmdt @test=test_config/ @stderr:Ignore @stderr!:FAILED @stderr!:PASSED -- $cmdt false @ignore
 
-$cmdt @test=assertion/ -- $cmdt @report=main 
+$cmdt @test=test_config/ -- $cmdt @report=main 
 
 
 >&2 echo

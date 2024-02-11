@@ -105,13 +105,14 @@ Done:
 	- replace ~ used in contains by :
 	- ~/PATTERN/FLAGS "contains match regexp"
 	- !~/PATTERN/FLAGS "not match regexp"
+- @global action for global config (config for all test suites)
+- @silent config hide success
 
 TODO:
 Bugs:
 
 Features :
-- @global action for global config (config for all test suites)
-- @silent config hide success
+
 - Rules as constants sorted by type in collections => if rule not in collection fail
 - @mock des appels de commande
 - @before=TEST_SUITE CMD ARG_1 ARG_2 ... ARG_N => execute CMD before each test

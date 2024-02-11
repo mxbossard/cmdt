@@ -94,7 +94,10 @@ func listTestSuites(token string) (suites []string) {
 		log.Fatalf("cannot list test suites: %s", err)
 	}
 	for _, m := range matches {
-		suites = append(suites, filepath.Base(m))
+		testSuite := filepath.Base(m)
+		if testSuite != GlobalConfigTestSuiteName {
+			suites = append(suites, testSuite)
+		}
 	}
 	return
 }
@@ -168,7 +171,7 @@ func PersistSuiteContext(testSuite, token string, config Context) {
 	}
 }
 
-func LoadSuiteContext(testSuite, token string) (config Context, err error) {
+func readSuiteContext(testSuite, token string) (config Context, err error) {
 	contextFilepath := testConfigFilepath(testSuite, token)
 	var content []byte
 	content, err = os.ReadFile(contextFilepath)
@@ -180,6 +183,20 @@ func LoadSuiteContext(testSuite, token string) (config Context, err error) {
 		log.Fatal(err)
 	}
 
+	return
+}
+
+func LoadSuiteContext(testSuite, token string) (config Context, err error) {
+	var globalCtx, suiteCtx Context
+	globalCtx, err = readSuiteContext(GlobalConfigTestSuiteName, token)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return
+	}
+	suiteCtx, err = readSuiteContext(testSuite, token)
+	if err != nil {
+		return
+	}
+	config = MergeContext(globalCtx, suiteCtx)
 	SetRulePrefix(config.Prefix)
 	return
 }
@@ -202,25 +219,48 @@ func UniqToken() string {
 	*/
 }
 
-func InitWorkspace0(ctx Context) {
+func initWorkspace(ctx Context) {
 	token := ctx.Token
 	testSuite := ctx.TestSuite
 
 	// init the tmp directory
 	tmpDir := testsuiteDirectoryPath(testSuite, token)
-	err := os.MkdirAll(tmpDir, 0700)
+	_, err := os.Stat(tmpDir)
+	if err == nil {
+		// Workspace already initialized
+		return
+	} else if !errors.Is(err, os.ErrNotExist) {
+		log.Fatal(err)
+	}
+
+	err = os.MkdirAll(tmpDir, 0700)
 	if err != nil {
 		log.Fatalf("Unable to create temp dir: %s ! Error: %s", tmpDir, err)
 	}
 
-	stdPrinter.ColoredErrf(messageColor, "Initialized new [%s] workspace.\n", token)
+	if ctx.Silent == nil || !*ctx.Silent {
+		stdPrinter.ColoredErrf(messageColor, "Initialized new [%s] workspace.\n", token)
+	}
+
 	stdPrinter.Flush()
 }
 
+func initConfig(ctx Context) {
+	token := ctx.Token
+	testSuite := ctx.TestSuite
+
+	// init the tmp directory
+	ctx.StartTime = time.Now()
+	// store config
+	PersistSuiteContext(testSuite, token, ctx)
+	InitSeq(testSuite, token)
+}
+
 func GlobalConfig(ctx Context) (exitCode int) {
-	// TODO: persist global config outside a test suite
-	// TDOD: merge global config on testsuite loadingg config
-	return
+	ctx.TestSuite = GlobalConfigTestSuiteName
+	initWorkspace(ctx)
+	initConfig(ctx)
+	return 0
 }
 
 func InitTestSuite(ctx Context) (exitCode int) {
@@ -238,27 +278,16 @@ func InitTestSuite(ctx Context) (exitCode int) {
 		ctx.Token = token
 	}
 
-	// init the tmp directory
-	tmpDir := testsuiteDirectoryPath(testSuite, token)
-	err := os.RemoveAll(tmpDir)
-	if err != nil {
-		log.Fatalf("Unable to erase temp dir (%s): %s", tmpDir, err)
-	}
-	err = os.MkdirAll(tmpDir, 0700)
-	if err != nil {
-		log.Fatalf("unable to create temp dir (%s): %s", tmpDir, err)
-	}
-	ctx.StartTime = time.Now()
-	// store config
-	PersistSuiteContext(testSuite, token, ctx)
-	InitSeq(testSuite, token)
-	// print export the key
+	initWorkspace(ctx)
+	initConfig(ctx)
 
-	var tokenMsg = ""
-	if token != "" {
-		tokenMsg = fmt.Sprintf(" (token: %s)", token)
+	if ctx.Silent == nil || !*ctx.Silent {
+		var tokenMsg = ""
+		if token != "" {
+			tokenMsg = fmt.Sprintf(" (token: %s)", token)
+		}
+		stdPrinter.ColoredErrf(messageColor, "Initialized new [%s] test suite%s.\n", testSuite, tokenMsg)
 	}
-	stdPrinter.ColoredErrf(messageColor, "Initialized new [%s] test suite%s.\n", testSuite, tokenMsg)
 	//stdPrinter.Errf("%s\n", tmpDir)
 	//stdPrinter.Errf("%s\n", context)
 	stdPrinter.Flush()
@@ -274,7 +303,7 @@ func ReportTestSuite(ctx Context) (exitCode int) {
 		// Report all test suites
 		testSuites := listTestSuites(token)
 		if testSuites != nil {
-			log.Printf("reporting found suites: %s", testSuites)
+			//log.Printf("reporting found suites: %s", testSuites)
 			for _, suite := range testSuites {
 				ctx, err := LoadSuiteContext(suite, token)
 				if err != nil {
@@ -306,7 +335,9 @@ func ReportTestSuite(ctx Context) (exitCode int) {
 	failureReports := failureReports(testSuite, token)
 	failedCount := len(failureReports)
 
-	stdPrinter.ColoredErrf(messageColor, "Reporting [%s] test suite ...\n", testSuite)
+	if ctx.Silent == nil || !*ctx.Silent {
+		stdPrinter.ColoredErrf(messageColor, "Reporting [%s] test suite ...\n", testSuite)
+	}
 
 	ignoredMessage := ""
 	if ignoredCount > 0 {
@@ -314,12 +345,12 @@ func ReportTestSuite(ctx Context) (exitCode int) {
 	}
 	if failedCount == 0 {
 		exitCode = 0
-		stdPrinter.ColoredErrf(successColor, "Successfuly ran %s test suite (%d tests in %s)", testSuite, testCount, time.Since(ctx.StartTime))
+		stdPrinter.ColoredErrf(successColor, "Successfuly ran [%s] test suite (%d tests in %s)", testSuite, testCount, time.Since(ctx.StartTime))
 		stdPrinter.ColoredErrf(warningColor, "%s", ignoredMessage)
 		stdPrinter.Errf("\n")
 	} else {
 		successCount := testCount - failedCount
-		stdPrinter.ColoredErrf(failureColor, "Failures in %s test suite (%d success, %d failures, %d tests in %s)", testSuite, successCount, failedCount, testCount, time.Since(ctx.StartTime))
+		stdPrinter.ColoredErrf(failureColor, "Failures in [%s] test suite (%d success, %d failures, %d tests in %s)", testSuite, successCount, failedCount, testCount, time.Since(ctx.StartTime))
 		stdPrinter.ColoredErrf(warningColor, "%s", ignoredMessage)
 		stdPrinter.Errf("\n")
 		for _, report := range failureReports {
@@ -381,7 +412,9 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 		qulifiedName = fmt.Sprintf("[%s]/%s", testSuite, testName)
 	}
 	if ctx.Ignore != nil && *ctx.Ignore {
-		stdPrinter.ColoredErrf(warningColor, "[%05d] Ignored test: %s\n", timecode, qulifiedName)
+		if ctx.Silent == nil || !*ctx.Silent {
+			stdPrinter.ColoredErrf(warningColor, "[%05d] Ignored test: %s\n", timecode, qulifiedName)
+		}
 		IncrementSeq(testSuite, token, IgnoredSequenceFilename)
 		return 0
 	}
@@ -411,7 +444,9 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 	cmd.AddEnviron(os.Environ())
 
 	testTitle := fmt.Sprintf("[%05d] Test %s #%02d", timecode, qulifiedName, seq)
-	stdPrinter.ColoredErrf(testColor, "%s... ", testTitle)
+	if ctx.Silent == nil || !*ctx.Silent {
+		stdPrinter.ColoredErrf(testColor, "%s... ", testTitle)
+	}
 
 	if *ctx.KeepStdout || *ctx.KeepStderr {
 		// NewLine because we expect cmd outputs
@@ -451,10 +486,15 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 	}
 
 	if exitCode == 0 {
-		stdPrinter.ColoredErrf(successColor, "PASSED")
-		stdPrinter.Errf(" (in %s)\n", testDuration)
+		if ctx.Silent == nil || !*ctx.Silent {
+			stdPrinter.ColoredErrf(successColor, "PASSED")
+			stdPrinter.Errf(" (in %s)\n", testDuration)
+		}
 		defer os.Remove(reportLog.Name())
 	} else {
+		if ctx.Silent == nil || *ctx.Silent {
+			stdPrinter.ColoredErrf(testColor, "%s... ", testTitle)
+		}
 		stdPrinter.ColoredErrf(failureColor, "FAILED")
 		if err == nil {
 			stdPrinter.Errf(" (in %s)\n", testDuration)

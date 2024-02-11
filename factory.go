@@ -61,7 +61,7 @@ func BoolMapper(s string) (v bool, err error) {
 	} else {
 		err = fmt.Errorf("bool rule value must be true or false")
 	}
-
+	//log.Printf("boolMapper: [%s] => %v", s, v)
 	return
 }
 
@@ -319,6 +319,9 @@ func ApplyConfig(c *Context, ruleExpr string) (ok bool, rule Rule, err error) {
 			boolVal, err = Translate(rule, BoolMapper, BooleanValidater)
 			c.ExportToken = boolVal
 		case "parallel":
+		case "silent":
+			boolVal, err = Translate(rule, BoolMapper, BooleanValidater)
+			c.Silent = &boolVal
 		default:
 			ok = false
 		}
@@ -599,6 +602,7 @@ func (r RuleKey) String() string {
 }
 func ruleKey(s ...string) (r RuleKey) {
 	r.Name = s[0]
+	r.Op = "all"
 	if len(s) > 1 {
 		r.Op = s[1]
 	}

@@ -20,9 +20,10 @@ type Asserter func(cmdz.Executer) (AssertionResult, error)
 type ConfigScope int
 
 const (
-	DefaultRulePrefix      = "@"
-	ContextTokenEnvVarName = "__CMDT_TOKEN"
-	DefaultTestSuiteName   = "main"
+	DefaultRulePrefix         = "@"
+	ContextTokenEnvVarName    = "__CMDT_TOKEN"
+	DefaultTestSuiteName      = "main"
+	GlobalConfigTestSuiteName = "__global"
 )
 
 const (
@@ -85,46 +86,55 @@ type AssertionResult struct {
 	Message   string
 }
 
-func MergeContext(suiteContext, testContext Context) Context {
-	suiteContext.TestName = testContext.TestName
-	suiteContext.Action = testContext.Action
-	if suiteContext.TestSuite == "" {
-		suiteContext.TestSuite = testContext.TestSuite
+func MergeContext(baseContext, overridingContext Context) Context {
+	baseContext.Token = overridingContext.Token
+	baseContext.Prefix = overridingContext.Prefix
+	baseContext.TestName = overridingContext.TestName
+	baseContext.Action = overridingContext.Action
+	if overridingContext.StartTime.Nanosecond() != 0 {
+		baseContext.StartTime = overridingContext.StartTime
 	}
 
-	if testContext.Ignore != nil {
-		suiteContext.Ignore = testContext.Ignore
-	}
-	if suiteContext.Ignore == nil {
-		suiteContext.Ignore = ptr.BoolPtr(false)
-	}
-	if testContext.StopOnFailure != nil {
-		suiteContext.StopOnFailure = testContext.StopOnFailure
-	}
-	if suiteContext.StopOnFailure == nil {
-		suiteContext.StopOnFailure = ptr.BoolPtr(false)
-	}
-	if testContext.KeepStdout != nil {
-		suiteContext.KeepStdout = testContext.KeepStdout
-	}
-	if suiteContext.KeepStdout == nil {
-		suiteContext.KeepStdout = ptr.BoolPtr(false)
-	}
-	if testContext.KeepStderr != nil {
-		suiteContext.KeepStderr = testContext.KeepStderr
-	}
-	if suiteContext.KeepStderr == nil {
-		suiteContext.KeepStderr = ptr.BoolPtr(false)
-	}
-	if testContext.Timeout.Nanoseconds() > 0 {
-		suiteContext.Timeout = testContext.Timeout
-	}
-	if testContext.RunCount != 0 {
-		suiteContext.RunCount = testContext.RunCount
-	}
-	if testContext.Parallel != 0 {
-		suiteContext.Parallel = testContext.Parallel
+	if baseContext.TestSuite == "" {
+		baseContext.TestSuite = overridingContext.TestSuite
 	}
 
-	return suiteContext
+	if overridingContext.Ignore != nil {
+		baseContext.Ignore = overridingContext.Ignore
+	}
+	if baseContext.Ignore == nil {
+		baseContext.Ignore = ptr.BoolPtr(false)
+	}
+	if overridingContext.StopOnFailure != nil {
+		baseContext.StopOnFailure = overridingContext.StopOnFailure
+	}
+	if baseContext.StopOnFailure == nil {
+		baseContext.StopOnFailure = ptr.BoolPtr(false)
+	}
+	if overridingContext.KeepStdout != nil {
+		baseContext.KeepStdout = overridingContext.KeepStdout
+	}
+	if baseContext.KeepStdout == nil {
+		baseContext.KeepStdout = ptr.BoolPtr(false)
+	}
+	if overridingContext.KeepStderr != nil {
+		baseContext.KeepStderr = overridingContext.KeepStderr
+	}
+	if baseContext.KeepStderr == nil {
+		baseContext.KeepStderr = ptr.BoolPtr(false)
+	}
+	if overridingContext.Timeout.Nanoseconds() > 0 {
+		baseContext.Timeout = overridingContext.Timeout
+	}
+	if overridingContext.RunCount != 0 {
+		baseContext.RunCount = overridingContext.RunCount
+	}
+	if overridingContext.Parallel != 0 {
+		baseContext.Parallel = overridingContext.Parallel
+	}
+	if overridingContext.Silent != nil {
+		baseContext.Silent = overridingContext.Silent
+	}
+
+	return baseContext
 }
