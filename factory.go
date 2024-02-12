@@ -469,12 +469,12 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 			if err != nil {
 				return
 			}
-			var path, permissions, owners string
+			var path, expectedPerms, owners string
 			if len(filepathRules) > 0 {
 				path = filepathRules[0]
 			}
 			if len(filepathRules) > 1 {
-				permissions = filepathRules[1]
+				expectedPerms = filepathRules[1]
 			}
 			if len(filepathRules) > 2 {
 				owners = filepathRules[2]
@@ -491,11 +491,12 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 				} else if err != nil {
 					return
 				}
-				if permissions != "" {
-					if permissions != stat.Mode().String() {
+				if expectedPerms != "" {
+					actualPerms := stat.Mode().String()
+					if expectedPerms != actualPerms {
 						res.Success = false
 						res.Value = stat.Mode().String()
-						res.Message = fmt.Sprintf("file %s have wrong permissions", path)
+						res.Message = fmt.Sprintf("file %s have wrong permissions. Expected: [%s] but got: [%s] ", path, expectedPerms, actualPerms)
 						return
 					}
 				}
@@ -556,7 +557,7 @@ func ParseArgs(args []string) (cfg Context, cmdAndArgs []string, assertions []As
 	statusAssertionFound := false
 	for _, a := range assertions {
 		// If no status assertion found add an implicit success rule
-		statusAssertionFound = statusAssertionFound || a.Name == "success" || a.Name == "fail" || a.Name == "exit"
+		statusAssertionFound = statusAssertionFound || a.Name == "success" || a.Name == "fail" || a.Name == "exit" // || a.Name == "cmd"
 	}
 	if !statusAssertionFound {
 		_, successAssertion, _ := BuildAssertion(RulePrefix() + "success")
@@ -636,6 +637,7 @@ func ValidateMutualyExclusiveRules(rules ...Rule) (err error) {
 	MutualyExclusiveRules := [][]RuleKey{
 		{{"init", "all"}, {"test", "all"}, {"report", "all"}, {"global", "all"}},
 		{{"fail", "all"}, {"success", "all"}, {"exit", "all"}},
+		//{{"fail", "all"}, {"success", "all"}, {"cmd", "all"}},
 		{{"test", "all"}, {"token", ""}},
 		{{"report", "all"}, {"token", ""}},
 	}

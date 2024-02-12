@@ -16,6 +16,9 @@ cmd="TO_REPLACE"
 cmdt="$GOBIN/cmdtest"
 ls -lh "$cmdt"
 
+cmdt0="$cmdt"
+cmdt1="$cmdt"
+
 mkdir -p "$scriptDir/.tmp"
 reportFile="$( mktemp "$scriptDir/.tmp/XXXXXX.log" )"
 rm -- "$scriptDir/.tmp/"*.log || true
@@ -41,7 +44,6 @@ die() {
 
 #$cmdt @global @silent
 
->&2 echo
 >&2 echo "## Test cmdt basic assertions should passed"
 $cmdt @init=should_succeed @stopOnFailure=false @silent
 
@@ -76,7 +78,6 @@ $cmdt @test=should_succeed/ sh -c ">&2 echo foo bar" @stderr!~/bar$/
 $cmdt @test=should_succeed/ sh -c ">&2 echo foo bar" @stderr:foo @stderr:bar
 $cmdt @test=should_succeed/ sh -c ">&2 echo foo bar" @stderr="foo bar\n" @stdout=
 
->&2 echo
 >&2 echo "## Test cmdt basic assertions should failed"
 $cmdt @init=should_fail @stopOnFailure=false @silent
 
@@ -104,20 +105,17 @@ $cmdt @report=should_succeed
 ! $cmdt @report=should_fail 2>&1 | grep "0 success" || die "should_fail test suite should have no success"
 
 
->&2 echo
 >&2 echo "## Test @report without test"
 expectedNothingToReportStderr="you must perform some test prior to report"
 $cmdt @init=meta1 @silent
 $cmdt @test=meta1/ @fail @stderr:"$expectedNothingToReportStderr" -- $cmdt @report=foo
 $cmdt @test=meta1/ @fail @stderr:"$expectedNothingToReportStderr" -- $cmdt @report=foo
 
->&2 echo
 >&2 echo "## Met1a test context not shared without token"
 $cmdt @test=meta1/ @stderr:"PASSED" @stderr:"#01" -- $cmdt true
 $cmdt @test=meta1/ @stderr:"PASSED" @stderr:"#01" -- $cmdt true
 $cmdt @test=meta1/ @fail -- $cmdt @report
 
->&2 echo
 >&2 echo "## Test printed token"
 tk0=$( $cmdt @init @printToken )
 >&2 echo "token: $tk0"
@@ -128,7 +126,6 @@ $cmdt @test=meta2/ @fail -- $cmdt @report
 $cmdt @test=meta2/ @stderr:"Successfuly ran" -- $cmdt @report @token=$tk0
 $cmdt @report 2>&1 | grep -v "Failures"
 
->&2 echo
 >&2 echo "## Test exported token"
 eval $( $cmdt @init @exportToken )
 >&2 echo "token: $__CMDT_TOKEN"
@@ -146,12 +143,10 @@ $cmdt @test=meta4/ @fail @stderr:"$expectedNothingToReportStderr" -- $cmdt @repo
 $cmdt @report 2>&1 | grep -v "Failures"
 export -n __CMDT_TOKEN
 
->&2 echo
 >&2 echo "## Test usage"
 $cmdt @init=meta @silent
 $cmdt @test=meta/ @fail @stderr:"usage:" -- $cmdt
 
->&2 echo
 >&2 echo "## Test cmdt basic assertions"
 $cmdt @test=meta/ @stderr:"PASSED" -- $cmdt true
 $cmdt @test=meta/ @stderr:"FAILED" -- $cmdt false
@@ -184,7 +179,6 @@ $cmdt @test=meta/ @stderr:"PASSED" -- $cmdt sh -c ">&2 echo foo bar" @stderr!=fo
 ## Forge a token for remaining tests
 eval $( $cmdt @test=meta/ @keepStdout -- $cmdt @init=t1 @exportToken)
 
->&2 echo
 >&2 echo "## Test assertions outputs"
 # Init the context used in t1 test suite
 $cmdt @init=meta @silent
@@ -195,7 +189,6 @@ $cmdt @test=meta/ @stderr:"#04..." @stderr:"PASSED" -- $cmdt false @fail @test=t
 $cmdt @test=meta/ @fail @stderr:"Failures in [t1] test suite (3 success, 1 failures, 4 tests in" -- $cmdt @report=t1
 
 
->&2 echo
 >&2 echo "## Test namings"
 $cmdt @init=naming @silent
 $cmdt @test=naming/ @stderr:"Test [main]/name1 #01..." @stderr:"PASSED" -- $cmdt true @test=name1
@@ -211,7 +204,6 @@ $cmdt @test=naming/ @stderr:"Successfuly ran [suite2] test suite" -- $cmdt @repo
 $cmdt @test=naming/ @stderr:"Successfuly ran [main] test suite" -- $cmdt @report=main
 
 
->&2 echo
 >&2 echo "## Test rules missusage"
 $cmdt @init=failing_rule_missusage @silent
 $cmdt @test=failing_rule_missusage/ @fail -- $cmdt @init true
@@ -233,7 +225,42 @@ $cmdt @test=failing_rule_missusage/ @fail @stderr:donotexist -- $cmdt true @dono
 $cmdt @test=failing_rule_missusage/ @fail @stderr:donotexist -- $cmdt true @donotexist
 
 
->&2 echo
+>&2 echo "## Test config"
+$cmdt0 @init=test_config @silent
+
+$cmdt0 @test=test_config/ @stderr:Ignore @stderr!:FAILED @stderr!:PASSED -- $cmdt1 true @ignore
+$cmdt0 @test=test_config/ @stderr!:Ignore @stderr:PASSED -- $cmdt1 true
+$cmdt0 @test=test_config/ @stderr:Ignore @stderr!:FAILED @stderr!:PASSED -- $cmdt1 true @ignore
+$cmdt0 @test=test_config/ @stderr:Ignore @stderr!:FAILED @stderr!:PASSED -- $cmdt1 false @ignore
+$cmdt0 @test=test_config/ @stderr!:Ignore @stderr:PASSED -- $cmdt1 true
+
+$cmdt0 @test=test_config/ @stdout!:foo @stderr!:bar @stderr:PASSED -- $cmdt1 @test=test_keepouts sh -c "echo foo; >&2 echo bar"
+$cmdt0 @test=test_config/ @stdout~/^foo$/m @stderr!:bar @stderr:PASSED -- $cmdt1 @test=test_keepouts sh -c "echo foo; >&2 echo bar" @keepStdout
+$cmdt0 @test=test_config/ @stdout!:foo @stderr:bar @stderr:PASSED -- $cmdt1 @test=test_keepouts sh -c "echo foo; >&2 echo bar" @keepStderr
+$cmdt0 @test=test_config/ @stdout~/^foo$/m @stderr:bar @stderr:PASSED -- $cmdt1 @test=test_keepouts sh -c "echo foo; >&2 echo bar" @keepOutputs
+
+$cmdt0 @test=test_config/ @stderr:FAILED -- $cmdt1 sleep 0.01 @timeout=5ms
+$cmdt0 @test=test_config/ @stderr:PASSED -- $cmdt1 sleep 0.01 @timeout=30ms
+
+$cmdt0 @test=test_config/ @stderr:FAILED @success -- $cmdt1 false
+$cmdt0 @test=test_config/ @stderr:FAILED @fail -- $cmdt1 false @stopOnFailure
+$cmdt0 @test=test_config/ @stderr:FAILED @success -- $cmdt1 false
+
+$cmdt0 @test=test_config/ @fail -- $cmdt1 @report=main 
+
+
+>&2 echo "## Test suite config"
+$cmdt0 @init=suite_config @silent
+$cmdt0 @init=suite_config_silent @silent
+$cmdt0 @test=suite_config/ @stdout= @stderr= -- $cmdt1 @test=suite_config_silent/ echo foo
+$cmdt0 @test=suite_config/ @stderr:PASSED -- $cmdt1 @test=suite_config_silent/ echo foo @silent=false
+$cmdt0 @test=suite_config/ @stdout="foo\n" @stderr= -- $cmdt1 @test=suite_config_silent/ echo foo @keepOutputs
+$cmdt0 @test=suite_config/ @stdout= @stderr="bar\n" -- $cmdt1 @test=suite_config_silent/ sh -c ">&2 echo bar" @keepOutputs
+$cmdt0 @test=suite_config/ -- $cmdt1 @report=suite_config_silent
+
+>&2 echo "## Test global config"
+
+
 >&2 echo "## Test assertion"
 $cmdt @init=assertion @silent
 $cmdt @test=assertion/ @stderr:PASSED -- $cmdt true
@@ -269,25 +296,19 @@ $cmdt @test=assertion/ @stderr:FAILED -- $cmdt sh -c ">&2 echo foo bar" @stderr=
 $cmdt @test=assertion/ @fail -- $cmdt sh -c ">&2 echo foo bar" @stderr:
 $cmdt @test=assertion/ @stderr:FAILED -- $cmdt sh -c ">&2 echo foo bar" @stderr:baz
 $cmdt @test=assertion/ @fail -- $cmdt sh -c ">&2 echo foo bar" @stdout:
-# TODO: @exists, @cmd
+
+$cmdt @test=assertion/ @stderr:FAILED -- $cmdt sh -c "rm /tmp/donotexists || true" @exists=/tmp/donotexists
+$cmdt @test=assertion/ @stderr:PASSED -- $cmdt sh -c "touch /tmp/doexists" @exists=/tmp/doexists
+$cmdt @test=assertion/ @stderr:PASSED -- $cmdt sh -c "chmod 640 /tmp/doexists" @exists=/tmp/doexists,-rw-r-----
+$cmdt @test=assertion/ @stderr:FAILED -- $cmdt sh -c "chmod 640 /tmp/doexists" @exists=/tmp/doexists,-rwxr-----
+
+$cmdt @test=assertion/ @stderr:PASSED -- $cmdt false @fail @cmd=true
+$cmdt @test=assertion/ @stderr:FAILED -- $cmdt true @cmd=false
+touch /tmp/doexists
+$cmdt @test=assertion/ @stderr:PASSED -- $cmdt false @fail @cmd="ls /tmp/doexists"
+
 $cmdt @test=assertion/ @fail -- $cmdt @report=main 
 
-
->&2 echo
->&2 echo "## Test @ignore"
-$cmdt @init=test_config @silent
-$cmdt @test=test_config/ @stderr:Ignore -- $cmdt true @ignore
-$cmdt @test=test_config/ @stderr:Ignore @stderr!:FAILED @stderr!:PASSED -- $cmdt true @ignore
-$cmdt @test=test_config/ @stderr:Ignore @stderr!:FAILED @stderr!:PASSED -- $cmdt false @ignore
-
-$cmdt @test=test_config/ -- $cmdt @report=main 
-
-
->&2 echo
->&2 echo "## Test config"
-
->&2 echo
->&2 echo "## Test suite config"
 
 $cmdt @report= ; >&2 echo SUCCESS ; exit 0
 
@@ -297,35 +318,12 @@ $cmdt @report= ; >&2 echo SUCCESS ; exit 0
 
 
 
->&2 echo "## Test sleep"
-$cmd sleep 0.3
-
 >&2 echo "## Test stdin"
 echo foo | $cmd "@test=stdin" cat @stdout="foo\n"
 
 >&2 echo "## Test exported var"
 export foo=bar
 $cmd "@test=exported var" sh -c "export" @stdout:"foo='bar'\n"
-
-#>&2 echo "## Test alias"
-#alias foo=echo
-#$cmd "@test=alias" sh -c "foo bar" @stdout:"bar\n"
-
->&2 echo "## Test @timeout"
-! $cmd sleep 1 @timeout=50ms || false
-
-
->&2 echo "## Test @cmd"
-$cmd false @cmd="true" @fail
-! $cmd false @cmd="false" @fail || false
-! $cmd true @cmd="false" || false
-! $cmd true @cmd= || false
-! $cmd true @cmd=notExist || false
-
->&2 echo "## Test @exists"
-! $cmd echo "test non existance" @exists=/tmp/donotexistsmbd123 || false
-$cmd touch /tmp/existsmbd123 @exists=/tmp/existsmbd123
-! $cmd true @exists= || false
 
 >&2 echo "## Change rule prefix"
 $cmd @prefix=% %fail false

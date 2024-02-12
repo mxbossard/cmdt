@@ -118,6 +118,9 @@ Features :
 - @before=TEST_SUITE CMD ARG_1 ARG_2 ... ARG_N => execute CMD before each test
 - @after=TEST_SUITE CMD ARG_1 ARG_2 ... ARG_N => execute CMD after each test
 - move seq into utils module
+- order reports : report failures at the end of report
+- rework failure description : hard to read (remove colors ? remove \n ?)
+- improve printer. Writer stdout & stder with prefix stdout> stderr> in descriptions
 - Run en option les tests dans un conteneur => plus facile de mocké, meilleur reproductibilité des tests
 	- Fournir une image pour tester l'éxecution dans cette image
 	- Reset l'image à chaque test suite ou à chaque test en option

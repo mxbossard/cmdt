@@ -257,6 +257,7 @@ func initConfig(ctx Context) {
 }
 
 func GlobalConfig(ctx Context) (exitCode int) {
+	defer stdPrinter.Flush()
 	ctx.TestSuite = GlobalConfigTestSuiteName
 	initWorkspace(ctx)
 	initConfig(ctx)
@@ -267,6 +268,7 @@ func InitTestSuite(ctx Context) (exitCode int) {
 	exitCode = 0
 	token := ctx.Token
 	testSuite := ctx.TestSuite
+	defer stdPrinter.Flush()
 
 	if ctx.Action == "init" && ctx.PrintToken {
 		token = UniqToken()
@@ -288,9 +290,6 @@ func InitTestSuite(ctx Context) (exitCode int) {
 		}
 		stdPrinter.ColoredErrf(messageColor, "Initialized new [%s] test suite%s.\n", testSuite, tokenMsg)
 	}
-	//stdPrinter.Errf("%s\n", tmpDir)
-	//stdPrinter.Errf("%s\n", context)
-	stdPrinter.Flush()
 	return
 }
 
@@ -298,20 +297,22 @@ func ReportTestSuite(ctx Context) (exitCode int) {
 	exitCode = 1
 	token := ctx.Token
 	testSuite := ctx.TestSuite
+	defer stdPrinter.Flush()
 
 	if ctx.ReportAll {
 		// Report all test suites
 		testSuites := listTestSuites(token)
 		if testSuites != nil {
+			exitCode = 0
 			//log.Printf("reporting found suites: %s", testSuites)
 			for _, suite := range testSuites {
 				ctx, err := LoadSuiteContext(suite, token)
 				if err != nil {
 					log.Fatalf("cannot load context: %s", err)
 				}
-				exitCode = ReportTestSuite(ctx)
-				if exitCode > 0 {
-					return
+				code := ReportTestSuite(ctx)
+				if code != 0 {
+					exitCode = code
 				}
 			}
 			return
@@ -357,7 +358,6 @@ func ReportTestSuite(ctx Context) (exitCode int) {
 			stdPrinter.ColoredErrf(reportColor, "%s\n", report)
 		}
 	}
-	stdPrinter.Flush()
 	return
 }
 
@@ -366,12 +366,14 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 	testSuite := ctx.TestSuite
 	testName := ctx.TestName
 	exitCode = 1
+	defer stdPrinter.Flush()
 
 	suiteContext, err := LoadSuiteContext(testSuite, token)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// test suite does not exists yet
-			exitCode = InitTestSuite(ctx)
+			suiteCtx := Context{Token: token, TestSuite: testSuite}
+			exitCode = InitTestSuite(suiteCtx)
 			if exitCode > 0 {
 				return
 			}
@@ -446,11 +448,10 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 	testTitle := fmt.Sprintf("[%05d] Test %s #%02d", timecode, qulifiedName, seq)
 	if ctx.Silent == nil || !*ctx.Silent {
 		stdPrinter.ColoredErrf(testColor, "%s... ", testTitle)
-	}
-
-	if *ctx.KeepStdout || *ctx.KeepStderr {
-		// NewLine because we expect cmd outputs
-		stdPrinter.Errf("\n")
+		if *ctx.KeepStdout || *ctx.KeepStderr {
+			// NewLine because we expect cmd outputs
+			stdPrinter.Errf("\n")
+		}
 	}
 
 	stdPrinter.Flush()
@@ -480,9 +481,10 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 		}
 	}
 
-	if *ctx.KeepStdout || *ctx.KeepStderr {
+	if (ctx.Silent == nil || !*ctx.Silent) && (*ctx.KeepStdout || *ctx.KeepStderr) {
 		// NewLine in printer to print test result in a new line
 		stdPrinter.Errf("        ")
+		stdPrinter.Flush()
 	}
 
 	if exitCode == 0 {
@@ -525,6 +527,10 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 
 				if assertName == "success" || assertName == "fail" {
 					stdPrinter.Errf("Expected %s%s\n", assertPrefix, assertName)
+					if cmd.StderrRecord() != "" {
+						stdPrinter.Errf("sdterr> %s\n", cmd.StderrRecord())
+					}
+					stdPrinter.Errf("Expected %s%s\n", assertPrefix, assertName)
 					continue
 				} else if assertName == "cmd" {
 					stdPrinter.Errf("Expected %s%s=%s to succeed\n", assertPrefix, assertName, expected)
@@ -539,8 +545,12 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 						stdPrinter.Errf("Expected %s%s to be: [%s] but got: [%v]\n", assertPrefix, assertName, expected, got)
 					} else if assertOp == ":" {
 						stdPrinter.Errf("Expected %s%s to contains: [%s] but got: [%v]\n", assertPrefix, assertName, expected, got)
+					} else if assertOp == "!:" {
+						stdPrinter.Errf("Expected %s%s not to contains: [%s] but got: [%v]\n", assertPrefix, assertName, expected, got)
 					} else if assertOp == "~" {
 						stdPrinter.Errf("Expected %s%s to match: [%s] but got: [%v]\n", assertPrefix, assertName, expected, got)
+					} else if assertOp == "!~" {
+						stdPrinter.Errf("Expected %s%s not to match: [%s] but got: [%v]\n", assertPrefix, assertName, expected, got)
 					}
 				} else {
 					stdPrinter.Errf("assertion %s%s%s%s failed\n", assertPrefix, assertName, assertOp, expected)
@@ -556,8 +566,6 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 			reportLog.WriteString(testTitle + "  => " + failedAssertionsReport)
 		}
 	}
-
-	stdPrinter.Flush()
 
 	if ctx.StopOnFailure == nil || *ctx.StopOnFailure && exitCode > 0 {
 		ReportTestSuite(ctx)
