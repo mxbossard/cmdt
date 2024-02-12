@@ -112,7 +112,7 @@ TODO:
 Bugs:
 
 Features :
-
+- silent ? quiet ? an option to quiet errors as well ?
 - Rules as constants sorted by type in collections => if rule not in collection fail
 - @mock des appels de commande
 - @before=TEST_SUITE CMD ARG_1 ARG_2 ... ARG_N => execute CMD before each test
@@ -121,6 +121,7 @@ Features :
 - order reports : report failures at the end of report
 - rework failure description : hard to read (remove colors ? remove \n ?)
 - improve printer. Writer stdout & stder with prefix stdout> stderr> in descriptions
+- change default test suite with @init=foo => foo become default test suite
 - Run en option les tests dans un conteneur => plus facile de mocké, meilleur reproductibilité des tests
 	- Fournir une image pour tester l'éxecution dans cette image
 	- Reset l'image à chaque test suite ou à chaque test en option
