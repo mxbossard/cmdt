@@ -43,6 +43,11 @@ type RuleKey struct {
 	Name, Op string
 }
 
+type RuleDefinition struct {
+	Name string
+	Ops  []string
+}
+
 type Context struct {
 	// TestSuite only
 	Token        string        `yaml:""`

@@ -634,6 +634,20 @@ func ValidateOnceOnlyDefinedRule(rules ...Rule) (err error) {
 	return
 }
 
+func ruleDef(name string, ops ...string) (r RuleDefinition) {
+	r.Name = name
+	r.Ops = ops
+	return
+}
+
+var (
+	Actions      = []RuleDefinition{ruleDef("global", ""), ruleDef("init", "", "="), ruleDef("test", "", "="), ruleDef("report", "", "=")}
+	SuiteConfigs = []RuleDefinition{ruleDef("fork"), ruleDef("suiteTimeout")}
+	TestConfigs  = []RuleDefinition{ruleDef("before"), ruleDef("after"), ruleDef("ignore"), ruleDef("stopOnFailure"), ruleDef("keepStdout"), ruleDef("keepStderr"),
+		ruleDef("keepOutputs"), ruleDef("timeout"), ruleDef("silent")}
+	Assertions = []RuleDefinition{ruleDef("success"), ruleDef("fail"), ruleDef("exit"), ruleDef("cmd"), ruleDef("stdout"), ruleDef("stderr"), ruleDef("exists")}
+)
+
 func ValidateMutualyExclusiveRules(rules ...Rule) (err error) {
 	// FIXME: stdout= and stdout~ are ME ; stdout= and stdout= are ME but stdout~ and stdout~ are not ME
 	MutualyExclusiveRules := [][]RuleKey{
@@ -646,9 +660,9 @@ func ValidateMutualyExclusiveRules(rules ...Rule) (err error) {
 
 	exlusiveRules := MutualyExclusiveRules
 	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{"global", "all"}, RuleKey{"success", "all"}, RuleKey{"fail", "all"}, RuleKey{"exit", "all"}, RuleKey{"cmd", "all"}, RuleKey{"stdout", "all"},
-		RuleKey{"stderr", "all"}, RuleKey{"exists", "all"}, RuleKey{"exists", "cmd"})...)
+		RuleKey{"stderr", "all"}, RuleKey{"exists", "all"}, RuleKey{"cmd", "all"})...)
 	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{"init", "all"}, RuleKey{"success", "all"}, RuleKey{"fail", "all"}, RuleKey{"exit", "all"}, RuleKey{"cmd", "all"}, RuleKey{"stdout", "all"},
-		RuleKey{"stderr", "all"}, RuleKey{"exists", "all"}, RuleKey{"exists", "cmd"})...)
+		RuleKey{"stderr", "all"}, RuleKey{"exists", "all"}, RuleKey{"cmd", "all"})...)
 	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{"test", "all"}, RuleKey{"suiteTimeout", "all"}, RuleKey{"fork", "all"})...)
 	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{"report", "all"}, RuleKey{"fork", "all"}, RuleKey{"suiteTimeout", "all"}, RuleKey{"before", "all"},
 		ruleKey("after"), ruleKey("ignore"), ruleKey("stopOnFailure"), ruleKey("keepStdout"), ruleKey("keepStderr"), ruleKey("keepOutputs"), ruleKey("timeout"), ruleKey("silent"),

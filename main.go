@@ -112,8 +112,8 @@ TODO:
 Bugs:
 
 Features :
-- silent ? quiet ? an option to quiet errors as well ?
 - Rules as constants sorted by type in collections => if rule not in collection fail
+- silent ? quiet ? an option to quiet errors as well ?
 - Total duration if reporting multiple suites
 - @mock des appels de commande
 - @before=TEST_SUITE CMD ARG_1 ARG_2 ... ARG_N => execute CMD before each test
