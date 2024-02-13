@@ -81,44 +81,41 @@ $cmdt0 @test=should_succeed/ sh -c ">&2 echo foo bar" @stderr="foo bar\n" @stdou
 >&2 echo "## Test cmdt basic assertions should failed"
 $cmdt0 @init=should_fail @stopOnFailure=false
 
-$cmdt0 @test=should_fail/ false
-$cmdt0 @test=should_fail/ true @fail
-$cmdt0 @test=should_fail/ false @success
-$cmdt0 @test=should_fail/ true @exit=1
-$cmdt0 @test=should_fail/ false @exit=0
+$cmdt0 @test=should_fail/ false 2> /dev/null
+$cmdt0 @test=should_fail/ true @fail 2> /dev/null
+$cmdt0 @test=should_fail/ false @success 2> /dev/null
+$cmdt0 @test=should_fail/ true @exit=1 2> /dev/null
+$cmdt0 @test=should_fail/ false @exit=0 2> /dev/null
 
-$cmdt0 @test=should_fail/ echo foo bar @stdout=
-$cmdt0 @test=should_fail/ echo foo bar @stdout=foo
-$cmdt0 @test=should_fail/ echo foo bar @stdout=foo bar
-$cmdt0 @test=should_fail/ echo foo bar @stdout:baz
-$cmdt0 @test=should_fail/ echo foo bar @stdout:foo @stdout:baz
-$cmdt0 @test=should_fail/ echo foo bar @stderr:foo
+$cmdt0 @test=should_fail/ echo foo bar @stdout= 2> /dev/null
+$cmdt0 @test=should_fail/ echo foo bar @stdout=foo 2> /dev/null
+$cmdt0 @test=should_fail/ echo foo bar @stdout=foo bar 2> /dev/null
+$cmdt0 @test=should_fail/ echo foo bar @stdout:baz 2> /dev/null
+$cmdt0 @test=should_fail/ echo foo bar @stdout:foo @stdout:baz 2> /dev/null
+$cmdt0 @test=should_fail/ echo foo bar @stderr:foo 2> /dev/null
 
-$cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stderr=
-$cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stderr=foo
-$cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stderr=foo bar
-$cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stderr:baz
-$cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stderr:foo @stderr:baz
-$cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stdout:foo
+$cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stderr= 2> /dev/null
+$cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stderr=foo 2> /dev/null
+$cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stderr=foo bar 2> /dev/null
+$cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stderr:baz 2> /dev/null
+$cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stderr:foo @stderr:baz 2> /dev/null
+$cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stdout:foo 2> /dev/null
 
-$cmdt0 @report=should_succeed
-! $cmdt0 @report=should_fail 2>&1 | grep "0 success" || die "should_fail test suite should have no success"
+$cmdt @report=should_succeed
+! $cmdt @report=should_fail 2>&1 | grep "0 success" || die "should_fail test suite should have no success"
 
 
->&2 echo "## Rules parsing stopper --"
-$cmdt0 @stdout="foo @success @fail\n" -- echo foo @success @fail
-
+nothingToReportExpectedStderrMsg="you must perform some test prior to report"
 
 >&2 echo "## Test @report without test"
-expectedNothingToReportStderr="you must perform some test prior to report"
 $cmdt0 @init=meta1
-$cmdt0 @test=meta1/ @fail @stderr:"$expectedNothingToReportStderr" -- $cmdt @report=foo
-$cmdt0 @test=meta1/ @fail @stderr:"$expectedNothingToReportStderr" -- $cmdt @report=foo
+$cmdt0 @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" -- $cmdt1 @report=foo
+$cmdt0 @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" -- $cmdt1 @report=foo
 
->&2 echo "## Met1a test context not shared without token"
-$cmdt0 @test=meta1/ @stderr:"PASSED" @stderr:"#01" -- $cmdt true
-$cmdt0 @test=meta1/ @stderr:"PASSED" @stderr:"#01" -- $cmdt true
-$cmdt0 @test=meta1/ @fail -- $cmdt @report
+>&2 echo "## Meta1 test context not shared without token"
+$cmdt0 @test=meta1/ @stderr:"PASSED" @stderr:"#01" -- $cmdt1 true
+$cmdt0 @test=meta1/ @stderr:"PASSED" @stderr:"#01" -- $cmdt1 true
+$cmdt0 @test=meta1/ @fail -- $cmdt1 @report
 
 >&2 echo "## Test printed token"
 tk0=$( $cmdt @init @printToken )
@@ -128,7 +125,7 @@ $cmdt0 @test=meta2/ @stderr:"PASSED" @stderr:"#01" -- $cmdt true @token=$tk0
 $cmdt0 @test=meta2/ @stderr:"PASSED" @stderr:"#02" -- $cmdt true @token=$tk0
 $cmdt0 @test=meta2/ @fail -- $cmdt @report
 $cmdt0 @test=meta2/ @stderr:"Successfuly ran" -- $cmdt @report @token=$tk0
-$cmdt0 @report 2>&1 | grep -v "Failures"
+$cmdt @report 2>&1 | grep -v "Failures"
 
 >&2 echo "## Test exported token"
 eval $( $cmdt @init @exportToken )
@@ -137,15 +134,42 @@ $cmdt0 @init=meta3
 $cmdt0 @test=meta3/ @stderr:"PASSED" @stderr:"#01" -- $cmdt true
 $cmdt0 @test=meta3/ @stderr:"PASSED" @stderr:"#02" -- $cmdt true
 $cmdt0 @test=meta3/ @stderr:"Successfuly ran" -- $cmdt @report=main
-$cmdt0 @test=meta3/ @fail @stderr:"$expectedNothingToReportStderr" -- $cmdt @report @token=$tk0
+$cmdt0 @test=meta3/ @fail @stderr:"$nothingToReportExpectedStderrMsg" -- $cmdt @report @token=$tk0
 
 $cmdt0 @init=meta4
 $cmdt0 @test=meta4/ @stderr:"PASSED" @stderr:"#01" -- $cmdt @test=sub4/ true
 $cmdt0 @test=meta4/ @stderr:"PASSED" @stderr:"#02" -- $cmdt @test=sub4/ true
 $cmdt0 @test=meta4/ @stderr:"Successfuly ran" -- $cmdt @report=sub4
-$cmdt0 @test=meta4/ @fail @stderr:"$expectedNothingToReportStderr" -- $cmdt @report=sub4 @token=$tk0
-$cmdt0 @report 2>&1 | grep -v "Failures"
+$cmdt0 @test=meta4/ @fail @stderr:"$nothingToReportExpectedStderrMsg" -- $cmdt @report=sub4 @token=$tk0
+$cmdt @report 2>&1 | grep -v "Failures"
 export -n __CMDT_TOKEN
+
+
+eval $( $cmdt @init @exportToken )
+
+>&2 echo "## Rules parsing stopper --"
+$cmdt0 @stdout="foo @success @fail\n" -- echo foo @success @fail
+
+>&2 echo "## Test Suite re-init"
+$cmdt0 @test=reinit/ -- $cmdt1 @test=sub1/ true
+$cmdt0 @test=reinit/ -- $cmdt1 @init=sub1
+$cmdt0 @test=reinit/ @stderr:"0 test" -- $cmdt1 @report=sub1
+
+$cmdt0 @test=reinit/ -- $cmdt1 @keepOutputs @test=sub2/ true
+$cmdt0 @test=reinit/ -- $cmdt1 @keepOutputs @init=sub2
+$cmdt0 @test=reinit/ -- $cmdt1 @keepOutputs @test=sub2/ true
+$cmdt0 @test=reinit/ -- $cmdt1 @keepOutputs @test=sub2/ true
+$cmdt0 @test=reinit/ @stderr:"2 test" -- $cmdt1 @report=sub2
+
+$cmdt0 @test=reinit/ @fail @stderr:"$nothingToReportExpectedStderrMsg" -- $cmdt1 @report=sub3
+$cmdt0 @test=reinit/ -- $cmdt1 @test=sub3/ true
+$cmdt0 @test=reinit/ -- $cmdt1 @init=sub3
+$cmdt0 @test=reinit/ -- $cmdt1 @test=sub3/ true
+$cmdt0 @test=reinit/ -- $cmdt1 @report=sub3
+$cmdt0 @test=reinit/ -- $cmdt1 @init=sub3
+$cmdt0 @test=reinit/ -- $cmdt1 @test=sub3/ true
+$cmdt0 @test=reinit/ @stderr:"1 test" -- $cmdt1 @report=sub3
+
 
 >&2 echo "## Test usage"
 $cmdt0 @init=meta
@@ -181,7 +205,7 @@ $cmdt0 @test=meta/ @stderr:"PASSED" -- $cmdt sh -c ">&2 echo foo bar" @stderr!=f
 
 
 ## Forge a token for remaining tests
-eval $( $cmdt @test=meta/ @keepStdout -- $cmdt @init=t1 @exportToken)
+#eval $( $cmdt @test=meta/ @keepStdout -- $cmdt @init=t1 @exportToken)
 
 >&2 echo "## Test assertions outputs"
 # Init the context used in t1 test suite
@@ -194,7 +218,8 @@ $cmdt0 @test=meta/ @fail @stderr:"Failures in [t1] test suite (3 success, 1 fail
 
 
 >&2 echo "## Test namings"
-$cmdt0 @init=naming
+$cmdt @init=naming
+$cmdt @init=main
 $cmdt0 @test=naming/ @stderr:"Test [main]/name1 #01..." @stderr:"PASSED" -- $cmdt true @test=name1
 $cmdt0 @test=naming/ @stderr:"Test [main]/name2 #02..." @stderr:"PASSED" -- $cmdt true @test=name2
 $cmdt0 @test=naming/ @stderr:"Test [main]/" @stderr:"true" @stderr:"#03..." @stderr:"PASSED" -- $cmdt true
@@ -258,8 +283,8 @@ $cmdt0 @test=test_config/ @fail -- $cmdt1 @report=main
 
 
 >&2 echo "## Test suite config"
-$cmdt0 @init=suite_config
-$cmdt0 @init=suite_config_silent @silent
+$cmdt @init=suite_config
+$cmdt @init=suite_config_silent @silent
 $cmdt0 @test=suite_config/ @stdout= @stderr= -- $cmdt1 @test=suite_config_silent/ echo foo
 $cmdt0 @test=suite_config/ @stderr:PASSED -- $cmdt1 @test=suite_config_silent/ echo foo @silent=false
 $cmdt0 @test=suite_config/ @stdout="foo\n" @stderr= -- $cmdt1 @test=suite_config_silent/ echo foo @keepOutputs
@@ -328,43 +353,74 @@ $cmdt0 @test=export/ @stdout~"/foo='bar'/m" sh -c "export"
 
 
 >&2 echo "## Interlaced tests"
-eval $( $cmdt0 @init="testA" @keepStdout )
-eval $( $cmdt0 @init="testB" @keepOutputs )
+$cmdt0 @init="testA"
+$cmdt0 @init="testB"
 
-$cmdt0 echo not ignored @test="testA/"
-$cmdt0 echo ignored @ignore @test="testA/"
+$cmdt0 echo ignored1 @ignore @test="testA/"
+$cmdt0 echo ignored2 @ignore @test="testA/"
+$cmdt0 false @test="testA/" 2> /dev/null
 
 $cmdt0 echo another test @test="testB/"
+$cmdt0 echo ignored3 @ignore @test="testA/"
 $cmdt0 echo interlaced test @test="testA/"
+$cmdt0 false @test="testB/" 2> /dev/null
+$cmdt0 true @test="testB/"
+$cmdt0 false @test="testA/" 2> /dev/null
 
->&2 echo should have 2 success and 1 ignored
-$cmd0 @stderr:"2 success" @stderr:"1 ignored" @stderr!:failure -- $cmdt1 @report="testA"
+# should have 1 success 2 failures and 3 ignored
+$cmdt0 @fail @stderr:"1 success" @stderr:"2 failure" @stderr:"3 ignored" -- $cmdt1 @report="testA"
+# should have 2 success 1 failure
+$cmdt0 @fail @stderr:"2 success" @stderr:"1 failure" @stderr!:"ignored" -- $cmdt1 @report="testB"
 
->&2 echo should have 1 success
-$cmd0 @stderr:"1 success", @sdterr!:"ignored" @stderr!:failure -- $cmdt1 @report="testB"
+
+#>&2 echo "## Mutually exclusive rules"
+merExpectedMsgRule="@stderr~/mutually exclusives/"
+# Actions are mutually exclusives
+#eval $( $cmdt0 @init=mutually_exclusive_rules @exportToken )
+$cmdt0 @test=mutually_exclusive_rules/ @fail "$merExpectedMsgRule" -- $cmdt1 @global @init
+$cmdt0 @test=mutually_exclusive_rules/ @fail "$merExpectedMsgRule" -- $cmdt1 @init @global
+$cmdt0 @test=mutually_exclusive_rules/ @fail "$merExpectedMsgRule" -- $cmdt1 @init @test
+$cmdt0 @test=mutually_exclusive_rules/ @fail "$merExpectedMsgRule" -- $cmdt1 @init @report
+$cmdt0 @test=mutually_exclusive_rules/ @fail "$merExpectedMsgRule" -- $cmdt1 @global @test
+$cmdt0 @test=mutually_exclusive_rules/ @fail "$merExpectedMsgRule" -- $cmdt1 @global @report
+$cmdt0 @test=mutually_exclusive_rules/ @fail "$merExpectedMsgRule" -- $cmdt1 @test @report
+
+# Assertions are only accepted on test actions
+for action in @global @init @report; do
+	for assertion in @success @fail @exit=0 @cmd=true @stdout= @stderr= @exists=foo; do
+		$cmdt0 @test=mutually_exclusive_rules/ @fail "$merExpectedMsgRule" -- $cmdt1 "$action" "$assertion"
+	done
+done
+
+# Suite Config are only accepted on global and init actions
+for action in @test @report; do
+	cmd=""
+	if [ "$action" = "@test" ]; then
+		cmd="true"
+	fi
+	for assertion in @fork=5; do
+		$cmdt0 @test=mutually_exclusive_rules/ @fail "$merExpectedMsgRule" -- $cmdt1 "$action" "$assertion" $cmd
+	done
+
+done
+
+# Test config are only accepted on global init and test actions
+for action in @report; do
+	for assertion in @silent @keepStdout @keepStderr @keepOutputs @stopOnFailure @ignore @timeout=1s @runCount=2 @parallel=3; do
+		$cmdt0 @test=mutually_exclusive_rules/ @fail "$merExpectedMsgRule" -- $cmdt1 "$action" "$assertion"
+	done
+done
 
 
->&2 echo "## Mutually exclusive rules"
-# TODO
+>&2 echo "## Test flow"
+$cmdt0 @init=main # clear main test suite
+$cmdt0 @test=test_flow/ -- $cmdt1 false @fail
+$cmdt0 @test=test_flow/ -- $cmdt1 true
+$cmdt0 @test=test_flow/ @fail -- $cmdt1 "@test" "@fork=5" # Should error because of bad param
+$cmdt0 @test=test_flow/ -- $cmdt1 true
+$cmdt0 @test=test_flow/ @fail -- $cmdt1 @report=main @stderr:"2 success" @stderr:"1 failure" @fail
 
 
 $cmdt @report= ; >&2 echo SUCCESS ; exit 0
 
-
-
-
->&2 echo "## Mutually exclusive rules"
-! $cmd @init @fail || false
-! $cmd @init @test || false
-
->&2 echo "## Mutually exclusive rules @test"
-! $cmd true @fail @success || false
-! $cmd true @fail @success || false
-! $cmd true @fail @exit=0 || false
-! $cmd true @fail @suiteTimeout=1m || false
-
->&2 echo "## Mutually exclusive rules @report"
-! $cmd @report @ignore || false
-! $cmd @report @test || false
-! $cmd @report @fail || false
 

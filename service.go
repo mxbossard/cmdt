@@ -54,6 +54,7 @@ func forgeContextualToken() string {
 	if err != nil {
 		log.Fatalf("cannot hash workspace dir: %s", err)
 	}
+	//log.Printf("contextual token: %s base on workDirPath: %s and ppid: %s\n", token, workDirPath, ppid)
 	return token
 }
 
@@ -102,7 +103,7 @@ func listTestSuites(token string) (suites []string) {
 	return
 }
 
-func testConfigFilepath(testSuite, token string) string {
+func testsuiteConfigFilepath(testSuite, token string) string {
 	return filepath.Join(testsuiteDirectoryPath(testSuite, token), ContextFilename)
 }
 
@@ -158,7 +159,7 @@ func sanitizeTestSuiteName(s string) string {
 }
 
 func PersistSuiteContext(testSuite, token string, config Context) {
-	contextFilepath := testConfigFilepath(testSuite, token)
+	contextFilepath := testsuiteConfigFilepath(testSuite, token)
 	//stdPrinter.Errf("Built context: %v\n", context)
 	content, err := yaml.Marshal(config)
 	if err != nil {
@@ -169,10 +170,11 @@ func PersistSuiteContext(testSuite, token string, config Context) {
 	if err != nil {
 		log.Fatalf("cannot persist context: %s", err)
 	}
+	//log.Printf("Persisted context file: %s\n", contextFilepath)
 }
 
 func readSuiteContext(testSuite, token string) (config Context, err error) {
-	contextFilepath := testConfigFilepath(testSuite, token)
+	contextFilepath := testsuiteConfigFilepath(testSuite, token)
 	var content []byte
 	content, err = os.ReadFile(contextFilepath)
 	if err != nil {
@@ -190,10 +192,12 @@ func LoadSuiteContext(testSuite, token string) (config Context, err error) {
 	var globalCtx, suiteCtx Context
 	globalCtx, err = readSuiteContext(GlobalConfigTestSuiteName, token)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		//log.Printf("readSuiteContext err: %s for: %s\n", err, GlobalConfigTestSuiteName)
 		return
 	}
 	suiteCtx, err = readSuiteContext(testSuite, token)
 	if err != nil {
+		//log.Printf("readSuiteContext err: %s for: %s\n", err, testSuite)
 		return
 	}
 	config = MergeContext(globalCtx, suiteCtx)
@@ -249,7 +253,6 @@ func initConfig(ctx Context) {
 	token := ctx.Token
 	testSuite := ctx.TestSuite
 
-	// init the tmp directory
 	ctx.StartTime = time.Now()
 	// store config
 	PersistSuiteContext(testSuite, token, ctx)
@@ -280,8 +283,18 @@ func InitTestSuite(ctx Context) (exitCode int) {
 		ctx.Token = token
 	}
 
+	// Clear the test suite directory
+	tmpDir := testsuiteDirectoryPath(testSuite, token)
+	err := os.RemoveAll(tmpDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+	//log.Printf("Cleared test suite dir: %s\n", tmpDir)
+
+	//log.Printf("init context: %s Silent: %v\n", testSuite, ctx.Silent)
 	initWorkspace(ctx)
 	initConfig(ctx)
+	//log.Printf("init context: %s Silent: %v\n", testSuite, ctx.Silent)
 
 	if ctx.Silent == nil || !*ctx.Silent {
 		var tokenMsg = ""
