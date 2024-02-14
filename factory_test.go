@@ -113,15 +113,15 @@ func TestBuildAssertion(t *testing.T) {
 	assert.Equal(t, "~", assertion.Op)
 	assert.Equal(t, "(?i)baz", assertion.Expected)
 
-	ok, assertion, err = BuildAssertion("@stdout~/baz")
+	_, assertion, err = BuildAssertion("@stdout~/baz")
 	assert.Error(t, err)
 
-	ok, assertion, err = BuildAssertion("@stdout~")
+	_, assertion, err = BuildAssertion("@stdout~")
 	assert.Error(t, err)
 
 	ok, assertion, err = BuildAssertion("@stdout+")
 	assert.Error(t, err)
-	assert.True(t, ok)
+	assert.False(t, ok)
 }
 
 func TestParseArgs(t *testing.T) {
@@ -253,4 +253,80 @@ func TestValidateMutualyExclusiveRules(t *testing.T) {
 
 	err = ValidateMutualyExclusiveRules(buildRule("stdout", "="), buildRule("stdout", "!="))
 	assert.Error(t, err)
+}
+
+func TestMockMapper(t *testing.T) {
+	var m CmdMock
+	var err error
+
+	m, err = MockMapper("true")
+	require.NoError(t, err)
+	assert.Equal(t, "true", m.Cmd)
+	assert.Empty(t, m.Args)
+	assert.Equal(t, "", m.Stdin)
+	assert.Equal(t, "", m.Stdout)
+	assert.Equal(t, "", m.Stderr)
+	assert.Equal(t, 0, m.ExitCode)
+	assert.True(t, m.Delegate)
+
+	m, err = MockMapper("true arg1 arg2")
+	require.NoError(t, err)
+	assert.Equal(t, "true", m.Cmd)
+	assert.Equal(t, []string{"arg1", "arg2"}, m.Args)
+	assert.Equal(t, "", m.Stdin)
+	assert.Equal(t, "", m.Stdout)
+	assert.Equal(t, "", m.Stderr)
+	assert.Equal(t, 0, m.ExitCode)
+	assert.True(t, m.Delegate)
+
+	m, err = MockMapper("true arg1 arg2;stdin=foo")
+	require.NoError(t, err)
+	assert.Equal(t, "true", m.Cmd)
+	assert.Equal(t, []string{"arg1", "arg2"}, m.Args)
+	assert.Equal(t, "foo", m.Stdin)
+	assert.Equal(t, "", m.Stdout)
+	assert.Equal(t, "", m.Stderr)
+	assert.Equal(t, 0, m.ExitCode)
+	assert.True(t, m.Delegate)
+
+	m, err = MockMapper("true arg1 arg2;stdin=foo;stdout=bar=;stderr=pif paf;exit=12")
+	require.NoError(t, err)
+	assert.Equal(t, "true", m.Cmd)
+	assert.Equal(t, []string{"arg1", "arg2"}, m.Args)
+	assert.Equal(t, "foo", m.Stdin)
+	assert.Equal(t, "bar=", m.Stdout)
+	assert.Equal(t, "pif paf", m.Stderr)
+	assert.Equal(t, 12, m.ExitCode)
+	assert.False(t, m.Delegate)
+
+	m, err = MockMapper(",true,arg 1,arg 2")
+	require.NoError(t, err)
+	assert.Equal(t, "true", m.Cmd)
+	assert.Equal(t, []string{"arg 1", "arg 2"}, m.Args)
+	assert.Equal(t, "", m.Stdin)
+	assert.Equal(t, "", m.Stdout)
+	assert.Equal(t, "", m.Stderr)
+	assert.Equal(t, 0, m.ExitCode)
+	assert.True(t, m.Delegate)
+
+	m, err = MockMapper(".true.arg 1.arg 2")
+	require.NoError(t, err)
+	assert.Equal(t, "true", m.Cmd)
+	assert.Equal(t, []string{"arg 1", "arg 2"}, m.Args)
+	assert.Equal(t, "", m.Stdin)
+	assert.Equal(t, "", m.Stdout)
+	assert.Equal(t, "", m.Stderr)
+	assert.Equal(t, 0, m.ExitCode)
+	assert.True(t, m.Delegate)
+
+	m, err = MockMapper("|true|arg 1|arg 2;stdin=foo;stdout=bar=;stderr=pif paf;exit=12")
+	require.NoError(t, err)
+	assert.Equal(t, "true", m.Cmd)
+	assert.Equal(t, []string{"arg 1", "arg 2"}, m.Args)
+	assert.Equal(t, "foo", m.Stdin)
+	assert.Equal(t, "bar=", m.Stdout)
+	assert.Equal(t, "pif paf", m.Stderr)
+	assert.Equal(t, 12, m.ExitCode)
+	assert.False(t, m.Delegate)
+
 }

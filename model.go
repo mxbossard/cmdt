@@ -45,7 +45,8 @@ var (
 	TestConfigs = []RuleDefinition{ruleDef("before", "="), ruleDef("after", "="), ruleDef("ignore", "", "="),
 		ruleDef("stopOnFailure", "", "="), ruleDef("keepStdout", "", "="), ruleDef("keepStderr", "", "="),
 		ruleDef("keepOutputs", "", "="), ruleDef("silent", "", "="), ruleDef("timeout", "="),
-		ruleDef("parallel", "="), ruleDef("runCount", "=")}
+		ruleDef("parallel", "="), ruleDef("runCount", "="), ruleDef("mock", "=", ":")}
+	// Config of test flow (init -> test -> report)
 	FlowConfigs = []RuleDefinition{ruleDef("token", "=")}
 	Assertions  = []RuleDefinition{ruleDef("success", ""), ruleDef("fail", ""), ruleDef("exit", "="),
 		ruleDef("cmd", "="), ruleDef("stdout", "=", ":", "~", "!=", "!:", "!~"),
@@ -113,6 +114,16 @@ type AssertionResult struct {
 	Success   bool
 	Value     any
 	Message   string
+}
+
+type CmdMock struct {
+	Cmd      string
+	Args     []string
+	Stdin    string
+	Stdout   string
+	Stderr   string
+	ExitCode int
+	Delegate bool
 }
 
 func MergeContext(baseContext, overridingContext Context) Context {

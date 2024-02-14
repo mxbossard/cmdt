@@ -113,12 +113,12 @@ TODO:
 Bugs:
 
 Features :
-- silent ? quiet ? an option to quiet errors as well ?
-- Total duration if reporting multiple suites
-- @mock des appels de commande
+- @mock des appels de commande @mock="CMD,ARG_1,ARG_2,ARG_N;stdin=baz;exit=0;stdout=foo;stderr=bar"
 - @before=TEST_SUITE CMD ARG_1 ARG_2 ... ARG_N => execute CMD before each test
 - @after=TEST_SUITE CMD ARG_1 ARG_2 ... ARG_N => execute CMD after each test
-
+- silent ? quiet ? an option to quiet errors as well ?
+- Total duration if reporting multiple suites
+- use rule definitions in usage
 - move seq into utils module
 - order reports : report failures at the end of report
 - rework failure description : hard to read (remove colors ? remove \n ?)
@@ -149,9 +149,12 @@ Features :
     il nous faut un programme mock qui consomme tous les args, compte les appels avec les args et répond de la manière dont il est configuré
     mock config :
         Exact call @mock="CMD,ARG_1,ARG_2,ARG_N;stdin=baz;exit=0;stdout=foo;stderr=bar" Must receive exactly stdin and specified args in order not more
-        Exact incomplete call @mock="CMD,ARG_1,ARG_2,ARG_N,*;stdin=baz;exit=0;stdout=foo;stderr=bar" Must receive exactly stdin and specified args in order then more args
-        Contains call @mock~"CMD,ARG_1,ARG_2,ARG_N;stdin=baz;exit=0;stdout=foo;stderr=bar" Must receive exactly stdin and specified args in various order not more
+        Partial call @mock="CMD,ARG_1,ARG_2,ARG_N,*;stdin=baz;exit=0;stdout=foo;stderr=bar" Must receive exactly stdin and specified args in order then more args
+        Contains call @mock:"CMD,ARG_1,ARG_2,ARG_N;stdin=baz;exit=0;stdout=foo;stderr=bar" Must receive exactly stdin and specified args in various order not more
         Default exit code @mock="CMD,*;exit=1"
+
+## Idées pour silent vs quiet ?!
+
 */
 
 type RuleType string

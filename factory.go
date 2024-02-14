@@ -85,12 +85,57 @@ func CmdMapper(s string) (v []string, err error) {
 	// FIXME: should leverage simple and double quottes to split args
 	if len(s) > 1 {
 		separator := " "
-		if s[0] == ',' || s[0] == ':' || s[0] == '|' {
+		if s[0] == ',' || s[0] == '.' || s[0] == '|' {
 			separator = s[0:1]
 			s = s[1:]
 		}
 		v = strings.Split(s, separator)
 		//log.Printf("CMD: [%v]", v)
+	}
+	return
+}
+
+func MockMapper(s string) (m CmdMock, err error) {
+	if len(s) > 1 {
+		splitted := strings.Split(s, ";")
+		// cmd always defined first
+		var cmdAndArgs []string
+		cmdAndArgs, err = CmdMapper(splitted[0])
+		if err != nil {
+			return
+		}
+		m.Cmd = cmdAndArgs[0]
+		if len(cmdAndArgs) > 1 {
+			m.Args = cmdAndArgs[1:]
+		}
+		m.Delegate = true
+		if len(splitted) > 1 {
+			for _, rule := range splitted[1:] {
+				ruleSplit := strings.Split(rule, "=")
+				if len(ruleSplit) < 2 {
+					err = fmt.Errorf("bad format for mock rule: expect an = sign")
+					return
+				}
+				key := ruleSplit[0]
+				value := strings.Join(ruleSplit[1:], "=")
+				switch key {
+				case "stdin":
+					m.Stdin = value
+				case "stdout":
+					m.Delegate = false
+					m.Stdout = value
+				case "stderr":
+					m.Delegate = false
+					m.Stderr = value
+				case "exit":
+					m.Delegate = false
+					m.ExitCode, err = IntMapper(value)
+					if err != nil {
+						return
+					}
+				}
+			}
+		}
 	}
 	return
 }
@@ -348,6 +393,8 @@ func ApplyConfig(c *Context, ruleExpr string) (ok bool, rule Rule, err error) {
 		case "silent":
 			boolVal, err = Translate(rule, BoolMapper, BooleanValidater)
 			c.Silent = &boolVal
+		case "mock":
+
 		default:
 			ok = false
 		}
