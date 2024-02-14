@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"time"
 
 	"mby.fr/utils/cmdz"
@@ -32,6 +33,25 @@ const (
 	Test                      // can be placed on test or on suite to configure all tests
 )
 
+var (
+	Actions = []RuleDefinition{ruleDef("global", ""), ruleDef("init", "", "="), ruleDef("test", "", "="),
+		ruleDef("report", "", "=")}
+	// Global config available to global
+	GlobalConfigs = []RuleDefinition{ruleDef("fork", "="), ruleDef("suiteTimeout", "="), ruleDef("prefix", "=")}
+	// Suite config available to suite
+	SuiteConfigs = append(GlobalConfigs, []RuleDefinition{
+		ruleDef("exportToken", ""), ruleDef("printToken", "")}...)
+	// Test config available at all levels (global, suite and test)
+	TestConfigs = []RuleDefinition{ruleDef("before", "="), ruleDef("after", "="), ruleDef("ignore", "", "="),
+		ruleDef("stopOnFailure", "", "="), ruleDef("keepStdout", "", "="), ruleDef("keepStderr", "", "="),
+		ruleDef("keepOutputs", "", "="), ruleDef("silent", "", "="), ruleDef("timeout", "="),
+		ruleDef("parallel", "="), ruleDef("runCount", "=")}
+	FlowConfigs = []RuleDefinition{ruleDef("token", "=")}
+	Assertions  = []RuleDefinition{ruleDef("success", ""), ruleDef("fail", ""), ruleDef("exit", "="),
+		ruleDef("cmd", "="), ruleDef("stdout", "=", ":", "~", "!=", "!:", "!~"),
+		ruleDef("stderr", "=", ":", "~", "!=", "!:", "!~"), ruleDef("exists", "=")}
+)
+
 type Rule struct {
 	Prefix   string
 	Name     string
@@ -41,6 +61,10 @@ type Rule struct {
 
 type RuleKey struct {
 	Name, Op string
+}
+
+func (r RuleKey) String() string {
+	return fmt.Sprintf("%s%s", r.Name, r.Op)
 }
 
 type RuleDefinition struct {
@@ -142,4 +166,32 @@ func MergeContext(baseContext, overridingContext Context) Context {
 	}
 
 	return baseContext
+}
+
+func ruleDef(name string, ops ...string) (r RuleDefinition) {
+	r.Name = name
+	r.Ops = ops
+	return
+}
+
+func IsRuleOfKind(ruleDefs []RuleDefinition, r Rule) (ok bool, err error) {
+	ok = false
+	var expectedOperators []string
+	for _, ruleDef := range ruleDefs {
+		if r.Name == ruleDef.Name {
+			expectedOperators = append(expectedOperators, ruleDef.Ops...)
+			for _, op := range ruleDef.Ops {
+				if r.Op == op {
+					ok = true
+					return
+				}
+			}
+		}
+	}
+
+	if len(expectedOperators) > 0 {
+		// name matched but not operator
+		err = fmt.Errorf("rule %s expect one of operators: %s", r.Name, expectedOperators)
+	}
+	return
 }

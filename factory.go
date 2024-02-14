@@ -234,6 +234,32 @@ func Translate[T any](rule Rule, m Mapper[T], validaters ...Validater[T]) (val T
 
 func ApplyConfig(c *Context, ruleExpr string) (ok bool, rule Rule, err error) {
 	ok, rule = SplitRuleExpr(ruleExpr)
+	if !ok {
+		return
+	}
+
+	var isAction, isTestConf, isSuiteConf, isFlowConf bool
+	isAction, err = IsRuleOfKind(Actions, rule)
+	if err != nil {
+		return
+	}
+	isTestConf, err = IsRuleOfKind(TestConfigs, rule)
+	if err != nil {
+		return
+	}
+	isSuiteConf, err = IsRuleOfKind(SuiteConfigs, rule)
+	if err != nil {
+		return
+	}
+	isFlowConf, err = IsRuleOfKind(FlowConfigs, rule)
+	if err != nil {
+		return
+	}
+	ok = isAction || isTestConf || isSuiteConf || isFlowConf
+	if !ok {
+		return
+	}
+
 	var boolVal bool
 	if ok {
 		switch rule.Name {
@@ -331,187 +357,197 @@ func ApplyConfig(c *Context, ruleExpr string) (ok bool, rule Rule, err error) {
 
 func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 	ok, assertion.Rule = SplitRuleExpr(ruleExpr)
-	if ok {
-		switch assertion.Rule.Name {
-		case "success":
-			_, err = Translate(assertion.Rule, DummyMapper, OperatorValidater[string](""))
-			if err != nil {
-				return
-			}
-			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
-				res.Value = ""
-				res.Success = cmd.ExitCode() == 0
-				return
-			}
-		case "fail":
-			_, err = Translate(assertion.Rule, DummyMapper, OperatorValidater[string](""))
-			if err != nil {
-				return
-			}
-			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
-				res.Value = ""
-				res.Success = cmd.ExitCode() > 0
-				return
-			}
-		case "exit":
-			var expectedExitCode int
-			expectedExitCode, err = Translate(assertion.Rule, IntMapper, IntValueValidater(0, 255), OperatorValidater[int]("="))
-			if err != nil {
-				return
-			}
-			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
-				res.Value = cmd.ExitCode()
-				res.Success = cmd.ExitCode() == expectedExitCode
-				return
-			}
-		case "stdout":
-			if assertion.Op == "~" || assertion.Op == "!~" {
-				var regexpPattern *regexp.Regexp
-				regexpPattern, err = Translate(assertion.Rule, RegexpPatternMapper, OperatorValidater[*regexp.Regexp]("~", "!~"), NotEmptyValidater[*regexp.Regexp])
-				if err != nil {
-					return
-				}
-				assertion.Expected = regexpPattern.String()
-				assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
-					res.Value = cmd.StdoutRecord()
-					if assertion.Rule.Op == "~" {
-						res.Success = regexpPattern.MatchString(cmd.StdoutRecord())
-					} else if assertion.Rule.Op == "!~" {
-						res.Success = !regexpPattern.MatchString(cmd.StdoutRecord())
-					} else {
-						err = fmt.Errorf("rule %s%s must use an operator '~' or '!~'", assertion.Rule.Prefix, assertion.Rule.Name)
-					}
-					return
-				}
-			} else {
-				var fileContent string
-				fileContent, err = Translate(assertion.Rule, FileContentMapper, OperatorValidater[string]("=", ":", "!=", "!:"), NotEmptyForOpValidater[string](":", "!:"))
-				if err != nil {
-					return
-				}
-				assertion.Expected = fileContent
-				assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
-					res.Value = cmd.StdoutRecord()
-					if assertion.Rule.Op == "=" {
-						res.Success = cmd.StdoutRecord() == fileContent
-					} else if assertion.Rule.Op == ":" {
-						res.Success = strings.Contains(cmd.StdoutRecord(), fileContent)
-					} else if assertion.Rule.Op == "!=" {
-						res.Success = cmd.StdoutRecord() != fileContent
-					} else if assertion.Rule.Op == "!:" {
-						res.Success = !strings.Contains(cmd.StdoutRecord(), fileContent)
-					} else {
-						err = fmt.Errorf("rule %s%s must use an operator '=' or ':'", assertion.Rule.Prefix, assertion.Rule.Name)
-					}
-					return
-				}
-			}
-		case "stderr":
-			if assertion.Op == "~" || assertion.Op == "!~" {
-				var regexpPattern *regexp.Regexp
-				regexpPattern, err = Translate(assertion.Rule, RegexpPatternMapper, OperatorValidater[*regexp.Regexp]("~", "!~"), NotEmptyValidater[*regexp.Regexp])
-				if err != nil {
-					return
-				}
-				assertion.Expected = regexpPattern.String()
-				assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
-					res.Value = cmd.StderrRecord()
-					if assertion.Rule.Op == "~" {
-						res.Success = regexpPattern.MatchString(cmd.StderrRecord())
-					} else if assertion.Rule.Op == "!~" {
-						res.Success = !regexpPattern.MatchString(cmd.StderrRecord())
-					} else {
-						err = fmt.Errorf("rule %s%s must use an operator '~' or '!~'", assertion.Rule.Prefix, assertion.Rule.Name)
-					}
-					return
-				}
-			} else {
-				var fileContent string
-				fileContent, err = Translate(assertion.Rule, FileContentMapper, OperatorValidater[string]("=", ":", "!=", "!:"), NotEmptyForOpValidater[string](":", "!:"))
-				if err != nil {
-					return
-				}
-				assertion.Expected = fileContent
-				assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
-					res.Value = cmd.StderrRecord()
-					if assertion.Rule.Op == "=" {
-						res.Success = cmd.StderrRecord() == fileContent
-					} else if assertion.Rule.Op == ":" {
-						res.Success = strings.Contains(cmd.StderrRecord(), fileContent)
-					} else if assertion.Rule.Op == "!=" {
-						res.Success = cmd.StderrRecord() != fileContent
-					} else if assertion.Rule.Op == "!:" {
-						res.Success = !strings.Contains(cmd.StderrRecord(), fileContent)
-					} else {
-						err = fmt.Errorf("rule %s%s must use an operator '=' or '~'", assertion.Rule.Prefix, assertion.Rule.Name)
-					}
-					return
-				}
-			}
-		case "cmd":
-			var cmdAndArgs []string
-			cmdAndArgs, err = Translate(assertion.Rule, CmdMapper, OperatorValidater[[]string]("="), CmdValidater)
-			if err != nil {
-				return
-			}
-			assertionCmd := cmdz.Cmd(cmdAndArgs...).Timeout(10 * time.Second)
-			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
-				res.Value = 0
-				exitCode := -1
-				exitCode, err = assertionCmd.BlockRun()
-				res.Value = exitCode
-				res.Success = exitCode == 0
-				return
-			}
-		case "exists":
-			var filepathRules []string
-			filepathRules, err = Translate(assertion.Rule, ExistsMapper, OperatorValidater[[]string]("="), ExistsValidater)
-			if err != nil {
-				return
-			}
-			var path, expectedPerms, owners string
-			if len(filepathRules) > 0 {
-				path = filepathRules[0]
-			}
-			if len(filepathRules) > 1 {
-				expectedPerms = filepathRules[1]
-			}
-			if len(filepathRules) > 2 {
-				owners = filepathRules[2]
-			}
+	if !ok {
+		return
+	}
 
-			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
-				var stat os.FileInfo
-				stat, err = os.Stat(path)
-				if errors.Is(err, os.ErrNotExist) {
-					res.Success = false
-					res.Message = fmt.Sprintf("file %s does not exists", path)
-					err = nil
-					return
-				} else if err != nil {
-					return
-				}
-				if expectedPerms != "" {
-					actualPerms := stat.Mode().String()
-					if expectedPerms != actualPerms {
-						res.Success = false
-						res.Value = stat.Mode().String()
-						res.Message = fmt.Sprintf("file %s have wrong permissions. Expected: [%s] but got: [%s] ", path, expectedPerms, actualPerms)
-						return
-					}
-				}
-				if owners != "" {
-					// FIXME: how to checke file owners ?
-					err = fmt.Errorf("exists assertion owner part not implemented yet")
-					return
-				}
-				res.Success = true
-				return
-			}
+	ok, err = IsRuleOfKind(Assertions, assertion.Rule)
+	if err != nil {
+		return
+	}
+	if !ok {
+		return
+	}
 
-		default:
-			ok = false
+	switch assertion.Rule.Name {
+	case "success":
+		_, err = Translate(assertion.Rule, DummyMapper, OperatorValidater[string](""))
+		if err != nil {
+			return
 		}
+		assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+			res.Value = ""
+			res.Success = cmd.ExitCode() == 0
+			return
+		}
+	case "fail":
+		_, err = Translate(assertion.Rule, DummyMapper, OperatorValidater[string](""))
+		if err != nil {
+			return
+		}
+		assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+			res.Value = ""
+			res.Success = cmd.ExitCode() > 0
+			return
+		}
+	case "exit":
+		var expectedExitCode int
+		expectedExitCode, err = Translate(assertion.Rule, IntMapper, IntValueValidater(0, 255), OperatorValidater[int]("="))
+		if err != nil {
+			return
+		}
+		assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+			res.Value = cmd.ExitCode()
+			res.Success = cmd.ExitCode() == expectedExitCode
+			return
+		}
+	case "stdout":
+		if assertion.Op == "~" || assertion.Op == "!~" {
+			var regexpPattern *regexp.Regexp
+			regexpPattern, err = Translate(assertion.Rule, RegexpPatternMapper, OperatorValidater[*regexp.Regexp]("~", "!~"), NotEmptyValidater[*regexp.Regexp])
+			if err != nil {
+				return
+			}
+			assertion.Expected = regexpPattern.String()
+			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+				res.Value = cmd.StdoutRecord()
+				if assertion.Rule.Op == "~" {
+					res.Success = regexpPattern.MatchString(cmd.StdoutRecord())
+				} else if assertion.Rule.Op == "!~" {
+					res.Success = !regexpPattern.MatchString(cmd.StdoutRecord())
+				} else {
+					err = fmt.Errorf("rule %s%s must use an operator '~' or '!~'", assertion.Rule.Prefix, assertion.Rule.Name)
+				}
+				return
+			}
+		} else {
+			var fileContent string
+			fileContent, err = Translate(assertion.Rule, FileContentMapper, OperatorValidater[string]("=", ":", "!=", "!:"), NotEmptyForOpValidater[string](":", "!:"))
+			if err != nil {
+				return
+			}
+			assertion.Expected = fileContent
+			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+				res.Value = cmd.StdoutRecord()
+				if assertion.Rule.Op == "=" {
+					res.Success = cmd.StdoutRecord() == fileContent
+				} else if assertion.Rule.Op == ":" {
+					res.Success = strings.Contains(cmd.StdoutRecord(), fileContent)
+				} else if assertion.Rule.Op == "!=" {
+					res.Success = cmd.StdoutRecord() != fileContent
+				} else if assertion.Rule.Op == "!:" {
+					res.Success = !strings.Contains(cmd.StdoutRecord(), fileContent)
+				} else {
+					err = fmt.Errorf("rule %s%s must use an operator '=' or ':'", assertion.Rule.Prefix, assertion.Rule.Name)
+				}
+				return
+			}
+		}
+	case "stderr":
+		if assertion.Op == "~" || assertion.Op == "!~" {
+			var regexpPattern *regexp.Regexp
+			regexpPattern, err = Translate(assertion.Rule, RegexpPatternMapper, OperatorValidater[*regexp.Regexp]("~", "!~"), NotEmptyValidater[*regexp.Regexp])
+			if err != nil {
+				return
+			}
+			assertion.Expected = regexpPattern.String()
+			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+				res.Value = cmd.StderrRecord()
+				if assertion.Rule.Op == "~" {
+					res.Success = regexpPattern.MatchString(cmd.StderrRecord())
+				} else if assertion.Rule.Op == "!~" {
+					res.Success = !regexpPattern.MatchString(cmd.StderrRecord())
+				} else {
+					err = fmt.Errorf("rule %s%s must use an operator '~' or '!~'", assertion.Rule.Prefix, assertion.Rule.Name)
+				}
+				return
+			}
+		} else {
+			var fileContent string
+			fileContent, err = Translate(assertion.Rule, FileContentMapper, OperatorValidater[string]("=", ":", "!=", "!:"), NotEmptyForOpValidater[string](":", "!:"))
+			if err != nil {
+				return
+			}
+			assertion.Expected = fileContent
+			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+				res.Value = cmd.StderrRecord()
+				if assertion.Rule.Op == "=" {
+					res.Success = cmd.StderrRecord() == fileContent
+				} else if assertion.Rule.Op == ":" {
+					res.Success = strings.Contains(cmd.StderrRecord(), fileContent)
+				} else if assertion.Rule.Op == "!=" {
+					res.Success = cmd.StderrRecord() != fileContent
+				} else if assertion.Rule.Op == "!:" {
+					res.Success = !strings.Contains(cmd.StderrRecord(), fileContent)
+				} else {
+					err = fmt.Errorf("rule %s%s must use an operator '=' or '~'", assertion.Rule.Prefix, assertion.Rule.Name)
+				}
+				return
+			}
+		}
+	case "cmd":
+		var cmdAndArgs []string
+		cmdAndArgs, err = Translate(assertion.Rule, CmdMapper, OperatorValidater[[]string]("="), CmdValidater)
+		if err != nil {
+			return
+		}
+		assertionCmd := cmdz.Cmd(cmdAndArgs...).Timeout(10 * time.Second)
+		assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+			res.Value = 0
+			exitCode := -1
+			exitCode, err = assertionCmd.BlockRun()
+			res.Value = exitCode
+			res.Success = exitCode == 0
+			return
+		}
+	case "exists":
+		var filepathRules []string
+		filepathRules, err = Translate(assertion.Rule, ExistsMapper, OperatorValidater[[]string]("="), ExistsValidater)
+		if err != nil {
+			return
+		}
+		var path, expectedPerms, owners string
+		if len(filepathRules) > 0 {
+			path = filepathRules[0]
+		}
+		if len(filepathRules) > 1 {
+			expectedPerms = filepathRules[1]
+		}
+		if len(filepathRules) > 2 {
+			owners = filepathRules[2]
+		}
+
+		assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+			var stat os.FileInfo
+			stat, err = os.Stat(path)
+			if errors.Is(err, os.ErrNotExist) {
+				res.Success = false
+				res.Message = fmt.Sprintf("file %s does not exists", path)
+				err = nil
+				return
+			} else if err != nil {
+				return
+			}
+			if expectedPerms != "" {
+				actualPerms := stat.Mode().String()
+				if expectedPerms != actualPerms {
+					res.Success = false
+					res.Value = stat.Mode().String()
+					res.Message = fmt.Sprintf("file %s have wrong permissions. Expected: [%s] but got: [%s] ", path, expectedPerms, actualPerms)
+					return
+				}
+			}
+			if owners != "" {
+				// FIXME: how to checke file owners ?
+				err = fmt.Errorf("exists assertion owner part not implemented yet")
+				return
+			}
+			res.Success = true
+			return
+		}
+
+	default:
+		ok = false
 	}
 	return
 }
@@ -600,14 +636,20 @@ func buildMutualyExclusiveCouples(rule RuleKey, exclusiveRules ...RuleKey) (res 
 	return
 }
 
-func (r RuleKey) String() string {
-	return fmt.Sprintf("%s%s", r.Name, r.Op)
-}
 func ruleKey(s ...string) (r RuleKey) {
 	r.Name = s[0]
 	r.Op = "all"
 	if len(s) > 1 {
 		r.Op = s[1]
+	}
+	return
+}
+
+func ruleKeys(ruleDefs ...[]RuleDefinition) (r []RuleKey) {
+	for _, ruleDef := range ruleDefs {
+		for _, def := range ruleDef {
+			r = append(r, RuleKey{Name: def.Name, Op: "all"})
+		}
 	}
 	return
 }
@@ -634,24 +676,10 @@ func ValidateOnceOnlyDefinedRule(rules ...Rule) (err error) {
 	return
 }
 
-func ruleDef(name string, ops ...string) (r RuleDefinition) {
-	r.Name = name
-	r.Ops = ops
-	return
-}
-
-var (
-	Actions      = []RuleDefinition{ruleDef("global", ""), ruleDef("init", "", "="), ruleDef("test", "", "="), ruleDef("report", "", "=")}
-	SuiteConfigs = []RuleDefinition{ruleDef("fork"), ruleDef("suiteTimeout")}
-	TestConfigs  = []RuleDefinition{ruleDef("before"), ruleDef("after"), ruleDef("ignore"), ruleDef("stopOnFailure"), ruleDef("keepStdout"), ruleDef("keepStderr"),
-		ruleDef("keepOutputs"), ruleDef("timeout"), ruleDef("silent")}
-	Assertions = []RuleDefinition{ruleDef("success"), ruleDef("fail"), ruleDef("exit"), ruleDef("cmd"), ruleDef("stdout"), ruleDef("stderr"), ruleDef("exists")}
-)
-
 func ValidateMutualyExclusiveRules(rules ...Rule) (err error) {
 	// FIXME: stdout= and stdout~ are ME ; stdout= and stdout= are ME but stdout~ and stdout~ are not ME
 	MutualyExclusiveRules := [][]RuleKey{
-		{{"init", "all"}, {"test", "all"}, {"report", "all"}, {"global", "all"}},
+		ruleKeys(Actions),
 		{{"fail", "all"}, {"success", "all"}, {"exit", "all"}},
 		//{{"fail", "all"}, {"success", "all"}, {"cmd", "all"}},
 		{{"test", "all"}, {"token", ""}},
@@ -659,14 +687,10 @@ func ValidateMutualyExclusiveRules(rules ...Rule) (err error) {
 	}
 
 	exlusiveRules := MutualyExclusiveRules
-	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{"global", "all"}, RuleKey{"success", "all"}, RuleKey{"fail", "all"}, RuleKey{"exit", "all"}, RuleKey{"cmd", "all"}, RuleKey{"stdout", "all"},
-		RuleKey{"stderr", "all"}, RuleKey{"exists", "all"}, RuleKey{"cmd", "all"})...)
-	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{"init", "all"}, RuleKey{"success", "all"}, RuleKey{"fail", "all"}, RuleKey{"exit", "all"}, RuleKey{"cmd", "all"}, RuleKey{"stdout", "all"},
-		RuleKey{"stderr", "all"}, RuleKey{"exists", "all"}, RuleKey{"cmd", "all"})...)
+	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{"global", "all"}, ruleKeys(Assertions)...)...)
+	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{"init", "all"}, ruleKeys(Assertions)...)...)
+	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{"report", "all"}, ruleKeys(Assertions, TestConfigs, SuiteConfigs)...)...)
 	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{"test", "all"}, RuleKey{"suiteTimeout", "all"}, RuleKey{"fork", "all"})...)
-	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{"report", "all"}, RuleKey{"fork", "all"}, RuleKey{"suiteTimeout", "all"}, RuleKey{"before", "all"},
-		ruleKey("after"), ruleKey("ignore"), ruleKey("stopOnFailure"), ruleKey("keepStdout"), ruleKey("keepStderr"), ruleKey("keepOutputs"), ruleKey("timeout"), ruleKey("silent"),
-		ruleKey("runCount"), ruleKey("parallel"), ruleKey("success"), ruleKey("fail"), ruleKey("exit"), RuleKey{"cmd", "all"}, ruleKey("stdout"), ruleKey("stderr"), ruleKey("exists"), RuleKey{"exists", "cmd"})...)
 	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("keepOutputs"), ruleKey("keepStdout"), ruleKey("keepStderr"))...)
 	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("stdout", "="), ruleKey("stdout", "~"), ruleKey("stdout", "!~"), ruleKey("stdout", "!="), ruleKey("stdout", ":"), ruleKey("stdout", "!:"))...)
 	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("stderr", "="), ruleKey("stderr", "~"), ruleKey("stderr", "!~"), ruleKey("stderr", "!="), ruleKey("stderr", ":"), ruleKey("stderr", "!:"))...)

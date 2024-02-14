@@ -107,17 +107,18 @@ Done:
 	- !~/PATTERN/FLAGS "not match regexp"
 - @global action for global config (config for all test suites)
 - @silent config hide success
-
+- Rules as constants sorted by type in collections => if rule not in collection fail
+- leverage rule definitions for Mutual Exclusions
 TODO:
 Bugs:
 
 Features :
-- Rules as constants sorted by type in collections => if rule not in collection fail
 - silent ? quiet ? an option to quiet errors as well ?
 - Total duration if reporting multiple suites
 - @mock des appels de commande
 - @before=TEST_SUITE CMD ARG_1 ARG_2 ... ARG_N => execute CMD before each test
 - @after=TEST_SUITE CMD ARG_1 ARG_2 ... ARG_N => execute CMD after each test
+
 - move seq into utils module
 - order reports : report failures at the end of report
 - rework failure description : hard to read (remove colors ? remove \n ?)
