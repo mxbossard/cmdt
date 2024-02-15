@@ -1,15 +1,18 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	cryptorand "crypto/rand"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,6 +23,16 @@ import (
 )
 
 var rulePrefix = DefaultRulePrefix
+
+func Fatal(testSuite, token string, v ...any) {
+	IncrementSeq(testSuite, token, ErrorSequenceFilename)
+	log.Fatal(v...)
+}
+
+func Fatalf(testSuite, token, format string, v ...any) {
+	IncrementSeq(testSuite, token, ErrorSequenceFilename)
+	log.Fatalf(format, v...)
+}
 
 func RulePrefix() string {
 	return rulePrefix
@@ -43,14 +56,44 @@ func readEnvToken() (token string) {
 	return
 }
 
+func getProcessStartTime(pid int) (int64, error) {
+	// Index of the starttime field. See proc(5).
+	const StartTimeIndex = 21
+
+	fname := filepath.Join("/proc", strconv.Itoa(pid), "stat")
+	data, err := ioutil.ReadFile(fname)
+	if err != nil {
+		return 0, err
+	}
+
+	fields := bytes.Fields(data)
+	if len(fields) < StartTimeIndex+1 {
+		return 0, fmt.Errorf("invalid /proc/[pid]/stat format: too few fields: %d", len(fields))
+	}
+
+	s := string(fields[StartTimeIndex])
+	starttime, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid starttime: %d", err)
+	}
+
+	return starttime, nil
+}
+
 func forgeContextualToken() string {
 	// If no token supplied use Workspace dir + ppid to forge tmp directory path
 	workDirPath, err := os.Getwd()
 	if err != nil {
 		log.Fatalf("cannot find workspace dir: %s", err)
 	}
-	ppid := fmt.Sprintf("%d", os.Getppid())
-	token, err := trust.SignStrings(workDirPath, "--", ppid)
+	ppid := os.Getppid()
+	ppidStr := fmt.Sprintf("%d", ppid)
+	ppidStartTime, err := getProcessStartTime(ppid)
+	if err != nil {
+		log.Fatalf("cannot find parent process start time: %s", err)
+	}
+	ppidStartTimeStr := fmt.Sprintf("%d", ppidStartTime)
+	token, err := trust.SignStrings(workDirPath, "--", ppidStr, "--", ppidStartTimeStr)
 	if err != nil {
 		log.Fatalf("cannot hash workspace dir: %s", err)
 	}
@@ -78,9 +121,15 @@ func testsuiteDirectoryPath(testSuite, token string) string {
 	//log.Printf("testsuiteDir: %s\n", path)
 	err := os.MkdirAll(path, 0700)
 	if err != nil {
-		log.Fatal(err)
+		Fatal(testSuite, token, err)
 	}
 	return path
+}
+
+func testDirectoryPath(testSuite, token string, seq int) string {
+	tmpDir := testsuiteDirectoryPath(testSuite, token)
+	testDir := filepath.Join(tmpDir, "test-"+fmt.Sprintf("%06d", seq))
+	return testDir
 }
 
 func listTestSuites(token string) (suites []string) {
@@ -108,28 +157,27 @@ func testsuiteConfigFilepath(testSuite, token string) string {
 }
 
 func cmdLogFiles(testSuite, token string, seq int) (*os.File, *os.File, *os.File) {
-	tmpDir := testsuiteDirectoryPath(testSuite, token)
-	testDir := filepath.Join(tmpDir, "test-"+fmt.Sprintf("%06d", seq))
+	testDir := testDirectoryPath(testSuite, token, seq)
 	stdoutFilepath := filepath.Join(testDir, StdoutFilename)
 	stderrFilepath := filepath.Join(testDir, StderrFilename)
 	reportFilepath := filepath.Join(testDir, ReportFilename)
 
 	err := os.MkdirAll(testDir, 0700)
 	if err != nil {
-		log.Fatalf("cannot create work dir: %s ! Error: %s", testDir, err)
+		Fatalf(testSuite, token, "cannot create work dir: %s ! Error: %s", testDir, err)
 	}
 
-	stdoutFile, err := os.OpenFile(stdoutFilepath, os.O_RDWR|os.O_CREATE, 0600)
+	stdoutFile, err := os.OpenFile(stdoutFilepath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0600)
 	if err != nil {
-		log.Fatalf("Cannot open file: %s ! Error: %s", stdoutFilepath, err)
+		Fatalf(testSuite, token, "Cannot open file: %s ! Error: %s", stdoutFilepath, err)
 	}
-	stderrFile, err := os.OpenFile(stderrFilepath, os.O_RDWR|os.O_CREATE, 0600)
+	stderrFile, err := os.OpenFile(stderrFilepath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0600)
 	if err != nil {
-		log.Fatalf("Cannot open file: %s ! Error: %s", stderrFilepath, err)
+		Fatalf(testSuite, token, "Cannot open file: %s ! Error: %s", stderrFilepath, err)
 	}
-	reportFile, err := os.OpenFile(reportFilepath, os.O_RDWR|os.O_CREATE, 0600)
+	reportFile, err := os.OpenFile(reportFilepath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0600)
 	if err != nil {
-		log.Fatalf("Cannot open file: %s ! Error: %s", reportFilepath, err)
+		Fatalf(testSuite, token, "Cannot open file: %s ! Error: %s", reportFilepath, err)
 	}
 
 	return stdoutFile, stderrFile, reportFile
@@ -148,7 +196,7 @@ func failureReports(testSuite, token string) (reports []string) {
 		return nil
 	})
 	if err != nil {
-		log.Fatal(err)
+		Fatal(testSuite, token, err)
 	}
 
 	return
@@ -163,12 +211,12 @@ func PersistSuiteContext(testSuite, token string, config Context) {
 	//stdPrinter.Errf("Built context: %v\n", context)
 	content, err := yaml.Marshal(config)
 	if err != nil {
-		log.Fatal(err)
+		Fatal(testSuite, token, err)
 	}
 	//stdPrinter.Errf("Persisting context: %s\n", content)
 	err = os.WriteFile(contextFilepath, content, 0600)
 	if err != nil {
-		log.Fatalf("cannot persist context: %s", err)
+		Fatalf(testSuite, token, "cannot persist context: %s", err)
 	}
 	//log.Printf("Persisted context file: %s\n", contextFilepath)
 }
@@ -182,7 +230,7 @@ func readSuiteContext(testSuite, token string) (config Context, err error) {
 	}
 	err = yaml.Unmarshal(content, &config)
 	if err != nil {
-		log.Fatal(err)
+		Fatal(testSuite, token, err)
 	}
 
 	return
@@ -201,6 +249,9 @@ func LoadSuiteContext(testSuite, token string) (config Context, err error) {
 		return
 	}
 	config = MergeContext(globalCtx, suiteCtx)
+	if globalCtx.StartTime.Nanosecond() != 0 {
+		config.StartTime = globalCtx.StartTime
+	}
 	SetRulePrefix(config.Prefix)
 	return
 }
@@ -234,12 +285,12 @@ func initWorkspace(ctx Context) {
 		// Workspace already initialized
 		return
 	} else if !errors.Is(err, os.ErrNotExist) {
-		log.Fatal(err)
+		Fatal(testSuite, token, err)
 	}
 
 	err = os.MkdirAll(tmpDir, 0700)
 	if err != nil {
-		log.Fatalf("Unable to create temp dir: %s ! Error: %s", tmpDir, err)
+		Fatalf(testSuite, token, "Unable to create temp dir: %s ! Error: %s", tmpDir, err)
 	}
 
 	if ctx.Silent == nil || !*ctx.Silent {
@@ -256,7 +307,6 @@ func initConfig(ctx Context) {
 	ctx.StartTime = time.Now()
 	// store config
 	PersistSuiteContext(testSuite, token, ctx)
-	InitSeq(testSuite, token)
 }
 
 func GlobalConfig(ctx Context) (exitCode int) {
@@ -287,7 +337,7 @@ func InitTestSuite(ctx Context) (exitCode int) {
 	tmpDir := testsuiteDirectoryPath(testSuite, token)
 	err := os.RemoveAll(tmpDir)
 	if err != nil {
-		log.Fatal(err)
+		Fatal(testSuite, token, err)
 	}
 	//log.Printf("Cleared test suite dir: %s\n", tmpDir)
 
@@ -317,11 +367,11 @@ func ReportTestSuite(ctx Context) (exitCode int) {
 		testSuites := listTestSuites(token)
 		if testSuites != nil {
 			exitCode = 0
-			//log.Printf("reporting found suites: %s", testSuites)
+			log.Printf("reporting found suites: %s\n", testSuites)
 			for _, suite := range testSuites {
 				ctx, err := LoadSuiteContext(suite, token)
 				if err != nil {
-					log.Fatalf("cannot load context: %s", err)
+					Fatalf(testSuite, token, "cannot load context: %s", err)
 				}
 				code := ReportTestSuite(ctx)
 				if code != 0 {
@@ -338,33 +388,34 @@ func ReportTestSuite(ctx Context) (exitCode int) {
 	suiteContext, err := LoadSuiteContext(testSuite, token)
 	if err != nil {
 		if os.IsNotExist(err) {
-			log.Fatalf("you must perform some test prior to report: [%s] test suite", testSuite)
+			Fatalf(testSuite, token, "you must perform some test prior to report: [%s] test suite", testSuite)
 		} else {
-			log.Fatalf("cannot load context: %s", err)
+			Fatalf(testSuite, token, "cannot load context: %s", err)
 		}
 	}
 	ctx = MergeContext(suiteContext, ctx)
 	testCount := ReadSeq(testSuite, token, TestSequenceFilename)
 	ignoredCount := ReadSeq(testSuite, token, IgnoredSequenceFilename)
+	errorCount := ReadSeq(testSuite, token, ErrorSequenceFilename)
 	failureReports := failureReports(testSuite, token)
 	failedCount := len(failureReports)
 
 	if ctx.Silent == nil || !*ctx.Silent {
-		stdPrinter.ColoredErrf(messageColor, "Reporting [%s] test suite ...\n", testSuite)
+		stdPrinter.ColoredErrf(messageColor, "Reporting [%s] test suite (%s) ...\n", testSuite, tmpDir)
 	}
 
 	ignoredMessage := ""
 	if ignoredCount > 0 {
 		ignoredMessage = fmt.Sprintf(" (%d ignored)", ignoredCount)
 	}
-	if failedCount == 0 {
+	if failedCount == 0 && errorCount == 0 {
 		exitCode = 0
 		stdPrinter.ColoredErrf(successColor, "Successfuly ran [%s] test suite (%d tests in %s)", testSuite, testCount, time.Since(ctx.StartTime))
 		stdPrinter.ColoredErrf(warningColor, "%s", ignoredMessage)
 		stdPrinter.Errf("\n")
 	} else {
 		successCount := testCount - failedCount
-		stdPrinter.ColoredErrf(failureColor, "Failures in [%s] test suite (%d success, %d failures, %d tests in %s)", testSuite, successCount, failedCount, testCount, time.Since(ctx.StartTime))
+		stdPrinter.ColoredErrf(failureColor, "Failures in [%s] test suite (%d success, %d failures, %d errors on %d tests in %s)", testSuite, successCount, failedCount, errorCount, testCount, time.Since(ctx.StartTime))
 		stdPrinter.ColoredErrf(warningColor, "%s", ignoredMessage)
 		stdPrinter.Errf("\n")
 		for _, report := range failureReports {
@@ -393,7 +444,7 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 			// Recursive call once test suite initialized
 			return PerformTest(ctx, cmdAndArgs, assertions)
 		} else {
-			log.Fatalf("cannot load context: %s", err)
+			Fatalf(testSuite, token, "cannot load context: %s", err)
 		}
 	}
 
@@ -401,7 +452,7 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 	timecode := int(time.Since(ctx.StartTime).Milliseconds())
 
 	if len(cmdAndArgs) == 0 {
-		log.Fatalf("no command supplied to test")
+		Fatalf(testSuite, token, "no command supplied to test")
 	}
 	cmd := cmdz.Cmd(cmdAndArgs[0])
 	if len(cmdAndArgs) > 1 {
@@ -455,8 +506,29 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 		cmd.SetInput(os.Stdin)
 	}
 
-	//fmt.Printf("%s", os.Environ())
-	cmd.AddEnviron(os.Environ())
+	for _, environ := range os.Environ() {
+		if !strings.HasPrefix(environ, "PATH=") {
+			cmd.AddEnviron(environ)
+		}
+	}
+	currentPath := os.Getenv("PATH")
+	if len(ctx.Mocks) > 0 {
+		// Put mockDir in PATH
+		var mockDir string
+		mockDir, err = ProcessMocking(testSuite, token, seq, ctx.Mocks)
+		if err != nil {
+			Fatal(testSuite, token, err)
+		}
+		cmd.AddEnv("ORIGINAL_PATH", currentPath)
+		newPath := fmt.Sprintf("%s:%s", mockDir, currentPath)
+		cmd.AddEnv("PATH", newPath)
+		err = os.Setenv("PATH", newPath)
+		if err != nil {
+			Fatal(testSuite, token, err)
+		}
+	} else {
+		cmd.AddEnv("PATH", currentPath)
+	}
 
 	testTitle := fmt.Sprintf("[%05d] Test %s #%02d", timecode, qulifiedName, seq)
 	if ctx.Silent == nil || !*ctx.Silent {
@@ -482,9 +554,10 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 			result, err = assertion.Asserter(cmd)
 			result.Assertion = assertion
 			if err != nil {
-				//log.Fatal(err)
+				//Fatal(testSuite, token, err)
 				//stdPrinter.ColoredErrf(errorColor, "FAILED (error: %s) ", err)
-				result.Message = fmt.Sprintf("%s", err)
+				// FIXME: aggregate errors
+				result.Message += fmt.Sprintf("%s ", err)
 				result.Success = false
 			}
 			if !result.Success {
@@ -510,14 +583,17 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 		if ctx.Silent == nil || *ctx.Silent {
 			stdPrinter.ColoredErrf(testColor, "%s... ", testTitle)
 		}
-		stdPrinter.ColoredErrf(failureColor, "FAILED")
 		if err == nil {
+			stdPrinter.ColoredErrf(failureColor, "FAILED")
 			stdPrinter.Errf(" (in %s)\n", testDuration)
 		} else {
 			if errors.Is(err, context.DeadlineExceeded) {
+				stdPrinter.ColoredErrf(failureColor, "FAILED")
 				stdPrinter.Errf(" (timed out after %s)\n", ctx.Timeout)
 				reportLog.WriteString(testTitle + "  =>  timed out")
 			} else {
+				IncrementSeq(testSuite, token, ErrorSequenceFilename)
+				stdPrinter.ColoredErrf(warningColor, "ERROR")
 				stdPrinter.Errf(" (not executed)\n")
 				reportLog.WriteString(testTitle + "  =>  not executed")
 			}
@@ -543,7 +619,6 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 					if cmd.StderrRecord() != "" {
 						stdPrinter.Errf("sdterr> %s\n", cmd.StderrRecord())
 					}
-					stdPrinter.Errf("Expected %s%s\n", assertPrefix, assertName)
 					continue
 				} else if assertName == "cmd" {
 					stdPrinter.Errf("Expected %s%s=%s to succeed\n", assertPrefix, assertName, expected)
@@ -574,7 +649,7 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 				assertName := result.Assertion.Name
 				assertOp := result.Assertion.Op
 				expected := result.Assertion.Expected
-				failedAssertionsReport = RulePrefix() + string(assertName) + string(assertOp) + string(expected)
+				failedAssertionsReport += RulePrefix() + string(assertName) + string(assertOp) + string(expected) + " "
 			}
 			reportLog.WriteString(testTitle + "  => " + failedAssertionsReport)
 		}
@@ -604,12 +679,15 @@ func ProcessArgs(allArgs []string) {
 	}
 
 	config, cmdAndArgs, assertions, err := ParseArgs(allArgs[1:])
-	if err != nil {
-		log.Fatal(err)
+	if config.TestSuite == "" {
+		config.TestSuite = DefaultTestSuiteName
 	}
-
 	if config.Token == "" {
 		config.Token = readEnvToken()
+	}
+
+	if err != nil {
+		Fatal(config.TestSuite, config.Token, err)
 	}
 
 	switch config.Action {
@@ -622,6 +700,79 @@ func ProcessArgs(allArgs []string) {
 	case "report":
 		exitCode = ReportTestSuite(config)
 	default:
-		log.Fatalf("action: [%s] not known", config.Action)
+		Fatalf(config.TestSuite, config.Token, "action: [%s] not known", config.Action)
 	}
+}
+
+func mockDirectoryPath(testSuite, token string, seq int) (mockDir string) {
+	testDir := testDirectoryPath(testSuite, token, seq)
+	mockDir = filepath.Join(testDir, "mock")
+	return
+}
+
+func ProcessMocking(testSuite, token string, seq int, mocks []CmdMock) (mockDir string, err error) {
+	// get test dir
+	// create a mock dir
+	mockDir = mockDirectoryPath(testSuite, token, seq)
+	err = os.MkdirAll(mockDir, 0755)
+	if err != nil {
+		return
+	}
+	wrapperFilepath := filepath.Join(mockDir, "mockWrapper.sh")
+	// add mockdir to PATH TODO in perform test
+
+	// write the mocke wrapper
+	err = writeMockWrapperScript(wrapperFilepath, mocks)
+	if err != nil {
+		return
+	}
+	// for each cmd mocked add link to the mock wrapper
+	for _, mock := range mocks {
+		linkName := filepath.Join(mockDir, mock.Cmd)
+		linkSource := wrapperFilepath
+		err = os.Symlink(linkSource, linkName)
+		if err != nil {
+			return
+		}
+	}
+
+	log.Printf("mock wrapper: %s\n", wrapperFilepath)
+	return
+}
+
+func writeMockWrapperScript(wrapperFilepath string, mocks []CmdMock) (err error) {
+	// By default run all args
+	//wrapper.sh CMD ARG_1 ARG_2 ... ARG_N
+	// Pour chaque CmdMock
+	// if "$@" match CmdMock
+	wrapperScript := "#! /bin/sh\n"
+	wrapperScript += `export PATH="$ORIGINAL_PATH"` + "\n"
+	wrapperScript += ">&2 echo PATH:$PATH\n"
+	wrapperScript += `cmd=$( basename "$0" )` + "\n"
+
+	for _, mock := range mocks {
+		// if [ "$1" = "echo" ] && [ "$2" = "foo" ]; then
+		// 	echo "baz"
+		// 	exit 0
+		// fi
+		wrapperScript += fmt.Sprintf(`if [ "$cmd" = "%s" ]`, mock.Cmd)
+		for pos, arg := range mock.Args {
+			wrapperScript += fmt.Sprintf(` && [ "$%d" = "%s" ]`, pos+1, arg)
+		}
+		wrapperScript += `; then` + "\n"
+		if mock.Stdout != "" {
+			wrapperScript += fmt.Sprintf("\t"+`echo -n "%s"`+"\n", mock.Stdout)
+		}
+		if mock.Stderr != "" {
+			wrapperScript += fmt.Sprintf("\t"+` >&2 echo -n "%s"`+"\n", mock.Stderr)
+		}
+		if !mock.Delegate {
+			wrapperScript += fmt.Sprintf("\t"+`exit %d`+"\n", mock.ExitCode)
+		}
+		wrapperScript += fmt.Sprintf(`fi` + "\n")
+	}
+	wrapperScript += `"$cmd" "$@"` + "\n"
+
+	err = os.WriteFile(wrapperFilepath, []byte(wrapperScript), 0755)
+	return
 }

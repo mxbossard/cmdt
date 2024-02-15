@@ -44,6 +44,10 @@ die() {
 
 #$cmdt @global @silent
 
+# Clear context
+export -n __CMDT_TOKEN
+#$cmdt @init=main
+
 >&2 echo "## Test cmdt basic assertions should passed"
 $cmdt0 @init=should_succeed @stopOnFailure=false
 
@@ -104,17 +108,16 @@ $cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stdout:foo 2> /dev/null
 $cmdt @report=should_succeed
 ! $cmdt @report=should_fail 2>&1 | grep "0 success" || die "should_fail test suite should have no success"
 
-
 nothingToReportExpectedStderrMsg="you must perform some test prior to report"
-
 >&2 echo "## Test @report without test"
 $cmdt0 @init=meta1
 $cmdt0 @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" -- $cmdt1 @report=foo
 $cmdt0 @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" -- $cmdt1 @report=foo
 
 >&2 echo "## Meta1 test context not shared without token"
-$cmdt0 @test=meta1/ @stderr:"PASSED" @stderr:"#01" -- $cmdt1 true
-$cmdt0 @test=meta1/ @stderr:"PASSED" @stderr:"#01" -- $cmdt1 true
+# Without token, cmdt run with different pid should run in differents workspaces
+$cmdt0 @test=meta1/"without token one" @stderr:"PASSED" @stderr:"#01" -- $cmdt1 true
+$cmdt0 @test=meta1/"without token two" @stderr:"PASSED" @stderr:"#01" -- $cmdt1 true
 $cmdt0 @test=meta1/ @fail -- $cmdt1 @report
 
 >&2 echo "## Test printed token"
@@ -142,6 +145,7 @@ $cmdt0 @test=meta4/ @stderr:"PASSED" @stderr:"#02" -- $cmdt @test=sub4/ true
 $cmdt0 @test=meta4/ @stderr:"Successfuly ran" -- $cmdt @report=sub4
 $cmdt0 @test=meta4/ @fail @stderr:"$nothingToReportExpectedStderrMsg" -- $cmdt @report=sub4 @token=$tk0
 $cmdt @report 2>&1 | grep -v "Failures"
+
 export -n __CMDT_TOKEN
 
 
@@ -214,7 +218,7 @@ $cmdt0 @test=meta/ @stderr:"#01..." @stderr:"PASSED" -- $cmdt true @test=t1/
 $cmdt0 @test=meta/ @stderr:"#02..." @stderr:"PASSED" -- $cmdt true @test=t1/
 $cmdt0 @test=meta/ @stderr:"#03..." @stderr:"FAILED" -- $cmdt false @test=t1/
 $cmdt0 @test=meta/ @stderr:"#04..." @stderr:"PASSED" -- $cmdt false @fail @test=t1/
-$cmdt0 @test=meta/ @fail @stderr:"Failures in [t1] test suite (3 success, 1 failures, 4 tests in" -- $cmdt @report=t1
+$cmdt0 @test=meta/ @fail @stderr:"Failures in [t1] test suite (3 success, 1 failures, 0 errors on 4 tests in" -- $cmdt @report=t1
 
 
 >&2 echo "## Test namings"
@@ -413,12 +417,25 @@ done
 
 
 >&2 echo "## Test flow"
-$cmdt0 @init=main # clear main test suite
-$cmdt0 @test=test_flow/ -- $cmdt1 false @fail
-$cmdt0 @test=test_flow/ -- $cmdt1 true
-$cmdt0 @test=test_flow/ @fail -- $cmdt1 "@test" "@fork=5" # Should error because of bad param
-$cmdt0 @test=test_flow/ -- $cmdt1 true
-$cmdt0 @test=test_flow/ @fail -- $cmdt1 @report=main @stderr:"2 success" @stderr:"1 failure" @fail
+$cmdt @init=main # clear main test suite
+$cmdt0 @test=test_flow/ @stderr:"#01" @stderr:PASSED -- $cmdt1 @fail false
+$cmdt0 @test=test_flow/ @stderr:"#02" @stderr:PASSED -- $cmdt1 true
+$cmdt0 @test=test_flow/ @fail @stderr:"mutually exclusive" -- $cmdt1 "@test" "@fork=5" # Should error because of bad param
+$cmdt0 @test=test_flow/ @stderr:"#03" @stderr:ERROR -- $cmdt1 doNotExists @stderr:"not executed" # Should error because of not executable
+$cmdt0 @test=test_flow/ @stderr:"#04" @stderr:PASSED -- $cmdt1 true
+$cmdt0 @test=test_flow/ @fail @stderr:"3 success" @stderr:"2 error" -- $cmdt1 @report=main
+$cmdt0 @test=test_flow/ @stderr:"#01" @stderr:PASSED -- $cmdt1 true
+$cmdt0 @test=test_flow/ @stderr:"1 test" -- $cmdt1 @report=main
+
+
+>&2 echo "## Cmd mock"
+mockCfg1="@mock=curl foo;stdout=baz;exit=42"
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 sh -c "echo \${PATH}" "$mockCfg1" @stdout:/mock:/
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 which curl "$mockCfg1" @stderr= @stdout:/mock/curl
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 sh -c "curl foo" "$mockCfg1" @stdout=baz @exit=42 @keepOutputs
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl foo "$mockCfg1" @stdout=baz @exit=42 @keepOutputs
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl bar "$mockCfg1" @fail
+$cmdt0 @test=cmd_mock/ -- $cmdt1 @report=main
 
 
 $cmdt @report= ; >&2 echo SUCCESS ; exit 0

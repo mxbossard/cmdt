@@ -257,6 +257,13 @@ func BooleanValidater(rule Rule, v bool) (err error) {
 	return
 }
 
+func MockValidater(rule Rule, v CmdMock) (err error) {
+	if strings.Contains(v.Cmd, "/") {
+		err = fmt.Errorf("rule %s%s command does not support slash", rule.Prefix, rule.Name)
+	}
+	return
+}
+
 func Validate[T any](rule Rule, val T, validaters ...Validater[T]) (err error) {
 	for _, v := range validaters {
 		err = v(rule, val)
@@ -394,7 +401,9 @@ func ApplyConfig(c *Context, ruleExpr string) (ok bool, rule Rule, err error) {
 			boolVal, err = Translate(rule, BoolMapper, BooleanValidater)
 			c.Silent = &boolVal
 		case "mock":
-
+			var mock CmdMock
+			mock, err = Translate(rule, MockMapper, OperatorValidater[CmdMock]("="), NotEmptyValidater[CmdMock], MockValidater)
+			c.Mocks = append(c.Mocks, mock)
 		default:
 			ok = false
 		}

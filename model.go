@@ -96,6 +96,7 @@ type Context struct {
 	Timeout       time.Duration `yaml:""`
 	RunCount      int           `yaml:""`
 	Parallel      int           `yaml:""`
+	Mocks		[]CmdMock   `yaml:""`
 }
 
 type Config struct {
@@ -175,6 +176,7 @@ func MergeContext(baseContext, overridingContext Context) Context {
 	if overridingContext.Silent != nil {
 		baseContext.Silent = overridingContext.Silent
 	}
+	baseContext.Mocks = append(baseContext.Mocks, overridingContext.Mocks...)
 
 	return baseContext
 }

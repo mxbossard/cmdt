@@ -202,6 +202,7 @@ var (
 	ContextFilename         = "context.yaml"
 	TestSequenceFilename    = "test-seq.txt"
 	IgnoredSequenceFilename = "ignored-seq.txt"
+	ErrorSequenceFilename   = "error-seq.txt"
 	StdoutFilename          = "stdout.log"
 	StderrFilename          = "stderr.log"
 	ReportFilename          = "report.log"
