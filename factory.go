@@ -44,16 +44,16 @@ func SplitRuleExpr(ruleExpr string) (ok bool, r Rule) {
 	return
 }
 
-func DummyMapper(s string) (v string, err error) {
+func DummyMapper(s, op string) (v string, err error) {
 	return s, nil
 }
 
-func IntMapper(s string) (v int, err error) {
+func IntMapper(s, op string) (v int, err error) {
 	v, err = strconv.Atoi(s)
 	return
 }
 
-func BoolMapper(s string) (v bool, err error) {
+func BoolMapper(s, op string) (v bool, err error) {
 	if s == "true" || s == "" {
 		v = true
 	} else if s == "false" {
@@ -65,11 +65,11 @@ func BoolMapper(s string) (v bool, err error) {
 	return
 }
 
-func DurationMapper(s string) (v time.Duration, err error) {
+func DurationMapper(s, op string) (v time.Duration, err error) {
 	return time.ParseDuration(s)
 }
 
-func FileContentMapper(s string) (v string, err error) {
+func FileContentMapper(s, op string) (v string, err error) {
 	if strings.HasPrefix(s, "@") {
 		// treat supplied value as a filepath
 		path := s[1:]
@@ -81,11 +81,11 @@ func FileContentMapper(s string) (v string, err error) {
 	return
 }
 
-func CmdMapper(s string) (v []string, err error) {
+func CmdMapper(s, op string) (v []string, err error) {
 	// FIXME: should leverage simple and double quottes to split args
 	if len(s) > 1 {
 		separator := " "
-		if s[0] == ',' || s[0] == '.' || s[0] == '|' {
+		if s[0] == ';' || s[0] == ':' || s[0] == '|' {
 			separator = s[0:1]
 			s = s[1:]
 		}
@@ -95,18 +95,19 @@ func CmdMapper(s string) (v []string, err error) {
 	return
 }
 
-func MockMapper(s string) (m CmdMock, err error) {
+func MockMapper(s, op string) (m CmdMock, err error) {
 	if len(s) > 1 {
-		splitted := strings.Split(s, ";")
+		splitted := strings.Split(s, ",")
 		// cmd always defined first
-		var cmdAndArgs []string
-		cmdAndArgs, err = CmdMapper(splitted[0])
+		var mockedCmdAndArgs []string
+		mockedCmdAndArgs, err = CmdMapper(splitted[0], op)
 		if err != nil {
 			return
 		}
-		m.Cmd = cmdAndArgs[0]
-		if len(cmdAndArgs) > 1 {
-			m.Args = cmdAndArgs[1:]
+		m.Op = op
+		m.Cmd = mockedCmdAndArgs[0]
+		if len(mockedCmdAndArgs) > 1 {
+			m.Args = mockedCmdAndArgs[1:]
 		}
 		m.Delegate = true
 		if len(splitted) > 1 {
@@ -129,10 +130,22 @@ func MockMapper(s string) (m CmdMock, err error) {
 					m.Stderr = value
 				case "exit":
 					m.Delegate = false
-					m.ExitCode, err = IntMapper(value)
+					m.ExitCode, err = IntMapper(value, "=")
 					if err != nil {
+						// FIXME: aggregate errors
 						return
 					}
+				case "cmd":
+					m.Delegate = false
+					m.OnCallCmdAndArgs, err = CmdMapper(value, "=")
+					if err != nil {
+						// FIXME: aggregate errors
+						return
+					}
+				default:
+					err = fmt.Errorf("mock rule: %s does not exists", key)
+					// FIXME: aggregate errors
+					return
 				}
 			}
 		}
@@ -140,14 +153,14 @@ func MockMapper(s string) (m CmdMock, err error) {
 	return
 }
 
-func ExistsMapper(s string) (v []string, err error) {
+func ExistsMapper(s, op string) (v []string, err error) {
 	// @exists=FILEPATH,PERMS,OWNERS
 	v = strings.Split(s, ",")
 	//log.Printf("EXISTS: [%v]", v)
 	return
 }
 
-func RegexpPatternMapper(s string) (c *regexp.Regexp, err error) {
+func RegexpPatternMapper(s, op string) (c *regexp.Regexp, err error) {
 	if len(s) < 2 {
 		err = fmt.Errorf("regexp pattern must be of form /PATTERN/FLAGS")
 		return
@@ -275,7 +288,7 @@ func Validate[T any](rule Rule, val T, validaters ...Validater[T]) (err error) {
 }
 
 func Translate[T any](rule Rule, m Mapper[T], validaters ...Validater[T]) (val T, err error) {
-	val, err = m(rule.Expected)
+	val, err = m(rule.Expected, rule.Op)
 	if err != nil {
 		err = fmt.Errorf("cannot map rule %s%s value: [%s] : %w", rule.Prefix, rule.Name, rule.Expected, err)
 		return
@@ -402,7 +415,7 @@ func ApplyConfig(c *Context, ruleExpr string) (ok bool, rule Rule, err error) {
 			c.Silent = &boolVal
 		case "mock":
 			var mock CmdMock
-			mock, err = Translate(rule, MockMapper, OperatorValidater[CmdMock]("="), NotEmptyValidater[CmdMock], MockValidater)
+			mock, err = Translate(rule, MockMapper, OperatorValidater[CmdMock]("=", ":"), NotEmptyValidater[CmdMock], MockValidater)
 			c.Mocks = append(c.Mocks, mock)
 		default:
 			ok = false

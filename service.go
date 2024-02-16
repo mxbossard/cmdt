@@ -745,26 +745,54 @@ func writeMockWrapperScript(wrapperFilepath string, mocks []CmdMock) (err error)
 	//wrapper.sh CMD ARG_1 ARG_2 ... ARG_N
 	// Pour chaque CmdMock
 	// if "$@" match CmdMock
-	wrapperScript := "#! /bin/sh\n"
+	wrapperScript := "#! /bin/sh\nset -e\n"
 	wrapperScript += `export PATH="$ORIGINAL_PATH"` + "\n"
-	wrapperScript += ">&2 echo PATH:$PATH\n"
+	//wrapperScript += ">&2 echo PATH:$PATH\n"
 	wrapperScript += `cmd=$( basename "$0" )` + "\n"
 
 	for _, mock := range mocks {
-		// if [ "$1" = "echo" ] && [ "$2" = "foo" ]; then
-		// 	echo "baz"
-		// 	exit 0
-		// fi
 		wrapperScript += fmt.Sprintf(`if [ "$cmd" = "%s" ]`, mock.Cmd)
-		for pos, arg := range mock.Args {
-			wrapperScript += fmt.Sprintf(` && [ "$%d" = "%s" ]`, pos+1, arg)
+		wildcard := false
+		if mock.Op == "=" {
+			// args must exactly match mock config
+			for pos, arg := range mock.Args {
+				if arg != "*" {
+					wrapperScript += fmt.Sprintf(` && [ "$%d" = "%s" ] `, pos+1, arg)
+				} else {
+					wildcard = true
+					break
+				}
+			}
+		} else if mock.Op == ":" {
+			// args must contains mock config disorderd
+			// all mock args must be in $@
+			// if multiple same mock args must all be present in $@
+			mockArgsCount := make(map[string]int, 8)
+			for _, arg := range mock.Args {
+				if arg != "*" {
+					mockArgsCount[arg]++
+				} else {
+					wildcard = true
+				}
+			}
+			for arg, count := range mockArgsCount {
+				wrapperScript += fmt.Sprintf(` && [ %d -eq $( echo "$@" | grep -c "%s" ) ]`, count, arg)
+			}
 		}
+		if !wildcard {
+			wrapperScript += fmt.Sprintf(` && [ "$#" -eq %d ] `, len(mock.Args))
+		}
+
 		wrapperScript += `; then` + "\n"
+		// FIXME: add stdin management
 		if mock.Stdout != "" {
 			wrapperScript += fmt.Sprintf("\t"+`echo -n "%s"`+"\n", mock.Stdout)
 		}
 		if mock.Stderr != "" {
 			wrapperScript += fmt.Sprintf("\t"+` >&2 echo -n "%s"`+"\n", mock.Stderr)
+		}
+		if len(mock.OnCallCmdAndArgs) > 0 {
+			wrapperScript += fmt.Sprintf("\t"+`%s`+"\n", strings.Join(mock.OnCallCmdAndArgs, " "))
 		}
 		if !mock.Delegate {
 			wrapperScript += fmt.Sprintf("\t"+`exit %d`+"\n", mock.ExitCode)

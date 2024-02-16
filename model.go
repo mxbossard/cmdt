@@ -10,7 +10,7 @@ import (
 
 type Action string
 
-type Mapper[T any] func(expr string) (T, error)
+type Mapper[T any] func(expr, op string) (T, error)
 
 type Validater[T any] func(rule Rule, value T) error
 
@@ -96,7 +96,7 @@ type Context struct {
 	Timeout       time.Duration `yaml:""`
 	RunCount      int           `yaml:""`
 	Parallel      int           `yaml:""`
-	Mocks		[]CmdMock   `yaml:""`
+	Mocks         []CmdMock     `yaml:""`
 }
 
 type Config struct {
@@ -118,13 +118,15 @@ type AssertionResult struct {
 }
 
 type CmdMock struct {
-	Cmd      string
-	Args     []string
-	Stdin    string
-	Stdout   string
-	Stderr   string
-	ExitCode int
-	Delegate bool
+	Op               string
+	Cmd              string
+	Args             []string
+	Stdin            string
+	Stdout           string
+	Stderr           string
+	ExitCode         int
+	Delegate         bool
+	OnCallCmdAndArgs []string
 }
 
 func MergeContext(baseContext, overridingContext Context) Context {

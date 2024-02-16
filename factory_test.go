@@ -259,7 +259,7 @@ func TestMockMapper(t *testing.T) {
 	var m CmdMock
 	var err error
 
-	m, err = MockMapper("true")
+	m, err = MockMapper("true", "=")
 	require.NoError(t, err)
 	assert.Equal(t, "true", m.Cmd)
 	assert.Empty(t, m.Args)
@@ -269,7 +269,7 @@ func TestMockMapper(t *testing.T) {
 	assert.Equal(t, 0, m.ExitCode)
 	assert.True(t, m.Delegate)
 
-	m, err = MockMapper("true arg1 arg2")
+	m, err = MockMapper("true arg1 arg2", "=")
 	require.NoError(t, err)
 	assert.Equal(t, "true", m.Cmd)
 	assert.Equal(t, []string{"arg1", "arg2"}, m.Args)
@@ -279,7 +279,7 @@ func TestMockMapper(t *testing.T) {
 	assert.Equal(t, 0, m.ExitCode)
 	assert.True(t, m.Delegate)
 
-	m, err = MockMapper("true arg1 arg2;stdin=foo")
+	m, err = MockMapper("true arg1 arg2;stdin=foo", "=")
 	require.NoError(t, err)
 	assert.Equal(t, "true", m.Cmd)
 	assert.Equal(t, []string{"arg1", "arg2"}, m.Args)
@@ -289,7 +289,7 @@ func TestMockMapper(t *testing.T) {
 	assert.Equal(t, 0, m.ExitCode)
 	assert.True(t, m.Delegate)
 
-	m, err = MockMapper("true arg1 arg2;stdin=foo;stdout=bar=;stderr=pif paf;exit=12")
+	m, err = MockMapper("true arg1 arg2;stdin=foo;stdout=bar=;stderr=pif paf;exit=12", "=")
 	require.NoError(t, err)
 	assert.Equal(t, "true", m.Cmd)
 	assert.Equal(t, []string{"arg1", "arg2"}, m.Args)
@@ -299,7 +299,7 @@ func TestMockMapper(t *testing.T) {
 	assert.Equal(t, 12, m.ExitCode)
 	assert.False(t, m.Delegate)
 
-	m, err = MockMapper(",true,arg 1,arg 2")
+	m, err = MockMapper(",true,arg 1,arg 2", "=")
 	require.NoError(t, err)
 	assert.Equal(t, "true", m.Cmd)
 	assert.Equal(t, []string{"arg 1", "arg 2"}, m.Args)
@@ -309,7 +309,7 @@ func TestMockMapper(t *testing.T) {
 	assert.Equal(t, 0, m.ExitCode)
 	assert.True(t, m.Delegate)
 
-	m, err = MockMapper(".true.arg 1.arg 2")
+	m, err = MockMapper(".true.arg 1.arg 2", "=")
 	require.NoError(t, err)
 	assert.Equal(t, "true", m.Cmd)
 	assert.Equal(t, []string{"arg 1", "arg 2"}, m.Args)
@@ -319,7 +319,7 @@ func TestMockMapper(t *testing.T) {
 	assert.Equal(t, 0, m.ExitCode)
 	assert.True(t, m.Delegate)
 
-	m, err = MockMapper("|true|arg 1|arg 2;stdin=foo;stdout=bar=;stderr=pif paf;exit=12")
+	m, err = MockMapper("|true|arg 1|arg 2;stdin=foo;stdout=bar=;stderr=pif paf;exit=12", "=")
 	require.NoError(t, err)
 	assert.Equal(t, "true", m.Cmd)
 	assert.Equal(t, []string{"arg 1", "arg 2"}, m.Args)

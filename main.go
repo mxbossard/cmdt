@@ -109,11 +109,11 @@ Done:
 - @silent config hide success
 - Rules as constants sorted by type in collections => if rule not in collection fail
 - leverage rule definitions for Mutual Exclusions
+- @mock des appels de commande @mock="CMD ARG_1 ARG_2 ARG_N,stdin=baz,exit=0,stdout=foo,stderr=bar,cmd=CMD ARG_1 ARG_N"
 TODO:
 Bugs:
 
 Features :
-- @mock des appels de commande @mock="CMD,ARG_1,ARG_2,ARG_N;stdin=baz;exit=0;stdout=foo;stderr=bar"
 - @before=TEST_SUITE CMD ARG_1 ARG_2 ... ARG_N => execute CMD before each test
 - @after=TEST_SUITE CMD ARG_1 ARG_2 ... ARG_N => execute CMD after each test
 - silent ? quiet ? an option to quiet errors as well ?

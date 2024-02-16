@@ -429,12 +429,39 @@ $cmdt0 @test=test_flow/ @stderr:"1 test" -- $cmdt1 @report=main
 
 
 >&2 echo "## Cmd mock"
-mockCfg1="@mock=curl foo;stdout=baz;exit=42"
+mockCfg1="@mock=curl foo,stdout=baz,exit=41"
+mockCfg2="@mock=curl foo,cmd=sh -c 'echo -n baz; exit 42'"
+mockCfg3="@mock=curl foo *,cmd=sh -c 'echo -n baz; exit 43'"
+mockCfg6="@mock:curl foo bar,stdout=baz,exit=46"
+mockCfg7="@mock:curl foo bar *,stdout=baz,exit=47"
 $cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 sh -c "echo \${PATH}" "$mockCfg1" @stdout:/mock:/
 $cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 which curl "$mockCfg1" @stderr= @stdout:/mock/curl
-$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 sh -c "curl foo" "$mockCfg1" @stdout=baz @exit=42 @keepOutputs
-$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl foo "$mockCfg1" @stdout=baz @exit=42 @keepOutputs
-$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl bar "$mockCfg1" @fail
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 sh -c "curl foo" "$mockCfg1" @stdout=baz @exit=41 @keepOutputs
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl foo "$mockCfg1" @stdout=baz @exit=41
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl bar "$mockCfg1" @fail @stderr:"Could not resolve host: bar"
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl bar foo "$mockCfg1" @fail @stderr:"Could not resolve host: bar" @stderr:"Could not resolve host: foo"
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl foo bar "$mockCfg1" @fail @stderr:"Could not resolve host: bar" @stderr:"Could not resolve host: foo"
+
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl foo "$mockCfg2" @stdout=baz @exit=42
+
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl foo "$mockCfg3" @stdout=baz @exit=43
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl bar "$mockCfg3" @fail @stderr:"Could not resolve host: bar"
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl bar foo "$mockCfg3" @fail @stderr:"Could not resolve host: bar"
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl foo bar "$mockCfg3" @stdout=baz @exit=43
+
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl foo "$mockCfg6" @fail @stderr:"Could not resolve host: foo"
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl bar "$mockCfg6" @fail @stderr:"Could not resolve host: bar"
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl bar foo "$mockCfg6" @stdout=baz @exit=46
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl foo bar "$mockCfg6" @stdout=baz @exit=46
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl foo bar baz "$mockCfg6" @fail @stderr:"Could not resolve host: foo" @stderr:"Could not resolve host: bar" @stderr:"Could not resolve host: baz"
+
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl foo "$mockCfg7" @fail @stderr:"Could not resolve host: foo"
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl bar "$mockCfg7" @fail @stderr:"Could not resolve host: bar"
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl bar foo "$mockCfg7" @stdout=baz @exit=47
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl foo bar "$mockCfg7" @stdout=baz @exit=47
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl foo bar baz "$mockCfg7" @stdout=baz @exit=47
+
+
 $cmdt0 @test=cmd_mock/ -- $cmdt1 @report=main
 
 
