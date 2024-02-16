@@ -114,9 +114,10 @@ TODO:
 Bugs:
 
 Features :
-- @before=TEST_SUITE CMD ARG_1 ARG_2 ... ARG_N => execute CMD before each test
-- @after=TEST_SUITE CMD ARG_1 ARG_2 ... ARG_N => execute CMD after each test
-- silent ? quiet ? an option to quiet errors as well ?
+- @before=CMD ARG_1 ARG_2 ... ARG_N => execute CMD before each test
+- @after=CMD ARG_1 ARG_2 ... ARG_N => execute CMD after each test
+- @called[=:]CMD ARG_S,stdin=IN,count=N assertion => verify a mock was called
+- silent ? quiet ? verbose ? an option to quiet errors as well ?
 - Total duration if reporting multiple suites
 - use rule definitions in usage
 - move seq into utils module
