@@ -110,12 +110,12 @@ Done:
 - Rules as constants sorted by type in collections => if rule not in collection fail
 - leverage rule definitions for Mutual Exclusions
 - @mock des appels de commande @mock="CMD ARG_1 ARG_2 ARG_N,stdin=baz,exit=0,stdout=foo,stderr=bar,cmd=CMD ARG_1 ARG_N"
+- @before=CMD ARG_1 ARG_2 ... ARG_N => execute CMD before each test
+- @after=CMD ARG_1 ARG_2 ... ARG_N => execute CMD after each test
 TODO:
 Bugs:
 
 Features :
-- @before=CMD ARG_1 ARG_2 ... ARG_N => execute CMD before each test
-- @after=CMD ARG_1 ARG_2 ... ARG_N => execute CMD after each test
 - @called[=:]CMD ARG_S,stdin=IN,count=N assertion => verify a mock was called
 - silent ? quiet ? verbose ? an option to quiet errors as well ?
 - Total duration if reporting multiple suites

@@ -372,8 +372,6 @@ func ApplyConfig(c *Context, ruleExpr string) (ok bool, rule Rule, err error) {
 			c.ForkCount, err = Translate(rule, IntMapper, OperatorValidater[int]("="), IntValueValidater(1, 5))
 		case "suiteTimeout":
 			c.SuiteTimeout, err = Translate(rule, DurationMapper)
-		case "before":
-		case "after":
 
 		case "ignore":
 			boolVal, err = Translate(rule, BoolMapper, BooleanValidater)
@@ -417,6 +415,20 @@ func ApplyConfig(c *Context, ruleExpr string) (ok bool, rule Rule, err error) {
 			var mock CmdMock
 			mock, err = Translate(rule, MockMapper, OperatorValidater[CmdMock]("=", ":"), NotEmptyValidater[CmdMock], MockValidater)
 			c.Mocks = append(c.Mocks, mock)
+		case "before":
+			var cmdAndArgs []string
+			cmdAndArgs, err = Translate(rule, CmdMapper, OperatorValidater[[]string]("="), CmdValidater)
+			if err != nil {
+				return
+			}
+			c.Before = append(c.Before, cmdAndArgs)
+		case "after":
+			var cmdAndArgs []string
+			cmdAndArgs, err = Translate(rule, CmdMapper, OperatorValidater[[]string]("="), CmdValidater)
+			if err != nil {
+				return
+			}
+			c.After = append(c.After, cmdAndArgs)
 		default:
 			ok = false
 		}
@@ -729,6 +741,7 @@ func ValidateOnceOnlyDefinedRule(rules ...Rule) (err error) {
 		{"stdout", "~"}, {"stderr", "~"}, {"stdout", "!~"}, {"stderr", "!~"},
 		{"stdout", "!="}, {"stderr", "!="},
 		{"stdout", ":"}, {"stderr", ":"}, {"stdout", "!:"}, {"stderr", "!:"},
+		{"before", "="}, {"after", "="},
 	}
 	matches := map[RuleKey][]Rule{}
 	for _, rule := range rules {

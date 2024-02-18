@@ -461,9 +461,19 @@ $cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl bar foo "$mockCfg7" @stdout
 $cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl foo bar "$mockCfg7" @stdout=baz @exit=47
 $cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 curl foo bar baz "$mockCfg7" @stdout=baz @exit=47
 
-
 $cmdt0 @test=cmd_mock/ -- $cmdt1 @report=main
 
+
+>&2 echo "## Test Before & After"
+testFile="/tmp/thisFileDoesNotExistsYet.txt"
+testFile2="/tmp/thisFileDoesNotExistsYet2.txt"
+rm -f -- "$testFile" "$testFile2" 2> /dev/null || true
+$cmdt0 @test=before_after/ @stderr:PASSED -- $cmdt1 ls "$testFile" @fail
+$cmdt0 @test=before_after/ @stderr:PASSED -- $cmdt1 ls "$testFile" @before="touch $testFile"
+$cmdt0 @test=before_after/ @stderr:PASSED -- $cmdt1 ls "$testFile"
+$cmdt0 @test=before_after/ @stderr:PASSED -- $cmdt1 ls "$testFile" @after="rm -f -- $testFile"
+$cmdt0 @test=before_after/ @stderr:PASSED -- $cmdt1 ls "$testFile" @fail
+$cmdt0 @test=before_after/ @stderr:PASSED -- $cmdt1 ls "$testFile" "$testFile2" @before="touch $testFile" @before="touch $testFile2"
 
 $cmdt @report= ; >&2 echo SUCCESS ; exit 0
 

@@ -541,6 +541,16 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 
 	stdPrinter.Flush()
 
+	for _, before := range ctx.Before {
+		cmdBefore := cmdz.Cmd(before...)
+		beforeExit, beforeErr := cmdBefore.BlockRun()
+		// FIXME: what to do of before exit code or beforeErr ?
+		_ = beforeExit
+		if beforeErr != nil {
+			Fatalf(testSuite, token, "error running before cmd: [%s]: %s", cmdBefore.String(), beforeErr)
+		}
+	}
+
 	_, err = cmd.BlockRun()
 	var failedResults []AssertionResult
 	var testDuration time.Duration
@@ -652,6 +662,16 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 				failedAssertionsReport += RulePrefix() + string(assertName) + string(assertOp) + string(expected) + " "
 			}
 			reportLog.WriteString(testTitle + "  => " + failedAssertionsReport)
+		}
+	}
+
+	for _, after := range ctx.After {
+		cmdAfter := cmdz.Cmd(after...)
+		afterExit, afterErr := cmdAfter.BlockRun()
+		// FIXME: what to do of before exit code or beforeErr ?
+		_ = afterExit
+		if afterErr != nil {
+			Fatalf(testSuite, token, "error running after cmd: [%s]: %s", cmdAfter.String(), afterErr)
 		}
 	}
 

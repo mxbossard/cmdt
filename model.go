@@ -45,7 +45,8 @@ var (
 	TestConfigs = []RuleDefinition{ruleDef("before", "="), ruleDef("after", "="), ruleDef("ignore", "", "="),
 		ruleDef("stopOnFailure", "", "="), ruleDef("keepStdout", "", "="), ruleDef("keepStderr", "", "="),
 		ruleDef("keepOutputs", "", "="), ruleDef("silent", "", "="), ruleDef("timeout", "="),
-		ruleDef("parallel", "="), ruleDef("runCount", "="), ruleDef("mock", "=", ":")}
+		ruleDef("parallel", "="), ruleDef("runCount", "="), ruleDef("mock", "=", ":"),
+		ruleDef("before", "="), ruleDef("after", "=")}
 	// Config of test flow (init -> test -> report)
 	FlowConfigs = []RuleDefinition{ruleDef("token", "=")}
 	Assertions  = []RuleDefinition{ruleDef("success", ""), ruleDef("fail", ""), ruleDef("exit", "="),
@@ -97,6 +98,8 @@ type Context struct {
 	RunCount      int           `yaml:""`
 	Parallel      int           `yaml:""`
 	Mocks         []CmdMock     `yaml:""`
+	Before        [][]string    `yaml:""`
+	After         [][]string    `yaml:""`
 }
 
 type Config struct {
@@ -179,6 +182,8 @@ func MergeContext(baseContext, overridingContext Context) Context {
 		baseContext.Silent = overridingContext.Silent
 	}
 	baseContext.Mocks = append(baseContext.Mocks, overridingContext.Mocks...)
+	baseContext.Before = append(baseContext.Before, overridingContext.Before...)
+	baseContext.After = append(baseContext.After, overridingContext.After...)
 
 	return baseContext
 }
