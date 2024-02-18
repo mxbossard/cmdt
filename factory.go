@@ -121,7 +121,7 @@ func MockMapper(s, op string) (m CmdMock, err error) {
 				value := strings.Join(ruleSplit[1:], "=")
 				switch key {
 				case "stdin":
-					m.Stdin = value
+					m.Stdin = &value
 				case "stdout":
 					m.Delegate = false
 					m.Stdout = value

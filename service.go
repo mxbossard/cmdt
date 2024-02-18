@@ -804,6 +804,11 @@ func writeMockWrapperScript(wrapperFilepath string, mocks []CmdMock) (err error)
 		}
 
 		wrapperScript += `; then` + "\n"
+		if mock.Stdin != nil {
+			wrapperScript += fmt.Sprintf("\t" + `stdin="$( cat )"` + "\n")
+			wrapperScript += fmt.Sprintf("\t"+`if [ "$stdin" = "%s" ]; then`+"\n", *mock.Stdin)
+		}
+
 		// FIXME: add stdin management
 		if mock.Stdout != "" {
 			wrapperScript += fmt.Sprintf("\t"+`echo -n "%s"`+"\n", mock.Stdout)
@@ -816,6 +821,9 @@ func writeMockWrapperScript(wrapperFilepath string, mocks []CmdMock) (err error)
 		}
 		if !mock.Delegate {
 			wrapperScript += fmt.Sprintf("\t"+`exit %d`+"\n", mock.ExitCode)
+		}
+		if mock.Stdin != nil {
+			wrapperScript += fmt.Sprintf("\t" + `fi` + "\n")
 		}
 		wrapperScript += fmt.Sprintf(`fi` + "\n")
 	}

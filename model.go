@@ -124,7 +124,8 @@ type CmdMock struct {
 	Op               string
 	Cmd              string
 	Args             []string
-	Stdin            string
+	StdinOp          string
+	Stdin            *string
 	Stdout           string
 	Stderr           string
 	ExitCode         int
