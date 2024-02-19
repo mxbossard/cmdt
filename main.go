@@ -112,13 +112,16 @@ Done:
 - @mock des appels de commande @mock="CMD ARG_1 ARG_2 ARG_N,stdin=baz,exit=0,stdout=foo,stderr=bar,cmd=CMD ARG_1 ARG_N"
 - @before=CMD ARG_1 ARG_2 ... ARG_N => execute CMD before each test
 - @after=CMD ARG_1 ARG_2 ... ARG_N => execute CMD after each test
+- Total duration if reporting multiple suites
+
+
 TODO:
 Bugs:
+- bad test suite duration : the duration is calculated with end at report not last executed test
 
 Features :
 - @called[=:]CMD ARG_S,stdin=IN,count=N assertion => verify a mock was called
 - silent ? quiet ? verbose ? an option to quiet errors as well ?
-- Total duration if reporting multiple suites
 - use rule definitions in usage
 - move seq into utils module
 - order reports : report failures at the end of report

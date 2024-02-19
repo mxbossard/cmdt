@@ -17,6 +17,7 @@ cmdt="$GOBIN/cmdtest"
 ls -lh "$cmdt"
 
 cmdt0="$cmdt @silent"
+#cmdt0="$cmdt"
 cmdt1="$cmdt"
 
 mkdir -p "$scriptDir/.tmp"
@@ -155,6 +156,7 @@ eval $( $cmdt @init @exportToken )
 $cmdt0 @stdout="foo @success @fail\n" -- echo foo @success @fail
 
 >&2 echo "## Test Suite re-init"
+$cmdt0 @init=reinit
 $cmdt0 @test=reinit/ -- $cmdt1 @test=sub1/ true
 $cmdt0 @test=reinit/ -- $cmdt1 @init=sub1
 $cmdt0 @test=reinit/ @stderr:"0 test" -- $cmdt1 @report=sub1
@@ -222,8 +224,8 @@ $cmdt0 @test=meta/ @fail @stderr:"Failures in [t1] test suite (3 success, 1 fail
 
 
 >&2 echo "## Test namings"
-$cmdt @init=naming
 $cmdt @init=main
+$cmdt0 @init=naming
 $cmdt0 @test=naming/ @stderr:"Test [main]/name1 #01..." @stderr:"PASSED" -- $cmdt true @test=name1
 $cmdt0 @test=naming/ @stderr:"Test [main]/name2 #02..." @stderr:"PASSED" -- $cmdt true @test=name2
 $cmdt0 @test=naming/ @stderr:"Test [main]/" @stderr:"true" @stderr:"#03..." @stderr:"PASSED" -- $cmdt true
@@ -287,8 +289,8 @@ $cmdt0 @test=test_config/ @fail -- $cmdt1 @report=main
 
 
 >&2 echo "## Test suite config"
-$cmdt @init=suite_config
 $cmdt @init=suite_config_silent @silent
+$cmdt0 @init=suite_config
 $cmdt0 @test=suite_config/ @stdout= @stderr= -- $cmdt1 @test=suite_config_silent/ echo foo
 $cmdt0 @test=suite_config/ @stderr:PASSED -- $cmdt1 @test=suite_config_silent/ echo foo @silent=false
 $cmdt0 @test=suite_config/ @stdout="foo\n" @stderr= -- $cmdt1 @test=suite_config_silent/ echo foo @keepOutputs
@@ -348,11 +350,13 @@ $cmdt0 @test=assertion/ @fail -- $cmdt @report=main
 
 
 >&2 echo "## Test stdin"
+$cmdt0 @init=stdin
 echo foo | $cmdt0 @test=stdin/ @stdout="foo\n" cat
 
 
 >&2 echo "## Test export"
 export foo=bar
+$cmdt0 @init=export
 $cmdt0 @test=export/ @stdout~"/foo='bar'/m" sh -c "export"
 
 
@@ -381,6 +385,7 @@ $cmdt0 @fail @stderr:"2 success" @stderr:"1 failure" @stderr!:"ignored" -- $cmdt
 merExpectedMsgRule="@stderr~/mutually exclusives/"
 # Actions are mutually exclusives
 #eval $( $cmdt0 @init=mutually_exclusive_rules @exportToken )
+$cmdt0 @init=mutually_exclusive_rules
 $cmdt0 @test=mutually_exclusive_rules/ @fail "$merExpectedMsgRule" -- $cmdt1 @global @init
 $cmdt0 @test=mutually_exclusive_rules/ @fail "$merExpectedMsgRule" -- $cmdt1 @init @global
 $cmdt0 @test=mutually_exclusive_rules/ @fail "$merExpectedMsgRule" -- $cmdt1 @init @test
@@ -418,6 +423,7 @@ done
 
 >&2 echo "## Test flow"
 $cmdt @init=main # clear main test suite
+$cmdt0 @init=test_flow
 $cmdt0 @test=test_flow/ @stderr:"#01" @stderr:PASSED -- $cmdt1 @fail false
 $cmdt0 @test=test_flow/ @stderr:"#02" @stderr:PASSED -- $cmdt1 true
 $cmdt0 @test=test_flow/ @fail @stderr:"mutually exclusive" -- $cmdt1 "@test" "@fork=5" # Should error because of bad param
@@ -435,6 +441,7 @@ mockCfg3="@mock=curl foo *,cmd=sh -c 'echo -n baz; exit 43'"
 mockCfg4="@mock=curl foo,stdin=baz,exit=44"
 mockCfg6="@mock:curl foo bar,stdout=baz,exit=46"
 mockCfg7="@mock:curl foo bar *,stdout=baz,exit=47"
+$cmdt0 @init=cmd_mock
 $cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 sh -c "echo \${PATH}" "$mockCfg1" @stdout:/mock:/
 $cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 which curl "$mockCfg1" @stderr= @stdout:/mock/curl
 $cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 sh -c "curl foo" "$mockCfg1" @stdout=baz @exit=41 @keepOutputs
@@ -473,6 +480,7 @@ $cmdt0 @test=cmd_mock/ -- $cmdt1 @report=main
 testFile="/tmp/thisFileDoesNotExistsYet.txt"
 testFile2="/tmp/thisFileDoesNotExistsYet2.txt"
 rm -f -- "$testFile" "$testFile2" 2> /dev/null || true
+$cmdt0 @init=before_after
 $cmdt0 @test=before_after/ @stderr:PASSED -- $cmdt1 ls "$testFile" @fail
 $cmdt0 @test=before_after/ @stderr:PASSED -- $cmdt1 ls "$testFile" @before="touch $testFile"
 $cmdt0 @test=before_after/ @stderr:PASSED -- $cmdt1 ls "$testFile"

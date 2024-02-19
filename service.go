@@ -238,7 +238,7 @@ func readSuiteContext(testSuite, token string) (config Context, err error) {
 
 func LoadSuiteContext(testSuite, token string) (config Context, err error) {
 	var globalCtx, suiteCtx Context
-	globalCtx, err = readSuiteContext(GlobalConfigTestSuiteName, token)
+	globalCtx, err = LoadGlobalContext(token)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		//log.Printf("readSuiteContext err: %s for: %s\n", err, GlobalConfigTestSuiteName)
 		return
@@ -249,10 +249,13 @@ func LoadSuiteContext(testSuite, token string) (config Context, err error) {
 		return
 	}
 	config = MergeContext(globalCtx, suiteCtx)
-	if globalCtx.StartTime.Nanosecond() != 0 {
-		config.StartTime = globalCtx.StartTime
-	}
 	SetRulePrefix(config.Prefix)
+	return
+}
+
+func LoadGlobalContext(token string) (config Context, err error) {
+	config, err = readSuiteContext(GlobalConfigTestSuiteName, token)
+	config.TestSuite = ""
 	return
 }
 
@@ -304,9 +307,19 @@ func initConfig(ctx Context) {
 	token := ctx.Token
 	testSuite := ctx.TestSuite
 
+	contextFilepath := testsuiteConfigFilepath(testSuite, token)
+	_, err := os.Stat(contextFilepath)
+	if err == nil {
+		// Workspace already initialized
+		return
+	} else if !errors.Is(err, os.ErrNotExist) {
+		Fatal(testSuite, token, err)
+	}
+
 	ctx.StartTime = time.Now()
 	// store config
 	PersistSuiteContext(testSuite, token, ctx)
+	stdPrinter.ColoredErrf(messageColor, "Initialized new config [%s].\n", testSuite)
 }
 
 func GlobalConfig(ctx Context) (exitCode int) {
@@ -332,6 +345,8 @@ func InitTestSuite(ctx Context) (exitCode int) {
 		fmt.Printf("export %s=%s\n", ContextTokenEnvVarName, token)
 		ctx.Token = token
 	}
+
+	GlobalConfig(Context{Token: token})
 
 	// Clear the test suite directory
 	tmpDir := testsuiteDirectoryPath(testSuite, token)
@@ -367,7 +382,7 @@ func ReportTestSuite(ctx Context) (exitCode int) {
 		testSuites := listTestSuites(token)
 		if testSuites != nil {
 			exitCode = 0
-			log.Printf("reporting found suites: %s\n", testSuites)
+			//log.Printf("reporting found suites: %s\n", testSuites)
 			for _, suite := range testSuites {
 				ctx, err := LoadSuiteContext(suite, token)
 				if err != nil {
@@ -378,6 +393,12 @@ func ReportTestSuite(ctx Context) (exitCode int) {
 					exitCode = code
 				}
 			}
+			global, err := LoadGlobalContext(token)
+			if err != nil {
+				Fatalf(testSuite, token, "cannot load global context: %s", err)
+			}
+			globalDuration := time.Since(global.StartTime)
+			stdPrinter.ColoredErrf(reportColor, "Global duration time: %s\n", globalDuration)
 			return
 		}
 	}
