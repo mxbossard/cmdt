@@ -131,7 +131,7 @@ $cmdt0 @test=meta1/"without token two" @stderr:"PASSED" @stderr:"#01" -- $cmdt1 
 $cmdt0 @test=meta1/ @fail -- $cmdt1 @report
 
 >&2 echo "## Test printed token"
-tk0=$( $cmdt @init @printToken )
+tk0=$( $cmdt @init @printToken 2> /dev/null )
 >&2 echo "token: $tk0"
 $cmdt0 @init=meta2
 $cmdt0 @test=meta2/ @stderr:"PASSED" @stderr:"#01" -- $cmdt true @token=$tk0
@@ -141,7 +141,7 @@ $cmdt0 @test=meta2/ @stderr:"Successfuly ran" -- $cmdt @report @token=$tk0
 $cmdt @report 2>&1 | grep -v "Failures"
 
 >&2 echo "## Test exported token"
-eval $( $cmdt @init @exportToken )
+eval $( $cmdt @init @exportToken 2> /dev/null )
 >&2 echo "token: $__CMDT_TOKEN"
 $cmdt0 @init=meta3
 $cmdt0 @test=meta3/ @stderr:"PASSED" @stderr:"#01" -- $cmdt true
@@ -159,7 +159,7 @@ $cmdt @report 2>&1 | grep -v "Failures"
 export -n __CMDT_TOKEN
 
 
-eval $( $cmdt @init @exportToken )
+eval $( $cmdt @init @exportToken 2> /dev/null )
 
 >&2 echo "## Rules parsing stopper --"
 $cmdt0 @stdout="foo @success @fail\n" -- echo foo @success @fail
@@ -233,7 +233,7 @@ $cmdt0 @test=meta/ @fail @stderr:"Failures in [t1] test suite (3 success, 1 fail
 
 
 >&2 echo "## Test namings"
-$cmdt @init=main
+$cmdt @init=main 2> /dev/null
 $cmdt0 @init=naming
 $cmdt0 @test=naming/ @stderr:"Test [main]/name1 #01..." @stderr:"PASSED" -- $cmdt true @test=name1
 $cmdt0 @test=naming/ @stderr:"Test [main]/name2 #02..." @stderr:"PASSED" -- $cmdt true @test=name2
@@ -384,13 +384,14 @@ $cmdt0 false @test="testB/" 2> /dev/null
 $cmdt0 true @test="testB/"
 $cmdt0 false @test="testA/" 2> /dev/null
 
+$cmdt0 @init=interlaced
 # should have 1 success 2 failures and 3 ignored
-$cmdt0 @fail @stderr:"1 success" @stderr:"2 failure" @stderr:"3 ignored" -- $cmdt1 @report="testA"
+$cmdt0 @test="interlaced/" @fail @stderr:"1 success" @stderr:"2 failure" @stderr:"3 ignored" -- $cmdt1 @report="testA"
 # should have 2 success 1 failure
-$cmdt0 @fail @stderr:"2 success" @stderr:"1 failure" @stderr!:"ignored" -- $cmdt1 @report="testB"
+$cmdt0 @test="interlaced/" @fail @stderr:"2 success" @stderr:"1 failure" @stderr!:"ignored" -- $cmdt1 @report="testB"
 
 
-#>&2 echo "## Mutually exclusive rules"
+>&2 echo "## Mutually exclusive rules"
 merExpectedMsgRule="@stderr~/mutually exclusives/"
 # Actions are mutually exclusives
 #eval $( $cmdt0 @init=mutually_exclusive_rules @exportToken )
@@ -431,7 +432,7 @@ done
 
 
 >&2 echo "## Test flow"
-$cmdt @init=main # clear main test suite
+$cmdt @init=main 2> /dev/null # clear main test suite
 $cmdt0 @init=test_flow
 $cmdt0 @test=test_flow/ @stderr:"#01" @stderr:PASSED -- $cmdt1 @fail false
 $cmdt0 @test=test_flow/ @stderr:"#02" @stderr:PASSED -- $cmdt1 true
@@ -503,6 +504,8 @@ $cmdt0 @test=before_after/ @stderr:PASSED -- $cmdt1 ls "$testFile"
 $cmdt0 @test=before_after/ @stderr:PASSED -- $cmdt1 ls "$testFile" @after="rm -f -- $testFile"
 $cmdt0 @test=before_after/ @stderr:PASSED -- $cmdt1 ls "$testFile" @fail
 $cmdt0 @test=before_after/ @stderr:PASSED -- $cmdt1 ls "$testFile" "$testFile2" @before="touch $testFile" @before="touch $testFile2"
+
+$cmdt0 @test=before_after/ -- $cmdt1 @report=main
 
 $cmdt @report= ; >&2 echo SUCCESS ; exit 0
 

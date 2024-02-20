@@ -374,7 +374,9 @@ func initConfig(ctx Context) (err error) {
 	ctx.StartTime = time.Now()
 	// store config
 	PersistSuiteContext(testSuite, token, ctx)
-	stdPrinter.ColoredErrf(messageColor, "Initialized new config [%s].\n", testSuite)
+	//if ctx.Silent == nil || !*ctx.Silent {
+	//	stdPrinter.ColoredErrf(messageColor, "Initialized new config [%s].\n", testSuite)
+	//}
 	return
 }
 
@@ -412,7 +414,7 @@ func InitTestSuite(ctx Context) (exitCode int, err error) {
 		ctx.Token = token
 	}
 
-	exitCode, err = GlobalConfig(Context{Token: token})
+	exitCode, err = GlobalConfig(Context{Token: token, Silent: ctx.Silent})
 	if err != nil {
 		return
 	}
