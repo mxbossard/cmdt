@@ -25,13 +25,34 @@ import (
 var rulePrefix = DefaultRulePrefix
 
 func Fatal(testSuite, token string, v ...any) {
+	// FIXME: stop using this for better error handling
 	IncrementSeq(testSuite, token, ErrorSequenceFilename)
+	suiteContext, err := LoadSuiteContext(testSuite, token)
+	if err != nil {
+		// swallow error
+	}
+	defer updateLastTestTime(suiteContext)
 	log.Fatal(v...)
 }
 
 func Fatalf(testSuite, token, format string, v ...any) {
+	// FIXME: stop using this for better error handling
 	IncrementSeq(testSuite, token, ErrorSequenceFilename)
+	suiteContext, err := LoadSuiteContext(testSuite, token)
+	if err != nil {
+		// swallow error
+	}
+	defer updateLastTestTime(suiteContext)
 	log.Fatalf(format, v...)
+}
+
+func SuiteError(testSuite, token string, v ...any) error {
+	return SuiteError(testSuite, token, fmt.Sprint(v...))
+}
+
+func SuiteErrorf(testSuite, token, format string, v ...any) error {
+	IncrementSeq(testSuite, token, ErrorSequenceFilename)
+	return fmt.Errorf(format, v...)
 }
 
 func RulePrefix() string {
@@ -429,14 +450,15 @@ func ReportTestSuite(ctx Context) (exitCode int) {
 	if ignoredCount > 0 {
 		ignoredMessage = fmt.Sprintf(" (%d ignored)", ignoredCount)
 	}
+	duration := suiteContext.LastTestTime.Sub(suiteContext.StartTime)
 	if failedCount == 0 && errorCount == 0 {
 		exitCode = 0
-		stdPrinter.ColoredErrf(successColor, "Successfuly ran [%s] test suite (%d tests in %s)", testSuite, testCount, time.Since(ctx.StartTime))
+		stdPrinter.ColoredErrf(successColor, "Successfuly ran [%s] test suite (%d tests in %s)", testSuite, testCount, duration)
 		stdPrinter.ColoredErrf(warningColor, "%s", ignoredMessage)
 		stdPrinter.Errf("\n")
 	} else {
 		successCount := testCount - failedCount
-		stdPrinter.ColoredErrf(failureColor, "Failures in [%s] test suite (%d success, %d failures, %d errors on %d tests in %s)", testSuite, successCount, failedCount, errorCount, testCount, time.Since(ctx.StartTime))
+		stdPrinter.ColoredErrf(failureColor, "Failures in [%s] test suite (%d success, %d failures, %d errors on %d tests in %s)", testSuite, successCount, failedCount, errorCount, testCount, duration)
 		stdPrinter.ColoredErrf(warningColor, "%s", ignoredMessage)
 		stdPrinter.Errf("\n")
 		for _, report := range failureReports {
@@ -444,6 +466,13 @@ func ReportTestSuite(ctx Context) (exitCode int) {
 		}
 	}
 	return
+}
+
+func updateLastTestTime(suiteCtx Context) {
+	token := suiteCtx.Token
+	testSuite := suiteCtx.TestSuite
+	suiteCtx.LastTestTime = time.Now()
+	PersistSuiteContext(testSuite, token, suiteCtx)
 }
 
 func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exitCode int) {
@@ -468,6 +497,7 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 			Fatalf(testSuite, token, "cannot load context: %s", err)
 		}
 	}
+	defer updateLastTestTime(suiteContext)
 
 	ctx = MergeContext(suiteContext, ctx)
 	timecode := int(time.Since(ctx.StartTime).Milliseconds())

@@ -118,8 +118,10 @@ Done:
 TODO:
 Bugs:
 - bad test suite duration : the duration is calculated with end at report not last executed test
+- @FILEPATH empeche de tester un contenu qui commence par @ sans passer par un fichier. Il faudrait pouvoir échapper @ ou bien utiliser un operator dédié à la lécture d'un fichier (ex: @stderr@=FILEPATH @stdin@:FILEPATH)
 
 Features :
+- @mock stdin=@FILEPATH stdin:PARTIAL_CONTENT stdout=@FILEPATH @stderr=@FILEPATH
 - @called[=:]CMD ARG_S,stdin=IN,count=N assertion => verify a mock was called
 - silent ? quiet ? verbose ? an option to quiet errors as well ?
 - use rule definitions in usage
@@ -156,6 +158,15 @@ Features :
         Partial call @mock="CMD,ARG_1,ARG_2,ARG_N,*;stdin=baz;exit=0;stdout=foo;stderr=bar" Must receive exactly stdin and specified args in order then more args
         Contains call @mock:"CMD,ARG_1,ARG_2,ARG_N;stdin=baz;exit=0;stdout=foo;stderr=bar" Must receive exactly stdin and specified args in various order not more
         Default exit code @mock="CMD,*;exit=1"
+
+## Idée pour executer les tests dans un conteneur
+  - Une image par défaut busybox like (avec cmdt déjà à l'interieur ? pas forcément nécéssaire sauf pour le speed)
+  - En général, il faut monter le binaire cmdt dans le conteneur et optionnelement l'ajouter au PATH
+  - cmdt => run cmdt avec exactement les memes args dans un conteneur jetable démarré à l'instant par cmdt
+  - avec quel owner démarrer cmdt dans le conteneur => default / option ??
+  - Mock une commande absolue possible, mais nécéssite de déplacer la commande original pour la remplacer par un wrapper
+  - 
+
 
 ## Idées pour silent vs quiet ?!
 

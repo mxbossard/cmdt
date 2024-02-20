@@ -82,6 +82,7 @@ type Context struct {
 	TestName     string        `yaml:""`
 	Action       Action        `yaml:""`
 	StartTime    time.Time     `yaml:""`
+	LastTestTime time.Time     `yaml:""`
 	SuiteTimeout time.Duration `yaml:""`
 	ForkCount    int           `yaml:""`
 
@@ -140,6 +141,9 @@ func MergeContext(baseContext, overridingContext Context) Context {
 	baseContext.Action = overridingContext.Action
 	if overridingContext.StartTime.Nanosecond() != 0 {
 		baseContext.StartTime = overridingContext.StartTime
+	}
+	if overridingContext.LastTestTime.Nanosecond() != 0 {
+		baseContext.LastTestTime = overridingContext.LastTestTime
 	}
 
 	if baseContext.TestSuite == "" {
