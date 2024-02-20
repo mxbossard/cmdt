@@ -117,7 +117,6 @@ Done:
 
 TODO:
 Bugs:
-- bad test suite duration : the duration is calculated with end at report not last executed test
 - @FILEPATH empeche de tester un contenu qui commence par @ sans passer par un fichier. Il faudrait pouvoir échapper @ ou bien utiliser un operator dédié à la lécture d'un fichier (ex: @stderr@=FILEPATH @stdin@:FILEPATH)
 
 Features :
@@ -165,7 +164,7 @@ Features :
   - cmdt => run cmdt avec exactement les memes args dans un conteneur jetable démarré à l'instant par cmdt
   - avec quel owner démarrer cmdt dans le conteneur => default / option ??
   - Mock une commande absolue possible, mais nécéssite de déplacer la commande original pour la remplacer par un wrapper
-  - 
+  -
 
 
 ## Idées pour silent vs quiet ?!

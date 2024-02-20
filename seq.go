@@ -9,24 +9,19 @@ import (
 	"strconv"
 )
 
-func InitSeq(testSuite, token string) {
-	tmpDir := testsuiteDirectoryPath(testSuite, token)
-	seqFilepath := filepath.Join(tmpDir, TestSequenceFilename)
-	err := os.WriteFile(seqFilepath, []byte("0"), 0600)
-	if err != nil {
-		log.Fatalf("cannot initialize seq file (%s): %s", seqFilepath, err)
-	}
-	seqFilepath = filepath.Join(tmpDir, IgnoredSequenceFilename)
+func InitSeq(pathes ...string) (err error) {
+	seqFilepath := filepath.Join(pathes...)
 	err = os.WriteFile(seqFilepath, []byte("0"), 0600)
 	if err != nil {
-		log.Fatalf("cannot initialize seq file (%s): %s", seqFilepath, err)
+		err = fmt.Errorf("cannot initialize seq file (%s): %w", seqFilepath, err)
 	}
+	return
 }
 
-func IncrementSeq(testSuite, token, filename string) (seq int) {
+func IncrementSeq(pathes ...string) (seq int) {
 	// return an increment for test indexing
-	tmpDir := testsuiteDirectoryPath(testSuite, token)
-	seqFilepath := filepath.Join(tmpDir, filename)
+	//tmpDir := testsuiteDirectoryPath(testSuite, token)
+	seqFilepath := filepath.Join(pathes...)
 
 	file, err := os.OpenFile(seqFilepath, os.O_RDWR|os.O_CREATE, 0600)
 	if err != nil {
@@ -57,10 +52,10 @@ func IncrementSeq(testSuite, token, filename string) (seq int) {
 	return newSec
 }
 
-func ReadSeq(testSuite, token, filename string) (c int) {
+func ReadSeq(pathes ...string) (c int) {
 	// return the count of run test
-	tmpDir := testsuiteDirectoryPath(testSuite, token)
-	seqFilepath := filepath.Join(tmpDir, filename)
+	//tmpDir := testsuiteDirectoryPath(testSuite, token)
+	seqFilepath := filepath.Join(pathes...)
 
 	file, err := os.OpenFile(seqFilepath, os.O_RDONLY, 0600)
 	if err != nil {

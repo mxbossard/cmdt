@@ -25,25 +25,16 @@ import (
 var rulePrefix = DefaultRulePrefix
 
 func Fatal(testSuite, token string, v ...any) {
-	// FIXME: stop using this for better error handling
-	IncrementSeq(testSuite, token, ErrorSequenceFilename)
-	suiteContext, err := LoadSuiteContext(testSuite, token)
+	tmpDir, err := testsuiteDirectoryPath(testSuite, token)
 	if err != nil {
-		// swallow error
+		log.Fatal(err)
 	}
-	defer updateLastTestTime(suiteContext)
+	IncrementSeq(tmpDir, ErrorSequenceFilename)
 	log.Fatal(v...)
 }
 
 func Fatalf(testSuite, token, format string, v ...any) {
-	// FIXME: stop using this for better error handling
-	IncrementSeq(testSuite, token, ErrorSequenceFilename)
-	suiteContext, err := LoadSuiteContext(testSuite, token)
-	if err != nil {
-		// swallow error
-	}
-	defer updateLastTestTime(suiteContext)
-	log.Fatalf(format, v...)
+	log.Fatal(testSuite, token, fmt.Sprintf(format, v...))
 }
 
 func SuiteError(testSuite, token string, v ...any) error {
@@ -95,74 +86,87 @@ func getProcessStartTime(pid int) (int64, error) {
 	s := string(fields[StartTimeIndex])
 	starttime, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("invalid starttime: %d", err)
+		return 0, fmt.Errorf("invalid starttime: %w", err)
 	}
 
 	return starttime, nil
 }
 
-func forgeContextualToken() string {
+func forgeContextualToken() (string, error) {
 	// If no token supplied use Workspace dir + ppid to forge tmp directory path
 	workDirPath, err := os.Getwd()
 	if err != nil {
-		log.Fatalf("cannot find workspace dir: %s", err)
+		//log.Fatalf("cannot find workspace dir: %s", err)
+		return "", fmt.Errorf("cannot find workspace dir: %w", err)
 	}
 	ppid := os.Getppid()
 	ppidStr := fmt.Sprintf("%d", ppid)
 	ppidStartTime, err := getProcessStartTime(ppid)
 	if err != nil {
-		log.Fatalf("cannot find parent process start time: %s", err)
+		//log.Fatalf("cannot find parent process start time: %s", err)
+		return "", fmt.Errorf("cannot find parent process start time: %w", err)
 	}
 	ppidStartTimeStr := fmt.Sprintf("%d", ppidStartTime)
 	token, err := trust.SignStrings(workDirPath, "--", ppidStr, "--", ppidStartTimeStr)
 	if err != nil {
-		log.Fatalf("cannot hash workspace dir: %s", err)
+		err = fmt.Errorf("cannot hash workspace dir: %w", err)
 	}
 	//log.Printf("contextual token: %s base on workDirPath: %s and ppid: %s\n", token, workDirPath, ppid)
-	return token
+	return token, err
 }
 
-func forgeTmpDirectoryPath(token string) (tempDirName string) {
+func forgeTmpDirectoryPath(token string) (tempDirPath string, err error) {
 	if token == "" {
-		token = forgeContextualToken()
+		token, err = forgeContextualToken()
 	}
-	tempDirName = fmt.Sprintf("%s-%s", TempDirPrefix, token)
-	tempDirPath := filepath.Join(os.TempDir(), tempDirName)
-	err := os.MkdirAll(tempDirPath, 0700)
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
-	return tempDirPath
+	tempDirName := fmt.Sprintf("%s-%s", TempDirPrefix, token)
+	tempDirPath = filepath.Join(os.TempDir(), tempDirName)
+	err = os.MkdirAll(tempDirPath, 0700)
+	return
 }
 
-func testsuiteDirectoryPath(testSuite, token string) string {
-	tmpDir := forgeTmpDirectoryPath(token)
+func testsuiteDirectoryPath(testSuite, token string) (path string, err error) {
+	var tmpDir string
+	tmpDir, err = forgeTmpDirectoryPath(token)
+	if err != nil {
+		return
+	}
 	suiteDir := sanitizeTestSuiteName(testSuite)
-	path := filepath.Join(tmpDir, suiteDir)
+	path = filepath.Join(tmpDir, suiteDir)
 	//log.Printf("testsuiteDir: %s\n", path)
-	err := os.MkdirAll(path, 0700)
+	err = os.MkdirAll(path, 0700)
+	return
+}
+
+func testDirectoryPath(testSuite, token string, seq int) (testDir string, err error) {
+	var tmpDir string
+	tmpDir, err = testsuiteDirectoryPath(testSuite, token)
 	if err != nil {
-		Fatal(testSuite, token, err)
+		return
 	}
-	return path
+	testDir = filepath.Join(tmpDir, "test-"+fmt.Sprintf("%06d", seq))
+	return
 }
 
-func testDirectoryPath(testSuite, token string, seq int) string {
-	tmpDir := testsuiteDirectoryPath(testSuite, token)
-	testDir := filepath.Join(tmpDir, "test-"+fmt.Sprintf("%06d", seq))
-	return testDir
-}
-
-func listTestSuites(token string) (suites []string) {
-	tmpDir := forgeTmpDirectoryPath(token)
-	_, err := os.Stat(tmpDir)
+func listTestSuites(token string) (suites []string, err error) {
+	var tmpDir string
+	tmpDir, err = forgeTmpDirectoryPath(token)
+	if err != nil {
+		return
+	}
+	_, err = os.Stat(tmpDir)
 	if os.IsNotExist(err) {
+		err = nil
 		return
 	}
 
 	matches, err := filepath.Glob(tmpDir + "/*")
 	if err != nil {
-		log.Fatalf("cannot list test suites: %s", err)
+		err = fmt.Errorf("cannot list test suites: %w", err)
+		return
 	}
 	for _, m := range matches {
 		testSuite := filepath.Base(m)
@@ -173,40 +177,56 @@ func listTestSuites(token string) (suites []string) {
 	return
 }
 
-func testsuiteConfigFilepath(testSuite, token string) string {
-	return filepath.Join(testsuiteDirectoryPath(testSuite, token), ContextFilename)
+func testsuiteConfigFilepath(testSuite, token string) (path string, err error) {
+	var testDir string
+	testDir, err = testsuiteDirectoryPath(testSuite, token)
+	if err != nil {
+		return
+	}
+	path = filepath.Join(testDir, ContextFilename)
+	return
 }
 
-func cmdLogFiles(testSuite, token string, seq int) (*os.File, *os.File, *os.File) {
-	testDir := testDirectoryPath(testSuite, token, seq)
+func cmdLogFiles(testSuite, token string, seq int) (stdoutFile, stderrFile, reportFile *os.File, err error) {
+	var testDir string
+	testDir, err = testDirectoryPath(testSuite, token, seq)
+	if err != nil {
+		return
+	}
 	stdoutFilepath := filepath.Join(testDir, StdoutFilename)
 	stderrFilepath := filepath.Join(testDir, StderrFilename)
 	reportFilepath := filepath.Join(testDir, ReportFilename)
 
-	err := os.MkdirAll(testDir, 0700)
+	err = os.MkdirAll(testDir, 0700)
 	if err != nil {
-		Fatalf(testSuite, token, "cannot create work dir: %s ! Error: %s", testDir, err)
+		err = fmt.Errorf("cannot create work dir %s : %w", testDir, err)
+		return
 	}
-
-	stdoutFile, err := os.OpenFile(stdoutFilepath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0600)
+	stdoutFile, err = os.OpenFile(stdoutFilepath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0600)
 	if err != nil {
-		Fatalf(testSuite, token, "Cannot open file: %s ! Error: %s", stdoutFilepath, err)
+		err = fmt.Errorf("cannot open file %s : %w", stdoutFilepath, err)
+		return
 	}
-	stderrFile, err := os.OpenFile(stderrFilepath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0600)
+	stderrFile, err = os.OpenFile(stderrFilepath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0600)
 	if err != nil {
-		Fatalf(testSuite, token, "Cannot open file: %s ! Error: %s", stderrFilepath, err)
+		err = fmt.Errorf("cannot open file %s : %w", stderrFilepath, err)
+		return
 	}
-	reportFile, err := os.OpenFile(reportFilepath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0600)
+	reportFile, err = os.OpenFile(reportFilepath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0600)
 	if err != nil {
-		Fatalf(testSuite, token, "Cannot open file: %s ! Error: %s", reportFilepath, err)
+		err = fmt.Errorf("cannot open file %s : %w", reportFilepath, err)
+		return
 	}
-
-	return stdoutFile, stderrFile, reportFile
+	return
 }
 
-func failureReports(testSuite, token string) (reports []string) {
-	tmpDir := testsuiteDirectoryPath(testSuite, token)
-	err := filepath.Walk(tmpDir, func(path string, info fs.FileInfo, err error) error {
+func failureReports(testSuite, token string) (reports []string, err error) {
+	var tmpDir string
+	tmpDir, err = testsuiteDirectoryPath(testSuite, token)
+	if err != nil {
+		return
+	}
+	err = filepath.Walk(tmpDir, func(path string, info fs.FileInfo, err error) error {
 		if ReportFilename == info.Name() {
 			content, err := os.ReadFile(path)
 			if err != nil {
@@ -216,10 +236,6 @@ func failureReports(testSuite, token string) (reports []string) {
 		}
 		return nil
 	})
-	if err != nil {
-		Fatal(testSuite, token, err)
-	}
-
 	return
 }
 
@@ -227,33 +243,39 @@ func sanitizeTestSuiteName(s string) string {
 	return testSuiteNameSanitizerPattern.ReplaceAllString(s, "_")
 }
 
-func PersistSuiteContext(testSuite, token string, config Context) {
-	contextFilepath := testsuiteConfigFilepath(testSuite, token)
+func PersistSuiteContext(testSuite, token string, config Context) (err error) {
+	var contextFilepath string
+	contextFilepath, err = testsuiteConfigFilepath(testSuite, token)
+	if err != nil {
+		return
+	}
 	//stdPrinter.Errf("Built context: %v\n", context)
 	content, err := yaml.Marshal(config)
 	if err != nil {
-		Fatal(testSuite, token, err)
+		return
 	}
 	//stdPrinter.Errf("Persisting context: %s\n", content)
 	err = os.WriteFile(contextFilepath, content, 0600)
 	if err != nil {
-		Fatalf(testSuite, token, "cannot persist context: %s", err)
+		err = fmt.Errorf("cannot persist context: %w", err)
+		return
 	}
 	//log.Printf("Persisted context file: %s\n", contextFilepath)
+	return
 }
 
 func readSuiteContext(testSuite, token string) (config Context, err error) {
-	contextFilepath := testsuiteConfigFilepath(testSuite, token)
+	var contextFilepath string
+	contextFilepath, err = testsuiteConfigFilepath(testSuite, token)
+	if err != nil {
+		return
+	}
 	var content []byte
 	content, err = os.ReadFile(contextFilepath)
 	if err != nil {
 		return
 	}
 	err = yaml.Unmarshal(content, &config)
-	if err != nil {
-		Fatal(testSuite, token, err)
-	}
-
 	return
 }
 
@@ -280,14 +302,14 @@ func LoadGlobalContext(token string) (config Context, err error) {
 	return
 }
 
-func UniqToken() string {
+func UniqToken() (uuid string, err error) {
 	b := make([]byte, 16)
-	_, err := cryptorand.Read(b)
+	_, err = cryptorand.Read(b)
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
-	uuid := fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
-	return uuid
+	uuid = fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
+	return
 
 	/*
 		h, err := trust.SignStrings(uuid)
@@ -298,23 +320,28 @@ func UniqToken() string {
 	*/
 }
 
-func initWorkspace(ctx Context) {
+func initWorkspace(ctx Context) (err error) {
 	token := ctx.Token
 	testSuite := ctx.TestSuite
 
 	// init the tmp directory
-	tmpDir := testsuiteDirectoryPath(testSuite, token)
-	_, err := os.Stat(tmpDir)
+	var tmpDir string
+	tmpDir, err = testsuiteDirectoryPath(testSuite, token)
+	if err != nil {
+		return
+	}
+	_, err = os.Stat(tmpDir)
 	if err == nil {
 		// Workspace already initialized
 		return
 	} else if !errors.Is(err, os.ErrNotExist) {
-		Fatal(testSuite, token, err)
+		return
 	}
 
 	err = os.MkdirAll(tmpDir, 0700)
 	if err != nil {
-		Fatalf(testSuite, token, "Unable to create temp dir: %s ! Error: %s", tmpDir, err)
+		err = fmt.Errorf("unable to create temp dir: %s ! Error: %w", tmpDir, err)
+		return
 	}
 
 	if ctx.Silent == nil || !*ctx.Silent {
@@ -322,64 +349,95 @@ func initWorkspace(ctx Context) {
 	}
 
 	stdPrinter.Flush()
+	return
 }
 
-func initConfig(ctx Context) {
+func initConfig(ctx Context) (err error) {
 	token := ctx.Token
 	testSuite := ctx.TestSuite
 
-	contextFilepath := testsuiteConfigFilepath(testSuite, token)
-	_, err := os.Stat(contextFilepath)
+	var contextFilepath string
+	contextFilepath, err = testsuiteConfigFilepath(testSuite, token)
+	if err != nil {
+		return
+	}
+	_, err = os.Stat(contextFilepath)
 	if err == nil {
 		// Workspace already initialized
 		return
 	} else if !errors.Is(err, os.ErrNotExist) {
-		Fatal(testSuite, token, err)
+		return
+	} else {
+		err = nil
 	}
 
 	ctx.StartTime = time.Now()
 	// store config
 	PersistSuiteContext(testSuite, token, ctx)
 	stdPrinter.ColoredErrf(messageColor, "Initialized new config [%s].\n", testSuite)
+	return
 }
 
-func GlobalConfig(ctx Context) (exitCode int) {
+func GlobalConfig(ctx Context) (exitCode int, err error) {
 	defer stdPrinter.Flush()
+	exitCode = 0
 	ctx.TestSuite = GlobalConfigTestSuiteName
-	initWorkspace(ctx)
-	initConfig(ctx)
-	return 0
+	err = initWorkspace(ctx)
+	if err != nil {
+		return
+	}
+	err = initConfig(ctx)
+	return
 }
 
-func InitTestSuite(ctx Context) (exitCode int) {
+func InitTestSuite(ctx Context) (exitCode int, err error) {
+	defer stdPrinter.Flush()
 	exitCode = 0
 	token := ctx.Token
 	testSuite := ctx.TestSuite
-	defer stdPrinter.Flush()
 
 	if ctx.Action == "init" && ctx.PrintToken {
-		token = UniqToken()
+		token, err = UniqToken()
+		if err != nil {
+			return
+		}
 		fmt.Printf("%s\n", token)
 		ctx.Token = token
 	} else if ctx.Action == "init" && ctx.ExportToken {
-		token = UniqToken()
+		token, err = UniqToken()
+		if err != nil {
+			return
+		}
 		fmt.Printf("export %s=%s\n", ContextTokenEnvVarName, token)
 		ctx.Token = token
 	}
 
-	GlobalConfig(Context{Token: token})
+	exitCode, err = GlobalConfig(Context{Token: token})
+	if err != nil {
+		return
+	}
 
 	// Clear the test suite directory
-	tmpDir := testsuiteDirectoryPath(testSuite, token)
-	err := os.RemoveAll(tmpDir)
+	var tmpDir string
+	tmpDir, err = testsuiteDirectoryPath(testSuite, token)
 	if err != nil {
-		Fatal(testSuite, token, err)
+		return
+	}
+	err = os.RemoveAll(tmpDir)
+	if err != nil {
+		return
 	}
 	//log.Printf("Cleared test suite dir: %s\n", tmpDir)
 
 	//log.Printf("init context: %s Silent: %v\n", testSuite, ctx.Silent)
-	initWorkspace(ctx)
-	initConfig(ctx)
+	err = initWorkspace(ctx)
+	if err != nil {
+		return
+	}
+	err = initConfig(ctx)
+	if err != nil {
+		return
+	}
 	//log.Printf("init context: %s Silent: %v\n", testSuite, ctx.Silent)
 
 	if ctx.Silent == nil || !*ctx.Silent {
@@ -392,7 +450,7 @@ func InitTestSuite(ctx Context) (exitCode int) {
 	return
 }
 
-func ReportTestSuite(ctx Context) (exitCode int) {
+func ReportTestSuite(ctx Context) (exitCode int, err error) {
 	exitCode = 1
 	token := ctx.Token
 	testSuite := ctx.TestSuite
@@ -400,23 +458,34 @@ func ReportTestSuite(ctx Context) (exitCode int) {
 
 	if ctx.ReportAll {
 		// Report all test suites
-		testSuites := listTestSuites(token)
+		var testSuites []string
+		testSuites, err = listTestSuites(token)
+		if err != nil {
+			return
+		}
 		if testSuites != nil {
 			exitCode = 0
 			//log.Printf("reporting found suites: %s\n", testSuites)
 			for _, suite := range testSuites {
-				ctx, err := LoadSuiteContext(suite, token)
+				ctx, err = LoadSuiteContext(suite, token)
 				if err != nil {
-					Fatalf(testSuite, token, "cannot load context: %s", err)
+					err = fmt.Errorf("cannot load context: %w", err)
+					return
 				}
-				code := ReportTestSuite(ctx)
+				var code int
+				code, err = ReportTestSuite(ctx)
+				if err != nil {
+					return
+				}
 				if code != 0 {
 					exitCode = code
 				}
 			}
-			global, err := LoadGlobalContext(token)
+			var global Context
+			global, err = LoadGlobalContext(token)
 			if err != nil {
-				Fatalf(testSuite, token, "cannot load global context: %s", err)
+				err = fmt.Errorf("cannot load global context: %s", err)
+				return
 			}
 			globalDuration := time.Since(global.StartTime)
 			stdPrinter.ColoredErrf(reportColor, "Global duration time: %s\n", globalDuration)
@@ -424,23 +493,33 @@ func ReportTestSuite(ctx Context) (exitCode int) {
 		}
 	}
 
-	tmpDir := testsuiteDirectoryPath(testSuite, token)
+	var tmpDir string
+	tmpDir, err = testsuiteDirectoryPath(testSuite, token)
+	if err != nil {
+		return
+	}
 	defer os.RemoveAll(tmpDir)
 
 	suiteContext, err := LoadSuiteContext(testSuite, token)
 	if err != nil {
 		if os.IsNotExist(err) {
-			Fatalf(testSuite, token, "you must perform some test prior to report: [%s] test suite", testSuite)
+			err = fmt.Errorf("you must perform some test prior to report: [%s] test suite", testSuite)
+			return
 		} else {
-			Fatalf(testSuite, token, "cannot load context: %s", err)
+			err = fmt.Errorf("cannot load context: %w", err)
+			return
 		}
 	}
 	ctx = MergeContext(suiteContext, ctx)
-	testCount := ReadSeq(testSuite, token, TestSequenceFilename)
-	ignoredCount := ReadSeq(testSuite, token, IgnoredSequenceFilename)
-	errorCount := ReadSeq(testSuite, token, ErrorSequenceFilename)
-	failureReports := failureReports(testSuite, token)
-	failedCount := len(failureReports)
+	testCount := ReadSeq(tmpDir, TestSequenceFilename)
+	ignoredCount := ReadSeq(tmpDir, IgnoredSequenceFilename)
+	errorCount := ReadSeq(tmpDir, ErrorSequenceFilename)
+	var failedReports []string
+	failedReports, err = failureReports(testSuite, token)
+	if err != nil {
+		return
+	}
+	failedCount := len(failedReports)
 
 	if ctx.Silent == nil || !*ctx.Silent {
 		stdPrinter.ColoredErrf(messageColor, "Reporting [%s] test suite (%s) ...\n", testSuite, tmpDir)
@@ -461,7 +540,7 @@ func ReportTestSuite(ctx Context) (exitCode int) {
 		stdPrinter.ColoredErrf(failureColor, "Failures in [%s] test suite (%d success, %d failures, %d errors on %d tests in %s)", testSuite, successCount, failedCount, errorCount, testCount, duration)
 		stdPrinter.ColoredErrf(warningColor, "%s", ignoredMessage)
 		stdPrinter.Errf("\n")
-		for _, report := range failureReports {
+		for _, report := range failedReports {
 			stdPrinter.ColoredErrf(reportColor, "%s\n", report)
 		}
 	}
@@ -475,7 +554,7 @@ func updateLastTestTime(suiteCtx Context) {
 	PersistSuiteContext(testSuite, token, suiteCtx)
 }
 
-func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exitCode int) {
+func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exitCode int, err error) {
 	token := ctx.Token
 	testSuite := ctx.TestSuite
 	testName := ctx.TestName
@@ -487,14 +566,18 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 		if os.IsNotExist(err) {
 			// test suite does not exists yet
 			suiteCtx := Context{Token: token, TestSuite: testSuite}
-			exitCode = InitTestSuite(suiteCtx)
+			exitCode, err = InitTestSuite(suiteCtx)
+			if err != nil {
+				return
+			}
 			if exitCode > 0 {
 				return
 			}
 			// Recursive call once test suite initialized
 			return PerformTest(ctx, cmdAndArgs, assertions)
 		} else {
-			Fatalf(testSuite, token, "cannot load context: %s", err)
+			err = fmt.Errorf("cannot load context: %w", err)
+			return
 		}
 	}
 	defer updateLastTestTime(suiteContext)
@@ -503,7 +586,8 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 	timecode := int(time.Since(ctx.StartTime).Milliseconds())
 
 	if len(cmdAndArgs) == 0 {
-		Fatalf(testSuite, token, "no command supplied to test")
+		err = fmt.Errorf("no command supplied to test")
+		return
 	}
 	cmd := cmdz.Cmd(cmdAndArgs[0])
 	if len(cmdAndArgs) > 1 {
@@ -528,15 +612,27 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 	if testSuite != "" {
 		qulifiedName = fmt.Sprintf("[%s]/%s", testSuite, testName)
 	}
+
+	var tmpDir string
+	tmpDir, err = testsuiteDirectoryPath(testSuite, token)
+	if err != nil {
+		return
+	}
+
 	if ctx.Ignore != nil && *ctx.Ignore {
 		if ctx.Silent == nil || !*ctx.Silent {
 			stdPrinter.ColoredErrf(warningColor, "[%05d] Ignored test: %s\n", timecode, qulifiedName)
 		}
-		IncrementSeq(testSuite, token, IgnoredSequenceFilename)
-		return 0
+		IncrementSeq(tmpDir, IgnoredSequenceFilename)
+		exitCode = 0
+		return
 	}
-	seq := IncrementSeq(testSuite, token, TestSequenceFilename)
-	stdoutLog, stderrLog, reportLog := cmdLogFiles(testSuite, token, seq)
+	seq := IncrementSeq(tmpDir, TestSequenceFilename)
+	var stdoutLog, stderrLog, reportLog *os.File
+	stdoutLog, stderrLog, reportLog, err = cmdLogFiles(testSuite, token, seq)
+	if err != nil {
+		return
+	}
 	defer stdoutLog.Close()
 	defer stderrLog.Close()
 	defer reportLog.Close()
@@ -568,14 +664,14 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 		var mockDir string
 		mockDir, err = ProcessMocking(testSuite, token, seq, ctx.Mocks)
 		if err != nil {
-			Fatal(testSuite, token, err)
+			return
 		}
 		cmd.AddEnv("ORIGINAL_PATH", currentPath)
 		newPath := fmt.Sprintf("%s:%s", mockDir, currentPath)
 		cmd.AddEnv("PATH", newPath)
 		err = os.Setenv("PATH", newPath)
 		if err != nil {
-			Fatal(testSuite, token, err)
+			return
 		}
 	} else {
 		cmd.AddEnv("PATH", currentPath)
@@ -598,7 +694,8 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 		// FIXME: what to do of before exit code or beforeErr ?
 		_ = beforeExit
 		if beforeErr != nil {
-			Fatalf(testSuite, token, "error running before cmd: [%s]: %s", cmdBefore.String(), beforeErr)
+			err = fmt.Errorf("error running before cmd: [%s]: %w", cmdBefore.String(), beforeErr)
+			return
 		}
 	}
 
@@ -649,11 +746,13 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 			stdPrinter.Errf(" (in %s)\n", testDuration)
 		} else {
 			if errors.Is(err, context.DeadlineExceeded) {
+				err = nil
 				stdPrinter.ColoredErrf(failureColor, "FAILED")
 				stdPrinter.Errf(" (timed out after %s)\n", ctx.Timeout)
 				reportLog.WriteString(testTitle + "  =>  timed out")
 			} else {
-				IncrementSeq(testSuite, token, ErrorSequenceFilename)
+				err = nil
+				IncrementSeq(tmpDir, ErrorSequenceFilename)
 				stdPrinter.ColoredErrf(warningColor, "ERROR")
 				stdPrinter.Errf(" (not executed)\n")
 				reportLog.WriteString(testTitle + "  =>  not executed")
@@ -722,7 +821,7 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 		// FIXME: what to do of before exit code or beforeErr ?
 		_ = afterExit
 		if afterErr != nil {
-			Fatalf(testSuite, token, "error running after cmd: [%s]: %s", cmdAfter.String(), afterErr)
+			err = fmt.Errorf("error running after cmd: [%s]: %w", cmdAfter.String(), afterErr)
 		}
 	}
 
@@ -758,25 +857,34 @@ func ProcessArgs(allArgs []string) {
 	}
 
 	if err != nil {
+		suiteContext, err2 := LoadSuiteContext(config.TestSuite, config.Token)
+		if err2 == nil {
+			updateLastTestTime(suiteContext)
+		}
 		Fatal(config.TestSuite, config.Token, err)
 	}
 
 	switch config.Action {
 	case "global":
-		exitCode = GlobalConfig(config)
+		exitCode, err = GlobalConfig(config)
 	case "init":
-		exitCode = InitTestSuite(config)
+		exitCode, err = InitTestSuite(config)
 	case "test":
-		exitCode = PerformTest(config, cmdAndArgs, assertions)
+		exitCode, err = PerformTest(config, cmdAndArgs, assertions)
 	case "report":
-		exitCode = ReportTestSuite(config)
+		exitCode, err = ReportTestSuite(config)
 	default:
-		Fatalf(config.TestSuite, config.Token, "action: [%s] not known", config.Action)
+		err = fmt.Errorf("action: [%s] not known", config.Action)
+	}
+
+	if err != nil {
+		Fatal(config.TestSuite, config.Token, err)
 	}
 }
 
-func mockDirectoryPath(testSuite, token string, seq int) (mockDir string) {
-	testDir := testDirectoryPath(testSuite, token, seq)
+func mockDirectoryPath(testSuite, token string, seq int) (mockDir string, err error) {
+	var testDir string
+	testDir, err = testDirectoryPath(testSuite, token, seq)
 	mockDir = filepath.Join(testDir, "mock")
 	return
 }
@@ -784,7 +892,10 @@ func mockDirectoryPath(testSuite, token string, seq int) (mockDir string) {
 func ProcessMocking(testSuite, token string, seq int, mocks []CmdMock) (mockDir string, err error) {
 	// get test dir
 	// create a mock dir
-	mockDir = mockDirectoryPath(testSuite, token, seq)
+	mockDir, err = mockDirectoryPath(testSuite, token, seq)
+	if err != nil {
+		return
+	}
 	err = os.MkdirAll(mockDir, 0755)
 	if err != nil {
 		return
