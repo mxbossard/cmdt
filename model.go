@@ -43,6 +43,7 @@ var (
 	TempDirPrefix           = "cmdtest"
 	ContextFilename         = "context.yaml"
 	TestSequenceFilename    = "test-seq.txt"
+	FailureSequenceFilename = "failure-seq.txt"
 	IgnoredSequenceFilename = "ignored-seq.txt"
 	ErrorSequenceFilename   = "error-seq.txt"
 	StdoutFilename          = "stdout.log"
@@ -252,5 +253,10 @@ func IsRuleOfKind(ruleDefs []RuleDefinition, r Rule) (ok bool, err error) {
 		// name matched but not operator
 		err = fmt.Errorf("rule %s expect one of operators: %s", r.Name, expectedOperators)
 	}
+	return
+}
+
+func NormalizeDurationInSec(d time.Duration) (duration string) {
+	duration = fmt.Sprintf("%.3f s", float32(d.Milliseconds())/1000)
 	return
 }

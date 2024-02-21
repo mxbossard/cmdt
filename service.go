@@ -167,10 +167,36 @@ func listTestSuites(token string) (suites []string, err error) {
 		err = fmt.Errorf("cannot list test suites: %w", err)
 		return
 	}
+	// Add success
 	for _, m := range matches {
 		testSuite := filepath.Base(m)
 		if testSuite != GlobalConfigTestSuiteName {
-			suites = append(suites, testSuite)
+			failedCount := ReadSeq(tmpDir, testSuite, FailureSequenceFilename)
+			errorCount := ReadSeq(tmpDir, testSuite, ErrorSequenceFilename)
+			if failedCount == 0 && errorCount == 0 {
+				suites = append(suites, testSuite)
+			}
+		}
+	}
+	// Add failures
+	for _, m := range matches {
+		testSuite := filepath.Base(m)
+		if testSuite != GlobalConfigTestSuiteName {
+			failedCount := ReadSeq(tmpDir, testSuite, FailureSequenceFilename)
+			errorCount := ReadSeq(tmpDir, testSuite, ErrorSequenceFilename)
+			if failedCount > 0 && errorCount == 0 {
+				suites = append(suites, testSuite)
+			}
+		}
+	}
+	// Add errors
+	for _, m := range matches {
+		testSuite := filepath.Base(m)
+		if testSuite != GlobalConfigTestSuiteName {
+			errorCount := ReadSeq(tmpDir, testSuite, ErrorSequenceFilename)
+			if errorCount > 0 {
+				suites = append(suites, testSuite)
+			}
 		}
 	}
 	return
@@ -261,6 +287,13 @@ func PersistSuiteContext(testSuite, token string, config Context) (err error) {
 	}
 	//log.Printf("Persisted context file: %s\n", contextFilepath)
 	return
+}
+
+func updateLastTestTime(suiteCtx Context) {
+	token := suiteCtx.Token
+	testSuite := suiteCtx.TestSuite
+	suiteCtx.LastTestTime = time.Now()
+	PersistSuiteContext(testSuite, token, suiteCtx)
 }
 
 func readSuiteContext(testSuite, token string) (config Context, err error) {
@@ -470,7 +503,7 @@ func ReportTestSuite(ctx Context) (exitCode int, err error) {
 				err = fmt.Errorf("cannot load global context: %s", err)
 				return
 			}
-			globalDuration := time.Since(global.StartTime)
+			globalDuration := NormalizeDurationInSec(time.Since(global.StartTime))
 			stdPrinter.ColoredErrf(reportColor, "Global duration time: %s\n", globalDuration)
 			return
 		}
@@ -496,13 +529,15 @@ func ReportTestSuite(ctx Context) (exitCode int, err error) {
 	ctx = MergeContext(suiteContext, ctx)
 	testCount := ReadSeq(tmpDir, TestSequenceFilename)
 	ignoredCount := ReadSeq(tmpDir, IgnoredSequenceFilename)
+	failureCount := ReadSeq(tmpDir, FailureSequenceFilename)
 	errorCount := ReadSeq(tmpDir, ErrorSequenceFilename)
 	var failedReports []string
 	failedReports, err = failureReports(testSuite, token)
 	if err != nil {
 		return
 	}
-	failedCount := len(failedReports)
+	//failedCount := len(failedReports)
+	failedCount := failureCount
 
 	if ctx.Silent == nil || !*ctx.Silent {
 		stdPrinter.ColoredErrf(messageColor, "Reporting [%s] test suite (%s) ...\n", testSuite, tmpDir)
@@ -512,7 +547,8 @@ func ReportTestSuite(ctx Context) (exitCode int, err error) {
 	if ignoredCount > 0 {
 		ignoredMessage = fmt.Sprintf(" (%d ignored)", ignoredCount)
 	}
-	duration := suiteContext.LastTestTime.Sub(suiteContext.StartTime)
+	d := suiteContext.LastTestTime.Sub(suiteContext.StartTime)
+	duration := NormalizeDurationInSec(d)
 	if failedCount == 0 && errorCount == 0 {
 		exitCode = 0
 		stdPrinter.ColoredErrf(successColor, "Successfuly ran [%s] test suite (%d tests in %s)", testSuite, testCount, duration)
@@ -528,13 +564,6 @@ func ReportTestSuite(ctx Context) (exitCode int, err error) {
 		}
 	}
 	return
-}
-
-func updateLastTestTime(suiteCtx Context) {
-	token := suiteCtx.Token
-	testSuite := suiteCtx.TestSuite
-	suiteCtx.LastTestTime = time.Now()
-	PersistSuiteContext(testSuite, token, suiteCtx)
 }
 
 func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exitCode int, err error) {
@@ -725,16 +754,20 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 			stdPrinter.ColoredErrf(testColor, "%s... ", testTitle)
 		}
 		if err == nil {
+			//IncrementSeq(tmpDir, FailureSequenceFilename)
 			stdPrinter.ColoredErrf(failureColor, "FAILED")
 			stdPrinter.Errf(" (in %s)\n", testDuration)
 		} else {
 			if errors.Is(err, context.DeadlineExceeded) {
+				// Swallow error
 				err = nil
+				//IncrementSeq(tmpDir, FailureSequenceFilename)
 				stdPrinter.ColoredErrf(failureColor, "FAILED")
 				stdPrinter.Errf(" (timed out after %s)\n", ctx.Timeout)
 				reportLog.WriteString(testTitle + "  =>  timed out")
 			} else {
 				err = nil
+				// Swallow error
 				IncrementSeq(tmpDir, ErrorSequenceFilename)
 				stdPrinter.ColoredErrf(warningColor, "ERROR")
 				stdPrinter.Errf(" (not executed)\n")
@@ -794,6 +827,7 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 				expected := result.Assertion.Expected
 				failedAssertionsReport += RulePrefix() + string(assertName) + string(assertOp) + string(expected) + " "
 			}
+			IncrementSeq(tmpDir, FailureSequenceFilename)
 			reportLog.WriteString(testTitle + "  => " + failedAssertionsReport)
 		}
 	}
@@ -819,6 +853,16 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 	return
 }
 
+func NoErrorOrFatal(ctx Context, err error) {
+	if err != nil {
+		suiteContext, err2 := LoadSuiteContext(ctx.TestSuite, ctx.Token)
+		if err2 == nil {
+			updateLastTestTime(suiteContext)
+		}
+		Fatal(ctx.TestSuite, ctx.Token, err)
+	}
+}
+
 func ProcessArgs(allArgs []string) {
 	exitCode := 1
 	defer func() { os.Exit(exitCode) }()
@@ -838,14 +882,13 @@ func ProcessArgs(allArgs []string) {
 	if config.Token == "" {
 		config.Token = readEnvToken()
 	}
-
-	if err != nil {
-		suiteContext, err2 := LoadSuiteContext(config.TestSuite, config.Token)
-		if err2 == nil {
-			updateLastTestTime(suiteContext)
-		}
-		Fatal(config.TestSuite, config.Token, err)
+	if config.Token == "" {
+		var err2 error
+		config.Token, err2 = forgeContextualToken()
+		NoErrorOrFatal(config, err2)
 	}
+
+	NoErrorOrFatal(config, err)
 
 	switch config.Action {
 	case "global":
@@ -853,6 +896,7 @@ func ProcessArgs(allArgs []string) {
 	case "init":
 		exitCode, err = InitTestSuite(config)
 	case "test":
+		//log.Printf("found token: %s\n", config.Token)
 		if config.ContainerImage == "" {
 			exitCode, err = PerformTest(config, cmdAndArgs, assertions)
 		} else {

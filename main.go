@@ -111,6 +111,7 @@ Done:
 - @before=CMD ARG_1 ARG_2 ... ARG_N => execute CMD before each test
 - @after=CMD ARG_1 ARG_2 ... ARG_N => execute CMD after each test
 - Total duration if reporting multiple suites
+- order reports : report failures then errors at the end of report
 
 
 TODO:
@@ -123,7 +124,6 @@ Features :
 - silent ? quiet ? verbose ? an option to quiet errors as well ?
 - use rule definitions in usage
 - move seq into utils module
-- order reports : report failures at the end of report
 - rework failure description : hard to read (remove colors ? remove \n ?)
 - improve printer. Writer stdout & stder with prefix stdout> stderr> in descriptions
 - change default test suite with @init=foo => foo become default test suite
@@ -136,9 +136,13 @@ Features :
 	- cmdt cmd arg1 argN @scenario=filepath
 	- pour chaque ligne du scenario concat la ligne du scenario avec les arguments fournit en paramétre de cmdt
 
-- @runCount=N + @parallel=FORK_COUNT (min, max, median exec time) run in separate context or in same context (before/after) ?
+- @runCount=N + @parallel=FORK_COUNT (min, max, median exec time) run in separate context or in same context (before/after) guided by @dirtyRun
 
-- @fork=5 global config only by default instead of @parallel. Fork = 5 increment and decrement a seq file
+- @fork=5 suite/global config only by default instead of @parallel. Fork = 5 increment and decrement a seq file
+  - what is forked ?
+  - by default suites forked but test serial in a suite
+  - optionaly all tests forked in a suite
+  - fork in a container ? or one container by fork ? (forking implies test independency @dirtyContainer only should guide for new container)
 - Clean old temp dir (older than 2 min ?)
 
 
@@ -156,12 +160,72 @@ Features :
         Contains call @mock:"CMD,ARG_1,ARG_2,ARG_N;stdin=baz;exit=0;stdout=foo;stderr=bar" Must receive exactly stdin and specified args in various order not more
         Default exit code @mock="CMD,*;exit=1"
 
-## Idée pour executer les tests dans un conteneur
+## Idées pour executer les tests dans un conteneur
   - Une image par défaut busybox like (avec cmdt déjà à l'interieur ? pas forcément nécéssaire sauf pour le speed)
   - En général, il faut monter le binaire cmdt dans le conteneur et optionnelement l'ajouter au PATH
   - cmdt => run cmdt avec exactement les memes args dans un conteneur jetable démarré à l'instant par cmdt
   - avec quel owner démarrer cmdt dans le conteneur => default / option ??
   - Mock une commande absolue possible, mais nécéssite de déplacer la commande original pour la remplacer par un wrapper
+  - En option fournir une limite CPU & ram quel valeur par défaut ?
+  - Scope ? discard container after suite, test, run (runCount > 1)
+    - @cnrScope=none => do not run inside a container
+    - @cnrScope=suite => keep suite ctId in suite ctx
+	- @cnrScope=test => use a new container for each test
+	- @cnrScope=run => use a new container for each test run
+  - Before / After scope ? none, suite, test, run
+  - Meilleur idée : Before + BeforeSuite + dirties=beforeSuite/afterSuite/beforeTest/afterTest/beforeRun/afterRun
+	- DEFAULT: before > run1 > ... > runN > after
+	- OPTION1: before1 > run1 > after1 > ... > beforeN > runN > afterN
+
+	- DEFAULT: runCnr > test1 > ... > testN > killCnr (1 cnr by suite)
+	- OPTION1: runCnr1 > test1 > killCnr1 > ... runCnrN > testN > killCnrN (1 cnr by test)
+	- OPTION2: runCnr11 > test1run1 > killCnr11 > runCnr12 > test1run2 > killCnr12 > ... runCnrNP > testNrunP > killCnrNP (1 cnr by run)
+
+	- DEFAULT: runCnr > before > run1 > ... > runN > after > killCnr
+	- OPTION1: runCnr1 > before1 > run1 > after1 > killCnr1 > ... > runCnrN > beforeN > runN > afterN > killCnrN
+
+	- @beforeSuite run on each container start ???
+	- @afterSuite run on each container kill ???
+
+    - contextDirty=beforeRun => each run need a new before and a new container
+	- contextDirty=afterRun => each run need a new after and a removed container
+
+	- @dirtyRun => mark test run dirty => enforce new before and after for each run
+
+	- @dirtyContainer=beforeRun => mark ctx dirty before each run => enforce new cnr before each run
+	- @dirtyContainer=afterRun => mark ctx dirty after each run => enforce cnr kill after each run
+	- @dirtyContainer=beforeTest => mark ctx dirty before each test => enforce new cnr before each test
+	- @dirtyContainer=afterTest => mark ctx dirty after each test => enforce cnr kill after each test
+	- @dirtyContainer=beforeSuite => mark ctx dirty before each suite => enforce new cnr before each suite (DEFAULT ?)
+	- @dirtyContainer=afterSuite => mark ctx dirty after each suite => enforce cnr kill after each suite
+
+	- @global @container => by default @dirtyContainer=never => will share a fresh same container between all suites
+	- @init @container => by default @dirtyContainer=beforeSuite => will share a fresh container between all tests in a suite
+	- @test @container => by default @dirtyContainer=beforeTest => will share a fresh container between all runs of a test
+
+  - Exemples
+    @global @container # dirtyContainer=none
+	@test true # run in cnr1
+	@test true # run in cnr1
+	@test @dirtyContainer=beforeTest true # run in cnr2 (destroyded cnr1 before)
+	@test true # run in cnr2
+	@test @dirtyContainer=afterTest true # run in cnr2 (will destroy cnr2 after)
+	@test true # run in cnr3
+
+	@global @container @dirtyContainer=beforeTest
+	@test true # run in cnr1
+	@test true # run in cnr2
+	@test @dirtyContainer=afterTest true # run in cnr2 (cnr2 not destroyed before)
+	@test true # run in cnr3
+
+	@global @container @dirtyContainer=beforeTest
+	@test true # all run in cnr1
+	@test @dirtyContainer=afterRun true # run1 in cnr1, run2 in cnr2, ..., runN in cnrN
+	@test true # all run in cnrN+1
+
+## Idées de présentation
+  - Print testsuite name on init ? on first test call ?
+  - Print only failures in test suite by default
   -
 
 

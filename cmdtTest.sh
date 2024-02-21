@@ -515,7 +515,7 @@ $cmdt0 @test=before_after/ -- $cmdt1 @report=main
 
 
 >&2 echo "## Test @container"
-$cmdt @init=container @keepOutputs
+$cmdt0 @init=container #@keepOutputs
 $cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 true @container
 $cmdt0 @test=container/ @stderr:FAILED -- $cmdt1 false @container
 $cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 true @container=alpine
@@ -530,11 +530,13 @@ $cmdt0 @test=container/ @fail -- $cmdt1 @report=main
 token="$__CMDT_TOKEN"
 export -n __CMDT_TOKEN
 
-$cmdt0 @test=container_wo_token/ @stderr:PASSED -- $cmdt1 true @container
+$cmdt0 @test=container_wo_token/ @stderr:PASSED -- $cmdt1 @container true
+$cmdt0 @test=container_wo_token/ @stderr:PASSED -- $cmdt1 @container @fail false
 
 $cmdt @report=container_wo_token || true
 
 export __CMDT_TOKEN="$token"
+
 
 $cmdt @report= ; >&2 echo SUCCESS ; exit 0
 
