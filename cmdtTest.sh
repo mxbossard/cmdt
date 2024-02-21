@@ -519,9 +519,22 @@ $cmdt @init=container @keepOutputs
 $cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 true @container
 $cmdt0 @test=container/ @stderr:FAILED -- $cmdt1 false @container
 $cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 true @container=alpine
+$cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 foo @container=alpine @mock=foo,exit=0
+$cmdt0 @test=container/ @stderr:FAILED -- $cmdt1 foo @container=alpine @mock=foo,exit=1
+$cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 /bar @container=alpine @mock=/bar,exit=0
 
-$cmdt0 @test=before_after/ @fail -- $cmdt1 @report=main
+$cmdt0 @test=container/ @fail -- $cmdt1 @report=main
 
+
+>&2 echo "## Test @container without exported token"
+token="$__CMDT_TOKEN"
+export -n __CMDT_TOKEN
+
+$cmdt0 @test=container_wo_token/ @stderr:PASSED -- $cmdt1 true @container
+
+$cmdt @report=container_wo_token || true
+
+export __CMDT_TOKEN="$token"
 
 $cmdt @report= ; >&2 echo SUCCESS ; exit 0
 
