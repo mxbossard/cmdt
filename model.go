@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"regexp"
 	"time"
 
+	"mby.fr/utils/ansi"
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/ptr"
 )
@@ -33,6 +35,37 @@ const (
 	Test                      // can be placed on test or on suite to configure all tests
 )
 
+const (
+	NamePattern = "[a-zA-Z][^/]*[a-zA-Z0-9]"
+)
+
+var (
+	TempDirPrefix           = "cmdtest"
+	ContextFilename         = "context.yaml"
+	TestSequenceFilename    = "test-seq.txt"
+	IgnoredSequenceFilename = "ignored-seq.txt"
+	ErrorSequenceFilename   = "error-seq.txt"
+	StdoutFilename          = "stdout.log"
+	StderrFilename          = "stderr.log"
+	ReportFilename          = "report.log"
+
+	messageColor = ansi.HiPurple
+	testColor    = ansi.HiCyan
+	successColor = ansi.BoldGreen
+	failureColor = ansi.BoldRed
+	reportColor  = ansi.Yellow
+	warningColor = ansi.BoldHiYellow
+	errorColor   = ansi.Red
+)
+
+var (
+	DefaultTestTimeout, _         = time.ParseDuration("1000h")
+	AbsNamePattern                = fmt.Sprintf("(%s/)?(%s)?", NamePattern, NamePattern)
+	NameRegexp                    = regexp.MustCompile("^" + NamePattern + "$")
+	AbsNameRegexp                 = regexp.MustCompile("^" + AbsNamePattern + "$")
+	testSuiteNameSanitizerPattern = regexp.MustCompile("[^a-zA-Z0-9]")
+)
+
 var (
 	Actions = []RuleDefinition{ruleDef("global", ""), ruleDef("init", "", "="), ruleDef("test", "", "="),
 		ruleDef("report", "", "=")}
@@ -46,7 +79,7 @@ var (
 		ruleDef("stopOnFailure", "", "="), ruleDef("keepStdout", "", "="), ruleDef("keepStderr", "", "="),
 		ruleDef("keepOutputs", "", "="), ruleDef("silent", "", "="), ruleDef("timeout", "="),
 		ruleDef("parallel", "="), ruleDef("runCount", "="), ruleDef("mock", "=", ":"),
-		ruleDef("before", "="), ruleDef("after", "=")}
+		ruleDef("before", "="), ruleDef("after", "="), ruleDef("container", "", "=")}
 	// Config of test flow (init -> test -> report)
 	FlowConfigs = []RuleDefinition{ruleDef("token", "=")}
 	Assertions  = []RuleDefinition{ruleDef("success", ""), ruleDef("fail", ""), ruleDef("exit", "="),
@@ -87,20 +120,21 @@ type Context struct {
 	ForkCount    int           `yaml:""`
 
 	// Test or TestSuite
-	PrintToken    bool
-	ExportToken   bool
-	ReportAll     bool
-	Silent        *bool         `yaml:""`
-	Ignore        *bool         `yaml:""`
-	StopOnFailure *bool         `yaml:""`
-	KeepStdout    *bool         `yaml:""`
-	KeepStderr    *bool         `yaml:""`
-	Timeout       time.Duration `yaml:""`
-	RunCount      int           `yaml:""`
-	Parallel      int           `yaml:""`
-	Mocks         []CmdMock     `yaml:""`
-	Before        [][]string    `yaml:""`
-	After         [][]string    `yaml:""`
+	PrintToken     bool
+	ExportToken    bool
+	ReportAll      bool
+	Silent         *bool         `yaml:""`
+	Ignore         *bool         `yaml:""`
+	StopOnFailure  *bool         `yaml:""`
+	KeepStdout     *bool         `yaml:""`
+	KeepStderr     *bool         `yaml:""`
+	Timeout        time.Duration `yaml:""`
+	RunCount       int           `yaml:""`
+	Parallel       int           `yaml:""`
+	Mocks          []CmdMock     `yaml:""`
+	Before         [][]string    `yaml:""`
+	After          [][]string    `yaml:""`
+	ContainerImage string        `yaml:""`
 }
 
 type Config struct {

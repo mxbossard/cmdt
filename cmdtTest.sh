@@ -7,7 +7,13 @@ workspaceDir="/tmp/cmdtWorkspace"
 >&2 echo "##### Building cmdtest binary ..."
 export GOBIN="$scriptDir/bin"
 cd "$scriptDir"
-go install
+#go install
+#CGO_ENABLED=0 GOOS=linux go install -a -ldflags '-extldflags "-static"'
+#CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go install -ldflags '-extldflags "-static"'
+#CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go install -a -tags netgo -ldflags '-w'
+#CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go install -a -tags netgo -ldflags '-w -extldflags "-static"'
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go install -tags netgo -ldflags '-w'
+
 cd - > /dev/null
 
 rm -rf -- "$workspaceDir"
@@ -444,7 +450,7 @@ $cmdt0 @test=test_flow/ @stderr:"#01" @stderr:PASSED -- $cmdt1 true
 $cmdt0 @test=test_flow/ @stderr:"1 test" -- $cmdt1 @report=main
 
 
->&2 echo "## Cmd mock"
+>&2 echo "## Test @mock"
 mockCfg1="@mock=ls foo,stdin=,stdout=baz,exit=41"
 mockCfg2="@mock=ls foo,cmd=sh -c 'echo -n baz; exit 42'"
 mockCfg3="@mock=ls foo *,cmd=sh -c 'echo -n baz; exit 43'"
@@ -493,7 +499,7 @@ $cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls foo bar baz "$mockCfg7" @stdo
 $cmdt0 @test=cmd_mock/ -- $cmdt1 @report=main
 
 
->&2 echo "## Test Before & After"
+>&2 echo "## Test @before & @after"
 testFile="/tmp/thisFileDoesNotExistsYet.txt"
 testFile2="/tmp/thisFileDoesNotExistsYet2.txt"
 rm -f -- "$testFile" "$testFile2" 2> /dev/null || true
@@ -506,6 +512,16 @@ $cmdt0 @test=before_after/ @stderr:PASSED -- $cmdt1 ls "$testFile" @fail
 $cmdt0 @test=before_after/ @stderr:PASSED -- $cmdt1 ls "$testFile" "$testFile2" @before="touch $testFile" @before="touch $testFile2"
 
 $cmdt0 @test=before_after/ -- $cmdt1 @report=main
+
+
+>&2 echo "## Test @container"
+$cmdt @init=container @keepOutputs
+$cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 true @container
+$cmdt0 @test=container/ @stderr:FAILED -- $cmdt1 false @container
+$cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 true @container=alpine
+
+$cmdt0 @test=before_after/ @fail -- $cmdt1 @report=main
+
 
 $cmdt @report= ; >&2 echo SUCCESS ; exit 0
 

@@ -18,9 +18,7 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"regexp"
 
-	"mby.fr/utils/ansi"
 	"mby.fr/utils/printz"
 )
 
@@ -171,69 +169,7 @@ Features :
 
 */
 
-type RuleType string
-
-type AssertionRule struct {
-	Typ      RuleType
-	Operator string
-	Expected string
-	Result   string
-}
-
-var (
-	//AssertionPrefix      = "@"
-
-	/*
-		ActionInit   = RuleType("init")
-		ActionReport = RuleType("report")
-		ActionTest   = RuleType("test")
-
-		GlobalFork   = RuleType("fork")
-		GlobalPrefix = RuleType("prefix")
-
-		ConfigStopOnFailure = RuleType("stopOnFailure")
-		ConfigKeepStdout    = RuleType("keepStdout")
-		ConfigKeepStderr    = RuleType("keepStderr")
-		ConfigKeepOutputs   = RuleType("keepOutputs")
-		ConfigIgnore        = RuleType("ignore")
-		ConfigRunCount      = RuleType("runCount")
-		ConfigParallel      = RuleType("parallel")
-
-		RuleFail    = RuleType("fail")
-		RuleSuccess = RuleType("success")
-		RuleExit    = RuleType("exit")
-		RuleStdout  = RuleType("stdout")
-		RuleStderr  = RuleType("stderr")
-		RuleExists  = RuleType("exists")
-		RuleTimeout = RuleType("timeout")
-		RuleCmd     = RuleType("cmd")
-
-		AssertFail    = &AssertionRule{Typ: RuleFail}
-		AssertSuccess = &AssertionRule{Typ: RuleSuccess}
-	*/
-
-	TempDirPrefix           = "cmdtest"
-	ContextFilename         = "context.yaml"
-	TestSequenceFilename    = "test-seq.txt"
-	IgnoredSequenceFilename = "ignored-seq.txt"
-	ErrorSequenceFilename   = "error-seq.txt"
-	StdoutFilename          = "stdout.log"
-	StderrFilename          = "stderr.log"
-	ReportFilename          = "report.log"
-
-	messageColor = ansi.HiPurple
-	testColor    = ansi.HiCyan
-	successColor = ansi.BoldGreen
-	failureColor = ansi.BoldRed
-	reportColor  = ansi.Yellow
-	warningColor = ansi.BoldHiYellow
-	errorColor   = ansi.Red
-)
-
 var stdPrinter printz.Printer
-
-// var assertionRulePattern = regexp.MustCompile("^" + AssertionPrefix + "([a-zA-Z]+)([=~])?(.+)?$")
-var testSuiteNameSanitizerPattern = regexp.MustCompile("[^a-zA-Z0-9]")
 
 //var logger = logz.Default("cmdtest", 0)
 

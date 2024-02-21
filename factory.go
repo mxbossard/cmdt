@@ -15,17 +15,6 @@ import (
 	"mby.fr/utils/filez"
 )
 
-const (
-	NamePattern = "[a-zA-Z][^/]*[a-zA-Z0-9]"
-)
-
-var (
-	DefaultTestTimeout, _ = time.ParseDuration("1000h")
-	AbsNamePattern        = fmt.Sprintf("(%s/)?(%s)?", NamePattern, NamePattern)
-	NameRegexp            = regexp.MustCompile("^" + NamePattern + "$")
-	AbsNameRegexp         = regexp.MustCompile("^" + AbsNamePattern + "$")
-)
-
 func IsRule(s string) bool {
 	return strings.HasPrefix(s, RulePrefix())
 }
@@ -429,6 +418,11 @@ func ApplyConfig(c *Context, ruleExpr string) (ok bool, rule Rule, err error) {
 				return
 			}
 			c.After = append(c.After, cmdAndArgs)
+		case "container":
+			c.ContainerImage, err = Translate(rule, DummyMapper, OperatorValidater[string]("", "="))
+			if c.ContainerImage == "" {
+				c.ContainerImage = "busybox"
+			}
 		default:
 			ok = false
 		}

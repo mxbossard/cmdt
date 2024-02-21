@@ -1,6 +1,7 @@
 package main
 
 import (
+	cryptorand "crypto/rand"
 	"fmt"
 	"io"
 	"log"
@@ -77,5 +78,15 @@ func ReadSeq(pathes ...string) (c int) {
 	if err != nil {
 		log.Fatalf("cannot read seq file (%s) as an integer: %s", seqFilepath, err)
 	}
+	return
+}
+
+func ForgeUuid() (uuid string, err error) {
+	b := make([]byte, 16)
+	_, err = cryptorand.Read(b)
+	if err != nil {
+		return
+	}
+	uuid = fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 	return
 }

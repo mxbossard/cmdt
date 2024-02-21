@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	cryptorand "crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -302,24 +301,6 @@ func LoadGlobalContext(token string) (config Context, err error) {
 	return
 }
 
-func UniqToken() (uuid string, err error) {
-	b := make([]byte, 16)
-	_, err = cryptorand.Read(b)
-	if err != nil {
-		return
-	}
-	uuid = fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
-	return
-
-	/*
-		h, err := trust.SignStrings(uuid)
-		if err != nil {
-			log.Fatalf("cannot forge a uniq token: %s", err)
-		}
-		return h
-	*/
-}
-
 func initWorkspace(ctx Context) (err error) {
 	token := ctx.Token
 	testSuite := ctx.TestSuite
@@ -399,14 +380,14 @@ func InitTestSuite(ctx Context) (exitCode int, err error) {
 	testSuite := ctx.TestSuite
 
 	if ctx.Action == "init" && ctx.PrintToken {
-		token, err = UniqToken()
+		token, err = ForgeUuid()
 		if err != nil {
 			return
 		}
 		fmt.Printf("%s\n", token)
 		ctx.Token = token
 	} else if ctx.Action == "init" && ctx.ExportToken {
-		token, err = UniqToken()
+		token, err = ForgeUuid()
 		if err != nil {
 			return
 		}
@@ -872,7 +853,11 @@ func ProcessArgs(allArgs []string) {
 	case "init":
 		exitCode, err = InitTestSuite(config)
 	case "test":
-		exitCode, err = PerformTest(config, cmdAndArgs, assertions)
+		if config.ContainerImage == "" {
+			exitCode, err = PerformTest(config, cmdAndArgs, assertions)
+		} else {
+			exitCode, err = PerformTestInNewContainer(config)
+		}
 	case "report":
 		exitCode, err = ReportTestSuite(config)
 	default:
