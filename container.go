@@ -23,13 +23,13 @@ func StartContainer(token, image string, mocks []CmdMock) (id string, err error)
 		return
 	}
 
-	cmdtestVol := os.Args[0] + ":/opt/cmdtest"
-	ctxDirVol := tmpDir + ":" + tmpDir
+	cmdtestVol := os.Args[0] + ":/opt/cmdtest:ro"
+	ctxDirVol := tmpDir + ":" + tmpDir + ":rw"
 	dr := container.DockerRunner{
 		Name:       id,
 		Image:      image,
 		Entrypoint: "/bin/sh",
-		CmdArgs:    []string{"-c", "sleep inf"},
+		CmdArgs:    []string{"-c", "sleep 120"}, //FIXME use suite timeout or test timeout
 		Remove:     true,
 		Detach:     true,
 		Volumes:    []string{cmdtestVol, ctxDirVol},
@@ -53,7 +53,7 @@ func StartContainer(token, image string, mocks []CmdMock) (id string, err error)
 	return
 }
 
-func StopContainer(id string) (err error) {
+func RemoveContainer(id string) (err error) {
 	c := cmdz.Cmd("docker", "rm", "-f", id)
 	var exitCode int
 	exitCode, err = c.BlockRun()
@@ -74,12 +74,12 @@ func ExecInContainer(token, id string, cmdAndArgs []string) (exitCode int, err e
 	c := cmdz.Cmd(args...)
 	//c.AddEnviron(os.Environ()...)
 	c.SetOutputs(os.Stdout, os.Stderr)
-	fmt.Printf("Will execute: [%s]\n", c)
+	//log.Printf("Will execute: [%s]\n", c)
 	exitCode, err = c.BlockRun()
 	return
 }
 
-func PerformTestInNewContainer(testCtx Context) (exitCode int, err error) {
+func PerformTestInEphemeralContainer(testCtx Context) (exitCode int, err error) {
 	// Launch test in new container
 	var ctId string
 	ctId, err = StartContainer(testCtx.Token, testCtx.ContainerImage, testCtx.Mocks)
@@ -102,7 +102,52 @@ func PerformTestInNewContainer(testCtx Context) (exitCode int, err error) {
 	}
 
 	if exitCode == 0 {
-		err = StopContainer(ctId)
+		err = RemoveContainer(ctId)
 	}
+	return
+}
+
+func PerformTestInContainer(testCtx Context) (ctId string, exitCode int, err error) {
+	if testCtx.ContainerId != nil {
+		ctId = *testCtx.ContainerId
+	}
+
+	// If container dirty before test
+	if ctId != "" && testCtx.ContainerDirties == "beforeTest" || testCtx.ContainerDirties == "beforeRun" {
+		err2 := RemoveContainer(ctId)
+		NoErrorOrFatal(testCtx, err2)
+		ctId = ""
+	}
+
+	// If container not already exists, create a new one
+	if ctId == "" {
+		ctId, err = StartContainer(testCtx.Token, testCtx.ContainerImage, testCtx.Mocks)
+		if err != nil {
+			return
+		}
+	}
+
+	//log.Printf("ctId: %s ; dirty: %s\n", ctId, testCtx.ContainerDirties)
+	//log.Printf("PerformTestInContainer #%s (%v)\n", ctId, *testCtx.ContainerScope)
+	// FIXME: Test if container is up and running
+
+	// Launch test in container
+	cmdAndArgs := []string{"/opt/cmdtest", "@container=false"}
+	if len(os.Args) > 1 {
+		for _, arg := range os.Args[1:] {
+			if !strings.HasPrefix(arg, "@container") {
+				cmdAndArgs = append(cmdAndArgs, arg)
+			}
+		}
+
+	}
+	exitCode, err = ExecInContainer(testCtx.Token, ctId, cmdAndArgs)
+
+	if testCtx.ContainerDirties == "afterTest" || testCtx.ContainerDirties == "afterRun" {
+		err2 := RemoveContainer(ctId)
+		NoErrorOrFatal(testCtx, err2)
+		ctId = ""
+	}
+
 	return
 }

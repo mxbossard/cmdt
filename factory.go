@@ -199,6 +199,15 @@ func OperatorValidater[T any](ops ...string) Validater[T] {
 	}
 }
 
+func KeywordsValidater[T any](keywords ...string) Validater[T] {
+	return func(rule Rule, v T) (err error) {
+		if !collections.Contains[string](&keywords, rule.Expected) {
+			err = fmt.Errorf("rule %s%s%s bad value. Must be one of: [%s]", rule.Prefix, rule.Name, rule.Expected, keywords)
+		}
+		return
+	}
+}
+
 func NotEmptyForOpValidater[T any](ops ...string) Validater[T] {
 	return func(rule Rule, v T) (err error) {
 		if collections.Contains[string](&ops, rule.Op) && rule.Expected == "" {
@@ -420,9 +429,17 @@ func ApplyConfig(c *Context, ruleExpr string) (ok bool, rule Rule, err error) {
 			c.After = append(c.After, cmdAndArgs)
 		case "container":
 			c.ContainerImage, err = Translate(rule, DummyMapper, OperatorValidater[string]("", "="))
-			if c.ContainerImage == "" {
-				c.ContainerImage = "busybox"
+			if c.ContainerImage == "" || c.ContainerImage == "true" {
+				c.ContainerImage = DefaultContainerImage
+			} else if c.ContainerImage == "false" {
+				trueVal := true
+				c.ContainerDisabled = &trueVal
 			}
+			// Erase ContainerId because we will want a new Container
+			noId := ""
+			c.ContainerId = &noId
+		case "dirtyContainer":
+			c.ContainerDirties, err = Translate(rule, DummyMapper, OperatorValidater[string]("="), KeywordsValidater[string]("beforeSuite", "afterSuite", "beforeTest", "afterTest", "beforeRun", "afterRun"))
 		default:
 			ok = false
 		}
@@ -629,6 +646,10 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 
 func ParseArgs(args []string) (cfg Context, cmdAndArgs []string, assertions []Assertion, err error) {
 	cfg.Silent = nil
+	cfg.ContainerId = nil
+	cfg.ContainerScope = nil
+	cfg.ContainerDisabled = nil
+
 	var rules []Rule
 	var rule Rule
 	parseRules := true
@@ -699,6 +720,23 @@ func ParseArgs(args []string) (cfg Context, cmdAndArgs []string, assertions []As
 		return
 	}
 	err = ValidateOnceOnlyDefinedRule(rules...)
+	if err != nil {
+		return
+	}
+
+	var cfgScope ConfigScope
+	switch cfg.Action {
+	case "global":
+		cfgScope = Global
+	case "init":
+		cfgScope = Suite
+	case "test":
+		cfgScope = Test
+	}
+
+	if cfg.ContainerImage != "" {
+		cfg.ContainerScope = &cfgScope
+	}
 
 	//log.Printf("build context: %s Silent: %v\n", args, cfg.Silent)
 	return
@@ -735,7 +773,7 @@ func ValidateOnceOnlyDefinedRule(rules ...Rule) (err error) {
 		{"stdout", "~"}, {"stderr", "~"}, {"stdout", "!~"}, {"stderr", "!~"},
 		{"stdout", "!="}, {"stderr", "!="},
 		{"stdout", ":"}, {"stderr", ":"}, {"stdout", "!:"}, {"stderr", "!:"},
-		{"before", "="}, {"after", "="},
+		{"before", "="}, {"after", "="}, {"mock", "="},
 	}
 	matches := map[RuleKey][]Rule{}
 	for _, rule := range rules {

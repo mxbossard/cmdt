@@ -117,8 +117,20 @@ Done:
 TODO:
 Bugs:
 - @FILEPATH empeche de tester un contenu qui commence par @ sans passer par un fichier. Il faudrait pouvoir échapper @ ou bien utiliser un operator dédié à la lécture d'un fichier (ex: @stderr@=FILEPATH @stdin@:FILEPATH)
+- remove docker run container generated ID from stdout
+- use suite timeout for container duration
 
 Features :
+- @global @keepOutputs does not works
+- multiple @mock
+- with -- report an error if commands before --
+- with -- auto concatenat args until next delim or --
+- @dirty= Reset l'image à chaque test suite ou à chaque test en option
+- Run en option les tests dans un conteneur => plus facile de mocké, meilleur reproductibilité des tests
+	- @container=IMAGE : Fournir une image pour tester l'éxecution dans cette image
+	- Mock les executable avec un chemin absolu
+	- Utiliser une image par défaut pour les cas d'usage simples
+- @beforeSuite=CMD_ANG_ARGS & @afterSuite=CMD_ANG_ARGS
 - @mock stdin=@FILEPATH stdin:PARTIAL_CONTENT stdout=@FILEPATH @stderr=@FILEPATH
 - @called[=:]CMD ARG_S,stdin=IN,count=N assertion => verify a mock was called
 - silent ? quiet ? verbose ? an option to quiet errors as well ?
@@ -127,11 +139,7 @@ Features :
 - rework failure description : hard to read (remove colors ? remove \n ?)
 - improve printer. Writer stdout & stder with prefix stdout> stderr> in descriptions
 - change default test suite with @init=foo => foo become default test suite
-- Run en option les tests dans un conteneur => plus facile de mocké, meilleur reproductibilité des tests
-	- Fournir une image pour tester l'éxecution dans cette image
-	- Reset l'image à chaque test suite ou à chaque test en option
-	- Mock les executable avec un chemin absolu
-	- Utiliser une image par défaut pour les cas d'usage simples
+
 - possibilité de passer un scénario ligne à ligne dans le stdin de cmdtest
 	- cmdt cmd arg1 argN @scenario=filepath
 	- pour chaque ligne du scenario concat la ligne du scenario avec les arguments fournit en paramétre de cmdt
@@ -167,6 +175,7 @@ Features :
   - avec quel owner démarrer cmdt dans le conteneur => default / option ??
   - Mock une commande absolue possible, mais nécéssite de déplacer la commande original pour la remplacer par un wrapper
   - En option fournir une limite CPU & ram quel valeur par défaut ?
+  - En option fournir un user différent dans le conteneur mais interragir avec le tmpDir avec le bon user !
   - Scope ? discard container after suite, test, run (runCount > 1)
     - @cnrScope=none => do not run inside a container
     - @cnrScope=suite => keep suite ctId in suite ctx
@@ -226,7 +235,9 @@ Features :
 ## Idées de présentation
   - Print testsuite name on init ? on first test call ?
   - Print only failures in test suite by default
-  -
+  - Remove colors of stdout & stderr
+  - Prefix each line of stdout and stderr with stdout> & stderr>
+  - Smart diff focusing on what is different for text comparison assertions
 
 
 ## Idées pour silent vs quiet ?!

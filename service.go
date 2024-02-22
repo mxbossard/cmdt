@@ -37,7 +37,7 @@ func Fatalf(testSuite, token, format string, v ...any) {
 }
 
 func SuiteError(testSuite, token string, v ...any) error {
-	return SuiteError(testSuite, token, fmt.Sprint(v...))
+	return SuiteErrorf(testSuite, token, "%s", fmt.Sprint(v...))
 }
 
 func SuiteErrorf(testSuite, token, format string, v ...any) error {
@@ -268,7 +268,7 @@ func sanitizeTestSuiteName(s string) string {
 	return testSuiteNameSanitizerPattern.ReplaceAllString(s, "_")
 }
 
-func PersistSuiteContext(testSuite, token string, config Context) (err error) {
+func PersistSuiteContext0(testSuite, token string, config Context) (err error) {
 	var contextFilepath string
 	contextFilepath, err = testsuiteConfigFilepath(testSuite, token)
 	if err != nil {
@@ -289,11 +289,42 @@ func PersistSuiteContext(testSuite, token string, config Context) (err error) {
 	return
 }
 
-func updateLastTestTime(suiteCtx Context) {
-	token := suiteCtx.Token
-	testSuite := suiteCtx.TestSuite
-	suiteCtx.LastTestTime = time.Now()
-	PersistSuiteContext(testSuite, token, suiteCtx)
+func PersistSuiteContext(config Context) (err error) {
+	testSuite := config.TestSuite
+	token := config.Token
+	var contextFilepath string
+	contextFilepath, err = testsuiteConfigFilepath(testSuite, token)
+	if err != nil {
+		return
+	}
+	//stdPrinter.Errf("Built context: %v\n", context)
+	content, err := yaml.Marshal(config)
+	if err != nil {
+		return
+	}
+	//stdPrinter.Errf("Persisting context: %s\n", content)
+	err = os.WriteFile(contextFilepath, content, 0600)
+	if err != nil {
+		err = fmt.Errorf("cannot persist context: %w", err)
+		return
+	}
+	//log.Printf("Persisted context in: %s\n", contextFilepath)
+	return
+}
+
+func updateLastTestTime(testSuite, token string) {
+	ctx, err := LoadSuiteContext(testSuite, token)
+	if err != nil {
+		log.Fatal(err)
+	}
+	//token := suiteCtx.Token
+	//testSuite := suiteCtx.TestSuite
+	ctx.LastTestTime = time.Now()
+	//PersistSuiteContext(testSuite, token, suiteCtx)
+	err = PersistSuiteContext(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func readSuiteContext(testSuite, token string) (config Context, err error) {
@@ -308,6 +339,7 @@ func readSuiteContext(testSuite, token string) (config Context, err error) {
 		return
 	}
 	err = yaml.Unmarshal(content, &config)
+	//log.Printf("Read context from %s\n", contextFilepath)
 	return
 }
 
@@ -323,8 +355,11 @@ func LoadSuiteContext(testSuite, token string) (config Context, err error) {
 		//log.Printf("readSuiteContext err: %s for: %s\n", err, testSuite)
 		return
 	}
+	//log.Printf("Loaded GlobalContext token: %s ; ctId: %s\n", token, globalCtx.ContainerId)
+	//log.Printf("Loaded SuiteContext %s token: %s ; ctId: %s\n", testSuite, token, suiteCtx.ContainerId)
 	config = MergeContext(globalCtx, suiteCtx)
 	SetRulePrefix(config.Prefix)
+	//log.Printf("Merged SuiteContext %s token: %s ; ctId: %s\n", testSuite, token, config.ContainerId)
 	return
 }
 
@@ -387,7 +422,8 @@ func initConfig(ctx Context) (err error) {
 
 	ctx.StartTime = time.Now()
 	// store config
-	PersistSuiteContext(testSuite, token, ctx)
+	//PersistSuiteContext(testSuite, token, ctx)
+	PersistSuiteContext(ctx)
 	//if ctx.Silent == nil || !*ctx.Silent {
 	//	stdPrinter.ColoredErrf(messageColor, "Initialized new config [%s].\n", testSuite)
 	//}
@@ -573,28 +609,6 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 	exitCode = 1
 	defer stdPrinter.Flush()
 
-	suiteContext, err := LoadSuiteContext(testSuite, token)
-	if err != nil {
-		if os.IsNotExist(err) {
-			// test suite does not exists yet
-			suiteCtx := Context{Token: token, TestSuite: testSuite}
-			exitCode, err = InitTestSuite(suiteCtx)
-			if err != nil {
-				return
-			}
-			if exitCode > 0 {
-				return
-			}
-			// Recursive call once test suite initialized
-			return PerformTest(ctx, cmdAndArgs, assertions)
-		} else {
-			err = fmt.Errorf("cannot load context: %w", err)
-			return
-		}
-	}
-	defer updateLastTestTime(suiteContext)
-
-	ctx = MergeContext(suiteContext, ctx)
 	timecode := int(time.Since(ctx.StartTime).Milliseconds())
 
 	if len(cmdAndArgs) == 0 {
@@ -857,7 +871,7 @@ func NoErrorOrFatal(ctx Context, err error) {
 	if err != nil {
 		suiteContext, err2 := LoadSuiteContext(ctx.TestSuite, ctx.Token)
 		if err2 == nil {
-			updateLastTestTime(suiteContext)
+			updateLastTestTime(suiteContext.TestSuite, suiteContext.Token)
 		}
 		Fatal(ctx.TestSuite, ctx.Token, err)
 	}
@@ -897,10 +911,58 @@ func ProcessArgs(allArgs []string) {
 		exitCode, err = InitTestSuite(config)
 	case "test":
 		//log.Printf("found token: %s\n", config.Token)
-		if config.ContainerImage == "" {
+		testSuite := config.TestSuite
+		token := config.Token
+		suiteContext, err := LoadSuiteContext(testSuite, token)
+		if err != nil {
+			if os.IsNotExist(err) {
+				// test suite does not exists yet
+				suiteCtx := Context{Token: token, TestSuite: testSuite}
+				exitCode, err = InitTestSuite(suiteCtx)
+				if err != nil {
+					return
+				}
+				if exitCode > 0 {
+					return
+				}
+			} else {
+				err = fmt.Errorf("cannot load context: %w", err)
+				NoErrorOrFatal(config, err)
+			}
+		}
+		defer updateLastTestTime(testSuite, token)
+
+		config = MergeContext(suiteContext, config)
+		//log.Printf("Merged ctx: %s\n", config)
+
+		if (config.ContainerDisabled != nil && *config.ContainerDisabled) || config.ContainerImage == "" {
+			//log.Printf("Performing test outside container: %s/%s (%v,%v)\n", config.TestSuite, config.TestName, config.ContainerDisabled, config.ContainerImage)
 			exitCode, err = PerformTest(config, cmdAndArgs, assertions)
+			NoErrorOrFatal(config, err)
 		} else {
-			exitCode, err = PerformTestInNewContainer(config)
+			//log.Printf("Performing test inside container: %s/%s suiteCtx: %s\n", config.TestSuite, config.TestName, suiteContext)
+			//log.Printf("config ctId: %s\n", config.ContainerId)
+			var ctId string
+			ctId, exitCode, err = PerformTestInContainer(config)
+			if config.ContainerScope != nil && *config.ContainerScope == Global {
+				globalCtx, err2 := LoadGlobalContext(config.Token)
+				NoErrorOrFatal(config, err2)
+				globalCtx.ContainerId = &ctId
+				//*globalCtx.ContainerScope = Global
+				err2 = PersistSuiteContext(globalCtx)
+				NoErrorOrFatal(config, err2)
+				//log.Printf("Persisted global ctx ctId:%s\n", ctId)
+			} else if config.ContainerScope != nil && *config.ContainerScope == Suite {
+				suiteCtx, err2 := LoadSuiteContext(config.TestSuite, config.Token)
+				NoErrorOrFatal(config, err2)
+				suiteCtx.ContainerId = &ctId
+				//*suiteCtx.ContainerScope = Suite
+				err2 = PersistSuiteContext(suiteCtx)
+				NoErrorOrFatal(config, err2)
+				//log.Printf("Test ContainerId: %s ; Persisted suite ctx ctId: %s\n", testContainerId, ctId)
+			}
+			NoErrorOrFatal(config, err)
+
 		}
 	case "report":
 		exitCode, err = ReportTestSuite(config)

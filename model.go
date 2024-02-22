@@ -23,10 +23,12 @@ type Asserter func(cmdz.Executer) (AssertionResult, error)
 type ConfigScope int
 
 const (
-	DefaultRulePrefix         = "@"
-	ContextTokenEnvVarName    = "__CMDT_TOKEN"
-	DefaultTestSuiteName      = "main"
-	GlobalConfigTestSuiteName = "__global"
+	DefaultRulePrefix             = "@"
+	ContextTokenEnvVarName        = "__CMDT_TOKEN"
+	DefaultTestSuiteName          = "main"
+	GlobalConfigTestSuiteName     = "__global"
+	DefaultContainerImage         = "busybox"
+	DefaultContainerDirtiesPolicy = "beforeSuite"
 )
 
 const (
@@ -60,7 +62,7 @@ var (
 )
 
 var (
-	DefaultTestTimeout, _         = time.ParseDuration("1000h")
+	DefaultTestTimeout, _         = time.ParseDuration("24h")
 	AbsNamePattern                = fmt.Sprintf("(%s/)?(%s)?", NamePattern, NamePattern)
 	NameRegexp                    = regexp.MustCompile("^" + NamePattern + "$")
 	AbsNameRegexp                 = regexp.MustCompile("^" + AbsNamePattern + "$")
@@ -80,7 +82,7 @@ var (
 		ruleDef("stopOnFailure", "", "="), ruleDef("keepStdout", "", "="), ruleDef("keepStderr", "", "="),
 		ruleDef("keepOutputs", "", "="), ruleDef("silent", "", "="), ruleDef("timeout", "="),
 		ruleDef("parallel", "="), ruleDef("runCount", "="), ruleDef("mock", "=", ":"),
-		ruleDef("before", "="), ruleDef("after", "="), ruleDef("container", "", "=")}
+		ruleDef("before", "="), ruleDef("after", "="), ruleDef("container", "", "="), ruleDef("dirtyContainer", "=")}
 	// Config of test flow (init -> test -> report)
 	FlowConfigs = []RuleDefinition{ruleDef("token", "=")}
 	Assertions  = []RuleDefinition{ruleDef("success", ""), ruleDef("fail", ""), ruleDef("exit", "="),
@@ -121,21 +123,25 @@ type Context struct {
 	ForkCount    int           `yaml:""`
 
 	// Test or TestSuite
-	PrintToken     bool
-	ExportToken    bool
-	ReportAll      bool
-	Silent         *bool         `yaml:""`
-	Ignore         *bool         `yaml:""`
-	StopOnFailure  *bool         `yaml:""`
-	KeepStdout     *bool         `yaml:""`
-	KeepStderr     *bool         `yaml:""`
-	Timeout        time.Duration `yaml:""`
-	RunCount       int           `yaml:""`
-	Parallel       int           `yaml:""`
-	Mocks          []CmdMock     `yaml:""`
-	Before         [][]string    `yaml:""`
-	After          [][]string    `yaml:""`
-	ContainerImage string        `yaml:""`
+	PrintToken        bool
+	ExportToken       bool
+	ReportAll         bool
+	Silent            *bool         `yaml:""`
+	Ignore            *bool         `yaml:""`
+	StopOnFailure     *bool         `yaml:""`
+	KeepStdout        *bool         `yaml:""`
+	KeepStderr        *bool         `yaml:""`
+	Timeout           time.Duration `yaml:""`
+	RunCount          int           `yaml:""`
+	Parallel          int           `yaml:""`
+	Mocks             []CmdMock     `yaml:""`
+	Before            [][]string    `yaml:""`
+	After             [][]string    `yaml:""`
+	ContainerDisabled *bool         `yaml:""`
+	ContainerImage    string        `yaml:""`
+	ContainerDirties  string        `yaml:""`
+	ContainerId       *string       `yaml:""`
+	ContainerScope    *ConfigScope  `yaml:""`
 }
 
 type Config struct {
@@ -224,6 +230,22 @@ func MergeContext(baseContext, overridingContext Context) Context {
 	baseContext.Mocks = append(baseContext.Mocks, overridingContext.Mocks...)
 	baseContext.Before = append(baseContext.Before, overridingContext.Before...)
 	baseContext.After = append(baseContext.After, overridingContext.After...)
+
+	if overridingContext.ContainerImage != "" {
+		baseContext.ContainerImage = overridingContext.ContainerImage
+	}
+	if overridingContext.ContainerDirties != "" {
+		baseContext.ContainerDirties = overridingContext.ContainerDirties
+	}
+	if overridingContext.ContainerId != nil {
+		baseContext.ContainerId = overridingContext.ContainerId
+	}
+	if overridingContext.ContainerScope != nil {
+		baseContext.ContainerScope = overridingContext.ContainerScope
+	}
+	if overridingContext.ContainerDisabled != nil {
+		baseContext.ContainerDisabled = overridingContext.ContainerDisabled
+	}
 
 	return baseContext
 }

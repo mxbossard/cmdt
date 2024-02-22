@@ -515,7 +515,7 @@ $cmdt0 @test=before_after/ -- $cmdt1 @report=main
 
 
 >&2 echo "## Test @container"
-$cmdt0 @init=container #@keepOutputs
+$cmdt0 @init=container #@ignore #@keepOutputs
 $cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 true @container
 $cmdt0 @test=container/ @stderr:FAILED -- $cmdt1 false @container
 $cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 true @container=alpine
@@ -530,6 +530,7 @@ $cmdt0 @test=container/ @fail -- $cmdt1 @report=main
 token="$__CMDT_TOKEN"
 export -n __CMDT_TOKEN
 
+$cmdt0 @init=container_wo_token #@ignore #@keepOutputs
 $cmdt0 @test=container_wo_token/ @stderr:PASSED -- $cmdt1 @container true
 $cmdt0 @test=container_wo_token/ @stderr:PASSED -- $cmdt1 @container @fail false
 
@@ -537,6 +538,58 @@ $cmdt @report=container_wo_token || true
 
 export __CMDT_TOKEN="$token"
 
+
+>&2 echo "## Test @dirtyContainer"
+testFile="/tmp/thisFileDoesNotExistsYet.txt"
+hostFile="/tmp/thisFileExistsOnHost.txt"
+rm -f -- "$testFile" 2> /dev/null || true
+touch "$hostFile"
+$cmdt0 @init=ephemeralContainer #@ignore #@keepOutputs
+$cmdt0 @test=ephemeralContainer/ @stderr:PASSED -- $cmdt1 ls "$testFile" @fail @stderr:"$testFile" # file should not exist on host
+$cmdt0 @test=ephemeralContainer/ @stderr:PASSED -- $cmdt1 ls "$hostFile" # file exists on host
+$cmdt0 @test=ephemeralContainer/ @stderr:PASSED -- $cmdt1 ls "$testFile" @fail @stderr:"$testFile" @container # file should not exist in container
+$cmdt0 @test=ephemeralContainer/ @stderr:PASSED -- $cmdt1 ls "$hostFile" @fail @stderr:"$hostFile" @container # file should not exist in container
+$cmdt0 @test=ephemeralContainer/ @stderr:PASSED -- $cmdt1 touch "$testFile" @container # create file in ephemeral container
+$cmdt0 @test=ephemeralContainer/ @stderr:PASSED -- $cmdt1 ls "$testFile" @fail @stderr:"$testFile" @container # file should not exist in container
+$cmdt0 @test=ephemeralContainer/ @stderr:PASSED -- $cmdt1 ls "$hostFile" @fail @stderr:"$hostFile" @container # file should not exist in container
+$cmdt0 @test=ephemeralContainer/ @stderr:PASSED -- $cmdt1 ls "$testFile" @fail @stderr:"$testFile" # file should not exist on host
+$cmdt0 @test=ephemeralContainer/ -- $cmdt1 @report=main
+
+$cmdt0 @init=suiteContainer #@keepOutputs
+$cmdt @init=sub @container 2> /dev/null # container should live the test suite
+$cmdt0 @test=suiteContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$testFile" @fail @stderr:"$testFile" # file should not exist in suite container
+$cmdt0 @test=suiteContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$hostFile" @fail @stderr:"$hostFile" # file should not exist in suite container
+$cmdt0 @test=suiteContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ touch "$testFile" # create file in suite container
+$cmdt0 @test=suiteContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$testFile" # file should exist in suite container
+$cmdt0 @test=suiteContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$hostFile" @fail @stderr:"$hostFile" # file should not exist in suite container
+$cmdt0 @test=suiteContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$testFile" @container @fail @stderr:"$testFile" # file should not exists in ephemeral container
+$cmdt0 @test=suiteContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$testFile" # file should exist in suite container
+$cmdt0 @test=suiteContainer/ -- $cmdt1 @report=sub
+
+$cmdt0 @init=dirtyContainer #@keepOutputs
+$cmdt @init=sub @container 2> /dev/null # container should live the test suite
+$cmdt0 @test=dirtyContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$testFile" @fail @stderr:"$testFile" # file should not exist in container
+$cmdt0 @test=dirtyContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$hostFile" @fail @stderr:"$hostFile" # file should not exist in container
+$cmdt0 @test=dirtyContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ touch "$testFile" # create file in suite container
+$cmdt0 @test=dirtyContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$testFile" # file should exist in suite container
+$cmdt0 @test=dirtyContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$hostFile" @fail @stderr:"$hostFile" # file should not exist in container
+$cmdt0 @test=dirtyContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$testFile" @dirtyContainer=afterTest # file should exist in container
+$cmdt0 @test=dirtyContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$testFile" @fail @stderr:"$testFile" # file should not exist in fresh container
+$cmdt0 @test=dirtyContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$hostFile" @fail @stderr:"$hostFile" # file should not exist in container
+$cmdt0 @test=dirtyContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ touch "$testFile" # create file in suite container
+$cmdt0 @test=dirtyContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$testFile" # file should exist in container
+$cmdt0 @test=dirtyContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$hostFile" @fail @stderr:"$hostFile" # file should not exist in container
+$cmdt0 @test=dirtyContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$testFile" @fail @dirtyContainer=beforeTest # file should not exist in fresh container
+$cmdt0 @test=dirtyContainer/ -- $cmdt1 @report=sub
+
+$cmdt0 @init=testContainer #@keepOutputs
+$cmdt @init=sub @container @dirtyContainer=beforeTest 2> /dev/null # container should live for each test
+$cmdt0 @test=testContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$testFile" @fail @stderr:"$testFile" # file should not exist in container
+$cmdt0 @test=testContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$hostFile" @fail @stderr:"$hostFile" # file should not exist in container
+$cmdt0 @test=testContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ touch "$testFile" # create file in test container
+$cmdt0 @test=testContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$testFile" @fail @stderr:"$testFile" # file should not exist in container
+$cmdt0 @test=testContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$hostFile" @fail @stderr:"$hostFile" # file should not exist in container
+$cmdt0 @test=testContainer/ -- $cmdt1 @report=sub
 
 $cmdt @report= ; >&2 echo SUCCESS ; exit 0
 
