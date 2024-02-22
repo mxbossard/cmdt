@@ -401,7 +401,23 @@ func initWorkspace(ctx Context) (err error) {
 	return
 }
 
-func initConfig(ctx Context) (err error) {
+func updateGlobalConfig(ctx Context) (err error) {
+	token := ctx.Token
+	ctx.TestSuite = GlobalConfigTestSuiteName
+	ctx.StartTime = time.Time{}
+	var prev Context
+	prev, err = LoadGlobalContext(token)
+	if err != nil {
+		return
+	}
+	ctx = MergeContext(prev, ctx)
+	log.Printf("Updating global with: %s\n", ctx)
+	err = PersistSuiteContext(ctx)
+	return
+}
+
+func initConfig(ctx Context) (ok bool, err error) {
+	ok = false
 	token := ctx.Token
 	testSuite := ctx.TestSuite
 
@@ -412,17 +428,17 @@ func initConfig(ctx Context) (err error) {
 	}
 	_, err = os.Stat(contextFilepath)
 	if err == nil {
-		// Workspace already initialized
+		// Config already initialized
 		return
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return
 	} else {
 		err = nil
+		ctx.StartTime = time.Now()
+		ok = true
 	}
 
-	ctx.StartTime = time.Now()
 	// store config
-	//PersistSuiteContext(testSuite, token, ctx)
 	PersistSuiteContext(ctx)
 	//if ctx.Silent == nil || !*ctx.Silent {
 	//	stdPrinter.ColoredErrf(messageColor, "Initialized new config [%s].\n", testSuite)
@@ -430,7 +446,7 @@ func initConfig(ctx Context) (err error) {
 	return
 }
 
-func GlobalConfig(ctx Context) (exitCode int, err error) {
+func GlobalConfig(ctx Context, update bool) (exitCode int, err error) {
 	defer stdPrinter.Flush()
 	exitCode = 0
 	ctx.TestSuite = GlobalConfigTestSuiteName
@@ -438,7 +454,11 @@ func GlobalConfig(ctx Context) (exitCode int, err error) {
 	if err != nil {
 		return
 	}
-	err = initConfig(ctx)
+	var ok bool
+	ok, err = initConfig(ctx)
+	if update && err == nil && !ok {
+		err = updateGlobalConfig(ctx)
+	}
 	return
 }
 
@@ -464,7 +484,7 @@ func InitTestSuite(ctx Context) (exitCode int, err error) {
 		ctx.Token = token
 	}
 
-	exitCode, err = GlobalConfig(Context{Token: token, Silent: ctx.Silent})
+	exitCode, err = GlobalConfig(Context{Token: token, Silent: ctx.Silent}, false)
 	if err != nil {
 		return
 	}
@@ -486,7 +506,7 @@ func InitTestSuite(ctx Context) (exitCode int, err error) {
 	if err != nil {
 		return
 	}
-	err = initConfig(ctx)
+	_, err = initConfig(ctx)
 	if err != nil {
 		return
 	}
@@ -906,7 +926,7 @@ func ProcessArgs(allArgs []string) {
 
 	switch config.Action {
 	case "global":
-		exitCode, err = GlobalConfig(config)
+		exitCode, err = GlobalConfig(config, true)
 	case "init":
 		exitCode, err = InitTestSuite(config)
 	case "test":

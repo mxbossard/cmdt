@@ -144,6 +144,12 @@ type Context struct {
 	ContainerScope    *ConfigScope  `yaml:""`
 }
 
+func (c Context) String() string {
+	keepStdout := c.KeepStdout != nil && *c.KeepStdout
+	keepStderr := c.KeepStderr != nil && *c.KeepStderr
+	return fmt.Sprintf("[%s/%s] KeepStdout: %v, KeepStderr: %v", c.TestSuite, c.TestName, keepStdout, keepStderr)
+}
+
 type Config struct {
 	Name  string
 	Scope ConfigScope
@@ -180,10 +186,10 @@ func MergeContext(baseContext, overridingContext Context) Context {
 	baseContext.Prefix = overridingContext.Prefix
 	baseContext.TestName = overridingContext.TestName
 	baseContext.Action = overridingContext.Action
-	if overridingContext.StartTime.Nanosecond() != 0 {
+	if !overridingContext.StartTime.IsZero() {
 		baseContext.StartTime = overridingContext.StartTime
 	}
-	if overridingContext.LastTestTime.Nanosecond() != 0 {
+	if !overridingContext.LastTestTime.IsZero() {
 		baseContext.LastTestTime = overridingContext.LastTestTime
 	}
 

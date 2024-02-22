@@ -112,24 +112,23 @@ Done:
 - @after=CMD ARG_1 ARG_2 ... ARG_N => execute CMD after each test
 - Total duration if reporting multiple suites
 - order reports : report failures then errors at the end of report
-
+- @dirty= Reset l'image à chaque test suite ou à chaque test en option
+- Run en option les tests dans un conteneur => plus facile de mocké, meilleur reproductibilité des tests
+	- @container=IMAGE : Fournir une image pour tester l'éxecution dans cette image
+	- Utiliser une image par défaut pour les cas d'usage simples
 
 TODO:
 Bugs:
 - @FILEPATH empeche de tester un contenu qui commence par @ sans passer par un fichier. Il faudrait pouvoir échapper @ ou bien utiliser un operator dédié à la lécture d'un fichier (ex: @stderr@=FILEPATH @stdin@:FILEPATH)
 - remove docker run container generated ID from stdout
 - use suite timeout for container duration
+- - @global config updates does not works
 
 Features :
-- @global @keepOutputs does not works
+- Mock les executable avec un chemin absolu dans les conteneur
 - multiple @mock
 - with -- report an error if commands before --
 - with -- auto concatenat args until next delim or --
-- @dirty= Reset l'image à chaque test suite ou à chaque test en option
-- Run en option les tests dans un conteneur => plus facile de mocké, meilleur reproductibilité des tests
-	- @container=IMAGE : Fournir une image pour tester l'éxecution dans cette image
-	- Mock les executable avec un chemin absolu
-	- Utiliser une image par défaut pour les cas d'usage simples
 - @beforeSuite=CMD_ANG_ARGS & @afterSuite=CMD_ANG_ARGS
 - @mock stdin=@FILEPATH stdin:PARTIAL_CONTENT stdout=@FILEPATH @stderr=@FILEPATH
 - @called[=:]CMD ARG_S,stdin=IN,count=N assertion => verify a mock was called
