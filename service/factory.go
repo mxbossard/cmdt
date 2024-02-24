@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"mby.fr/cmdtest/model"
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/collections"
 	"mby.fr/utils/filez"
@@ -19,7 +20,7 @@ func IsRule(s string) bool {
 	return strings.HasPrefix(s, RulePrefix())
 }
 
-func SplitRuleExpr(ruleExpr string) (ok bool, r Rule) {
+func SplitRuleExpr(ruleExpr string) (ok bool, r model.Rule) {
 	ok = false
 	assertionRulePattern := regexp.MustCompile("^" + RulePrefix() + "([a-zA-Z]+)([=~:!]{1,2})?(.+)?$")
 	submatch := assertionRulePattern.FindStringSubmatch(ruleExpr)
@@ -84,7 +85,7 @@ func CmdMapper(s, op string) (v []string, err error) {
 	return
 }
 
-func MockMapper(s, op string) (m CmdMock, err error) {
+func MockMapper(s, op string) (m model.CmdMock, err error) {
 	if len(s) > 1 {
 		splitted := strings.Split(s, ",")
 		// cmd always defined first
@@ -181,8 +182,8 @@ func RegexpPatternMapper(s, op string) (c *regexp.Regexp, err error) {
 	return
 }
 
-func IntValueValidater(min, max int) Validater[int] {
-	return func(rule Rule, n int) (err error) {
+func IntValueValidater(min, max int) model.Validater[int] {
+	return func(rule model.Rule, n int) (err error) {
 		if n < min || n > max {
 			err = fmt.Errorf("rule %s%s value must be an integer >= %d and <= %d", rule.Prefix, rule.Name, min, max)
 		}
@@ -190,8 +191,8 @@ func IntValueValidater(min, max int) Validater[int] {
 	}
 }
 
-func OperatorValidater[T any](ops ...string) Validater[T] {
-	return func(rule Rule, v T) (err error) {
+func OperatorValidater[T any](ops ...string) model.Validater[T] {
+	return func(rule model.Rule, v T) (err error) {
 		if !collections.Contains[string](&ops, rule.Op) {
 			err = fmt.Errorf("rule %s%s%s bad operator. Must be one of: [%s]", rule.Prefix, rule.Name, rule.Op, ops)
 		}
@@ -199,8 +200,8 @@ func OperatorValidater[T any](ops ...string) Validater[T] {
 	}
 }
 
-func KeywordsValidater[T any](keywords ...string) Validater[T] {
-	return func(rule Rule, v T) (err error) {
+func KeywordsValidater[T any](keywords ...string) model.Validater[T] {
+	return func(rule model.Rule, v T) (err error) {
 		if !collections.Contains[string](&keywords, rule.Expected) {
 			err = fmt.Errorf("rule %s%s%s bad value. Must be one of: [%s]", rule.Prefix, rule.Name, rule.Expected, keywords)
 		}
@@ -208,8 +209,8 @@ func KeywordsValidater[T any](keywords ...string) Validater[T] {
 	}
 }
 
-func NotEmptyForOpValidater[T any](ops ...string) Validater[T] {
-	return func(rule Rule, v T) (err error) {
+func NotEmptyForOpValidater[T any](ops ...string) model.Validater[T] {
+	return func(rule model.Rule, v T) (err error) {
 		if collections.Contains[string](&ops, rule.Op) && rule.Expected == "" {
 			err = fmt.Errorf("rule %s%s%s must have a value", rule.Prefix, rule.Name, rule.Op)
 		}
@@ -217,14 +218,14 @@ func NotEmptyForOpValidater[T any](ops ...string) Validater[T] {
 	}
 }
 
-func NotEmptyValidater[T any](rule Rule, v T) (err error) {
+func NotEmptyValidater[T any](rule model.Rule, v T) (err error) {
 	if fmt.Sprintf("%v", v) == "" {
 		err = fmt.Errorf("rule %s%s%s must have a value", rule.Prefix, rule.Name, rule.Op)
 	}
 	return
 }
 
-func CmdValidater(rule Rule, v []string) (err error) {
+func CmdValidater(rule model.Rule, v []string) (err error) {
 	if len(v) == 0 {
 		err = fmt.Errorf("rule %s%s value must be an executable command", rule.Prefix, rule.Name)
 	}
@@ -232,7 +233,7 @@ func CmdValidater(rule Rule, v []string) (err error) {
 	return
 }
 
-func ExistsValidater(rule Rule, v []string) (err error) {
+func ExistsValidater(rule model.Rule, v []string) (err error) {
 	if len(v) == 0 || len(v[0]) == 0 {
 		err = fmt.Errorf("rule %s%s value must have a filepath", rule.Prefix, rule.Name)
 	}
@@ -240,42 +241,42 @@ func ExistsValidater(rule Rule, v []string) (err error) {
 	return
 }
 
-func TestNameValidater(rule Rule, v string) (err error) {
+func TestNameValidater(rule model.Rule, v string) (err error) {
 	switch rule.Name {
 	case "init", "report":
-		if v != "" && !NameRegexp.MatchString(v) {
-			err = fmt.Errorf("name %s does not match expected pattern: %s", v, NamePattern)
+		if v != "" && !model.NameRegexp.MatchString(v) {
+			err = fmt.Errorf("name %s does not match expected pattern: %s", v, model.NamePattern)
 		}
 	case "test":
-		if !AbsNameRegexp.MatchString(v) {
-			err = fmt.Errorf("name %s does not match expected pattern: %s", v, AbsNamePattern)
+		if !model.AbsNameRegexp.MatchString(v) {
+			err = fmt.Errorf("name %s does not match expected pattern: %s", v, model.AbsNamePattern)
 		}
 	}
 	return
 }
 
-func StringOrNotingValidater(rule Rule, v string) (err error) {
+func StringOrNotingValidater(rule model.Rule, v string) (err error) {
 	if rule.Op == "=" && v == "" {
 		err = fmt.Errorf("rule %s%s= must have a value", rule.Prefix, rule.Name)
 	}
 	return
 }
 
-func BooleanValidater(rule Rule, v bool) (err error) {
+func BooleanValidater(rule model.Rule, v bool) (err error) {
 	if rule.Op != "" && rule.Op != "=" {
 		err = fmt.Errorf("rule %s%s operator must be '='", rule.Prefix, rule.Name)
 	}
 	return
 }
 
-func MockValidater(rule Rule, v CmdMock) (err error) {
+func MockValidater(rule model.Rule, v model.CmdMock) (err error) {
 	if strings.Contains(v.Cmd, "/") {
 		err = fmt.Errorf("rule %s%s command does not support slash", rule.Prefix, rule.Name)
 	}
 	return
 }
 
-func Validate[T any](rule Rule, val T, validaters ...Validater[T]) (err error) {
+func Validate[T any](rule model.Rule, val T, validaters ...model.Validater[T]) (err error) {
 	for _, v := range validaters {
 		err = v(rule, val)
 		if err != nil {
@@ -285,7 +286,7 @@ func Validate[T any](rule Rule, val T, validaters ...Validater[T]) (err error) {
 	return
 }
 
-func Translate[T any](rule Rule, m Mapper[T], validaters ...Validater[T]) (val T, err error) {
+func Translate[T any](rule model.Rule, m model.Mapper[T], validaters ...model.Validater[T]) (val T, err error) {
 	val, err = m(rule.Expected, rule.Op)
 	if err != nil {
 		err = fmt.Errorf("cannot map rule %s%s value: [%s] : %w", rule.Prefix, rule.Name, rule.Expected, err)
@@ -295,26 +296,26 @@ func Translate[T any](rule Rule, m Mapper[T], validaters ...Validater[T]) (val T
 	return
 }
 
-func ApplyConfig(c *Context, ruleExpr string) (ok bool, rule Rule, err error) {
+func ApplyConfig(c *model.Context, ruleExpr string) (ok bool, rule model.Rule, err error) {
 	ok, rule = SplitRuleExpr(ruleExpr)
 	if !ok {
 		return
 	}
 
 	var isAction, isTestConf, isSuiteConf, isFlowConf bool
-	isAction, err = IsRuleOfKind(Actions, rule)
+	isAction, err = model.IsRuleOfKind(model.Actions, rule)
 	if err != nil {
 		return
 	}
-	isTestConf, err = IsRuleOfKind(TestConfigs, rule)
+	isTestConf, err = model.IsRuleOfKind(model.TestConfigs, rule)
 	if err != nil {
 		return
 	}
-	isSuiteConf, err = IsRuleOfKind(SuiteConfigs, rule)
+	isSuiteConf, err = model.IsRuleOfKind(model.SuiteConfigs, rule)
 	if err != nil {
 		return
 	}
-	isFlowConf, err = IsRuleOfKind(FlowConfigs, rule)
+	isFlowConf, err = model.IsRuleOfKind(model.FlowConfigs, rule)
 	if err != nil {
 		return
 	}
@@ -327,14 +328,14 @@ func ApplyConfig(c *Context, ruleExpr string) (ok bool, rule Rule, err error) {
 	if ok {
 		switch rule.Name {
 		case "global":
-			c.Action = Action(rule.Name)
+			c.Action = model.Action(rule.Name)
 			if rule.Op != "" || rule.Expected != "" {
 				err = fmt.Errorf("rule %s%s does not accept an operator nor a value", rule.Prefix, rule.Name)
 			}
 		case "init", "report":
 			suiteName := rule.Expected
 			err = Validate[string](rule, suiteName, TestNameValidater)
-			c.Action = Action(rule.Name)
+			c.Action = model.Action(rule.Name)
 			if suiteName != "" {
 				c.TestSuite = suiteName
 			}
@@ -344,9 +345,9 @@ func ApplyConfig(c *Context, ruleExpr string) (ok bool, rule Rule, err error) {
 		case "test":
 			testName := rule.Expected
 			err = Validate[string](rule, testName, TestNameValidater)
-			c.Action = Action(rule.Name)
+			c.Action = model.Action(rule.Name)
 			if testName != "" {
-				matches := AbsNameRegexp.FindStringSubmatch(testName)
+				matches := model.AbsNameRegexp.FindStringSubmatch(testName)
 				//log.Printf("Matching names: %v", matches)
 				if len(matches) == 2 {
 					name := matches[1]
@@ -410,8 +411,8 @@ func ApplyConfig(c *Context, ruleExpr string) (ok bool, rule Rule, err error) {
 			boolVal, err = Translate(rule, BoolMapper, BooleanValidater)
 			c.Silent = &boolVal
 		case "mock":
-			var mock CmdMock
-			mock, err = Translate(rule, MockMapper, OperatorValidater[CmdMock]("=", ":"), NotEmptyValidater[CmdMock], MockValidater)
+			var mock model.CmdMock
+			mock, err = Translate(rule, MockMapper, OperatorValidater[model.CmdMock]("=", ":"), NotEmptyValidater[model.CmdMock], MockValidater)
 			c.Mocks = append(c.Mocks, mock)
 		case "before":
 			var cmdAndArgs []string
@@ -430,7 +431,7 @@ func ApplyConfig(c *Context, ruleExpr string) (ok bool, rule Rule, err error) {
 		case "container":
 			c.ContainerImage, err = Translate(rule, DummyMapper, OperatorValidater[string]("", "="))
 			if c.ContainerImage == "" || c.ContainerImage == "true" {
-				c.ContainerImage = DefaultContainerImage
+				c.ContainerImage = model.DefaultContainerImage
 			} else if c.ContainerImage == "false" {
 				trueVal := true
 				c.ContainerDisabled = &trueVal
@@ -447,13 +448,13 @@ func ApplyConfig(c *Context, ruleExpr string) (ok bool, rule Rule, err error) {
 	return
 }
 
-func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
+func BuildAssertion(ruleExpr string) (ok bool, assertion model.Assertion, err error) {
 	ok, assertion.Rule = SplitRuleExpr(ruleExpr)
 	if !ok {
 		return
 	}
 
-	ok, err = IsRuleOfKind(Assertions, assertion.Rule)
+	ok, err = model.IsRuleOfKind(model.Assertions, assertion.Rule)
 	if err != nil {
 		return
 	}
@@ -467,7 +468,7 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 		if err != nil {
 			return
 		}
-		assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+		assertion.Asserter = func(cmd cmdz.Executer) (res model.AssertionResult, err error) {
 			res.Value = ""
 			res.Success = cmd.ExitCode() == 0
 			return
@@ -477,7 +478,7 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 		if err != nil {
 			return
 		}
-		assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+		assertion.Asserter = func(cmd cmdz.Executer) (res model.AssertionResult, err error) {
 			res.Value = ""
 			res.Success = cmd.ExitCode() > 0
 			return
@@ -488,7 +489,7 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 		if err != nil {
 			return
 		}
-		assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+		assertion.Asserter = func(cmd cmdz.Executer) (res model.AssertionResult, err error) {
 			res.Value = cmd.ExitCode()
 			res.Success = cmd.ExitCode() == expectedExitCode
 			return
@@ -501,7 +502,7 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 				return
 			}
 			assertion.Expected = regexpPattern.String()
-			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+			assertion.Asserter = func(cmd cmdz.Executer) (res model.AssertionResult, err error) {
 				res.Value = cmd.StdoutRecord()
 				if assertion.Rule.Op == "~" {
 					res.Success = regexpPattern.MatchString(cmd.StdoutRecord())
@@ -519,7 +520,7 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 				return
 			}
 			assertion.Expected = fileContent
-			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+			assertion.Asserter = func(cmd cmdz.Executer) (res model.AssertionResult, err error) {
 				res.Value = cmd.StdoutRecord()
 				if assertion.Rule.Op == "=" {
 					res.Success = cmd.StdoutRecord() == fileContent
@@ -543,7 +544,7 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 				return
 			}
 			assertion.Expected = regexpPattern.String()
-			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+			assertion.Asserter = func(cmd cmdz.Executer) (res model.AssertionResult, err error) {
 				res.Value = cmd.StderrRecord()
 				if assertion.Rule.Op == "~" {
 					res.Success = regexpPattern.MatchString(cmd.StderrRecord())
@@ -561,7 +562,7 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 				return
 			}
 			assertion.Expected = fileContent
-			assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+			assertion.Asserter = func(cmd cmdz.Executer) (res model.AssertionResult, err error) {
 				res.Value = cmd.StderrRecord()
 				if assertion.Rule.Op == "=" {
 					res.Success = cmd.StderrRecord() == fileContent
@@ -584,7 +585,7 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 			return
 		}
 		assertionCmd := cmdz.Cmd(cmdAndArgs...).Timeout(10 * time.Second)
-		assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+		assertion.Asserter = func(cmd cmdz.Executer) (res model.AssertionResult, err error) {
 			res.Value = 0
 			exitCode := -1
 			exitCode, err = assertionCmd.BlockRun()
@@ -609,7 +610,7 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 			owners = filepathRules[2]
 		}
 
-		assertion.Asserter = func(cmd cmdz.Executer) (res AssertionResult, err error) {
+		assertion.Asserter = func(cmd cmdz.Executer) (res model.AssertionResult, err error) {
 			var stat os.FileInfo
 			stat, err = os.Stat(path)
 			if errors.Is(err, os.ErrNotExist) {
@@ -644,14 +645,14 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion Assertion, err error) {
 	return
 }
 
-func ParseArgs(args []string) (cfg Context, cmdAndArgs []string, assertions []Assertion, err error) {
+func ParseArgs(args []string) (cfg model.Context, cmdAndArgs []string, assertions []model.Assertion, err error) {
 	cfg.Silent = nil
 	cfg.ContainerId = nil
 	cfg.ContainerScope = nil
 	cfg.ContainerDisabled = nil
 
-	var rules []Rule
-	var rule Rule
+	var rules []model.Rule
+	var rule model.Rule
 	parseRules := true
 	for _, arg := range args {
 		var ok bool
@@ -670,7 +671,7 @@ func ParseArgs(args []string) (cfg Context, cmdAndArgs []string, assertions []As
 				rules = append(rules, rule)
 				continue
 			}
-			var assertion Assertion
+			var assertion model.Assertion
 			ok, assertion, err = BuildAssertion(arg)
 			if err != nil {
 				return
@@ -697,7 +698,7 @@ func ParseArgs(args []string) (cfg Context, cmdAndArgs []string, assertions []As
 		assertions = append(assertions, successAssertion)
 	}
 
-	if cfg.Action == Action("") {
+	if cfg.Action == model.Action("") {
 		// If no action supplied add implicit test rule.
 		_, rule, err = ApplyConfig(&cfg, RulePrefix()+"test")
 		if err != nil {
@@ -707,7 +708,7 @@ func ParseArgs(args []string) (cfg Context, cmdAndArgs []string, assertions []As
 	}
 
 	if cfg.TestSuite == "" {
-		cfg.TestSuite = DefaultTestSuiteName
+		cfg.TestSuite = model.DefaultTestSuiteName
 	}
 
 	if (cfg.Action == "init" || cfg.Action == "report") && len(cmdAndArgs) > 0 {
@@ -724,14 +725,14 @@ func ParseArgs(args []string) (cfg Context, cmdAndArgs []string, assertions []As
 		return
 	}
 
-	var cfgScope ConfigScope
+	var cfgScope model.ConfigScope
 	switch cfg.Action {
 	case "global":
-		cfgScope = Global
+		cfgScope = model.Global
 	case "init":
-		cfgScope = Suite
+		cfgScope = model.Suite
 	case "test":
-		cfgScope = Test
+		cfgScope = model.Test
 	}
 
 	if cfg.ContainerImage != "" {
@@ -742,14 +743,14 @@ func ParseArgs(args []string) (cfg Context, cmdAndArgs []string, assertions []As
 	return
 }
 
-func buildMutualyExclusiveCouples(rule RuleKey, exclusiveRules ...RuleKey) (res [][]RuleKey) {
+func buildMutualyExclusiveCouples(rule model.RuleKey, exclusiveRules ...model.RuleKey) (res [][]model.RuleKey) {
 	for _, e := range exclusiveRules {
-		res = append(res, []RuleKey{rule, e})
+		res = append(res, []model.RuleKey{rule, e})
 	}
 	return
 }
 
-func ruleKey(s ...string) (r RuleKey) {
+func ruleKey(s ...string) (r model.RuleKey) {
 	r.Name = s[0]
 	r.Op = "all"
 	if len(s) > 1 {
@@ -758,26 +759,26 @@ func ruleKey(s ...string) (r RuleKey) {
 	return
 }
 
-func ruleKeys(ruleDefs ...[]RuleDefinition) (r []RuleKey) {
+func ruleKeys(ruleDefs ...[]model.RuleDefinition) (r []model.RuleKey) {
 	for _, ruleDef := range ruleDefs {
 		for _, def := range ruleDef {
-			r = append(r, RuleKey{Name: def.Name, Op: "all"})
+			r = append(r, model.RuleKey{Name: def.Name, Op: "all"})
 		}
 	}
 	return
 }
 
 // ValidateOnceOnlyDefinedRule => verify rules which cannot be defined multiple times are not defined twice or more
-func ValidateOnceOnlyDefinedRule(rules ...Rule) (err error) {
-	multiDefinedRules := []RuleKey{
+func ValidateOnceOnlyDefinedRule(rules ...model.Rule) (err error) {
+	multiDefinedRules := []model.RuleKey{
 		{"stdout", "~"}, {"stderr", "~"}, {"stdout", "!~"}, {"stderr", "!~"},
 		{"stdout", "!="}, {"stderr", "!="},
 		{"stdout", ":"}, {"stderr", ":"}, {"stdout", "!:"}, {"stderr", "!:"},
 		{"before", "="}, {"after", "="}, {"mock", "="},
 	}
-	matches := map[RuleKey][]Rule{}
+	matches := map[model.RuleKey][]model.Rule{}
 	for _, rule := range rules {
-		key := RuleKey{rule.Name, rule.Op}
+		key := model.RuleKey{rule.Name, rule.Op}
 		matches[key] = append(matches[key], rule)
 	}
 
@@ -790,10 +791,10 @@ func ValidateOnceOnlyDefinedRule(rules ...Rule) (err error) {
 	return
 }
 
-func ValidateMutualyExclusiveRules(rules ...Rule) (err error) {
+func ValidateMutualyExclusiveRules(rules ...model.Rule) (err error) {
 	// FIXME: stdout= and stdout~ are ME ; stdout= and stdout= are ME but stdout~ and stdout~ are not ME
-	MutualyExclusiveRules := [][]RuleKey{
-		ruleKeys(Actions),
+	MutualyExclusiveRules := [][]model.RuleKey{
+		ruleKeys(model.Actions),
 		{{"fail", "all"}, {"success", "all"}, {"exit", "all"}},
 		//{{"fail", "all"}, {"success", "all"}, {"cmd", "all"}},
 		{{"test", "all"}, {"token", ""}},
@@ -801,10 +802,10 @@ func ValidateMutualyExclusiveRules(rules ...Rule) (err error) {
 	}
 
 	exlusiveRules := MutualyExclusiveRules
-	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{"global", "all"}, ruleKeys(Assertions)...)...)
-	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{"init", "all"}, ruleKeys(Assertions)...)...)
-	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{"report", "all"}, ruleKeys(Assertions, TestConfigs, SuiteConfigs)...)...)
-	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(RuleKey{"test", "all"}, RuleKey{"suiteTimeout", "all"}, RuleKey{"fork", "all"})...)
+	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(model.RuleKey{"global", "all"}, ruleKeys(model.Assertions)...)...)
+	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(model.RuleKey{"init", "all"}, ruleKeys(model.Assertions)...)...)
+	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(model.RuleKey{"report", "all"}, ruleKeys(model.Assertions, model.TestConfigs, model.SuiteConfigs)...)...)
+	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(model.RuleKey{"test", "all"}, model.RuleKey{"suiteTimeout", "all"}, model.RuleKey{"fork", "all"})...)
 	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("keepOutputs"), ruleKey("keepStdout"), ruleKey("keepStderr"))...)
 	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("stdout", "="), ruleKey("stdout", "~"), ruleKey("stdout", "!~"), ruleKey("stdout", "!="), ruleKey("stdout", ":"), ruleKey("stdout", "!:"))...)
 	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("stderr", "="), ruleKey("stderr", "~"), ruleKey("stderr", "!~"), ruleKey("stderr", "!="), ruleKey("stderr", ":"), ruleKey("stderr", "!:"))...)
@@ -812,7 +813,7 @@ func ValidateMutualyExclusiveRules(rules ...Rule) (err error) {
 	// Compter le nombre de match pour chaque key
 	// Pour chaque MER compter le nombre de key
 	//matches := map[RuleKey][]Rule{}
-	matchingMers := [][]RuleKey{}
+	matchingMers := [][]model.RuleKey{}
 	for i, rule1 := range rules {
 		ruleKey1 := ruleKey(rule1.Name, rule1.Op)
 		for j, rule2 := range rules {

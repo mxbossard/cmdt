@@ -2,7 +2,7 @@ package model
 
 import "mby.fr/utils/utilz"
 
-type Context struct {
+type Context2 struct {
 	Token  string
 	Action string
 

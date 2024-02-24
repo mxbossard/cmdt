@@ -5,15 +5,17 @@ import (
 	"os"
 	"strings"
 
+	"mby.fr/cmdtest/model"
+	"mby.fr/cmdtest/utils"
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/container"
 )
 
-func StartContainer(token, image string, mocks []CmdMock) (id string, err error) {
+func StartContainer(token, image string, mocks []model.CmdMock) (id string, err error) {
 	// Start container with :
 	// - cmdtest
 	// - configured mock
-	id, err = ForgeUuid()
+	id, err = utils.ForgeUuid()
 	if err != nil {
 		return
 	}
@@ -69,7 +71,7 @@ func RemoveContainer(id string) (err error) {
 func ExecInContainer(token, id string, cmdAndArgs []string) (exitCode int, err error) {
 	user := fmt.Sprintf("%d", os.Getuid())
 	//workDir := "/tmp"
-	args := []string{"docker", "exec", "-u", user, "-e", ContextTokenEnvVarName + "=" + token, id}
+	args := []string{"docker", "exec", "-u", user, "-e", model.ContextTokenEnvVarName + "=" + token, id}
 	args = append(args, cmdAndArgs...)
 	c := cmdz.Cmd(args...)
 	//c.AddEnviron(os.Environ()...)
@@ -79,7 +81,7 @@ func ExecInContainer(token, id string, cmdAndArgs []string) (exitCode int, err e
 	return
 }
 
-func PerformTestInEphemeralContainer(testCtx Context) (exitCode int, err error) {
+func PerformTestInEphemeralContainer(testCtx model.Context) (exitCode int, err error) {
 	// Launch test in new container
 	var ctId string
 	ctId, err = StartContainer(testCtx.Token, testCtx.ContainerImage, testCtx.Mocks)
@@ -107,7 +109,7 @@ func PerformTestInEphemeralContainer(testCtx Context) (exitCode int, err error) 
 	return
 }
 
-func PerformTestInContainer(testCtx Context) (ctId string, exitCode int, err error) {
+func PerformTestInContainer(testCtx model.Context) (ctId string, exitCode int, err error) {
 	if testCtx.ContainerId != nil {
 		ctId = *testCtx.ContainerId
 	}

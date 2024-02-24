@@ -6,28 +6,7 @@ import (
 	"mby.fr/utils/utilz"
 )
 
-type CmdMock struct {
-	Op               string
-	Cmd              string
-	Args             []string
-	StdinOp          string
-	Stdin            *string
-	Stdout           string
-	Stderr           string
-	ExitCode         int
-	Delegate         bool
-	OnCallCmdAndArgs []string
-}
-
-type ConfigScope int
-
-const (
-	Global ConfigScope = iota // How to use this ?
-	Suite                     // can be placed on suite init only
-	Test                      // can be placed on test or on suite to configure all tests
-)
-
-type Config struct {
+type Config2 struct {
 	// TestSuite only
 
 	TestSuite utilz.Optional[string] `yaml:""`

@@ -1,4 +1,4 @@
-package service
+package model
 
 import (
 	"fmt"
@@ -52,13 +52,13 @@ var (
 	StderrFilename          = "stderr.log"
 	ReportFilename          = "report.log"
 
-	messageColor = ansi.HiPurple
-	testColor    = ansi.HiCyan
-	successColor = ansi.BoldGreen
-	failureColor = ansi.BoldRed
-	reportColor  = ansi.Yellow
-	warningColor = ansi.BoldHiYellow
-	errorColor   = ansi.Red
+	MessageColor = ansi.HiPurple
+	TestColor    = ansi.HiCyan
+	SuccessColor = ansi.BoldGreen
+	FailureColor = ansi.BoldRed
+	ReportColor  = ansi.Yellow
+	WarningColor = ansi.BoldHiYellow
+	ErrorColor   = ansi.Red
 )
 
 var (
@@ -66,7 +66,7 @@ var (
 	AbsNamePattern                = fmt.Sprintf("(%s/)?(%s)?", NamePattern, NamePattern)
 	NameRegexp                    = regexp.MustCompile("^" + NamePattern + "$")
 	AbsNameRegexp                 = regexp.MustCompile("^" + AbsNamePattern + "$")
-	testSuiteNameSanitizerPattern = regexp.MustCompile("[^a-zA-Z0-9]")
+	TestSuiteNameSanitizerPattern = regexp.MustCompile("[^a-zA-Z0-9]")
 )
 
 var (

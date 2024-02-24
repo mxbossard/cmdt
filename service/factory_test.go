@@ -6,11 +6,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"mby.fr/cmdtest/model"
 )
 
 func TestSplitRuleExpr(t *testing.T) {
 	var ok bool
-	var rule Rule
+	var rule model.Rule
 
 	ok, _ = SplitRuleExpr("foo")
 	assert.False(t, ok)
@@ -36,7 +37,7 @@ func TestSplitRuleExpr(t *testing.T) {
 
 func TestApplyConfig(t *testing.T) {
 	var ok bool
-	var cfg Context
+	var cfg model.Context
 	var err error
 
 	ok, _, err = ApplyConfig(&cfg, "foo")
@@ -74,7 +75,7 @@ func TestApplyConfig(t *testing.T) {
 
 func TestBuildAssertion(t *testing.T) {
 	var ok bool
-	var assertion Assertion
+	var assertion model.Assertion
 	var err error
 
 	ok, _, err = BuildAssertion("foo")
@@ -125,16 +126,16 @@ func TestBuildAssertion(t *testing.T) {
 }
 
 func TestParseArgs(t *testing.T) {
-	var cfg Context
+	var cfg model.Context
 	var cmdAndArgs []string
-	var assertions []Assertion
+	var assertions []model.Assertion
 	var err error
 
 	// Parse command and args without config nor assertions
 	cfg, cmdAndArgs, assertions, err = ParseArgs([]string{"foo", "bar", "baz"})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"foo", "bar", "baz"}, cmdAndArgs)
-	assert.Equal(t, DefaultTestSuiteName, cfg.TestSuite)
+	assert.Equal(t, model.DefaultTestSuiteName, cfg.TestSuite)
 	assert.Equal(t, "", cfg.TestName)
 	assert.Len(t, assertions, 1)
 
@@ -146,7 +147,7 @@ func TestParseArgs(t *testing.T) {
 	cfg, cmdAndArgs, assertions, err = ParseArgs([]string{"foo", "bar", "@fail", "@test=pif"})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"foo", "bar"}, cmdAndArgs)
-	assert.Equal(t, DefaultTestSuiteName, cfg.TestSuite)
+	assert.Equal(t, model.DefaultTestSuiteName, cfg.TestSuite)
 	assert.Equal(t, "pif", cfg.TestName)
 	assert.Len(t, assertions, 1)
 
@@ -162,7 +163,7 @@ func TestParseArgs(t *testing.T) {
 	cfg, cmdAndArgs, assertions, err = ParseArgs([]string{"foo", "bar", "@fail", "@success"})
 	require.Error(t, err)
 	assert.Equal(t, []string{"foo", "bar"}, cmdAndArgs)
-	assert.Equal(t, DefaultTestSuiteName, cfg.TestSuite)
+	assert.Equal(t, model.DefaultTestSuiteName, cfg.TestSuite)
 	assert.Equal(t, "", cfg.TestName)
 	assert.Len(t, assertions, 2)
 
@@ -183,7 +184,7 @@ func TestParseArgs(t *testing.T) {
 
 }
 
-func buildRule(name, op string) (r Rule) {
+func buildRule(name, op string) (r model.Rule) {
 	r.Name = name
 	r.Op = op
 	return
@@ -256,7 +257,7 @@ func TestValidateMutualyExclusiveRules(t *testing.T) {
 }
 
 func TestMockMapper(t *testing.T) {
-	var m CmdMock
+	var m model.CmdMock
 	var err error
 
 	m, err = MockMapper("true", "=")

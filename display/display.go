@@ -4,11 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"mby.fr/cmdtest/model"
-	"mby.fr/cmdtest/service"
+	"mby.fr/cmdtest/utils"
 	"mby.fr/utils/ansi"
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/printz"
@@ -29,7 +28,7 @@ type Displayer interface {
 	Suite(model.Context)
 	TestTitle(model.Context)
 	TestOutcome(ctx model.Context)
-	AssertionResult(service.AssertionResult)
+	AssertionResult(model.AssertionResult)
 	ReportAll(model.Context)
 	ReportSuite(model.Context)
 	Stdout(string)
@@ -42,7 +41,7 @@ type BasicDisplay struct {
 	printer printz.Printer
 }
 
-func (d BasicDisplay) Global(ctx service.Context) {
+func (d BasicDisplay) Global(ctx model.Context) {
 	defer d.Flush()
 	// Do nothing ?
 	if ctx.Silent == nil || !*ctx.Silent {
@@ -50,7 +49,7 @@ func (d BasicDisplay) Global(ctx service.Context) {
 	}
 }
 
-func (d BasicDisplay) Suite(ctx service.Context) {
+func (d BasicDisplay) Suite(ctx model.Context) {
 	defer d.Flush()
 	if ctx.Silent == nil || !*ctx.Silent {
 		var tokenMsg = ""
@@ -61,7 +60,7 @@ func (d BasicDisplay) Suite(ctx service.Context) {
 	}
 }
 
-func (d BasicDisplay) TestTitle(ctx service.Context, seq int) {
+func (d BasicDisplay) TestTitle(ctx model.Context, seq int) {
 	// FIXME: get seq from ctx
 	defer d.Flush()
 	timecode := int(time.Since(ctx.StartTime).Milliseconds())
@@ -87,7 +86,7 @@ func (d BasicDisplay) TestTitle(ctx service.Context, seq int) {
 	}
 }
 
-func (d BasicDisplay) TestOutcome(ctx service.Context, outcome string, cmd cmdz.Executer, testDuration, err error) {
+func (d BasicDisplay) TestOutcome(ctx model.Context, outcome string, cmd cmdz.Executer, testDuration, err error) {
 	// FIXME get outcome from ctx
 	// FIXME get cmd, duration and error from outcome
 	defer d.Flush()
@@ -121,7 +120,7 @@ func (d BasicDisplay) TestOutcome(ctx service.Context, outcome string, cmd cmdz.
 	}
 }
 
-func (d BasicDisplay) AssertionResult(cmd cmdz.Executer, result service.AssertionResult) {
+func (d BasicDisplay) AssertionResult(cmd cmdz.Executer, result model.AssertionResult) {
 	//log.Printf("failedResult: %v\n", result)
 	assertPrefix := result.Assertion.Prefix
 	assertName := result.Assertion.Name
@@ -164,28 +163,21 @@ func (d BasicDisplay) AssertionResult(cmd cmdz.Executer, result service.Assertio
 	}
 }
 
-func (d BasicDisplay) ReportAll(ctx service.Context) {
+func (d BasicDisplay) ReportAll(ctx model.Context) {
 	defer d.Flush()
 	// TODO: list test suite and iterate over it
 
 	globalStartTime := time.Now() // FIXME
-	globalDuration := service.NormalizeDurationInSec(time.Since(globalStartTime))
+	globalDuration := model.NormalizeDurationInSec(time.Since(globalStartTime))
 	d.printer.ColoredErrf(reportColor, "Global duration time: %s\n", globalDuration)
 }
 
-func (d BasicDisplay) ReportSuite(ctx service.Context) {
-	tmpDir, err := service.TestsuiteDirectoryPath(ctx.TestSuite, ctx.Token)
-	if err != nil {
-		log.Fatal(err)
-	}
-	testCount := service.ReadSeq(tmpDir, service.TestSequenceFilename)       // TODO: put in model.Context
-	ignoredCount := service.ReadSeq(tmpDir, service.IgnoredSequenceFilename) // TODO: put in model.Context
-	failureCount := service.ReadSeq(tmpDir, service.FailureSequenceFilename) // TODO: put in model.Context
-	errorCount := service.ReadSeq(tmpDir, service.ErrorSequenceFilename)     // TODO: put in model.Context
-	failedReports, err := service.FailureReports(ctx.TestSuite, ctx.Token)   // TODO: put in model.Context
-	if err != nil {
-		log.Fatal(err)
-	}
+func (d BasicDisplay) ReportSuite(ctx model.Context, tmpDir string, failedReports []string) {
+	// FIXME: get tmpDir and failed reports from ctx
+	testCount := utils.ReadSeq(tmpDir, model.TestSequenceFilename)       // TODO: put in model.Context
+	ignoredCount := utils.ReadSeq(tmpDir, model.IgnoredSequenceFilename) // TODO: put in model.Context
+	failureCount := utils.ReadSeq(tmpDir, model.FailureSequenceFilename) // TODO: put in model.Context
+	errorCount := utils.ReadSeq(tmpDir, model.ErrorSequenceFilename)     // TODO: put in model.Context
 	//failedCount := len(failedReports)
 	failedCount := failureCount
 
@@ -198,7 +190,7 @@ func (d BasicDisplay) ReportSuite(ctx service.Context) {
 		ignoredMessage = fmt.Sprintf(" (%d ignored)", ignoredCount)
 	}
 	duration := ctx.LastTestTime.Sub(ctx.StartTime)
-	fmtDuration := service.NormalizeDurationInSec(duration)
+	fmtDuration := NormalizeDurationInSec(duration)
 	if failedCount == 0 && errorCount == 0 {
 		d.printer.ColoredErrf(successColor, "Successfuly ran [%s] test suite (%d tests in %s)", ctx.TestSuite, testCount, fmtDuration)
 		d.printer.ColoredErrf(warningColor, "%s", ignoredMessage)
@@ -232,4 +224,9 @@ func (d BasicDisplay) Flush() error {
 
 func New() BasicDisplay {
 	return BasicDisplay{printer: printz.NewStandard()}
+}
+
+func NormalizeDurationInSec(d time.Duration) (duration string) {
+	duration = fmt.Sprintf("%.3f s", float32(d.Milliseconds())/1000)
+	return
 }
