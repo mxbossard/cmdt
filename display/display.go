@@ -86,17 +86,21 @@ func (d BasicDisplay) TestTitle(ctx model.Context, seq int) {
 	}
 }
 
-func (d BasicDisplay) TestOutcome(ctx model.Context, outcome string, cmd cmdz.Executer, testDuration, err error) {
+func (d BasicDisplay) TestOutcome(ctx model.Context, seq int, outcome model.Outcome, cmd cmdz.Executer, testDuration time.Duration, err error) {
 	// FIXME get outcome from ctx
 	// FIXME get cmd, duration and error from outcome
 	defer d.Flush()
 	switch outcome {
-	case "PASSED":
+	case model.PASSED:
 		if ctx.Silent == nil || !*ctx.Silent {
 			d.printer.ColoredErrf(successColor, "PASSED")
 			d.printer.Errf(" (in %s)\n", testDuration)
 		}
-	case "FAILED":
+	case model.FAILED:
+		if ctx.Silent != nil && *ctx.Silent {
+			*ctx.Silent = false
+			d.TestTitle(ctx, 0)
+		}
 		if err == nil {
 			//IncrementSeq(tmpDir, FailureSequenceFilename)
 			d.printer.ColoredErrf(failureColor, "FAILED")
@@ -111,16 +115,24 @@ func (d BasicDisplay) TestOutcome(ctx model.Context, outcome string, cmd cmdz.Ex
 			}
 		}
 		d.printer.Errf("Failure calling cmd: <|%s|>\n", cmd)
-	case "ERRORED":
+	case model.ERRORED:
 		d.printer.ColoredErrf(warningColor, "ERROR")
 		d.printer.Errf(" (not executed)\n")
 		d.printer.Errf("Failure calling cmd: <|%s|>\n", cmd)
-	case "IGNORED":
+	case model.IGNORED:
+		if ctx.Silent == nil || !*ctx.Silent {
+			d.printer.ColoredErrf(warningColor, "IGNORED")
+			d.printer.Err("\n")
+		}
 	default:
+	}
+	if err != nil {
+		d.printer.ColoredErrf(model.ErrorColor, "%s\n", err)
 	}
 }
 
 func (d BasicDisplay) AssertionResult(cmd cmdz.Executer, result model.AssertionResult) {
+	defer d.Flush()
 	//log.Printf("failedResult: %v\n", result)
 	assertPrefix := result.Assertion.Prefix
 	assertName := result.Assertion.Name

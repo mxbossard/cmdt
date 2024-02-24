@@ -6,7 +6,8 @@ type Context2 struct {
 	Token  string
 	Action string
 
-	Config       Config
+	Config Config
+
 	TestOutcome  utilz.Optional[TestOutcome]
 	SuiteOutcome utilz.Optional[SuiteOutcome]
 }
@@ -62,6 +63,36 @@ func (c Context) SuiteWorkDir() (err error) {
 }
 
 func (c Context) TestWorkDir() (err error) {
+	// TODO
+	return
+}
+
+func (c Context) TestId() (id string) {
+	// TODO
+	return
+}
+
+func (c Context) TestQualifiedName() (name string) {
+	// TODO
+	// qulifiedName := testName
+	// if testSuite != "" {
+	// 	qulifiedName = fmt.Sprintf("[%s]/%s", testSuite, testName)
+	// }
+	return
+}
+
+func (c Context) TestTitle() (title string) {
+	// TODO
+	//title = fmt.Sprintf("[%05d] Test %s #%02d", timecode, qualifiedName, seq)
+	return
+}
+
+func (c Context) PersistTestOutcome(outcome TestOutcome) (err error) {
+	// TODO
+	return
+}
+
+func (c Context) LoadSuiteOutcome(testSuite string) (outcome SuiteOutcome, err error) {
 	// TODO
 	return
 }

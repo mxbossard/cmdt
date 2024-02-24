@@ -533,13 +533,7 @@ func InitTestSuite(ctx model.Context) (exitCode int, err error) {
 	}
 	//log.Printf("init context: %s Silent: %v\n", testSuite, ctx.Silent)
 
-	if ctx.Silent == nil || !*ctx.Silent {
-		var tokenMsg = ""
-		if token != "" {
-			tokenMsg = fmt.Sprintf(" (token: %s)", token)
-		}
-		stdPrinter.ColoredErrf(model.MessageColor, "Initialized new [%s] test suite%s.\n", testSuite, tokenMsg)
-	}
+	dpl.Suite(ctx)
 	return
 }
 
@@ -606,15 +600,14 @@ func ReportTestSuite(ctx model.Context) (exitCode int, err error) {
 	ctx = model.MergeContext(suiteContext, ctx)
 	testCount := utils.ReadSeq(tmpDir, model.TestSequenceFilename)
 	ignoredCount := utils.ReadSeq(tmpDir, model.IgnoredSequenceFilename)
-	failureCount := utils.ReadSeq(tmpDir, model.FailureSequenceFilename)
+	failedCount := utils.ReadSeq(tmpDir, model.FailureSequenceFilename)
 	errorCount := utils.ReadSeq(tmpDir, model.ErrorSequenceFilename)
+	passedCount := testCount - failedCount - ignoredCount
 	var failedReports []string
 	failedReports, err = FailureReports(testSuite, token)
 	if err != nil {
 		return
 	}
-	//failedCount := len(failedReports)
-	failedCount := failureCount
 
 	if ctx.Silent == nil || !*ctx.Silent {
 		stdPrinter.ColoredErrf(model.MessageColor, "Reporting [%s] test suite (%s) ...\n", testSuite, tmpDir)
@@ -628,12 +621,11 @@ func ReportTestSuite(ctx model.Context) (exitCode int, err error) {
 	duration := model.NormalizeDurationInSec(d)
 	if failedCount == 0 && errorCount == 0 {
 		exitCode = 0
-		stdPrinter.ColoredErrf(model.SuccessColor, "Successfuly ran [%s] test suite (%d tests in %s)", testSuite, testCount, duration)
+		stdPrinter.ColoredErrf(model.SuccessColor, "Successfuly ran [%s] test suite (%d tests in %s)", testSuite, passedCount, duration)
 		stdPrinter.ColoredErrf(model.WarningColor, "%s", ignoredMessage)
 		stdPrinter.Errf("\n")
 	} else {
-		successCount := testCount - failedCount
-		stdPrinter.ColoredErrf(model.FailureColor, "Failures in [%s] test suite (%d success, %d failures, %d errors on %d tests in %s)", testSuite, successCount, failedCount, errorCount, testCount, duration)
+		stdPrinter.ColoredErrf(model.FailureColor, "Failures in [%s] test suite (%d success, %d failures, %d errors on %d tests in %s)", testSuite, passedCount, failedCount, errorCount, testCount, duration)
 		stdPrinter.ColoredErrf(model.WarningColor, "%s", ignoredMessage)
 		stdPrinter.Errf("\n")
 		for _, report := range failedReports {
@@ -650,8 +642,6 @@ func PerformTest(ctx model.Context, cmdAndArgs []string, assertions []model.Asse
 	exitCode = 1
 	defer stdPrinter.Flush()
 
-	timecode := int(time.Since(ctx.StartTime).Milliseconds())
-
 	if len(cmdAndArgs) == 0 {
 		err = fmt.Errorf("no command supplied to test")
 		return
@@ -666,6 +656,7 @@ func PerformTest(ctx model.Context, cmdAndArgs []string, assertions []model.Asse
 	}
 
 	if testName == "" {
+		// FIXME: move this in ctx ?
 		cmdNameParts := strings.Split(cmd.String(), " ")
 		shortenedCmd := filepath.Base(cmdNameParts[0])
 		shortenCmdNameParts := cmdNameParts
@@ -673,11 +664,7 @@ func PerformTest(ctx model.Context, cmdAndArgs []string, assertions []model.Asse
 		cmdName := strings.Join(shortenCmdNameParts, " ")
 		//testName = fmt.Sprintf("cmd: <|%s|>", cmdName)
 		testName = fmt.Sprintf("<|%s|>", cmdName)
-	}
-
-	qulifiedName := testName
-	if testSuite != "" {
-		qulifiedName = fmt.Sprintf("[%s]/%s", testSuite, testName)
+		ctx.TestName = testName
 	}
 
 	var tmpDir string
@@ -686,15 +673,17 @@ func PerformTest(ctx model.Context, cmdAndArgs []string, assertions []model.Asse
 		return
 	}
 
+	seq := utils.IncrementSeq(tmpDir, model.TestSequenceFilename)
+
+	dpl.TestTitle(ctx, seq)
+
 	if ctx.Ignore != nil && *ctx.Ignore {
-		if ctx.Silent == nil || !*ctx.Silent {
-			stdPrinter.ColoredErrf(model.WarningColor, "[%05d] Ignored test: %s\n", timecode, qulifiedName)
-		}
 		utils.IncrementSeq(tmpDir, model.IgnoredSequenceFilename)
+		dpl.TestOutcome(ctx, seq, "IGNORED", nil, 0, nil)
 		exitCode = 0
 		return
 	}
-	seq := utils.IncrementSeq(tmpDir, model.TestSequenceFilename)
+
 	var stdoutLog, stderrLog, reportLog *os.File
 	stdoutLog, stderrLog, reportLog, err = cmdLogFiles(testSuite, token, seq)
 	if err != nil {
@@ -744,16 +733,11 @@ func PerformTest(ctx model.Context, cmdAndArgs []string, assertions []model.Asse
 		cmd.AddEnv("PATH", currentPath)
 	}
 
-	testTitle := fmt.Sprintf("[%05d] Test %s #%02d", timecode, qulifiedName, seq)
-	if ctx.Silent == nil || !*ctx.Silent {
-		stdPrinter.ColoredErrf(model.TestColor, "%s... ", testTitle)
-		if *ctx.KeepStdout || *ctx.KeepStderr {
-			// NewLine because we expect cmd outputs
-			stdPrinter.Errf("\n")
-		}
+	qualifiedName := testName
+	if testSuite != "" {
+		qualifiedName = fmt.Sprintf("[%s]/%s", testSuite, testName)
 	}
-
-	stdPrinter.Flush()
+	testTitle := fmt.Sprintf("Test %s #%02d", qualifiedName, seq)
 
 	for _, before := range ctx.Before {
 		cmdBefore := cmdz.Cmd(before...)
@@ -779,8 +763,6 @@ func PerformTest(ctx model.Context, cmdAndArgs []string, assertions []model.Asse
 			result, err = assertion.Asserter(cmd)
 			result.Assertion = assertion
 			if err != nil {
-				//Fatal(testSuite, token, err)
-				//stdPrinter.ColoredErrf(errorColor, "FAILED (error: %s) ", err)
 				// FIXME: aggregate errors
 				result.Message += fmt.Sprintf("%s ", err)
 				result.Success = false
@@ -799,81 +781,30 @@ func PerformTest(ctx model.Context, cmdAndArgs []string, assertions []model.Asse
 	}
 
 	if exitCode == 0 {
-		if ctx.Silent == nil || !*ctx.Silent {
-			stdPrinter.ColoredErrf(model.SuccessColor, "PASSED")
-			stdPrinter.Errf(" (in %s)\n", testDuration)
-		}
+		dpl.TestOutcome(ctx, seq, model.PASSED, cmd, testDuration, err)
 		defer os.Remove(reportLog.Name())
 	} else {
-		if ctx.Silent == nil || *ctx.Silent {
-			stdPrinter.ColoredErrf(model.TestColor, "%s... ", testTitle)
-		}
 		if err == nil {
-			//IncrementSeq(tmpDir, FailureSequenceFilename)
-			stdPrinter.ColoredErrf(model.FailureColor, "FAILED")
-			stdPrinter.Errf(" (in %s)\n", testDuration)
+			dpl.TestOutcome(ctx, seq, model.FAILED, cmd, testDuration, err)
 		} else {
 			if errors.Is(err, context.DeadlineExceeded) {
 				// Swallow error
 				err = nil
 				//IncrementSeq(tmpDir, FailureSequenceFilename)
-				stdPrinter.ColoredErrf(model.FailureColor, "FAILED")
-				stdPrinter.Errf(" (timed out after %s)\n", ctx.Timeout)
+				dpl.TestOutcome(ctx, seq, model.FAILED, cmd, testDuration, err)
 				reportLog.WriteString(testTitle + "  =>  timed out")
 			} else {
 				err = nil
 				// Swallow error
 				utils.IncrementSeq(tmpDir, model.ErrorSequenceFilename)
-				stdPrinter.ColoredErrf(model.WarningColor, "ERROR")
-				stdPrinter.Errf(" (not executed)\n")
+				dpl.TestOutcome(ctx, seq, model.ERRORED, cmd, testDuration, err)
 				reportLog.WriteString(testTitle + "  =>  not executed")
 			}
 		}
-		stdPrinter.Errf("Failure calling cmd: <|%s|>\n", cmd)
-		if err != nil {
-			stdPrinter.ColoredErrf(model.ErrorColor, "%s\n", err)
-		} else {
+		//stdPrinter.Errf("Failure calling cmd: <|%s|>\n", cmd)
+		if err == nil {
 			for _, result := range failedResults {
-				//log.Printf("failedResult: %v\n", result)
-				assertPrefix := result.Assertion.Prefix
-				assertName := result.Assertion.Name
-				assertOp := result.Assertion.Op
-				expected := result.Assertion.Expected
-				got := result.Value
-
-				if result.Message != "" {
-					stdPrinter.ColoredErrf(model.ErrorColor, result.Message+"\n")
-				}
-
-				if assertName == "success" || assertName == "fail" {
-					stdPrinter.Errf("Expected %s%s\n", assertPrefix, assertName)
-					if cmd.StderrRecord() != "" {
-						stdPrinter.Errf("sdterr> %s\n", cmd.StderrRecord())
-					}
-					continue
-				} else if assertName == "cmd" {
-					stdPrinter.Errf("Expected %s%s=%s to succeed\n", assertPrefix, assertName, expected)
-					continue
-				} else if assertName == "exists" {
-					stdPrinter.Errf("Expected file %s%s=%s file to exists\n", assertPrefix, assertName, expected)
-					continue
-				}
-
-				if expected != got {
-					if assertOp == "=" {
-						stdPrinter.Errf("Expected %s%s to be: [%s] but got: [%v]\n", assertPrefix, assertName, expected, got)
-					} else if assertOp == ":" {
-						stdPrinter.Errf("Expected %s%s to contains: [%s] but got: [%v]\n", assertPrefix, assertName, expected, got)
-					} else if assertOp == "!:" {
-						stdPrinter.Errf("Expected %s%s not to contains: [%s] but got: [%v]\n", assertPrefix, assertName, expected, got)
-					} else if assertOp == "~" {
-						stdPrinter.Errf("Expected %s%s to match: [%s] but got: [%v]\n", assertPrefix, assertName, expected, got)
-					} else if assertOp == "!~" {
-						stdPrinter.Errf("Expected %s%s not to match: [%s] but got: [%v]\n", assertPrefix, assertName, expected, got)
-					}
-				} else {
-					stdPrinter.Errf("assertion %s%s%s%s failed\n", assertPrefix, assertName, assertOp, expected)
-				}
+				dpl.AssertionResult(cmd, result)
 			}
 			failedAssertionsReport := ""
 			for _, result := range failedResults {

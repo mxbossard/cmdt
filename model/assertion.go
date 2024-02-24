@@ -6,6 +6,15 @@ import (
 	"mby.fr/utils/cmdz"
 )
 
+type Outcome string
+
+const (
+	PASSED  = Outcome("PASSED")
+	FAILED  = Outcome("FAILED")
+	ERRORED = Outcome("ERRORED")
+	IGNORED = Outcome("IGNORED")
+)
+
 type TestOutcome struct {
 	Cmd              cmdz.Executer
 	Duration         time.Duration
