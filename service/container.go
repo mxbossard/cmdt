@@ -20,7 +20,7 @@ func StartContainer(token, image string, mocks []model.CmdMock) (id string, err 
 		return
 	}
 	var tmpDir string
-	tmpDir, err = forgeTmpDirectoryPath(token)
+	tmpDir, err = utils.ForgeTmpDirectoryPath(token)
 	if err != nil {
 		return
 	}

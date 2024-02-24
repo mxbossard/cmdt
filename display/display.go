@@ -29,8 +29,8 @@ type Displayer interface {
 	TestTitle(model.Context)
 	TestOutcome(ctx model.Context)
 	AssertionResult(model.AssertionResult)
-	ReportAll(model.Context)
 	ReportSuite(model.Context)
+	ReportAll(model.Context)
 	Stdout(string)
 	Stderr(string)
 	Error(error)
@@ -129,6 +129,12 @@ func (d BasicDisplay) TestOutcome(ctx model.Context, seq int, outcome model.Outc
 	if err != nil {
 		d.printer.ColoredErrf(model.ErrorColor, "%s\n", err)
 	}
+
+	if (ctx.Silent == nil || !*ctx.Silent) && (*ctx.KeepStdout || *ctx.KeepStderr) {
+		// NewLine in printer to print test result in a new line
+		d.printer.Errf("        ")
+		d.printer.Flush()
+	}
 }
 
 func (d BasicDisplay) AssertionResult(cmd cmdz.Executer, result model.AssertionResult) {
@@ -175,23 +181,14 @@ func (d BasicDisplay) AssertionResult(cmd cmdz.Executer, result model.AssertionR
 	}
 }
 
-func (d BasicDisplay) ReportAll(ctx model.Context) {
-	defer d.Flush()
-	// TODO: list test suite and iterate over it
-
-	globalStartTime := time.Now() // FIXME
-	globalDuration := model.NormalizeDurationInSec(time.Since(globalStartTime))
-	d.printer.ColoredErrf(reportColor, "Global duration time: %s\n", globalDuration)
-}
-
 func (d BasicDisplay) ReportSuite(ctx model.Context, tmpDir string, failedReports []string) {
+	defer d.Flush()
 	// FIXME: get tmpDir and failed reports from ctx
 	testCount := utils.ReadSeq(tmpDir, model.TestSequenceFilename)       // TODO: put in model.Context
 	ignoredCount := utils.ReadSeq(tmpDir, model.IgnoredSequenceFilename) // TODO: put in model.Context
-	failureCount := utils.ReadSeq(tmpDir, model.FailureSequenceFilename) // TODO: put in model.Context
+	failedCount := utils.ReadSeq(tmpDir, model.FailureSequenceFilename)  // TODO: put in model.Context
 	errorCount := utils.ReadSeq(tmpDir, model.ErrorSequenceFilename)     // TODO: put in model.Context
-	//failedCount := len(failedReports)
-	failedCount := failureCount
+	passedCount := testCount - failedCount - ignoredCount
 
 	if ctx.Silent == nil || !*ctx.Silent {
 		d.printer.ColoredErrf(messageColor, "Reporting [%s] test suite (%s) ...\n", ctx.TestSuite, tmpDir)
@@ -204,18 +201,25 @@ func (d BasicDisplay) ReportSuite(ctx model.Context, tmpDir string, failedReport
 	duration := ctx.LastTestTime.Sub(ctx.StartTime)
 	fmtDuration := NormalizeDurationInSec(duration)
 	if failedCount == 0 && errorCount == 0 {
-		d.printer.ColoredErrf(successColor, "Successfuly ran [%s] test suite (%d tests in %s)", ctx.TestSuite, testCount, fmtDuration)
+		d.printer.ColoredErrf(successColor, "Successfuly ran [%s] test suite (%d tests in %s)", ctx.TestSuite, passedCount, fmtDuration)
 		d.printer.ColoredErrf(warningColor, "%s", ignoredMessage)
 		d.printer.Errf("\n")
 	} else {
-		successCount := testCount - failedCount
-		d.printer.ColoredErrf(failureColor, "Failures in [%s] test suite (%d success, %d failures, %d errors on %d tests in %s)", ctx.TestSuite, successCount, failedCount, errorCount, testCount, fmtDuration)
+		d.printer.ColoredErrf(failureColor, "Failures in [%s] test suite (%d success, %d failures, %d errors on %d tests in %s)", ctx.TestSuite, passedCount, failedCount, errorCount, testCount, fmtDuration)
 		d.printer.ColoredErrf(warningColor, "%s", ignoredMessage)
 		d.printer.Errf("\n")
 		for _, report := range failedReports {
 			d.printer.ColoredErrf(reportColor, "%s\n", report)
 		}
 	}
+}
+
+func (d BasicDisplay) ReportAllFooter(testSuitesCtx model.Context) {
+	defer d.Flush()
+
+	globalStartTime := time.Now() // FIXME
+	globalDuration := model.NormalizeDurationInSec(time.Since(globalStartTime))
+	d.printer.ColoredErrf(reportColor, "Global duration time: %s\n", globalDuration)
 }
 
 func (d BasicDisplay) Stdout(s string) {
