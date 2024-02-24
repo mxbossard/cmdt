@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/utils"
 	"mby.fr/utils/ansi"
 	"mby.fr/utils/cmdz"
+	"mby.fr/utils/inout"
 	"mby.fr/utils/printz"
 )
 
@@ -38,7 +40,10 @@ type Displayer interface {
 }
 
 type BasicDisplay struct {
-	printer printz.Printer
+	printer            printz.Printer
+	clearAnsiFormatter inout.Formatter
+	outFormatter       inout.Formatter
+	errFormatter       inout.Formatter
 }
 
 func (d BasicDisplay) Global(ctx model.Context) {
@@ -71,7 +76,7 @@ func (d BasicDisplay) TestTitle(ctx model.Context, seq int) {
 
 	if ctx.Ignore != nil && *ctx.Ignore {
 		if ctx.Silent == nil || !*ctx.Silent {
-			d.printer.ColoredErrf(warningColor, "[%05d] Ignored test: %s\n", timecode, qulifiedName)
+			d.printer.ColoredErrf(warningColor, "[%05d] Test: %s #%02d... ", timecode, qulifiedName, seq)
 		}
 		return
 	}
@@ -152,9 +157,13 @@ func (d BasicDisplay) AssertionResult(cmd cmdz.Executer, result model.AssertionR
 
 	if assertName == "success" || assertName == "fail" {
 		d.printer.Errf("Expected %s%s\n", assertPrefix, assertName)
-		if cmd.StderrRecord() != "" {
-			d.printer.Errf("sdterr> %s\n", cmd.StderrRecord())
-		}
+		d.Stdout(cmd.StdoutRecord())
+		d.Stderr(cmd.StderrRecord())
+		/*
+			if cmd.StderrRecord() != "" {
+				d.printer.Errf("sdterr> %s\n", cmd.StderrRecord())
+			}
+		*/
 		return
 	} else if assertName == "cmd" {
 		d.printer.Errf("Expected %s%s=%s to succeed\n", assertPrefix, assertName, expected)
@@ -165,6 +174,42 @@ func (d BasicDisplay) AssertionResult(cmd cmdz.Executer, result model.AssertionR
 	}
 
 	if expected != got {
+
+		if s, ok := got.(string); ok {
+			got = strings.ReplaceAll(s, "\n", "\\n")
+			/*
+				const sliceSize = 16
+				minStrLen := min(len(s), len(expected))
+				for k := range minStrLen / sliceSize {
+					left := expected[k*sliceSize : min(len(expected), (k+1)*sliceSize-1)]
+					right := s[k*sliceSize : min(len(s), (k+1)*sliceSize-1)]
+					if left == right {
+						continue
+					} else {
+						shortenExpected := ""
+						if k > 0 {
+							shortenExpected += "[...]"
+						}
+						shortenExpected += left
+						if k*minStrLen < len(expected) {
+							shortenExpected += "[...]"
+						}
+						shortenGot := ""
+						if k > 0 {
+							shortenGot += "[...]"
+						}
+						shortenGot += right
+						if k*minStrLen < len(s) {
+							shortenGot += "[...]"
+						}
+						expected = shortenExpected
+						s = shortenGot
+					}
+				}
+					expected = d.clearAnsiFormatter.Format(expected)
+					got = d.clearAnsiFormatter.Format(s)
+			*/
+		}
 		if assertOp == "=" {
 			d.printer.Errf("Expected %s%s to be: [%s] but got: [%v]\n", assertPrefix, assertName, expected, got)
 		} else if assertOp == ":" {
@@ -223,11 +268,15 @@ func (d BasicDisplay) ReportAllFooter(testSuitesCtx model.Context) {
 }
 
 func (d BasicDisplay) Stdout(s string) {
-
+	if s != "" {
+		d.printer.Err(d.outFormatter.Format(s))
+	}
 }
 
 func (d BasicDisplay) Stderr(s string) {
-
+	if s != "" {
+		d.printer.Err(d.errFormatter.Format(s))
+	}
 }
 
 func (d BasicDisplay) Error(err error) {
@@ -239,7 +288,12 @@ func (d BasicDisplay) Flush() error {
 }
 
 func New() BasicDisplay {
-	return BasicDisplay{printer: printz.NewStandard()}
+	return BasicDisplay{
+		printer:            printz.NewStandard(),
+		clearAnsiFormatter: inout.AnsiFormatter{AnsiFormat: ansi.Reset},
+		outFormatter:       inout.PrefixFormatter{Prefix: "out> "},
+		errFormatter:       inout.PrefixFormatter{Prefix: "err> "},
+	}
 }
 
 func NormalizeDurationInSec(d time.Duration) (duration string) {

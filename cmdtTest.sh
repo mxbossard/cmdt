@@ -278,11 +278,11 @@ $cmdt0 @test=failing_rule_missusage/ @fail @stderr:donotexist -- $cmdt true @don
 >&2 echo "## Test config"
 $cmdt0 @init=test_config
 
-$cmdt0 @test=test_config/ @stderr:Ignore @stderr!:FAILED @stderr!:PASSED -- $cmdt1 true @ignore
-$cmdt0 @test=test_config/ @stderr!:Ignore @stderr:PASSED -- $cmdt1 true
-$cmdt0 @test=test_config/ @stderr:Ignore @stderr!:FAILED @stderr!:PASSED -- $cmdt1 true @ignore
-$cmdt0 @test=test_config/ @stderr:Ignore @stderr!:FAILED @stderr!:PASSED -- $cmdt1 false @ignore
-$cmdt0 @test=test_config/ @stderr!:Ignore @stderr:PASSED -- $cmdt1 true
+$cmdt0 @test=test_config/ @stderr:IGNORED @stderr!:FAILED @stderr!:PASSED -- $cmdt1 true @ignore
+$cmdt0 @test=test_config/ @stderr!:IGNORED @stderr:PASSED -- $cmdt1 true
+$cmdt0 @test=test_config/ @stderr:IGNORED @stderr!:FAILED @stderr!:PASSED -- $cmdt1 true @ignore
+$cmdt0 @test=test_config/ @stderr:IGNORED @stderr!:FAILED @stderr!:PASSED -- $cmdt1 false @ignore
+$cmdt0 @test=test_config/ @stderr!:IGNORED @stderr:PASSED -- $cmdt1 true
 
 $cmdt0 @test=test_config/ @stdout!:foo @stderr!:bar @stderr:PASSED -- $cmdt1 @test=test_keepouts sh -c "echo foo; >&2 echo bar"
 $cmdt0 @test=test_config/ @stdout~/^foo$/m @stderr!:bar @stderr:PASSED -- $cmdt1 @test=test_keepouts sh -c "echo foo; >&2 echo bar" @keepStdout

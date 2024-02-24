@@ -115,6 +115,7 @@ Done:
 - Run en option les tests dans un conteneur => plus facile de mocké, meilleur reproductibilité des tests
 	- @container=IMAGE : Fournir une image pour tester l'éxecution dans cette image
 	- Utiliser une image par défaut pour les cas d'usage simples
+- improve printer. Writer stdout & stder with prefix stdout> stderr> in descriptions
 
 TODO:
 Bugs:
@@ -126,6 +127,12 @@ Bugs:
 - - @global config updates does not works
 
 Features :
+- New Config/Context
+
+- Introduce @verbose=N
+- Replace @silent by @quiet
+- rework failure description : hard to read (remove colors ? remove \n ?)
+
 - List unmockable commands and give error feedback if attempting to mock unmockable command
 - Use podman or docker binary
 
@@ -136,11 +143,8 @@ Features :
 - @beforeSuite=CMD_ANG_ARGS & @afterSuite=CMD_ANG_ARGS
 - @mock stdin=@FILEPATH stdin:PARTIAL_CONTENT stdout=@FILEPATH @stderr=@FILEPATH
 - @called[=:]CMD ARG_S,stdin=IN,count=N assertion => verify a mock was called
-- silent ? quiet ? verbose ? an option to quiet errors as well ?
 - use rule definitions in usage
 - move seq into utils module
-- rework failure description : hard to read (remove colors ? remove \n ?)
-- improve printer. Writer stdout & stder with prefix stdout> stderr> in descriptions
 - change default test suite with @init=foo => foo become default test suite
 
 - possibilité de passer un scénario ligne à ligne dans le stdin de cmdtest
