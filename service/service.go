@@ -1,4 +1,4 @@
-package main
+package service
 
 import (
 	"bytes"
@@ -23,8 +23,25 @@ import (
 
 var rulePrefix = DefaultRulePrefix
 
+var stdPrinter printz.Printer
+
+//var logger = logz.Default("cmdtest", 0)
+
+func usage() {
+	cmd := filepath.Base(os.Args[0])
+	stdPrinter.Errf("cmdtest tool is usefull to test various scripts cli and command behaviors.\n")
+	stdPrinter.Errf("You must initialize a test suite (%[1]s @init) before running tests and then report the test (%[1]s @report).\n", cmd)
+	stdPrinter.Errf("usage: \t%s @init[=TEST_SUITE_NAME] [@CONFIG_1] ... [@CONFIG_N] \n", cmd)
+	stdPrinter.Errf("usage: \t%s <COMMAND> [ARG_1] ... [ARG_N] [@CONFIG_1] ... [@CONFIG_N] [@ASSERTION_1] ... [@ASSERTION_N]\n", cmd)
+	stdPrinter.Errf("usage: \t%s @report[=TEST_SUITE_NAME] \n", cmd)
+	stdPrinter.Errf("\tCONFIG available: @ignore @stopOnFailure @keepStdout @keepStderr @keepOutputs @timeout=Duration @fork=N\n")
+	stdPrinter.Errf("\tCOMMAND and ARGs: the command on which to run tests\n")
+	stdPrinter.Errf("\tASSERTIONs available: @fail @success @exit=N @stdout= @stdout~ @stderr= @stderr~ @cmd= @exists=\n")
+	stdPrinter.Errf("In complex cases assertions must be correlated by a token. You can generate a token with @init @printToken or @init @exportToken and supply it with @token=\n")
+}
+
 func Fatal(testSuite, token string, v ...any) {
-	tmpDir, err := testsuiteDirectoryPath(testSuite, token)
+	tmpDir, err := TestsuiteDirectoryPath(testSuite, token)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -127,7 +144,7 @@ func forgeTmpDirectoryPath(token string) (tempDirPath string, err error) {
 	return
 }
 
-func testsuiteDirectoryPath(testSuite, token string) (path string, err error) {
+func TestsuiteDirectoryPath(testSuite, token string) (path string, err error) {
 	var tmpDir string
 	tmpDir, err = forgeTmpDirectoryPath(token)
 	if err != nil {
@@ -142,7 +159,7 @@ func testsuiteDirectoryPath(testSuite, token string) (path string, err error) {
 
 func testDirectoryPath(testSuite, token string, seq int) (testDir string, err error) {
 	var tmpDir string
-	tmpDir, err = testsuiteDirectoryPath(testSuite, token)
+	tmpDir, err = TestsuiteDirectoryPath(testSuite, token)
 	if err != nil {
 		return
 	}
@@ -204,7 +221,7 @@ func listTestSuites(token string) (suites []string, err error) {
 
 func testsuiteConfigFilepath(testSuite, token string) (path string, err error) {
 	var testDir string
-	testDir, err = testsuiteDirectoryPath(testSuite, token)
+	testDir, err = TestsuiteDirectoryPath(testSuite, token)
 	if err != nil {
 		return
 	}
@@ -245,9 +262,9 @@ func cmdLogFiles(testSuite, token string, seq int) (stdoutFile, stderrFile, repo
 	return
 }
 
-func failureReports(testSuite, token string) (reports []string, err error) {
+func FailureReports(testSuite, token string) (reports []string, err error) {
 	var tmpDir string
-	tmpDir, err = testsuiteDirectoryPath(testSuite, token)
+	tmpDir, err = TestsuiteDirectoryPath(testSuite, token)
 	if err != nil {
 		return
 	}
@@ -375,7 +392,7 @@ func initWorkspace(ctx Context) (err error) {
 
 	// init the tmp directory
 	var tmpDir string
-	tmpDir, err = testsuiteDirectoryPath(testSuite, token)
+	tmpDir, err = TestsuiteDirectoryPath(testSuite, token)
 	if err != nil {
 		return
 	}
@@ -491,7 +508,7 @@ func InitTestSuite(ctx Context) (exitCode int, err error) {
 
 	// Clear the test suite directory
 	var tmpDir string
-	tmpDir, err = testsuiteDirectoryPath(testSuite, token)
+	tmpDir, err = TestsuiteDirectoryPath(testSuite, token)
 	if err != nil {
 		return
 	}
@@ -566,7 +583,7 @@ func ReportTestSuite(ctx Context) (exitCode int, err error) {
 	}
 
 	var tmpDir string
-	tmpDir, err = testsuiteDirectoryPath(testSuite, token)
+	tmpDir, err = TestsuiteDirectoryPath(testSuite, token)
 	if err != nil {
 		return
 	}
@@ -588,7 +605,7 @@ func ReportTestSuite(ctx Context) (exitCode int, err error) {
 	failureCount := ReadSeq(tmpDir, FailureSequenceFilename)
 	errorCount := ReadSeq(tmpDir, ErrorSequenceFilename)
 	var failedReports []string
-	failedReports, err = failureReports(testSuite, token)
+	failedReports, err = FailureReports(testSuite, token)
 	if err != nil {
 		return
 	}
@@ -660,7 +677,7 @@ func PerformTest(ctx Context, cmdAndArgs []string, assertions []Assertion) (exit
 	}
 
 	var tmpDir string
-	tmpDir, err = testsuiteDirectoryPath(testSuite, token)
+	tmpDir, err = TestsuiteDirectoryPath(testSuite, token)
 	if err != nil {
 		return
 	}

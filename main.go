@@ -17,9 +17,8 @@ package main
 
 import (
 	"os"
-	"path/filepath"
 
-	"mby.fr/utils/printz"
+	"mby.fr/cmdtest/service"
 )
 
 /**
@@ -122,9 +121,14 @@ Bugs:
 - @FILEPATH empeche de tester un contenu qui commence par @ sans passer par un fichier. Il faudrait pouvoir échapper @ ou bien utiliser un operator dédié à la lécture d'un fichier (ex: @stderr@=FILEPATH @stdin@:FILEPATH)
 - remove docker run container generated ID from stdout
 - use suite timeout for container duration
+- Check for container existance before exec in running container
+- Suite Timeout not managed (should error if timeout exceeded) Should ask for suite clear and no test should pass; initless suite should have a greater default timeout
 - - @global config updates does not works
 
 Features :
+- List unmockable commands and give error feedback if attempting to mock unmockable command
+- Use podman or docker binary
+
 - Mock les executable avec un chemin absolu dans les conteneur
 - multiple @mock
 - with -- report an error if commands before --
@@ -237,29 +241,38 @@ Features :
   - Remove colors of stdout & stderr
   - Prefix each line of stdout and stderr with stdout> & stderr>
   - Smart diff focusing on what is different for text comparison assertions
+  - Display.TestTitle()
+  - Display.TestOutcome()
+  - Display.Suite()
+  - Display.Global()
+  - Display.ReportAll()
+  - Display.ReportSuite()
+  - Display.AssertionResult()
+  - Display.Stdout()
+  - Display.Stderr()
+
 
 
 ## Idées pour silent vs quiet ?!
+  - @debug=LEVEL for debugging => which logger ?
+  - replace @silent by @quiet
+  - @quiet should produce minimal output (only @reports and @keepOutputs should output)
+  - by default not inited suite is @verbose=1
+  - by default inited suite is @verbose=0
+  - verbose=0 => Print Failures & Errors Tests only with short assertion report
+  - verbose=1 => Same + descriptive assertion report (cleaned & shorten stdout & stderr for failures & errors)
+  - verbose=2 => Same + Print success titles
+  - verbose=3 => Same + (cleaned & shorten stdout & stderr for success)
 
+## Idées pour la gestion du Context
+  - Context.PersistGlobal()
+  - Context.PersistSuite()
+  - Context.IncrementTestCount(outcome)
+  - Context.UpdateContainerId(ctId, scope)
+  - Functionnal options pattern : https://dev.to/kittipat1413/understanding-the-options-pattern-in-go-390c + persist a collection of options
+  - Optional instead of pointer ? => cleaner for Merging
 */
 
-var stdPrinter printz.Printer
-
-//var logger = logz.Default("cmdtest", 0)
-
-func usage() {
-	cmd := filepath.Base(os.Args[0])
-	stdPrinter.Errf("cmdtest tool is usefull to test various scripts cli and command behaviors.\n")
-	stdPrinter.Errf("You must initialize a test suite (%[1]s @init) before running tests and then report the test (%[1]s @report).\n", cmd)
-	stdPrinter.Errf("usage: \t%s @init[=TEST_SUITE_NAME] [@CONFIG_1] ... [@CONFIG_N] \n", cmd)
-	stdPrinter.Errf("usage: \t%s <COMMAND> [ARG_1] ... [ARG_N] [@CONFIG_1] ... [@CONFIG_N] [@ASSERTION_1] ... [@ASSERTION_N]\n", cmd)
-	stdPrinter.Errf("usage: \t%s @report[=TEST_SUITE_NAME] \n", cmd)
-	stdPrinter.Errf("\tCONFIG available: @ignore @stopOnFailure @keepStdout @keepStderr @keepOutputs @timeout=Duration @fork=N\n")
-	stdPrinter.Errf("\tCOMMAND and ARGs: the command on which to run tests\n")
-	stdPrinter.Errf("\tASSERTIONs available: @fail @success @exit=N @stdout= @stdout~ @stderr= @stderr~ @cmd= @exists=\n")
-	stdPrinter.Errf("In complex cases assertions must be correlated by a token. You can generate a token with @init @printToken or @init @exportToken and supply it with @token=\n")
-}
-
 func main() {
-	ProcessArgs(os.Args)
+	service.ProcessArgs(os.Args)
 }
