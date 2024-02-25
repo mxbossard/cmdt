@@ -2,8 +2,6 @@ package model
 
 import (
 	"time"
-
-	"mby.fr/utils/cmdz"
 )
 
 type Outcome string
@@ -15,10 +13,25 @@ const (
 	IGNORED = Outcome("IGNORED")
 )
 
+type Assertion struct {
+	Rule
+	Asserter Asserter
+}
+
+type AssertionResult struct {
+	Assertion Assertion
+	Success   bool
+	Value     any
+	Message   string
+}
+
 type TestOutcome struct {
-	Cmd              cmdz.Executer
+	Context          Context
+	CmdTitle         string
 	Duration         time.Duration
 	Err              error
+	Stdout           string
+	Stderr           string
 	AssertionResults []AssertionResult
 }
 

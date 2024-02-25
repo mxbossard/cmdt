@@ -7,10 +7,16 @@ import (
 
 	"mby.fr/utils/ansi"
 	"mby.fr/utils/cmdz"
-	"mby.fr/utils/ptr"
 )
 
 type Action string
+
+const (
+	GlobalAction = Action("global")
+	InitAction   = Action("init")
+	TestAction   = Action("test")
+	ReportAction = Action("report")
+)
 
 type Mapper[T any] func(expr, op string) (T, error)
 
@@ -19,8 +25,6 @@ type Validater[T any] func(rule Rule, value T) error
 type Configurer func(ctx Context) (Context, error)
 
 type Asserter func(cmdz.Executer) (AssertionResult, error)
-
-type ConfigScope int
 
 const (
 	DefaultRulePrefix             = "@"
@@ -32,12 +36,6 @@ const (
 )
 
 const (
-	Global ConfigScope = iota // How to use this ?
-	Suite                     // can be placed on suite init only
-	Test                      // can be placed on test or on suite to configure all tests
-)
-
-const (
 	NamePattern = "[a-zA-Z][^/]*[a-zA-Z0-9]"
 )
 
@@ -45,9 +43,10 @@ var (
 	TempDirPrefix           = "cmdtest"
 	ContextFilename         = "context.yaml"
 	TestSequenceFilename    = "test-seq.txt"
-	FailureSequenceFilename = "failure-seq.txt"
+	PassedSequenceFilename  = "passed-seq.txt"
+	FailedSequenceFilename  = "failure-seq.txt"
 	IgnoredSequenceFilename = "ignored-seq.txt"
-	ErrorSequenceFilename   = "error-seq.txt"
+	ErroredSequenceFilename = "error-seq.txt"
 	StdoutFilename          = "stdout.log"
 	StderrFilename          = "stderr.log"
 	ReportFilename          = "report.log"
@@ -62,11 +61,10 @@ var (
 )
 
 var (
-	DefaultTestTimeout, _         = time.ParseDuration("24h")
-	AbsNamePattern                = fmt.Sprintf("(%s/)?(%s)?", NamePattern, NamePattern)
-	NameRegexp                    = regexp.MustCompile("^" + NamePattern + "$")
-	AbsNameRegexp                 = regexp.MustCompile("^" + AbsNamePattern + "$")
-	TestSuiteNameSanitizerPattern = regexp.MustCompile("[^a-zA-Z0-9]")
+	DefaultTestTimeout, _ = time.ParseDuration("24h")
+	AbsNamePattern        = fmt.Sprintf("(%s/)?(%s)?", NamePattern, NamePattern)
+	NameRegexp            = regexp.MustCompile("^" + NamePattern + "$")
+	AbsNameRegexp         = regexp.MustCompile("^" + AbsNamePattern + "$")
 )
 
 var (
@@ -110,7 +108,7 @@ type RuleDefinition struct {
 	Ops  []string
 }
 
-type Context struct {
+type Context0 struct {
 	// TestSuite only
 	Token        string        `yaml:""`
 	Prefix       string        `yaml:""`
@@ -144,43 +142,19 @@ type Context struct {
 	ContainerScope    *ConfigScope  `yaml:""`
 }
 
-func (c Context) String() string {
+func (c Context0) String() string {
 	keepStdout := c.KeepStdout != nil && *c.KeepStdout
 	keepStderr := c.KeepStderr != nil && *c.KeepStderr
 	return fmt.Sprintf("[%s/%s] KeepStdout: %v, KeepStderr: %v", c.TestSuite, c.TestName, keepStdout, keepStderr)
 }
 
-type Config struct {
+type Config0 struct {
 	Name  string
 	Scope ConfigScope
 	Value string
 }
 
-type Assertion struct {
-	Rule
-	Asserter Asserter
-}
-
-type AssertionResult struct {
-	Assertion Assertion
-	Success   bool
-	Value     any
-	Message   string
-}
-
-type CmdMock struct {
-	Op               string
-	Cmd              string
-	Args             []string
-	StdinOp          string
-	Stdin            *string
-	Stdout           string
-	Stderr           string
-	ExitCode         int
-	Delegate         bool
-	OnCallCmdAndArgs []string
-}
-
+/*
 func MergeContext(baseContext, overridingContext Context) Context {
 	baseContext.Token = overridingContext.Token
 	baseContext.Prefix = overridingContext.Prefix
@@ -255,6 +229,7 @@ func MergeContext(baseContext, overridingContext Context) Context {
 
 	return baseContext
 }
+*/
 
 func ruleDef(name string, ops ...string) (r RuleDefinition) {
 	r.Name = name

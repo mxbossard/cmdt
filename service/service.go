@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"log"
 	"log/slog"
 	"os"
@@ -13,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"gopkg.in/yaml.v3"
 	"mby.fr/cmdtest/display"
 	"mby.fr/cmdtest/model"
+	"mby.fr/cmdtest/repo"
 	"mby.fr/cmdtest/utils"
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/printz"
@@ -26,6 +25,8 @@ var rulePrefix = model.DefaultRulePrefix
 var dpl = display.New()
 
 var logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
+
+var ctxRepo = repo.New("")
 
 func usage() {
 	usagePrinter := printz.NewStandard()
@@ -42,6 +43,7 @@ func usage() {
 	usagePrinter.Flush()
 }
 
+/*
 func RulePrefix() string {
 	return rulePrefix
 }
@@ -51,6 +53,7 @@ func SetRulePrefix(prefix string) {
 		rulePrefix = prefix
 	}
 }
+*/
 
 func readEnvToken() (token string) {
 	// Search uniqKey in env
@@ -61,160 +64,6 @@ func readEnvToken() (token string) {
 		}
 	}
 	logger.Debug("Found a token in env: " + token)
-	return
-}
-
-func cmdLogFiles(testSuite, token string, seq int) (stdoutFile, stderrFile, reportFile *os.File, err error) {
-	var testDir string
-	testDir, err = utils.TestDirectoryPath(testSuite, token, seq)
-	if err != nil {
-		return
-	}
-	stdoutFilepath := filepath.Join(testDir, model.StdoutFilename)
-	stderrFilepath := filepath.Join(testDir, model.StderrFilename)
-	reportFilepath := filepath.Join(testDir, model.ReportFilename)
-
-	err = os.MkdirAll(testDir, 0700)
-	if err != nil {
-		err = fmt.Errorf("cannot create work dir %s : %w", testDir, err)
-		return
-	}
-	stdoutFile, err = os.OpenFile(stdoutFilepath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0600)
-	if err != nil {
-		err = fmt.Errorf("cannot open file %s : %w", stdoutFilepath, err)
-		return
-	}
-	stderrFile, err = os.OpenFile(stderrFilepath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0600)
-	if err != nil {
-		err = fmt.Errorf("cannot open file %s : %w", stderrFilepath, err)
-		return
-	}
-	reportFile, err = os.OpenFile(reportFilepath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0600)
-	if err != nil {
-		err = fmt.Errorf("cannot open file %s : %w", reportFilepath, err)
-		return
-	}
-	return
-}
-
-func FailureReports(testSuite, token string) (reports []string, err error) {
-	var tmpDir string
-	tmpDir, err = utils.TestsuiteDirectoryPath(testSuite, token)
-	if err != nil {
-		return
-	}
-	err = filepath.Walk(tmpDir, func(path string, info fs.FileInfo, err error) error {
-		if model.ReportFilename == info.Name() {
-			content, err := os.ReadFile(path)
-			if err != nil {
-				return err
-			}
-			reports = append(reports, string(content))
-		}
-		return nil
-	})
-	return
-}
-
-func PersistSuiteContext0(testSuite, token string, config model.Context) (err error) {
-	var contextFilepath string
-	contextFilepath, err = utils.TestsuiteConfigFilepath(testSuite, token)
-	if err != nil {
-		return
-	}
-	content, err := yaml.Marshal(config)
-	if err != nil {
-		return
-	}
-	logger.Debug("Persisting context", "context", content, "file", contextFilepath)
-	err = os.WriteFile(contextFilepath, content, 0600)
-	if err != nil {
-		err = fmt.Errorf("cannot persist context: %w", err)
-		return
-	}
-	return
-}
-
-func PersistSuiteContext(config model.Context) (err error) {
-	testSuite := config.TestSuite
-	token := config.Token
-	var contextFilepath string
-	contextFilepath, err = utils.TestsuiteConfigFilepath(testSuite, token)
-	if err != nil {
-		return
-	}
-	content, err := yaml.Marshal(config)
-	if err != nil {
-		return
-	}
-	logger.Debug("Persisting context", "context", content, "file", contextFilepath)
-	err = os.WriteFile(contextFilepath, content, 0600)
-	if err != nil {
-		err = fmt.Errorf("cannot persist context: %w", err)
-		return
-	}
-	return
-}
-
-func updateLastTestTime(testSuite, token string) {
-	ctx, err := LoadSuiteContext(testSuite, token)
-	if err != nil {
-		log.Fatal(err)
-	}
-	ctx.LastTestTime = time.Now()
-	err = PersistSuiteContext(ctx)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func initWorkspace(ctx model.Context) (err error) {
-	token := ctx.Token
-	testSuite := ctx.TestSuite
-
-	// init the tmp directory
-	var tmpDir string
-	tmpDir, err = utils.TestsuiteDirectoryPath(testSuite, token)
-	if err != nil {
-		return
-	}
-	_, err = os.Stat(tmpDir)
-	if err == nil {
-		// Workspace already initialized
-		return
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return
-	}
-
-	err = os.MkdirAll(tmpDir, 0700)
-	if err != nil {
-		err = fmt.Errorf("unable to create temp dir: %s ! Error: %w", tmpDir, err)
-		return
-	}
-
-	return
-}
-
-func LoadSuiteContext(testSuite, token string) (config model.Context, err error) {
-	var globalCtx, suiteCtx model.Context
-	globalCtx, err = LoadGlobalContext(token)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return
-	}
-	suiteCtx, err = utils.ReadSuiteContext(testSuite, token)
-	if err != nil {
-		return
-	}
-	logger.Debug("Loaded context", "global", globalCtx, "suite", suiteCtx)
-	config = model.MergeContext(globalCtx, suiteCtx)
-	SetRulePrefix(config.Prefix)
-	logger.Debug("Merges context", "merged", config)
-	return
-}
-
-func LoadGlobalContext(token string) (config model.Context, err error) {
-	config, err = utils.ReadSuiteContext(model.GlobalConfigTestSuiteName, token)
-	config.TestSuite = ""
 	return
 }
 
@@ -394,8 +243,8 @@ func ReportTestSuite(ctx model.Context) (exitCode int, err error) {
 	}
 	dpl.ReportSuite(ctx, tmpDir, failedReports)
 
-	failedCount := utils.ReadSeq(tmpDir, model.FailureSequenceFilename)
-	errorCount := utils.ReadSeq(tmpDir, model.ErrorSequenceFilename)
+	failedCount := utils.ReadSeq(tmpDir, model.FailedSequenceFilename)
+	errorCount := utils.ReadSeq(tmpDir, model.ErroredSequenceFilename)
 	if failedCount == 0 && errorCount == 0 {
 		exitCode = 0
 	}
@@ -557,7 +406,7 @@ func PerformTest(ctx model.Context, cmdAndArgs []string, assertions []model.Asse
 			} else {
 				err = nil
 				// Swallow error
-				utils.IncrementSeq(tmpDir, model.ErrorSequenceFilename)
+				utils.IncrementSeq(tmpDir, model.ErroredSequenceFilename)
 				dpl.TestOutcome(ctx, seq, model.ERRORED, cmd, testDuration, err)
 				reportLog.WriteString(testTitle + "  =>  not executed")
 			}
@@ -573,7 +422,7 @@ func PerformTest(ctx model.Context, cmdAndArgs []string, assertions []model.Asse
 				expected := result.Assertion.Expected
 				failedAssertionsReport += RulePrefix() + string(assertName) + string(assertOp) + string(expected) + " "
 			}
-			utils.IncrementSeq(tmpDir, model.FailureSequenceFilename)
+			utils.IncrementSeq(tmpDir, model.FailedSequenceFilename)
 			reportLog.WriteString(testTitle + "  => " + failedAssertionsReport)
 		}
 	}
@@ -597,16 +446,6 @@ func PerformTest(ctx model.Context, cmdAndArgs []string, assertions []model.Asse
 		exitCode = 0
 	}
 	return
-}
-
-func NoErrorOrFatal(ctx model.Context, err error) {
-	if err != nil {
-		suiteContext, err2 := LoadSuiteContext(ctx.TestSuite, ctx.Token)
-		if err2 == nil {
-			updateLastTestTime(suiteContext.TestSuite, suiteContext.Token)
-		}
-		utils.Fatal(ctx.TestSuite, ctx.Token, err)
-	}
 }
 
 func ProcessArgs(allArgs []string) {

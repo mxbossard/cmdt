@@ -1,70 +1,31 @@
 package model
 
-import "mby.fr/utils/utilz"
+import (
+	"regexp"
+	"strings"
 
-type Context2 struct {
-	Token  string
-	Action string
+	"mby.fr/utils/utilz"
+)
+
+func NewContext(token string, action Action, cfg Config) Context {
+	c := Context{
+		Token:  token,
+		Action: action,
+	}
+	c.SetRulePrefix(cfg.Prefix.Get())
+	return c
+}
+
+type Context struct {
+	Token                string
+	Action               Action
+	rulePrefix           string         // TODEL ?
+	assertionRulePattern *regexp.Regexp // TODEL
 
 	Config Config
 
-	TestOutcome  utilz.Optional[TestOutcome]
-	SuiteOutcome utilz.Optional[SuiteOutcome]
-}
-
-func (c Context) TestCount() (n int) {
-	// TODO
-	return
-}
-
-func (c Context) IgnoreCount() (n int) {
-	// TODO
-	return
-}
-
-func (c Context) FailureCount() (n int) {
-	// TODO
-	return
-}
-
-func (c Context) ErrorCount() (n int) {
-	// TODO
-	return
-}
-
-func (c Context) IncrementTestCount() (err error) {
-	// TODO
-	return
-}
-
-func (c Context) IncrementIgnoreCount() (err error) {
-	// TODO
-	return
-}
-
-func (c Context) IncrementFailureCount() (err error) {
-	// TODO
-	return
-}
-
-func (c Context) IncrementErrorCount() (err error) {
-	// TODO
-	return
-}
-
-func (c Context) GlobalWorkDir() (err error) {
-	// TODO
-	return
-}
-
-func (c Context) SuiteWorkDir() (err error) {
-	// TODO
-	return
-}
-
-func (c Context) TestWorkDir() (err error) {
-	// TODO
-	return
+	TestOutcome  utilz.AnyOptional[TestOutcome]
+	SuiteOutcome utilz.AnyOptional[SuiteOutcome]
 }
 
 func (c Context) TestId() (id string) {
@@ -87,17 +48,30 @@ func (c Context) TestTitle() (title string) {
 	return
 }
 
-func (c Context) PersistTestOutcome(outcome TestOutcome) (err error) {
-	// TODO
-	return
+func (c Context) RulePrefix() string {
+	return c.rulePrefix
 }
 
-func (c Context) LoadSuiteOutcome(testSuite string) (outcome SuiteOutcome, err error) {
-	// TODO
-	return
+func (c Context) SetRulePrefix(prefix string) {
+	if prefix != "" {
+		c.rulePrefix = prefix
+		c.assertionRulePattern = regexp.MustCompile("^" + c.RulePrefix() + "([a-zA-Z]+)([=~:!]{1,2})?(.+)?$")
+	}
 }
 
-func NewContext(token, action string) (err error) {
-	// TODO
+func (c Context) IsRule(s string) bool {
+	return strings.HasPrefix(s, c.RulePrefix())
+}
+
+func (c Context) SplitRuleExpr(ruleExpr string) (ok bool, r Rule) {
+	ok = false
+	submatch := c.assertionRulePattern.FindStringSubmatch(ruleExpr)
+	if submatch != nil {
+		ok = true
+		r.Prefix = c.RulePrefix()
+		r.Name = submatch[1]
+		r.Op = submatch[2]
+		r.Expected = submatch[3]
+	}
 	return
 }

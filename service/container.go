@@ -11,7 +11,12 @@ import (
 	"mby.fr/utils/container"
 )
 
-func StartContainer(token, image string, mocks []model.CmdMock) (id string, err error) {
+func StartContainer(testCtx model.Context) (id string, err error) {
+	image := testCtx.Config.ContainerImage.Get()
+	mocks := testCtx.Config.Mocks
+	// FIXME: implements Mocking in caontainer
+	_ = mocks
+
 	// Start container with :
 	// - cmdtest
 	// - configured mock
@@ -19,14 +24,10 @@ func StartContainer(token, image string, mocks []model.CmdMock) (id string, err 
 	if err != nil {
 		return
 	}
-	var tmpDir string
-	tmpDir, err = utils.ForgeTmpDirectoryPath(token)
-	if err != nil {
-		return
-	}
+	repoDir := ctxRepo.BackingFilepath()
 
 	cmdtestVol := os.Args[0] + ":/opt/cmdtest:ro"
-	ctxDirVol := tmpDir + ":" + tmpDir + ":rw"
+	ctxDirVol := repoDir + ":" + repoDir + ":rw"
 	dr := container.DockerRunner{
 		Name:       id,
 		Image:      image,
@@ -84,7 +85,7 @@ func ExecInContainer(token, id string, cmdAndArgs []string) (exitCode int, err e
 func PerformTestInEphemeralContainer(testCtx model.Context) (exitCode int, err error) {
 	// Launch test in new container
 	var ctId string
-	ctId, err = StartContainer(testCtx.Token, testCtx.ContainerImage, testCtx.Mocks)
+	ctId, err = StartContainer(testCtx)
 	if err != nil {
 		return
 	}
@@ -110,20 +111,22 @@ func PerformTestInEphemeralContainer(testCtx model.Context) (exitCode int, err e
 }
 
 func PerformTestInContainer(testCtx model.Context) (ctId string, exitCode int, err error) {
-	if testCtx.ContainerId != nil {
-		ctId = *testCtx.ContainerId
+	if testCtx.Config.ContainerId.IsPresent() {
+		ctId = testCtx.Config.ContainerId.Get()
 	}
 
 	// If container dirty before test
-	if ctId != "" && testCtx.ContainerDirties == "beforeTest" || testCtx.ContainerDirties == "beforeRun" {
-		err2 := RemoveContainer(ctId)
-		NoErrorOrFatal(testCtx, err2)
+	if ctId != "" && testCtx.Config.ContainerDirties.Is(model.DirtyBeforeTest) || testCtx.Config.ContainerDirties.Is(model.DirtyBeforeRun) {
+		err = RemoveContainer(ctId)
+		if err != nil {
+			return
+		}
 		ctId = ""
 	}
 
 	// If container not already exists, create a new one
 	if ctId == "" {
-		ctId, err = StartContainer(testCtx.Token, testCtx.ContainerImage, testCtx.Mocks)
+		ctId, err = StartContainer(testCtx)
 		if err != nil {
 			return
 		}
@@ -144,10 +147,15 @@ func PerformTestInContainer(testCtx model.Context) (ctId string, exitCode int, e
 
 	}
 	exitCode, err = ExecInContainer(testCtx.Token, ctId, cmdAndArgs)
+	if err != nil {
+		return
+	}
 
-	if testCtx.ContainerDirties == "afterTest" || testCtx.ContainerDirties == "afterRun" {
-		err2 := RemoveContainer(ctId)
-		NoErrorOrFatal(testCtx, err2)
+	if testCtx.Config.ContainerDirties.Is(model.DirtyAfterTest) || testCtx.Config.ContainerDirties.Is(model.DirtyAfterRun) {
+		err = RemoveContainer(ctId)
+		if err != nil {
+			return
+		}
 		ctId = ""
 	}
 

@@ -49,19 +49,15 @@ type BasicDisplay struct {
 func (d BasicDisplay) Global(ctx model.Context) {
 	defer d.Flush()
 	// Do nothing ?
-	if ctx.Silent == nil || !*ctx.Silent {
-		d.printer.ColoredErrf(messageColor, "Initialized new config [%s].\n", ctx.TestSuite)
+	if ctx.Config.Verbose.Get() >= model.BETTER_ASSERTION_REPORT {
+		d.printer.ColoredErrf(messageColor, "## New config (token: %s)\n", ctx.Token)
 	}
 }
 
 func (d BasicDisplay) Suite(ctx model.Context) {
 	defer d.Flush()
-	if ctx.Silent == nil || !*ctx.Silent {
-		var tokenMsg = ""
-		if ctx.Token != "" {
-			tokenMsg = fmt.Sprintf(" (token: %s)", ctx.Token)
-		}
-		d.printer.ColoredErrf(messageColor, "Initialized new [%s] test suite%s.\n", ctx.TestSuite, tokenMsg)
+	if ctx.Config.Verbose.Get() >= model.BETTER_ASSERTION_REPORT {
+		d.printer.ColoredErrf(messageColor, "## New test suite: [%s] (token: %s)\n", ctx.TestQualifiedName(), ctx.Token)
 	}
 }
 
@@ -231,8 +227,8 @@ func (d BasicDisplay) ReportSuite(ctx model.Context, tmpDir string, failedReport
 	// FIXME: get tmpDir and failed reports from ctx
 	testCount := utils.ReadSeq(tmpDir, model.TestSequenceFilename)       // TODO: put in model.Context
 	ignoredCount := utils.ReadSeq(tmpDir, model.IgnoredSequenceFilename) // TODO: put in model.Context
-	failedCount := utils.ReadSeq(tmpDir, model.FailureSequenceFilename)  // TODO: put in model.Context
-	errorCount := utils.ReadSeq(tmpDir, model.ErrorSequenceFilename)     // TODO: put in model.Context
+	failedCount := utils.ReadSeq(tmpDir, model.FailedSequenceFilename)   // TODO: put in model.Context
+	errorCount := utils.ReadSeq(tmpDir, model.ErroredSequenceFilename)   // TODO: put in model.Context
 	passedCount := testCount - failedCount - ignoredCount
 
 	if ctx.Silent == nil || !*ctx.Silent {

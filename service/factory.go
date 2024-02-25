@@ -14,24 +14,17 @@ import (
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/collections"
 	"mby.fr/utils/filez"
+	"mby.fr/utils/utilz"
 )
 
-func IsRule(s string) bool {
-	return strings.HasPrefix(s, RulePrefix())
-}
-
-func SplitRuleExpr(ruleExpr string) (ok bool, r model.Rule) {
-	ok = false
-	assertionRulePattern := regexp.MustCompile("^" + RulePrefix() + "([a-zA-Z]+)([=~:!]{1,2})?(.+)?$")
-	submatch := assertionRulePattern.FindStringSubmatch(ruleExpr)
-	if submatch != nil {
-		ok = true
-		r.Prefix = RulePrefix()
-		r.Name = submatch[1]
-		r.Op = submatch[2]
-		r.Expected = submatch[3]
+/*
+	func IsRule(s string) bool {
+		return strings.HasPrefix(s, RulePrefix())
 	}
-	return
+*/
+
+func SplitRuleExpr(cfg model.Config, ruleExpr string) (ok bool, r model.Rule) {
+	return cfg.SplitRuleExpr(ruleExpr)
 }
 
 func DummyMapper(s, op string) (v string, err error) {
@@ -57,6 +50,26 @@ func BoolMapper(s, op string) (v bool, err error) {
 
 func DurationMapper(s, op string) (v time.Duration, err error) {
 	return time.ParseDuration(s)
+}
+
+func DirtiesMapper(s, op string) (v model.DirtyScope, err error) {
+	switch s {
+	case "beforeSuite":
+		v = model.DirtyBeforeSuite
+	case "afterSuite":
+		v = model.DirtyAfterSuite
+	case "beforeTest":
+		v = model.DirtyBeforeTest
+	case "afterTest":
+		v = model.DirtyAfterTest
+	case "beforeRun":
+		v = model.DirtyBeforeRun
+	case "afterRun":
+		v = model.DirtyAfterRun
+	default:
+		err = fmt.Errorf("dirty scope: %s not supported", s)
+	}
+	return
 }
 
 func FileContentMapper(s, op string) (v string, err error) {
@@ -296,8 +309,20 @@ func Translate[T any](rule model.Rule, m model.Mapper[T], validaters ...model.Va
 	return
 }
 
-func ApplyConfig(c *model.Context, ruleExpr string) (ok bool, rule model.Rule, err error) {
-	ok, rule = SplitRuleExpr(ruleExpr)
+func TranslateOptional[T comparable](rule model.Rule, m model.Mapper[T], validaters ...model.Validater[T]) (opt utilz.Optional[T], err error) {
+	var val T
+	val, err = m(rule.Expected, rule.Op)
+	if err != nil {
+		err = fmt.Errorf("cannot map rule %s%s value: [%s] : %w", rule.Prefix, rule.Name, rule.Expected, err)
+		return
+	}
+	err = Validate(rule, val, validaters...)
+	opt = utilz.OptionnalOf(val)
+	return
+}
+
+func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, err error) {
+	ok, rule = c.SplitRuleExpr(ruleExpr)
 	if !ok {
 		return
 	}
@@ -324,95 +349,85 @@ func ApplyConfig(c *model.Context, ruleExpr string) (ok bool, rule model.Rule, e
 		return
 	}
 
-	var boolVal bool
 	if ok {
 		switch rule.Name {
 		case "global":
-			c.Action = model.Action(rule.Name)
+			c.Action = utilz.OptionnalOf(model.Action(rule.Name))
 			if rule.Op != "" || rule.Expected != "" {
 				err = fmt.Errorf("rule %s%s does not accept an operator nor a value", rule.Prefix, rule.Name)
 			}
 		case "init", "report":
 			suiteName := rule.Expected
 			err = Validate[string](rule, suiteName, TestNameValidater)
-			c.Action = model.Action(rule.Name)
+			c.Action = utilz.OptionnalOf(model.Action(rule.Name))
 			if suiteName != "" {
-				c.TestSuite = suiteName
+				c.TestSuite = utilz.OptionnalOf(suiteName)
 			}
 			if rule.Name == "report" && rule.Expected == "" {
-				c.ReportAll = true
+				c.ReportAll = utilz.OptionnalOf(true)
 			}
 		case "test":
 			testName := rule.Expected
 			err = Validate[string](rule, testName, TestNameValidater)
-			c.Action = model.Action(rule.Name)
+			c.Action = utilz.OptionnalOf(model.Action(rule.Name))
 			if testName != "" {
 				matches := model.AbsNameRegexp.FindStringSubmatch(testName)
 				//log.Printf("Matching names: %v", matches)
 				if len(matches) == 2 {
 					name := matches[1]
 					if strings.HasSuffix(name, "/") {
-						c.TestSuite = name[0 : len(name)-1]
+						c.TestSuite = utilz.OptionnalOf(name[0 : len(name)-1])
 					} else {
-						c.TestName = name
+						c.TestName = utilz.OptionnalOf(name)
 					}
 				} else if len(matches) == 3 {
 					name := matches[1]
 					if strings.HasSuffix(name, "/") {
-						c.TestSuite = name[0 : len(name)-1]
+						c.TestSuite = utilz.OptionnalOf(name[0 : len(name)-1])
 					}
-					c.TestName = matches[2]
+					c.TestName = utilz.OptionnalOf(matches[2])
 				} else {
 					err = fmt.Errorf("bad test name: [%s]", testName)
 				}
 			}
 
 		case "fork":
-			c.ForkCount, err = Translate(rule, IntMapper, OperatorValidater[int]("="), IntValueValidater(1, 5))
+			c.ForkCount, err = TranslateOptional(rule, IntMapper, OperatorValidater[int]("="), IntValueValidater(1, 5))
 		case "suiteTimeout":
-			c.SuiteTimeout, err = Translate(rule, DurationMapper)
+			c.SuiteTimeout, err = TranslateOptional(rule, DurationMapper)
 
 		case "ignore":
-			boolVal, err = Translate(rule, BoolMapper, BooleanValidater)
-			c.Ignore = &boolVal
+			c.Ignore, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
 		case "stopOnFailure":
-			boolVal, err = Translate(rule, BoolMapper, BooleanValidater)
-			c.StopOnFailure = &boolVal
+			c.StopOnFailure, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
 		case "keepStdout":
-			boolVal, err = Translate(rule, BoolMapper, BooleanValidater)
-			c.KeepStdout = &boolVal
+			c.KeepStdout, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
 		case "keepStderr":
-			boolVal, err = Translate(rule, BoolMapper, BooleanValidater)
-			c.KeepStderr = &boolVal
+			c.KeepStderr, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
 		case "keepOutputs":
-			var keepOutputs bool
-			keepOutputs, err = Translate(rule, BoolMapper, BooleanValidater)
-			c.KeepStdout = &keepOutputs
-			c.KeepStderr = &keepOutputs
+			var keepOutputs utilz.Optional[bool]
+			keepOutputs, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
+			c.KeepStdout = keepOutputs
+			c.KeepStderr = keepOutputs
 		case "timeout":
-			c.Timeout, err = Translate(rule, DurationMapper)
+			c.Timeout, err = TranslateOptional(rule, DurationMapper)
 		case "runCount":
-			c.RunCount, err = Translate(rule, IntMapper, OperatorValidater[int]("="), IntValueValidater(1, 1000))
+			c.RunCount, err = TranslateOptional(rule, IntMapper, OperatorValidater[int]("="), IntValueValidater(1, 1000))
 		case "prefix":
-			c.Prefix, err = Translate(rule, DummyMapper, OperatorValidater[string]("="))
-			if err == nil {
-				SetRulePrefix(c.Prefix)
-			}
+			c.Prefix, err = TranslateOptional(rule, DummyMapper, OperatorValidater[string]("="))
 		case "token":
-			c.Token, err = Translate(rule, DummyMapper, OperatorValidater[string]("="), NotEmptyValidater[string])
+			c.Token, err = TranslateOptional(rule, DummyMapper, OperatorValidater[string]("="), NotEmptyValidater[string])
 		case "printToken":
-			boolVal, err = Translate(rule, BoolMapper, BooleanValidater)
-			c.PrintToken = boolVal
+			c.PrintToken, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
 		case "exportToken":
-			boolVal, err = Translate(rule, BoolMapper, BooleanValidater)
-			c.ExportToken = boolVal
+			c.ExportToken, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
 		case "parallel":
 		case "silent":
-			boolVal, err = Translate(rule, BoolMapper, BooleanValidater)
-			c.Silent = &boolVal
+			c.Quiet, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
 		case "mock":
 			var mock model.CmdMock
 			mock, err = Translate(rule, MockMapper, OperatorValidater[model.CmdMock]("=", ":"), NotEmptyValidater[model.CmdMock], MockValidater)
+
 			c.Mocks = append(c.Mocks, mock)
 		case "before":
 			var cmdAndArgs []string
@@ -429,18 +444,16 @@ func ApplyConfig(c *model.Context, ruleExpr string) (ok bool, rule model.Rule, e
 			}
 			c.After = append(c.After, cmdAndArgs)
 		case "container":
-			c.ContainerImage, err = Translate(rule, DummyMapper, OperatorValidater[string]("", "="))
-			if c.ContainerImage == "" || c.ContainerImage == "true" {
-				c.ContainerImage = model.DefaultContainerImage
-			} else if c.ContainerImage == "false" {
-				trueVal := true
-				c.ContainerDisabled = &trueVal
+			c.ContainerImage, err = TranslateOptional(rule, DummyMapper, OperatorValidater[string]("", "="))
+			if c.ContainerImage.Is("") || c.ContainerImage.Is("true") {
+				c.ContainerImage = utilz.OptionnalOf(model.DefaultContainerImage)
+			} else if c.ContainerImage.Is("false") {
+				c.ContainerDisabled = utilz.OptionnalOf(true)
 			}
 			// Erase ContainerId because we will want a new Container
-			noId := ""
-			c.ContainerId = &noId
+			c.ContainerId = utilz.EmptyOptionnal[string]()
 		case "dirtyContainer":
-			c.ContainerDirties, err = Translate(rule, DummyMapper, OperatorValidater[string]("="), KeywordsValidater[string]("beforeSuite", "afterSuite", "beforeTest", "afterTest", "beforeRun", "afterRun"))
+			c.ContainerDirties, err = TranslateOptional(rule, DirtiesMapper, OperatorValidater[model.DirtyScope]("="))
 		default:
 			ok = false
 		}
@@ -448,8 +461,8 @@ func ApplyConfig(c *model.Context, ruleExpr string) (ok bool, rule model.Rule, e
 	return
 }
 
-func BuildAssertion(ruleExpr string) (ok bool, assertion model.Assertion, err error) {
-	ok, assertion.Rule = SplitRuleExpr(ruleExpr)
+func BuildAssertion(cfg model.Config, ruleExpr string) (ok bool, assertion model.Assertion, err error) {
+	ok, assertion.Rule = cfg.SplitRuleExpr(ruleExpr)
 	if !ok {
 		return
 	}
@@ -645,14 +658,15 @@ func BuildAssertion(ruleExpr string) (ok bool, assertion model.Assertion, err er
 	return
 }
 
-func ParseArgs(args []string) (cfg model.Context, cmdAndArgs []string, assertions []model.Assertion, err error) {
-	cfg.Silent = nil
-	cfg.ContainerId = nil
-	cfg.ContainerScope = nil
-	cfg.ContainerDisabled = nil
-
+func ParseArgs(args []string) (cfg model.Config, cmdAndArgs []string, assertions []model.Assertion, err error) {
+	/*
+		cfg.Silent = nil
+		cfg.ContainerId = nil
+		cfg.ContainerScope = nil
+		cfg.ContainerDisabled = nil
+	*/
 	var rules []model.Rule
-	var rule model.Rule
+	//var rule model.Rule
 	parseRules := true
 	for _, arg := range args {
 		var ok bool
@@ -662,7 +676,8 @@ func ParseArgs(args []string) (cfg model.Context, cmdAndArgs []string, assertion
 			parseRules = false
 			continue
 		}
-		if parseRules && IsRule(arg) {
+		if parseRules && cfg.IsRule(arg) {
+			var rule model.Rule
 			ok, rule, err = ApplyConfig(&cfg, arg)
 			if err != nil {
 				return
@@ -672,7 +687,7 @@ func ParseArgs(args []string) (cfg model.Context, cmdAndArgs []string, assertion
 				continue
 			}
 			var assertion model.Assertion
-			ok, assertion, err = BuildAssertion(arg)
+			ok, assertion, err = BuildAssertion(cfg, arg)
 			if err != nil {
 				return
 			}
@@ -694,25 +709,26 @@ func ParseArgs(args []string) (cfg model.Context, cmdAndArgs []string, assertion
 		statusAssertionFound = statusAssertionFound || a.Name == "success" || a.Name == "fail" || a.Name == "exit" // || a.Name == "cmd"
 	}
 	if !statusAssertionFound {
-		_, successAssertion, _ := BuildAssertion(RulePrefix() + "success")
+		_, successAssertion, _ := BuildAssertion(cfg, cfg.Prefix.Get()+"success")
 		assertions = append(assertions, successAssertion)
 	}
 
-	if cfg.Action == model.Action("") {
+	if cfg.Action.IsEmpty() {
 		// If no action supplied add implicit test rule.
-		_, rule, err = ApplyConfig(&cfg, RulePrefix()+"test")
+		var rule model.Rule
+		_, rule, err = ApplyConfig(&cfg, cfg.Prefix.Get()+"test")
 		if err != nil {
 			return
 		}
 		rules = append(rules, rule)
 	}
 
-	if cfg.TestSuite == "" {
-		cfg.TestSuite = model.DefaultTestSuiteName
+	if cfg.TestSuite.IsEmpty() {
+		cfg.TestSuite = utilz.OptionnalOf(model.DefaultTestSuiteName)
 	}
 
-	if (cfg.Action == "init" || cfg.Action == "report") && len(cmdAndArgs) > 0 {
-		err = fmt.Errorf("you cannot run commands with action %s%s", cfg.Prefix, cfg.Action)
+	if (cfg.Action.Is(model.InitAction) || cfg.Action.Is(model.ReportAction)) && len(cmdAndArgs) > 0 {
+		err = fmt.Errorf("you cannot run commands with action %s%s", cfg.Prefix.Get(), cfg.Action.Get())
 		return
 	}
 
@@ -726,17 +742,17 @@ func ParseArgs(args []string) (cfg model.Context, cmdAndArgs []string, assertion
 	}
 
 	var cfgScope model.ConfigScope
-	switch cfg.Action {
-	case "global":
-		cfgScope = model.Global
-	case "init":
-		cfgScope = model.Suite
-	case "test":
-		cfgScope = model.Test
+	switch cfg.Action.Get() {
+	case model.GlobalAction:
+		cfgScope = model.GLOBAL_SCOPE
+	case model.InitAction:
+		cfgScope = model.SUITE_SCOPE
+	case model.TestAction:
+		cfgScope = model.TEST_SCOPE
 	}
 
-	if cfg.ContainerImage != "" {
-		cfg.ContainerScope = &cfgScope
+	if cfg.ContainerImage.IsPresent() {
+		cfg.ContainerScope = utilz.OptionnalOf(cfgScope)
 	}
 
 	//log.Printf("build context: %s Silent: %v\n", args, cfg.Silent)
