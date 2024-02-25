@@ -7,10 +7,17 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
+
+	"mby.fr/cmdtest/model"
+	"mby.fr/utils/trust"
 )
+
+var logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
 
 /*
 func Fatal(testSuite, token string, v ...any) {
@@ -141,4 +148,43 @@ func GetProcessStartTime(pid int) (int64, error) {
 	}
 
 	return starttime, nil
+}
+
+func readEnvToken() (token string) {
+	// Search uniqKey in env
+	for _, env := range os.Environ() {
+		if strings.HasPrefix(env, model.ContextTokenEnvVarName+"=") {
+			splitted := strings.Split(env, "=")
+			token = strings.Join(splitted[1:], "")
+		}
+	}
+	logger.Debug("Found a token in env: " + token)
+	return
+}
+
+func ForgeContextualToken() (string, error) {
+	token := readEnvToken()
+	if token != "" {
+		return token, nil
+	}
+	// If no token supplied use Workspace dir + ppid to forge tmp directory path
+	workDirPath, err := os.Getwd()
+	if err != nil {
+		//log.Fatalf("cannot find workspace dir: %s", err)
+		return "", fmt.Errorf("cannot find workspace dir: %w", err)
+	}
+	ppid := os.Getppid()
+	ppidStr := fmt.Sprintf("%d", ppid)
+	ppidStartTime, err := GetProcessStartTime(ppid)
+	if err != nil {
+		//log.Fatalf("cannot find parent process start time: %s", err)
+		return "", fmt.Errorf("cannot find parent process start time: %w", err)
+	}
+	ppidStartTimeStr := fmt.Sprintf("%d", ppidStartTime)
+	token, err = trust.SignStrings(workDirPath, "--", ppidStr, "--", ppidStartTimeStr)
+	if err != nil {
+		err = fmt.Errorf("cannot hash workspace dir: %w", err)
+	}
+	//log.Printf("contextual token: %s base on workDirPath: %s and ppid: %s\n", token, workDirPath, ppid)
+	return token, err
 }

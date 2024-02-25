@@ -26,7 +26,6 @@ type AssertionResult struct {
 }
 
 type TestOutcome struct {
-	Context          Context
 	CmdTitle         string
 	Duration         time.Duration
 	Err              error

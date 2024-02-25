@@ -22,7 +22,7 @@ type Mapper[T any] func(expr, op string) (T, error)
 
 type Validater[T any] func(rule Rule, value T) error
 
-type Configurer func(ctx Context) (Context, error)
+//type Configurer func(ctx Context) (Context, error)
 
 type Asserter func(cmdz.Executer) (AssertionResult, error)
 

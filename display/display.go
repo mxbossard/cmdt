@@ -7,12 +7,13 @@ import (
 	"strings"
 	"time"
 
+	"mby.fr/cmdtest/facade"
 	"mby.fr/cmdtest/model"
-	"mby.fr/cmdtest/utils"
 	"mby.fr/utils/ansi"
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/inout"
 	"mby.fr/utils/printz"
+	"mby.fr/utils/utilz"
 )
 
 var (
@@ -26,13 +27,13 @@ var (
 )
 
 type Displayer interface {
-	Global(model.Context)
-	Suite(model.Context)
-	TestTitle(model.Context)
-	TestOutcome(ctx model.Context)
+	Global(facade.Context)
+	Suite(facade.Context)
+	TestTitle(facade.Context)
+	TestOutcome(ctx facade.Context)
 	AssertionResult(model.AssertionResult)
-	ReportSuite(model.Context)
-	ReportAll(model.Context)
+	ReportSuite(facade.Context)
+	ReportAll(facade.Context)
 	Stdout(string)
 	Stderr(string)
 	Error(error)
@@ -46,7 +47,7 @@ type BasicDisplay struct {
 	errFormatter       inout.Formatter
 }
 
-func (d BasicDisplay) Global(ctx model.Context) {
+func (d BasicDisplay) Global(ctx facade.GlobalContext) {
 	defer d.Flush()
 	// Do nothing ?
 	if ctx.Config.Verbose.Get() >= model.BETTER_ASSERTION_REPORT {
@@ -54,53 +55,48 @@ func (d BasicDisplay) Global(ctx model.Context) {
 	}
 }
 
-func (d BasicDisplay) Suite(ctx model.Context) {
+func (d BasicDisplay) Suite(ctx facade.SuiteContext) {
 	defer d.Flush()
 	if ctx.Config.Verbose.Get() >= model.BETTER_ASSERTION_REPORT {
 		d.printer.ColoredErrf(messageColor, "## New test suite: [%s] (token: %s)\n", ctx.TestQualifiedName(), ctx.Token)
 	}
 }
 
-func (d BasicDisplay) TestTitle(ctx model.Context, seq int) {
+func (d BasicDisplay) TestTitle(ctx facade.TestContext) {
 	// FIXME: get seq from ctx
 	defer d.Flush()
-	timecode := int(time.Since(ctx.StartTime).Milliseconds())
-	qulifiedName := ctx.TestName
-	if ctx.TestSuite != "" {
-		qulifiedName = fmt.Sprintf("[%s]/%s", ctx.TestSuite, ctx.TestName)
-	}
+	title := ctx.TestTitle()
 
-	if ctx.Ignore != nil && *ctx.Ignore {
-		if ctx.Silent == nil || !*ctx.Silent {
-			d.printer.ColoredErrf(warningColor, "[%05d] Test: %s #%02d... ", timecode, qulifiedName, seq)
+	if ctx.Config.Ignore.Is(true) {
+		if ctx.Config.Verbose.Get() >= model.BETTER_ASSERTION_REPORT {
+			d.printer.ColoredErrf(warningColor, title)
 		}
 		return
 	}
 
-	testTitle := fmt.Sprintf("[%05d] Test %s #%02d", timecode, qulifiedName, seq)
-	if ctx.Silent == nil || !*ctx.Silent {
-		d.printer.ColoredErrf(testColor, "%s... ", testTitle)
-		if *ctx.KeepStdout || *ctx.KeepStderr {
+	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
+		d.printer.ColoredErrf(testColor, title)
+		if ctx.Config.KeepStdout.Is(true) || ctx.Config.KeepStderr.Is(true) {
 			// NewLine because we expect cmd outputs
 			d.printer.Errf("\n")
 		}
 	}
 }
 
-func (d BasicDisplay) TestOutcome(ctx model.Context, seq int, outcome model.Outcome, cmd cmdz.Executer, testDuration time.Duration, err error) {
+func (d BasicDisplay) TestOutcome(ctx facade.TestContext, seq int, outcome model.Outcome, cmd cmdz.Executer, testDuration time.Duration, err error) {
 	// FIXME get outcome from ctx
 	// FIXME get cmd, duration and error from outcome
 	defer d.Flush()
 	switch outcome {
 	case model.PASSED:
-		if ctx.Silent == nil || !*ctx.Silent {
+		if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
 			d.printer.ColoredErrf(successColor, "PASSED")
 			d.printer.Errf(" (in %s)\n", testDuration)
 		}
 	case model.FAILED:
-		if ctx.Silent != nil && *ctx.Silent {
-			*ctx.Silent = false
-			d.TestTitle(ctx, 0)
+		if ctx.Config.Verbose.Get() < model.SHOW_PASSED {
+			ctx.Config.Verbose = utilz.OptionalOf(model.SHOW_PASSED)
+			d.TestTitle(ctx)
 		}
 		if err == nil {
 			//IncrementSeq(tmpDir, FailureSequenceFilename)
@@ -112,7 +108,7 @@ func (d BasicDisplay) TestOutcome(ctx model.Context, seq int, outcome model.Outc
 				err = nil
 				//IncrementSeq(tmpDir, FailureSequenceFilename)
 				d.printer.ColoredErrf(failureColor, "FAILED")
-				d.printer.Errf(" (timed out after %s)\n", ctx.Timeout)
+				d.printer.Errf(" (timed out after %s)\n", ctx.Config.Timeout.Get())
 			}
 		}
 		d.printer.Errf("Failure calling cmd: <|%s|>\n", cmd)
@@ -121,7 +117,7 @@ func (d BasicDisplay) TestOutcome(ctx model.Context, seq int, outcome model.Outc
 		d.printer.Errf(" (not executed)\n")
 		d.printer.Errf("Failure calling cmd: <|%s|>\n", cmd)
 	case model.IGNORED:
-		if ctx.Silent == nil || !*ctx.Silent {
+		if ctx.Config.Verbose.Get() >= model.BETTER_ASSERTION_REPORT {
 			d.printer.ColoredErrf(warningColor, "IGNORED")
 			d.printer.Err("\n")
 		}
@@ -131,7 +127,8 @@ func (d BasicDisplay) TestOutcome(ctx model.Context, seq int, outcome model.Outc
 		d.printer.ColoredErrf(model.ErrorColor, "%s\n", err)
 	}
 
-	if (ctx.Silent == nil || !*ctx.Silent) && (*ctx.KeepStdout || *ctx.KeepStderr) {
+	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED &&
+		(ctx.Config.KeepStdout.Is(true) || ctx.Config.KeepStderr.Is(true)) {
 		// NewLine in printer to print test result in a new line
 		d.printer.Errf("        ")
 		d.printer.Flush()
@@ -222,31 +219,31 @@ func (d BasicDisplay) AssertionResult(cmd cmdz.Executer, result model.AssertionR
 	}
 }
 
-func (d BasicDisplay) ReportSuite(ctx model.Context, tmpDir string, failedReports []string) {
+func (d BasicDisplay) ReportSuite(ctx facade.SuiteContext, failedReports []string) {
 	defer d.Flush()
-	// FIXME: get tmpDir and failed reports from ctx
-	testCount := utils.ReadSeq(tmpDir, model.TestSequenceFilename)       // TODO: put in model.Context
-	ignoredCount := utils.ReadSeq(tmpDir, model.IgnoredSequenceFilename) // TODO: put in model.Context
-	failedCount := utils.ReadSeq(tmpDir, model.FailedSequenceFilename)   // TODO: put in model.Context
-	errorCount := utils.ReadSeq(tmpDir, model.ErroredSequenceFilename)   // TODO: put in model.Context
+	testCount := ctx.TestCount()
+	ignoredCount := ctx.IgnoredCount()
+	failedCount := ctx.FailedCount()
+	errorCount := ctx.ErroredCount()
 	passedCount := testCount - failedCount - ignoredCount
 
-	if ctx.Silent == nil || !*ctx.Silent {
-		d.printer.ColoredErrf(messageColor, "Reporting [%s] test suite (%s) ...\n", ctx.TestSuite, tmpDir)
+	testSuite := ctx.Config.TestSuite.Get()
+	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
+		d.printer.ColoredErrf(messageColor, "Reporting [%s] test suite (%s) ...\n", testSuite, ctx.Token)
 	}
 
 	ignoredMessage := ""
 	if ignoredCount > 0 {
 		ignoredMessage = fmt.Sprintf(" (%d ignored)", ignoredCount)
 	}
-	duration := ctx.LastTestTime.Sub(ctx.StartTime)
+	duration := ctx.Config.LastTestTime.Get().Sub(ctx.Config.SuiteStartTime.Get())
 	fmtDuration := NormalizeDurationInSec(duration)
 	if failedCount == 0 && errorCount == 0 {
-		d.printer.ColoredErrf(successColor, "Successfuly ran [%s] test suite (%d tests in %s)", ctx.TestSuite, passedCount, fmtDuration)
+		d.printer.ColoredErrf(successColor, "Successfuly ran [%s] test suite (%d tests in %s)", testSuite, passedCount, fmtDuration)
 		d.printer.ColoredErrf(warningColor, "%s", ignoredMessage)
 		d.printer.Errf("\n")
 	} else {
-		d.printer.ColoredErrf(failureColor, "Failures in [%s] test suite (%d success, %d failures, %d errors on %d tests in %s)", ctx.TestSuite, passedCount, failedCount, errorCount, testCount, fmtDuration)
+		d.printer.ColoredErrf(failureColor, "Failures in [%s] test suite (%d success, %d failures, %d errors on %d tests in %s)", testSuite, passedCount, failedCount, errorCount, testCount, fmtDuration)
 		d.printer.ColoredErrf(warningColor, "%s", ignoredMessage)
 		d.printer.Errf("\n")
 		for _, report := range failedReports {
@@ -255,10 +252,10 @@ func (d BasicDisplay) ReportSuite(ctx model.Context, tmpDir string, failedReport
 	}
 }
 
-func (d BasicDisplay) ReportAllFooter(testSuitesCtx model.Context) {
+func (d BasicDisplay) ReportAllFooter(globalCtx facade.GlobalContext) {
 	defer d.Flush()
 
-	globalStartTime := time.Now() // FIXME
+	globalStartTime := globalCtx.Config.GlobalStartTime.Get()
 	globalDuration := model.NormalizeDurationInSec(time.Since(globalStartTime))
 	d.printer.ColoredErrf(reportColor, "Global duration time: %s\n", globalDuration)
 }

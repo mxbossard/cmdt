@@ -13,11 +13,13 @@ import (
 	"time"
 
 	"mby.fr/cmdtest/display"
+	"mby.fr/cmdtest/facade"
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/repo"
 	"mby.fr/cmdtest/utils"
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/printz"
+	"mby.fr/utils/utilz"
 )
 
 var rulePrefix = model.DefaultRulePrefix
@@ -54,7 +56,7 @@ func SetRulePrefix(prefix string) {
 	}
 }
 */
-
+/*
 func readEnvToken() (token string) {
 	// Search uniqKey in env
 	for _, env := range os.Environ() {
@@ -66,8 +68,10 @@ func readEnvToken() (token string) {
 	logger.Debug("Found a token in env: " + token)
 	return
 }
+*/
 
-func updateGlobalConfig(ctx model.Context) (err error) {
+/*
+func updateGlobalConfig0(ctx model.Context) (err error) {
 	token := ctx.Token
 	ctx.TestSuite = model.GlobalConfigTestSuiteName
 	ctx.StartTime = time.Time{}
@@ -82,7 +86,7 @@ func updateGlobalConfig(ctx model.Context) (err error) {
 	return
 }
 
-func initConfig(ctx model.Context) (ok bool, err error) {
+func initConfig0(ctx model.Context) (ok bool, err error) {
 	ok = false
 	token := ctx.Token
 	testSuite := ctx.TestSuite
@@ -109,79 +113,94 @@ func initConfig(ctx model.Context) (ok bool, err error) {
 	logger.Debug("Initialized new config", "token", token, "suite", testSuite)
 	return
 }
+*/
 
-func GlobalConfig(ctx model.Context, update bool) (exitCode int, err error) {
+func GlobalConfig(ctx facade.GlobalContext, update bool) (exitCode int, err error) {
+	// Init or Update Global config
+	// FIXME: do we need to use update bool ?
 	exitCode = 0
-	ctx.TestSuite = model.GlobalConfigTestSuiteName
-	err = initWorkspace(ctx)
-	if err != nil {
-		return
-	}
-	var ok bool
-	ok, err = initConfig(ctx)
-	if update && err == nil && !ok {
-		err = updateGlobalConfig(ctx)
-	}
+	err = ctx.Save()
 	return
+	/*
+		ctx.TestSuite = model.GlobalConfigTestSuiteName
+		err = initWorkspace(ctx)
+		if err != nil {
+			return
+		}
+		var ok bool
+		ok, err = initConfig(ctx)
+		if update && err == nil && !ok {
+			err = updateGlobalConfig(ctx)
+		}
+		return
+	*/
 }
 
-func InitTestSuite(ctx model.Context) (exitCode int, err error) {
+func InitTestSuite(ctx facade.SuiteContext) (exitCode int, err error) {
+	// Clear and Init new test suite
 	exitCode = 0
 	token := ctx.Token
-	testSuite := ctx.TestSuite
+	cfg := ctx.Config
 
-	if ctx.Action == "init" && ctx.PrintToken {
+	if cfg.PrintToken.Is(true) {
 		token, err = utils.ForgeUuid()
 		if err != nil {
 			return
 		}
 		fmt.Printf("%s\n", token)
-		ctx.Token = token
-	} else if ctx.Action == "init" && ctx.ExportToken {
+		cfg.Token = utilz.OptionalOf(token)
+	} else if cfg.ExportToken.Is(true) {
 		token, err = utils.ForgeUuid()
 		if err != nil {
 			return
 		}
 		fmt.Printf("export %s=%s\n", model.ContextTokenEnvVarName, token)
-		ctx.Token = token
+		cfg.Token = utilz.OptionalOf(token)
 	}
 
-	exitCode, err = GlobalConfig(model.Context{Token: token, Silent: ctx.Silent}, false)
+	err = ctx.InitSuite()
 	if err != nil {
-		return
+		ctx.NoErrorOrFatal(err)
 	}
 
-	// Clear the test suite directory
-	var tmpDir string
-	tmpDir, err = utils.TestsuiteDirectoryPath(testSuite, token)
-	if err != nil {
-		return
-	}
-	err = os.RemoveAll(tmpDir)
-	if err != nil {
-		return
-	}
-	logger.Debug("Cleared test suite", "token", token, "suite", testSuite, "dir", tmpDir)
+	/*
+		exitCode, err = GlobalConfig(model.Context{Token: token, Silent: ctx.Silent}, false)
+		if err != nil {
+			return
+		}
 
-	err = initWorkspace(ctx)
-	if err != nil {
-		return
-	}
-	_, err = initConfig(ctx)
-	if err != nil {
-		return
-	}
+		// Clear the test suite directory
+		var tmpDir string
+		tmpDir, err = utils.TestsuiteDirectoryPath(testSuite, token)
+		if err != nil {
+			return
+		}
+		err = os.RemoveAll(tmpDir)
+		if err != nil {
+			return
+		}
+		logger.Debug("Cleared test suite", "token", token, "suite", testSuite, "dir", tmpDir)
+
+		err = initWorkspace(ctx)
+		if err != nil {
+			return
+		}
+		_, err = initConfig(ctx)
+		if err != nil {
+			return
+		}
+	*/
 
 	dpl.Suite(ctx)
 	return
 }
 
-func ReportTestSuite(ctx model.Context) (exitCode int, err error) {
+func ReportTestSuite(ctx facade.SuiteContext) (exitCode int, err error) {
 	exitCode = 1
 	token := ctx.Token
-	testSuite := ctx.TestSuite
+	cfg := ctx.Config
 
-	if ctx.ReportAll {
+	if cfg.ReportAll.Is(true) {
 		// Report all test suites
 		var testSuites []string
 		testSuites, err = utils.ListTestSuites(token)
@@ -252,49 +271,24 @@ func ReportTestSuite(ctx model.Context) (exitCode int, err error) {
 	return
 }
 
-func PerformTest(ctx model.Context, cmdAndArgs []string, assertions []model.Assertion) (exitCode int, err error) {
-	token := ctx.Token
-	testSuite := ctx.TestSuite
-	testName := ctx.TestName
+func PerformTest(ctx facade.TestContext, cmdAndArgs []string, assertions []model.Assertion) (exitCode int, err error) {
 	exitCode = 1
+	token := ctx.Token
+	cfg := ctx.Config
 
-	if len(cmdAndArgs) == 0 {
-		err = fmt.Errorf("no command supplied to test")
-		return
-	}
-	cmd := cmdz.Cmd(cmdAndArgs[0])
-	if len(cmdAndArgs) > 1 {
-		cmd.AddArgs(cmdAndArgs[1:]...)
-	}
+	/*
+		var tmpDir string
+		tmpDir, err = utils.TestsuiteDirectoryPath(testSuite, token)
+		if err != nil {
+			return
+		}
+	*/
+	seq := ctx.IncrementTestCount()
 
-	if ctx.Timeout.Milliseconds() > 0 {
-		cmd.Timeout(ctx.Timeout)
-	}
+	dpl.TestTitle(ctx)
 
-	if testName == "" {
-		// FIXME: move this in ctx ?
-		cmdNameParts := strings.Split(cmd.String(), " ")
-		shortenedCmd := filepath.Base(cmdNameParts[0])
-		shortenCmdNameParts := cmdNameParts
-		shortenCmdNameParts[0] = shortenedCmd
-		cmdName := strings.Join(shortenCmdNameParts, " ")
-		//testName = fmt.Sprintf("cmd: <|%s|>", cmdName)
-		testName = fmt.Sprintf("<|%s|>", cmdName)
-		ctx.TestName = testName
-	}
-
-	var tmpDir string
-	tmpDir, err = utils.TestsuiteDirectoryPath(testSuite, token)
-	if err != nil {
-		return
-	}
-
-	seq := utils.IncrementSeq(tmpDir, model.TestSequenceFilename)
-
-	dpl.TestTitle(ctx, seq)
-
-	if ctx.Ignore != nil && *ctx.Ignore {
-		utils.IncrementSeq(tmpDir, model.IgnoredSequenceFilename)
+	if cfg.Ignore.Is(true) {
+		ctx.IncrementIgnoredCount()
 		dpl.TestOutcome(ctx, seq, "IGNORED", nil, 0, nil)
 		exitCode = 0
 		return
@@ -311,11 +305,11 @@ func PerformTest(ctx model.Context, cmdAndArgs []string, assertions []model.Asse
 
 	var stdout, stderr io.Writer
 	stdout = stdoutLog
-	if *ctx.KeepStdout {
+	if cfg.KeepStdout.Is(true) {
 		stdout = io.MultiWriter(os.Stdout, stdoutLog)
 	}
 	stderr = stdoutLog
-	if *ctx.KeepStderr {
+	if cfg.KeepStderr.Is(true) {
 		stderr = io.MultiWriter(os.Stderr, stderrLog)
 	}
 	cmd.SetOutputs(stdout, stderr)
@@ -457,29 +451,32 @@ func ProcessArgs(allArgs []string) {
 		return
 	}
 
-	config, cmdAndArgs, assertions, err := ParseArgs(allArgs[1:])
-	if config.TestSuite == "" {
-		config.TestSuite = model.DefaultTestSuiteName
-	}
-	if config.Token == "" {
-		config.Token = readEnvToken()
-	}
-	if config.Token == "" {
-		var err2 error
-		config.Token, err2 = utils.ForgeContextualToken()
-		NoErrorOrFatal(config, err2)
-	}
+	config, assertions, err := ParseArgs(allArgs[1:])
+	token := config.Token.Get()
+	action := config.Action.Get()
 
-	NoErrorOrFatal(config, err)
+	switch action {
+	case model.GlobalAction:
+		if err != nil {
+			log.Fatal(err)
+		}
+		globalCtx := facade.NewGlobalContext(token, config)
+		exitCode, err = GlobalConfig(globalCtx, true)
+	case model.InitAction:
+		testSuite := config.TestSuite.Get()
+		suiteCtx := facade.NewSuiteContext(token, testSuite, action, config)
+		suiteCtx.NoErrorOrFatal(err)
+		exitCode, err = InitTestSuite(suiteCtx)
+	case model.ReportAction:
+		testSuite := config.TestSuite.Get()
+		suiteCtx := facade.NewSuiteContext(token, testSuite, action, config)
+		suiteCtx.NoErrorOrFatal(err)
+		exitCode, err = ReportTestSuite(suiteCtx)
+	case model.TestAction:
+		testSuite := config.TestSuite.Get()
+		testCtx := facade.NewTestContext(token, testSuite, config)
+		testCtx.NoErrorOrFatal(err)
 
-	switch config.Action {
-	case "global":
-		exitCode, err = GlobalConfig(config, true)
-	case "init":
-		exitCode, err = InitTestSuite(config)
-	case "test":
-		testSuite := config.TestSuite
-		token := config.Token
 		suiteContext, err := LoadSuiteContext(testSuite, token)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -525,8 +522,6 @@ func ProcessArgs(allArgs []string) {
 			NoErrorOrFatal(config, err)
 
 		}
-	case "report":
-		exitCode, err = ReportTestSuite(config)
 	default:
 		err = fmt.Errorf("action: [%s] not known", config.Action)
 	}

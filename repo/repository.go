@@ -14,7 +14,6 @@ import (
 	"gopkg.in/yaml.v2"
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/utils"
-	"mby.fr/utils/trust"
 	"mby.fr/utils/utilz"
 )
 
@@ -43,12 +42,21 @@ func (r FileRepo) BackingFilepath() string {
 	return path
 }
 
+func (r FileRepo) InitSuite(cfg model.Config) (err error) {
+	err = clearSuiteWorkspace(r.token, cfg)
+	if err != nil {
+		return
+	}
+	err = persistSuiteConfig(r.token, cfg)
+	return
+}
+
 func (r FileRepo) SaveGlobalConfig(cfg model.Config) (err error) {
-	cfg.TestSuite = utilz.OptionnalOf(model.GlobalConfigTestSuiteName)
+	cfg.TestSuite = utilz.OptionalOf(model.GlobalConfigTestSuiteName)
 	return persistSuiteConfig(r.token, cfg)
 }
 
-func (r FileRepo) LoadGlobalConfig(testSuite string) (model.Config, error) {
+func (r FileRepo) LoadGlobalConfig() (cfg model.Config, err error) {
 	return loadGlobalConfig(r.token)
 }
 
@@ -56,20 +64,50 @@ func (r FileRepo) SaveSuiteConfig(cfg model.Config) (err error) {
 	return persistSuiteConfig(r.token, cfg)
 }
 
-func (r FileRepo) LoadSuiteConfig(testSuite string) (model.Config, error) {
+func (r FileRepo) LoadSuiteConfig(testSuite string) (cfg model.Config, err error) {
 	return loadSuiteConfig(r.token, testSuite)
 }
 
+func (r FileRepo) ReadSuiteSeq(testSuite, name string) (n int) {
+	suiteDir, err := testSuiteDirectoryPath(testSuite, r.token)
+	if err != nil {
+		log.Fatal(err)
+	}
+	n = utils.ReadSeq(suiteDir, name)
+	return
+}
+
+func (r FileRepo) IncrementSuiteSeq(testSuite, name string) (n int) {
+	suiteDir, err := testSuiteDirectoryPath(testSuite, r.token)
+	if err != nil {
+		log.Fatal(err)
+	}
+	n = utils.IncrementSeq(suiteDir, name)
+	return
+}
+
 func (r FileRepo) SaveTestOutcome(outcome model.TestOutcome) (err error) {
-	initWorkspaceIfNot(r.token, outcome.Context.Config.TestName.Get())
 	// TODO
+	err = fmt.Errorf("not implemented yet")
 	return
 }
 
 func (r FileRepo) LoadSuiteOutcome(testSuite string) (outcome model.SuiteOutcome, err error) {
-	initWorkspaceIfNot(r.token, testSuite)
 	// TODO
+	err = fmt.Errorf("not implemented yet")
 	return
+}
+
+func (r FileRepo) UpdateLastTestTime(testSuite string) {
+	cfg, err := loadSuiteConfig(testSuite, r.token)
+	if err != nil {
+		log.Fatal(err)
+	}
+	cfg.LastTestTime = utilz.OptionalOf(time.Now())
+	err = persistSuiteConfig(r.token, cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func (r FileRepo) ListTestSuites(token string) (suites []string, err error) {
@@ -124,101 +162,9 @@ func (r FileRepo) ListTestSuites(token string) (suites []string, err error) {
 	return
 }
 
-func (r FileRepo) TestCount(ctx model.Context) (n int) {
-	return readSeq(ctx, model.TestSequenceFilename)
-}
-
-func (r FileRepo) PassedCount(ctx model.Context) (n int) {
-	return readSeq(ctx, model.PassedSequenceFilename)
-}
-
-func (r FileRepo) IgnoredCount(ctx model.Context) (n int) {
-	return readSeq(ctx, model.IgnoredSequenceFilename)
-}
-
-func (r FileRepo) FailedCount(ctx model.Context) (n int) {
-	return readSeq(ctx, model.FailedSequenceFilename)
-}
-
-func (r FileRepo) ErroredCount(ctx model.Context) (n int) {
-	return readSeq(ctx, model.ErroredSequenceFilename)
-}
-
-func (r FileRepo) IncrementTestCount(ctx model.Context) (n int) {
-	return incrementSeq(ctx, model.TestSequenceFilename)
-}
-
-func (r FileRepo) IncrementPassedCount(ctx model.Context) (n int) {
-	return incrementSeq(ctx, model.PassedSequenceFilename)
-}
-
-func (r FileRepo) IncrementIgnoredCount(ctx model.Context) (n int) {
-	return incrementSeq(ctx, model.IgnoredSequenceFilename)
-}
-
-func (r FileRepo) IncrementFailedCount(ctx model.Context) (n int) {
-	return incrementSeq(ctx, model.FailedSequenceFilename)
-}
-
-func (r FileRepo) IncrementErroredCount(ctx model.Context) (n int) {
-	return incrementSeq(ctx, model.ErroredSequenceFilename)
-}
-
-func (r FileRepo) SuiteError(ctx model.Context, v ...any) error {
-	return r.SuiteErrorf(ctx, "%s", fmt.Sprint(v...))
-}
-
-func (r FileRepo) SuiteErrorf(ctx model.Context, format string, v ...any) error {
-	r.IncrementErroredCount(ctx)
-	return fmt.Errorf(format, v...)
-}
-
-func (r FileRepo) Fatal(ctx model.Context, v ...any) {
-	r.IncrementErroredCount(ctx)
-	log.Fatal(v...)
-}
-
-func (r FileRepo) Fatalf(ctx model.Context, format string, v ...any) {
-	r.Fatal(ctx, fmt.Sprintf(format, v...))
-}
-
-func (r FileRepo) NoErrorOrFatal(ctx model.Context, err error) {
-	if err != nil {
-		ctx.Config.TestSuite.IfPresent(func(testSuite string) error {
-			updateLastTestTime(testSuite, r.token)
-			r.Fatal(ctx, err)
-			return nil
-		})
-		log.Fatal(err)
-	}
-}
-
-func forgeContextualToken() (string, error) {
-	// If no token supplied use Workspace dir + ppid to forge tmp directory path
-	workDirPath, err := os.Getwd()
-	if err != nil {
-		//log.Fatalf("cannot find workspace dir: %s", err)
-		return "", fmt.Errorf("cannot find workspace dir: %w", err)
-	}
-	ppid := os.Getppid()
-	ppidStr := fmt.Sprintf("%d", ppid)
-	ppidStartTime, err := utils.GetProcessStartTime(ppid)
-	if err != nil {
-		//log.Fatalf("cannot find parent process start time: %s", err)
-		return "", fmt.Errorf("cannot find parent process start time: %w", err)
-	}
-	ppidStartTimeStr := fmt.Sprintf("%d", ppidStartTime)
-	token, err := trust.SignStrings(workDirPath, "--", ppidStr, "--", ppidStartTimeStr)
-	if err != nil {
-		err = fmt.Errorf("cannot hash workspace dir: %w", err)
-	}
-	//log.Printf("contextual token: %s base on workDirPath: %s and ppid: %s\n", token, workDirPath, ppid)
-	return token, err
-}
-
 func forgeWorkDirectoryPath(token string) (tempDirPath string, err error) {
 	if token == "" {
-		token, err = forgeContextualToken()
+		token, err = utils.ForgeContextualToken()
 	}
 	if err != nil {
 		return
@@ -328,6 +274,18 @@ func persistSuiteContext1(config model.Context) (err error) {
 }
 */
 
+func clearSuiteWorkspace(token string, cfg model.Config) (err error) {
+	testSuite := cfg.TestSuite.Get()
+	var workDir string
+	workDir, err = testSuiteDirectoryPath(testSuite, token)
+	if err != nil {
+		return
+	}
+	logger.Debug("Clearing suite workspace", "suite", testSuite, "workDir", workDir)
+	err = os.RemoveAll(workDir)
+	return
+}
+
 func persistSuiteConfig(token string, cfg model.Config) (err error) {
 	testSuite := cfg.TestSuite.Get()
 	err = initWorkspaceIfNot(token, testSuite)
@@ -343,7 +301,7 @@ func persistSuiteConfig(token string, cfg model.Config) (err error) {
 	if err2 != nil {
 		return err2
 	}
-	logger.Debug("Persisting context", "context", content, "file", contextFilepath)
+	logger.Debug("Persisting config", "suite", testSuite, "file", contextFilepath)
 	err2 = os.WriteFile(contextFilepath, content, 0600)
 	if err2 != nil {
 		err2 = fmt.Errorf("cannot persist context: %w", err2)
@@ -374,6 +332,18 @@ func readConfig(name, token string) (config model.Config, err error) {
 	return
 }
 
+func loadGlobalConfig(token string) (config model.Config, err error) {
+	config = model.NewGlobalDefaultConfig()
+	var loaded model.Config
+	loaded, err = readConfig(model.GlobalConfigTestSuiteName, token)
+	if err != nil {
+		return
+	}
+	loaded.TestSuite = utilz.OptionalOf("")
+	config.Merge(loaded)
+	return
+}
+
 func loadSuiteConfig(testSuite, token string) (config model.Config, err error) {
 	var globalCfg, suiteCfg model.Config
 	globalCfg, err = loadGlobalConfig(token)
@@ -386,48 +356,9 @@ func loadSuiteConfig(testSuite, token string) (config model.Config, err error) {
 	}
 	logger.Debug("Loaded context", "global", globalCfg, "suite", suiteCfg)
 	config = globalCfg
-	err = config.Merge(suiteCfg)
-	if err != nil {
-		return
-	}
+	config.Merge(suiteCfg)
 	//SetRulePrefix(config.Prefix)
 	logger.Debug("Merges context", "merged", config)
-	return
-}
-
-func loadGlobalConfig(token string) (config model.Config, err error) {
-	config, err = readConfig(model.GlobalConfigTestSuiteName, token)
-	config.TestSuite = utilz.OptionnalOf("")
-	return
-}
-
-func updateLastTestTime(testSuite, token string) {
-	cfg, err := loadSuiteConfig(testSuite, token)
-	if err != nil {
-		log.Fatal(err)
-	}
-	cfg.LastTestTime = utilz.OptionnalOf(time.Now())
-	err = persistSuiteConfig(token, cfg)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func readSeq(ctx model.Context, name string) (n int) {
-	suiteDir, err := testSuiteDirectoryPath(ctx.Config.TestSuite.Get(), ctx.Token)
-	if err != nil {
-		log.Fatal(err)
-	}
-	n = utils.ReadSeq(suiteDir, name)
-	return
-}
-
-func incrementSeq(ctx model.Context, name string) (n int) {
-	suiteDir, err := testSuiteDirectoryPath(ctx.Config.TestSuite.Get(), ctx.Token)
-	if err != nil {
-		log.Fatal(err)
-	}
-	n = utils.IncrementSeq(suiteDir, name)
 	return
 }
 

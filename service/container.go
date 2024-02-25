@@ -5,13 +5,14 @@ import (
 	"os"
 	"strings"
 
+	"mby.fr/cmdtest/facade"
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/utils"
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/container"
 )
 
-func StartContainer(testCtx model.Context) (id string, err error) {
+func StartContainer(testCtx facade.Context) (id string, err error) {
 	image := testCtx.Config.ContainerImage.Get()
 	mocks := testCtx.Config.Mocks
 	// FIXME: implements Mocking in caontainer
@@ -24,7 +25,7 @@ func StartContainer(testCtx model.Context) (id string, err error) {
 	if err != nil {
 		return
 	}
-	repoDir := ctxRepo.BackingFilepath()
+	repoDir := testCtx.Repo.BackingFilepath()
 
 	cmdtestVol := os.Args[0] + ":/opt/cmdtest:ro"
 	ctxDirVol := repoDir + ":" + repoDir + ":rw"
@@ -82,7 +83,7 @@ func ExecInContainer(token, id string, cmdAndArgs []string) (exitCode int, err e
 	return
 }
 
-func PerformTestInEphemeralContainer(testCtx model.Context) (exitCode int, err error) {
+func PerformTestInEphemeralContainer(testCtx facade.Context) (exitCode int, err error) {
 	// Launch test in new container
 	var ctId string
 	ctId, err = StartContainer(testCtx)
@@ -110,7 +111,7 @@ func PerformTestInEphemeralContainer(testCtx model.Context) (exitCode int, err e
 	return
 }
 
-func PerformTestInContainer(testCtx model.Context) (ctId string, exitCode int, err error) {
+func PerformTestInContainer(testCtx facade.Context) (ctId string, exitCode int, err error) {
 	if testCtx.Config.ContainerId.IsPresent() {
 		ctId = testCtx.Config.ContainerId.Get()
 	}

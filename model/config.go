@@ -10,35 +10,37 @@ import (
 
 func NewGlobalDefaultConfig() Config {
 	return Config{
-		Prefix:            utilz.OptionnalOf(DefaultRulePrefix),
-		GlobalStartTime:   utilz.OptionnalOf(time.Now()),
-		ForkCount:         utilz.OptionnalOf(1),
-		Quiet:             utilz.OptionnalOf(false),
-		Ignore:            utilz.OptionnalOf(false),
-		StopOnFailure:     utilz.OptionnalOf(false),
-		KeepStdout:        utilz.OptionnalOf(false),
-		KeepStderr:        utilz.OptionnalOf(false),
-		Timeout:           utilz.OptionnalOf(10 * time.Second),
-		RunCount:          utilz.OptionnalOf(1),
-		Parallel:          utilz.OptionnalOf(1),
-		ContainerDisabled: utilz.OptionnalOf(true),
-		ContainerImage:    utilz.OptionnalOf(DefaultContainerImage),
-		ContainerDirties:  utilz.OptionnalOf(DirtyBeforeSuite),
-		ContainerScope:    utilz.OptionnalOf(SUITE_SCOPE),
+		Token:             utilz.OptionalOf(""),
+		Prefix:            utilz.OptionalOf(DefaultRulePrefix),
+		GlobalStartTime:   utilz.OptionalOf(time.Now()),
+		TestSuite:         utilz.OptionalOf(DefaultTestSuiteName),
+		ForkCount:         utilz.OptionalOf(1),
+		Quiet:             utilz.OptionalOf(false),
+		Ignore:            utilz.OptionalOf(false),
+		StopOnFailure:     utilz.OptionalOf(false),
+		KeepStdout:        utilz.OptionalOf(false),
+		KeepStderr:        utilz.OptionalOf(false),
+		Timeout:           utilz.OptionalOf(10 * time.Second),
+		RunCount:          utilz.OptionalOf(1),
+		Parallel:          utilz.OptionalOf(1),
+		ContainerDisabled: utilz.OptionalOf(true),
+		ContainerImage:    utilz.OptionalOf(DefaultContainerImage),
+		ContainerDirties:  utilz.OptionalOf(DirtyBeforeSuite),
+		ContainerScope:    utilz.OptionalOf(SUITE_SCOPE),
 	}
 }
 
 func NewSuiteDefaultConfig() Config {
 	return Config{
-		StartTime:    utilz.OptionnalOf(time.Now()),
-		SuiteTimeout: utilz.OptionnalOf(120 * time.Second),
+		SuiteStartTime: utilz.OptionalOf(time.Now()),
+		SuiteTimeout:   utilz.OptionalOf(120 * time.Second),
 	}
 }
 
 func NewInitlessSuiteDefaultConfig() Config {
 	return Config{
-		StartTime:    utilz.OptionnalOf(time.Now()),
-		SuiteTimeout: utilz.OptionnalOf(3600 * time.Second),
+		SuiteStartTime: utilz.OptionalOf(time.Now()),
+		SuiteTimeout:   utilz.OptionalOf(3600 * time.Second),
 	}
 }
 
@@ -68,7 +70,7 @@ const (
 	FAILED_ONLY VerboseLevel = iota
 	BETTER_ASSERTION_REPORT
 	SHOW_PASSED
-	SHOW_PASSED_OUTPUTS
+	SHOW_PASSED_AND_OUTPUTS
 )
 
 type CmdMock struct {
@@ -92,8 +94,9 @@ type Config struct {
 	TestName  utilz.Optional[string] `yaml:""`
 
 	Prefix          utilz.Optional[string]        `yaml:""`
+	CmdAndArgs      []string                      `yaml:""`
 	GlobalStartTime utilz.Optional[time.Time]     `yaml:""`
-	StartTime       utilz.Optional[time.Time]     `yaml:""`
+	SuiteStartTime  utilz.Optional[time.Time]     `yaml:""`
 	LastTestTime    utilz.Optional[time.Time]     `yaml:""`
 	SuiteTimeout    utilz.Optional[time.Duration] `yaml:""`
 	ForkCount       utilz.Optional[int]           `yaml:""`
@@ -145,7 +148,7 @@ func (c Config) SplitRuleExpr(ruleExpr string) (ok bool, r Rule) {
 	return
 }
 
-func (c Config) Merge(new Config) (err error) {
+func (c *Config) Merge(new Config) {
 	if new.TestSuite.IsPresent() {
 		c.TestSuite = new.TestSuite
 	}
@@ -156,8 +159,11 @@ func (c Config) Merge(new Config) (err error) {
 	if new.Prefix.IsPresent() {
 		c.Prefix = new.Prefix
 	}
-	if new.StartTime.IsPresent() {
-		c.StartTime = new.StartTime
+	if len(new.CmdAndArgs) > 0 {
+		c.CmdAndArgs = new.CmdAndArgs
+	}
+	if new.SuiteStartTime.IsPresent() {
+		c.SuiteStartTime = new.SuiteStartTime
 	}
 	if new.LastTestTime.IsPresent() {
 		c.LastTestTime = new.LastTestTime
@@ -234,6 +240,4 @@ func (c Config) Merge(new Config) (err error) {
 	if new.ContainerScope.IsPresent() {
 		c.ContainerScope = new.ContainerScope
 	}
-
-	return
 }
