@@ -11,6 +11,7 @@ const (
 	FAILED  = Outcome("FAILED")
 	ERRORED = Outcome("ERRORED")
 	IGNORED = Outcome("IGNORED")
+	TIMEOUT = Outcome("TIMEOUT")
 )
 
 type Assertion struct {
@@ -19,22 +20,35 @@ type Assertion struct {
 }
 
 type AssertionResult struct {
-	Assertion Assertion
-	Success   bool
-	Value     any
-	Message   string
+	Assertion  Assertion
+	Success    bool
+	Value      any
+	ErrMessage string
 }
 
 type TestOutcome struct {
-	CmdTitle         string
-	Duration         time.Duration
-	Err              error
-	Stdout           string
-	Stderr           string
-	AssertionResults []AssertionResult
+	TestSuite         string
+	Seq               int
+	TestQualifiedName string
+	CmdTitle          string
+	ExitCode          int
+	Err               error
+	Duration          time.Duration
+	Stdout            string
+	Stderr            string
+	Outcome           Outcome
+	AssertionResults  []AssertionResult
 }
 
 type SuiteOutcome struct {
+	TestSuite string
+	//ExitCode    int
 	Duration time.Duration
-	Err      error
+	//Err         error
+	FailureReports []string
+	TestCount      int
+	PassedCount    int
+	FailedCount    int
+	ErroredCount   int
+	IgnoredCount   int
 }

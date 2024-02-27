@@ -26,20 +26,21 @@ var (
 	errorColor   = ansi.Red
 )
 
-type Displayer interface {
-	Global(facade.Context)
-	Suite(facade.Context)
-	TestTitle(facade.Context)
-	TestOutcome(ctx facade.Context)
-	AssertionResult(model.AssertionResult)
-	ReportSuite(facade.Context)
-	ReportAll(facade.Context)
-	Stdout(string)
-	Stderr(string)
-	Error(error)
-	Flush() error
-}
-
+/*
+	type Displayer interface {
+		Global(facade.Context)
+		Suite(facade.Context)
+		TestTitle(facade.Context)
+		TestOutcome(ctx facade.Context)
+		AssertionResult(model.AssertionResult)
+		ReportSuite(facade.Context)
+		ReportAll(facade.Context)
+		Stdout(string)
+		Stderr(string)
+		Error(error)
+		Flush() error
+	}
+*/
 type BasicDisplay struct {
 	printer            printz.Printer
 	clearAnsiFormatter inout.Formatter
@@ -63,7 +64,6 @@ func (d BasicDisplay) Suite(ctx facade.SuiteContext) {
 }
 
 func (d BasicDisplay) TestTitle(ctx facade.TestContext) {
-	// FIXME: get seq from ctx
 	defer d.Flush()
 	title := ctx.TestTitle()
 
@@ -85,7 +85,6 @@ func (d BasicDisplay) TestTitle(ctx facade.TestContext) {
 
 func (d BasicDisplay) TestOutcome(ctx facade.TestContext, seq int, outcome model.Outcome, cmd cmdz.Executer, testDuration time.Duration, err error) {
 	// FIXME get outcome from ctx
-	// FIXME get cmd, duration and error from outcome
 	defer d.Flush()
 	switch outcome {
 	case model.PASSED:
@@ -99,14 +98,12 @@ func (d BasicDisplay) TestOutcome(ctx facade.TestContext, seq int, outcome model
 			d.TestTitle(ctx)
 		}
 		if err == nil {
-			//IncrementSeq(tmpDir, FailureSequenceFilename)
 			d.printer.ColoredErrf(failureColor, "FAILED")
 			d.printer.Errf(" (in %s)\n", testDuration)
 		} else {
 			if errors.Is(err, context.DeadlineExceeded) {
 				// Swallow error
 				err = nil
-				//IncrementSeq(tmpDir, FailureSequenceFilename)
 				d.printer.ColoredErrf(failureColor, "FAILED")
 				d.printer.Errf(" (timed out after %s)\n", ctx.Config.Timeout.Get())
 			}
@@ -144,8 +141,8 @@ func (d BasicDisplay) AssertionResult(cmd cmdz.Executer, result model.AssertionR
 	expected := result.Assertion.Expected
 	got := result.Value
 
-	if result.Message != "" {
-		d.printer.ColoredErrf(errorColor, result.Message+"\n")
+	if result.ErrMessage != "" {
+		d.printer.ColoredErrf(errorColor, result.ErrMessage+"\n")
 	}
 
 	if assertName == "success" || assertName == "fail" {
@@ -219,13 +216,14 @@ func (d BasicDisplay) AssertionResult(cmd cmdz.Executer, result model.AssertionR
 	}
 }
 
-func (d BasicDisplay) ReportSuite(ctx facade.SuiteContext, failedReports []string) {
+func (d BasicDisplay) ReportSuite(ctx facade.SuiteContext, outcome model.SuiteOutcome) {
 	defer d.Flush()
-	testCount := ctx.TestCount()
-	ignoredCount := ctx.IgnoredCount()
-	failedCount := ctx.FailedCount()
-	errorCount := ctx.ErroredCount()
-	passedCount := testCount - failedCount - ignoredCount
+	testCount := outcome.TestCount
+	ignoredCount := outcome.IgnoredCount
+	failedCount := outcome.FailedCount
+	errorCount := outcome.ErroredCount
+	//passedCount := testCount - failedCount - ignoredCount
+	passedCount := outcome.PassedCount
 
 	testSuite := ctx.Config.TestSuite.Get()
 	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
@@ -246,7 +244,7 @@ func (d BasicDisplay) ReportSuite(ctx facade.SuiteContext, failedReports []strin
 		d.printer.ColoredErrf(failureColor, "Failures in [%s] test suite (%d success, %d failures, %d errors on %d tests in %s)", testSuite, passedCount, failedCount, errorCount, testCount, fmtDuration)
 		d.printer.ColoredErrf(warningColor, "%s", ignoredMessage)
 		d.printer.Errf("\n")
-		for _, report := range failedReports {
+		for _, report := range outcome.FailureReports {
 			d.printer.ColoredErrf(reportColor, "%s\n", report)
 		}
 	}

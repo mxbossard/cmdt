@@ -1,34 +1,24 @@
 package service
 
 import (
-	"context"
-	"errors"
 	"fmt"
-	"io"
 	"log"
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
-	"time"
 
 	"mby.fr/cmdtest/display"
 	"mby.fr/cmdtest/facade"
 	"mby.fr/cmdtest/model"
-	"mby.fr/cmdtest/repo"
 	"mby.fr/cmdtest/utils"
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/printz"
 	"mby.fr/utils/utilz"
 )
 
-var rulePrefix = model.DefaultRulePrefix
-
 var dpl = display.New()
 
 var logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
-
-var ctxRepo = repo.New("")
 
 func usage() {
 	usagePrinter := printz.NewStandard()
@@ -139,9 +129,9 @@ func GlobalConfig(ctx facade.GlobalContext, update bool) (exitCode int, err erro
 func InitTestSuite(ctx facade.SuiteContext) (exitCode int, err error) {
 	// Clear and Init new test suite
 	exitCode = 0
-	token := ctx.Token
 	cfg := ctx.Config
 
+	var token string
 	if cfg.PrintToken.Is(true) {
 		token, err = utils.ForgeUuid()
 		if err != nil {
@@ -195,94 +185,54 @@ func InitTestSuite(ctx facade.SuiteContext) (exitCode int, err error) {
 	return
 }
 
-func ReportTestSuite(ctx facade.SuiteContext) (exitCode int, err error) {
-	exitCode = 1
+func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int, err error) {
 	token := ctx.Token
-	cfg := ctx.Config
 
-	if cfg.ReportAll.Is(true) {
-		// Report all test suites
-		var testSuites []string
-		testSuites, err = utils.ListTestSuites(token)
-		if err != nil {
-			return
-		}
-		if len(testSuites) > 0 {
-			exitCode = 0
-			logger.Debug("reporting found suites", "suites", testSuites)
-			for _, suite := range testSuites {
-				ctx, err = LoadSuiteContext(suite, token)
-				if err != nil {
-					err = fmt.Errorf("cannot load context: %w", err)
-					return
-				}
-				var code int
-				code, err = ReportTestSuite(ctx)
-				if err != nil {
-					return
-				}
-				if code != 0 {
-					exitCode = code
-				}
-			}
-			var global model.Context
-			global, err = LoadGlobalContext(token)
+	var testSuites []string
+	testSuites, err = ctx.Repo.ListTestSuites()
+	if err != nil {
+		return
+	}
+
+	if len(testSuites) > 0 {
+		exitCode = 0
+		logger.Debug("reporting found suites", "suites", testSuites)
+		for _, testSuite := range testSuites {
+			suiteCtx := facade.NewSuiteContext(token, testSuite, model.ReportAction, ctx.Config)
+			code := 0
+			code, err = ReportTestSuite(suiteCtx)
 			if err != nil {
-				err = fmt.Errorf("cannot load global context: %s", err)
 				return
 			}
-			dpl.ReportAllFooter(global)
-			return
+			if code != 0 {
+				exitCode = code
+			}
 		}
-		// Continue to return errors
+		dpl.ReportAllFooter(ctx)
 	}
 
-	var tmpDir string
-	tmpDir, err = utils.TestsuiteDirectoryPath(testSuite, token)
-	if err != nil {
-		return
-	}
-	defer os.RemoveAll(tmpDir)
+	return
+}
 
-	suiteContext, err := LoadSuiteContext(testSuite, token)
-	if err != nil {
-		if os.IsNotExist(err) {
-			err = fmt.Errorf("you must perform some test prior to report: [%s] test suite", testSuite)
-			return
-		} else {
-			err = fmt.Errorf("cannot load context: %w", err)
-			return
-		}
-	}
-	ctx = model.MergeContext(suiteContext, ctx)
-	var failedReports []string
-	failedReports, err = FailureReports(testSuite, token)
-	if err != nil {
-		return
-	}
-	dpl.ReportSuite(ctx, tmpDir, failedReports)
+func ReportTestSuite(ctx facade.SuiteContext) (exitCode int, err error) {
+	exitCode = 1
+	cfg := ctx.Config
 
-	failedCount := utils.ReadSeq(tmpDir, model.FailedSequenceFilename)
-	errorCount := utils.ReadSeq(tmpDir, model.ErroredSequenceFilename)
-	if failedCount == 0 && errorCount == 0 {
+	var suiteOutcome model.SuiteOutcome
+	suiteOutcome, err = ctx.Repo.LoadSuiteOutcome(cfg.TestSuite.Get())
+	dpl.ReportSuite(ctx, suiteOutcome)
+
+	if suiteOutcome.FailedCount == 0 && suiteOutcome.ErroredCount == 0 {
 		exitCode = 0
 	}
 
 	return
 }
 
-func PerformTest(ctx facade.TestContext, cmdAndArgs []string, assertions []model.Assertion) (exitCode int, err error) {
+func PerformTest(ctx facade.TestContext, assertions []model.Assertion) (exitCode int, err error) {
 	exitCode = 1
-	token := ctx.Token
 	cfg := ctx.Config
 
-	/*
-		var tmpDir string
-		tmpDir, err = utils.TestsuiteDirectoryPath(testSuite, token)
-		if err != nil {
-			return
-		}
-	*/
 	seq := ctx.IncrementTestCount()
 
 	dpl.TestTitle(ctx)
@@ -294,62 +244,7 @@ func PerformTest(ctx facade.TestContext, cmdAndArgs []string, assertions []model
 		return
 	}
 
-	var stdoutLog, stderrLog, reportLog *os.File
-	stdoutLog, stderrLog, reportLog, err = cmdLogFiles(testSuite, token, seq)
-	if err != nil {
-		return
-	}
-	defer stdoutLog.Close()
-	defer stderrLog.Close()
-	defer reportLog.Close()
-
-	var stdout, stderr io.Writer
-	stdout = stdoutLog
-	if cfg.KeepStdout.Is(true) {
-		stdout = io.MultiWriter(os.Stdout, stdoutLog)
-	}
-	stderr = stdoutLog
-	if cfg.KeepStderr.Is(true) {
-		stderr = io.MultiWriter(os.Stderr, stderrLog)
-	}
-	cmd.SetOutputs(stdout, stderr)
-
-	stat, _ := os.Stdin.Stat()
-	if (stat.Mode() & os.ModeCharDevice) == 0 {
-		cmd.SetInput(os.Stdin)
-	}
-
-	for _, environ := range os.Environ() {
-		if !strings.HasPrefix(environ, "PATH=") {
-			cmd.AddEnviron(environ)
-		}
-	}
-	currentPath := os.Getenv("PATH")
-	if len(ctx.Mocks) > 0 {
-		// Put mockDir in PATH
-		var mockDir string
-		mockDir, err = ProcessMocking(testSuite, token, seq, ctx.Mocks)
-		if err != nil {
-			return
-		}
-		cmd.AddEnv("ORIGINAL_PATH", currentPath)
-		newPath := fmt.Sprintf("%s:%s", mockDir, currentPath)
-		cmd.AddEnv("PATH", newPath)
-		err = os.Setenv("PATH", newPath)
-		if err != nil {
-			return
-		}
-	} else {
-		cmd.AddEnv("PATH", currentPath)
-	}
-
-	qualifiedName := testName
-	if testSuite != "" {
-		qualifiedName = fmt.Sprintf("[%s]/%s", testSuite, testName)
-	}
-	testTitle := fmt.Sprintf("Test %s #%02d", qualifiedName, seq)
-
-	for _, before := range ctx.Before {
+	for _, before := range cfg.Before {
 		cmdBefore := cmdz.Cmd(before...)
 		beforeExit, beforeErr := cmdBefore.BlockRun()
 		// FIXME: what to do of before exit code or beforeErr ?
@@ -360,68 +255,9 @@ func PerformTest(ctx facade.TestContext, cmdAndArgs []string, assertions []model
 		}
 	}
 
-	_, err = cmd.BlockRun()
-	var failedResults []model.AssertionResult
-	var testDuration time.Duration
-	exitCode = 1
+	outcome := ctx.AssertCmdExecBlocking(seq, assertions)
 
-	if err == nil {
-		exitCode = 0
-		testDuration = cmd.Duration()
-		for _, assertion := range assertions {
-			var result model.AssertionResult
-			result, err = assertion.Asserter(cmd)
-			result.Assertion = assertion
-			if err != nil {
-				// FIXME: aggregate errors
-				result.Message += fmt.Sprintf("%s ", err)
-				result.Success = false
-			}
-			if !result.Success {
-				failedResults = append(failedResults, result)
-				exitCode = 1
-			}
-		}
-	}
-
-	if exitCode == 0 {
-		dpl.TestOutcome(ctx, seq, model.PASSED, cmd, testDuration, err)
-		defer os.Remove(reportLog.Name())
-	} else {
-		if err == nil {
-			dpl.TestOutcome(ctx, seq, model.FAILED, cmd, testDuration, err)
-		} else {
-			if errors.Is(err, context.DeadlineExceeded) {
-				// Swallow error
-				err = nil
-				//IncrementSeq(tmpDir, FailureSequenceFilename)
-				dpl.TestOutcome(ctx, seq, model.FAILED, cmd, testDuration, err)
-				reportLog.WriteString(testTitle + "  =>  timed out")
-			} else {
-				err = nil
-				// Swallow error
-				utils.IncrementSeq(tmpDir, model.ErroredSequenceFilename)
-				dpl.TestOutcome(ctx, seq, model.ERRORED, cmd, testDuration, err)
-				reportLog.WriteString(testTitle + "  =>  not executed")
-			}
-		}
-		if err == nil {
-			for _, result := range failedResults {
-				dpl.AssertionResult(cmd, result)
-			}
-			failedAssertionsReport := ""
-			for _, result := range failedResults {
-				assertName := result.Assertion.Name
-				assertOp := result.Assertion.Op
-				expected := result.Assertion.Expected
-				failedAssertionsReport += RulePrefix() + string(assertName) + string(assertOp) + string(expected) + " "
-			}
-			utils.IncrementSeq(tmpDir, model.FailedSequenceFilename)
-			reportLog.WriteString(testTitle + "  => " + failedAssertionsReport)
-		}
-	}
-
-	for _, after := range ctx.After {
+	for _, after := range cfg.After {
 		cmdAfter := cmdz.Cmd(after...)
 		afterExit, afterErr := cmdAfter.BlockRun()
 		// FIXME: what to do of before exit code or beforeErr ?
@@ -431,12 +267,11 @@ func PerformTest(ctx facade.TestContext, cmdAndArgs []string, assertions []model
 		}
 	}
 
-	if ctx.StopOnFailure == nil || *ctx.StopOnFailure && exitCode > 0 {
-		ReportTestSuite(ctx)
-	}
-
-	if ctx.StopOnFailure == nil || !*ctx.StopOnFailure {
-		// FIXME: Do not return a success to let test continue
+	if cfg.StopOnFailure.Is(true) && outcome.Outcome != model.PASSED {
+		exitCode = max(outcome.ExitCode, 1)
+		//ReportTestSuite(ctx)
+		// FIXME do we need to call ReportTestSuite ?
+	} else {
 		exitCode = 0
 	}
 	return
@@ -468,178 +303,75 @@ func ProcessArgs(allArgs []string) {
 		suiteCtx.NoErrorOrFatal(err)
 		exitCode, err = InitTestSuite(suiteCtx)
 	case model.ReportAction:
-		testSuite := config.TestSuite.Get()
-		suiteCtx := facade.NewSuiteContext(token, testSuite, action, config)
-		suiteCtx.NoErrorOrFatal(err)
-		exitCode, err = ReportTestSuite(suiteCtx)
+		if config.ReportAll.Is(true) {
+			if err != nil {
+				log.Fatal(err)
+			}
+			globalCtx := facade.NewGlobalContext(token, config)
+			exitCode, err = ReportAllTestSuites(globalCtx)
+		} else {
+			testSuite := config.TestSuite.Get()
+			suiteCtx := facade.NewSuiteContext(token, testSuite, action, config)
+			suiteCtx.NoErrorOrFatal(err)
+			exitCode, err = ReportTestSuite(suiteCtx)
+		}
 	case model.TestAction:
 		testSuite := config.TestSuite.Get()
 		testCtx := facade.NewTestContext(token, testSuite, config)
 		testCtx.NoErrorOrFatal(err)
 
-		suiteContext, err := LoadSuiteContext(testSuite, token)
-		if err != nil {
-			if os.IsNotExist(err) {
-				// test suite does not exists yet
-				suiteCtx := model.Context{Token: token, TestSuite: testSuite}
-				exitCode, err = InitTestSuite(suiteCtx)
-				if err != nil {
-					return
+		/*
+			suiteContext, err := LoadSuiteContext(testSuite, token)
+			if err != nil {
+				if os.IsNotExist(err) {
+					// test suite does not exists yet
+					suiteCtx := model.Context{Token: token, TestSuite: testSuite}
+					exitCode, err = InitTestSuite(suiteCtx)
+					if err != nil {
+						return
+					}
+					if exitCode > 0 {
+						return
+					}
+				} else {
+					err = fmt.Errorf("cannot load context: %w", err)
+					NoErrorOrFatal(config, err)
 				}
-				if exitCode > 0 {
-					return
-				}
-			} else {
-				err = fmt.Errorf("cannot load context: %w", err)
-				NoErrorOrFatal(config, err)
 			}
-		}
-		defer updateLastTestTime(testSuite, token)
+			defer updateLastTestTime(testSuite, token)
 
-		config = model.MergeContext(suiteContext, config)
+			config = model.MergeContext(suiteContext, config)
+		*/
 
-		if (config.ContainerDisabled != nil && *config.ContainerDisabled) || config.ContainerImage == "" {
+		if config.ContainerDisabled.Is(true) || config.ContainerImage.IsEmpty() {
 			//logger.Debug("Performing test outside container", "context", config, "image", config.ContainerImage, "containerDisabled", config.ContainerDisabled)
-			exitCode, err = PerformTest(config, cmdAndArgs, assertions)
-			NoErrorOrFatal(config, err)
+			exitCode, err = PerformTest(testCtx, assertions)
+			testCtx.NoErrorOrFatal(err)
 		} else {
 			logger.Debug("Performing test inside container", "context", config, "image", config.ContainerImage, "containerDisabled", config.ContainerDisabled)
 			var ctId string
-			ctId, exitCode, err = PerformTestInContainer(config)
-			if config.ContainerScope != nil && *config.ContainerScope == model.Global {
-				globalCtx, err2 := LoadGlobalContext(config.Token)
-				NoErrorOrFatal(config, err2)
-				globalCtx.ContainerId = &ctId
-				err2 = PersistSuiteContext(globalCtx)
-				NoErrorOrFatal(config, err2)
-			} else if config.ContainerScope != nil && *config.ContainerScope == model.Suite {
-				suiteCtx, err2 := LoadSuiteContext(config.TestSuite, config.Token)
-				NoErrorOrFatal(config, err2)
-				suiteCtx.ContainerId = &ctId
-				err2 = PersistSuiteContext(suiteCtx)
-				NoErrorOrFatal(config, err2)
+			ctId, exitCode, err = PerformTestInContainer(testCtx)
+			if config.ContainerScope.Is(model.GLOBAL_SCOPE) {
+				globalCfg, err2 := testCtx.Repo.LoadGlobalConfig()
+				testCtx.NoErrorOrFatal(err2)
+				globalCfg.ContainerId = utilz.OptionalOf(ctId)
+				err2 = testCtx.Repo.SaveGlobalConfig(globalCfg)
+				testCtx.NoErrorOrFatal(err2)
+			} else if config.ContainerScope.Is(model.SUITE_SCOPE) {
+				suiteCfg, err2 := testCtx.Repo.LoadSuiteConfig(testSuite)
+				testCtx.NoErrorOrFatal(err2)
+				suiteCfg.ContainerId = utilz.OptionalOf(ctId)
+				err2 = testCtx.Repo.SaveSuiteConfig(suiteCfg)
+				testCtx.NoErrorOrFatal(err2)
 			}
-			NoErrorOrFatal(config, err)
+			testCtx.NoErrorOrFatal(err)
 
 		}
 	default:
-		err = fmt.Errorf("action: [%s] not known", config.Action)
+		err = fmt.Errorf("action: [%v] not known", config.Action)
 	}
 
 	if err != nil {
-		utils.Fatal(config.TestSuite, config.Token, err)
+		log.Fatal(config.TestSuite, config.Token, err)
 	}
-}
-
-func mockDirectoryPath(testSuite, token string, seq int) (mockDir string, err error) {
-	var testDir string
-	testDir, err = utils.TestDirectoryPath(testSuite, token, seq)
-	mockDir = filepath.Join(testDir, "mock")
-	return
-}
-
-func ProcessMocking(testSuite, token string, seq int, mocks []model.CmdMock) (mockDir string, err error) {
-	// get test dir
-	// create a mock dir
-	mockDir, err = mockDirectoryPath(testSuite, token, seq)
-	if err != nil {
-		return
-	}
-	err = os.MkdirAll(mockDir, 0755)
-	if err != nil {
-		return
-	}
-	wrapperFilepath := filepath.Join(mockDir, "mockWrapper.sh")
-	// add mockdir to PATH TODO in perform test
-
-	// write the mocke wrapper
-	err = writeMockWrapperScript(wrapperFilepath, mocks)
-	if err != nil {
-		return
-	}
-	// for each cmd mocked add link to the mock wrapper
-	for _, mock := range mocks {
-		linkName := filepath.Join(mockDir, mock.Cmd)
-		linkSource := wrapperFilepath
-		err = os.Symlink(linkSource, linkName)
-		if err != nil {
-			return
-		}
-	}
-
-	log.Printf("mock wrapper: %s\n", wrapperFilepath)
-	return
-}
-
-func writeMockWrapperScript(wrapperFilepath string, mocks []model.CmdMock) (err error) {
-	// By default run all args
-	//wrapper.sh CMD ARG_1 ARG_2 ... ARG_N
-	// Pour chaque CmdMock
-	// if "$@" match CmdMock
-	wrapperScript := "#! /bin/sh\nset -e\n"
-	wrapperScript += `export PATH="$ORIGINAL_PATH"` + "\n"
-	//wrapperScript += ">&2 echo PATH:$PATH\n"
-	wrapperScript += `cmd=$( basename "$0" )` + "\n"
-
-	for _, mock := range mocks {
-		wrapperScript += fmt.Sprintf(`if [ "$cmd" = "%s" ]`, mock.Cmd)
-		wildcard := false
-		if mock.Op == "=" {
-			// args must exactly match mock config
-			for pos, arg := range mock.Args {
-				if arg != "*" {
-					wrapperScript += fmt.Sprintf(` && [ "$%d" = "%s" ] `, pos+1, arg)
-				} else {
-					wildcard = true
-					break
-				}
-			}
-		} else if mock.Op == ":" {
-			// args must contains mock config disorderd
-			// all mock args must be in $@
-			// if multiple same mock args must all be present in $@
-			mockArgsCount := make(map[string]int, 8)
-			for _, arg := range mock.Args {
-				if arg != "*" {
-					mockArgsCount[arg]++
-				} else {
-					wildcard = true
-				}
-			}
-			for arg, count := range mockArgsCount {
-				wrapperScript += fmt.Sprintf(` && [ %d -eq $( echo "$@" | grep -c "%s" ) ]`, count, arg)
-			}
-		}
-		if !wildcard {
-			wrapperScript += fmt.Sprintf(` && [ "$#" -eq %d ] `, len(mock.Args))
-		}
-
-		wrapperScript += `; then` + "\n"
-		if mock.Stdin != nil {
-			wrapperScript += fmt.Sprintf("\t" + `stdin="$( cat )"` + "\n")
-			wrapperScript += fmt.Sprintf("\t"+`if [ "$stdin" = "%s" ]; then`+"\n", *mock.Stdin)
-		}
-
-		// FIXME: add stdin management
-		if mock.Stdout != "" {
-			wrapperScript += fmt.Sprintf("\t"+`echo -n "%s"`+"\n", mock.Stdout)
-		}
-		if mock.Stderr != "" {
-			wrapperScript += fmt.Sprintf("\t"+` >&2 echo -n "%s"`+"\n", mock.Stderr)
-		}
-		if len(mock.OnCallCmdAndArgs) > 0 {
-			wrapperScript += fmt.Sprintf("\t"+`%s`+"\n", strings.Join(mock.OnCallCmdAndArgs, " "))
-		}
-		if !mock.Delegate {
-			wrapperScript += fmt.Sprintf("\t"+`exit %d`+"\n", mock.ExitCode)
-		}
-		if mock.Stdin != nil {
-			wrapperScript += fmt.Sprintf("\t" + `fi` + "\n")
-		}
-		wrapperScript += fmt.Sprintf(`fi` + "\n")
-	}
-	wrapperScript += `"$cmd" "$@"` + "\n"
-
-	err = os.WriteFile(wrapperFilepath, []byte(wrapperScript), 0755)
-	return
 }

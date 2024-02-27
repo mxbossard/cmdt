@@ -12,7 +12,7 @@ import (
 	"mby.fr/utils/container"
 )
 
-func StartContainer(testCtx facade.Context) (id string, err error) {
+func StartContainer(testCtx facade.TestContext) (id string, err error) {
 	image := testCtx.Config.ContainerImage.Get()
 	mocks := testCtx.Config.Mocks
 	// FIXME: implements Mocking in caontainer
@@ -83,7 +83,7 @@ func ExecInContainer(token, id string, cmdAndArgs []string) (exitCode int, err e
 	return
 }
 
-func PerformTestInEphemeralContainer(testCtx facade.Context) (exitCode int, err error) {
+func PerformTestInEphemeralContainer(testCtx facade.TestContext) (exitCode int, err error) {
 	// Launch test in new container
 	var ctId string
 	ctId, err = StartContainer(testCtx)
@@ -111,7 +111,7 @@ func PerformTestInEphemeralContainer(testCtx facade.Context) (exitCode int, err 
 	return
 }
 
-func PerformTestInContainer(testCtx facade.Context) (ctId string, exitCode int, err error) {
+func PerformTestInContainer(testCtx facade.TestContext) (ctId string, exitCode int, err error) {
 	if testCtx.Config.ContainerId.IsPresent() {
 		ctId = testCtx.Config.ContainerId.Get()
 	}

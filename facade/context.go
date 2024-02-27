@@ -1,13 +1,17 @@
 package facade
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"io"
 	"log"
+	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
+	"mby.fr/cmdtest/mock"
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/repo"
 	"mby.fr/cmdtest/utils"
@@ -85,18 +89,22 @@ func NewTestContext(token, testSuite string, inputCfg model.Config) TestContext 
 	}
 
 	if !mergedCfg.TestName.IsPresent() || mergedCfg.TestName.Is("") {
-		mergedCfg.TestName = utilz.OptionalOf(testNameFromCmd(cmd))
+		mergedCfg.TestName = utilz.OptionalOf(cmdTitle(cmd))
 	}
 
 	testCtx := TestContext{
 		SuiteContext: suiteCtx,
-		Cmd:          cmd,
+	}
+	err := testCtx.initExecuter()
+	if err != nil {
+		testCtx.NoErrorOrFatal(err)
 	}
 
 	//c.SetRulePrefix(cfg.Prefix.Get())
 	return testCtx
 }
 
+/*
 type Context struct {
 	Token                string
 	Action               model.Action
@@ -170,26 +178,6 @@ func (c Context) SplitRuleExpr(ruleExpr string) (ok bool, r model.Rule) {
 	return
 }
 
-func (c Context) TestCount() (n int) {
-	return c.Repo.ReadSuiteSeq(c.Config.TestName.Get(), model.TestSequenceFilename)
-}
-
-func (c Context) PassedCount() (n int) {
-	return c.Repo.ReadSuiteSeq(c.Config.TestName.Get(), model.PassedSequenceFilename)
-}
-
-func (c Context) IgnoredCount() (n int) {
-	return c.Repo.ReadSuiteSeq(c.Config.TestName.Get(), model.IgnoredSequenceFilename)
-}
-
-func (c Context) FailedCount() (n int) {
-	return c.Repo.ReadSuiteSeq(c.Config.TestName.Get(), model.FailedSequenceFilename)
-}
-
-func (c Context) ErroredCount() (n int) {
-	return c.Repo.ReadSuiteSeq(c.Config.TestName.Get(), model.ErroredSequenceFilename)
-}
-
 func (c Context) IncrementTestCount() (n int) {
 	return c.Repo.IncrementSuiteSeq(c.Config.TestName.Get(), model.TestSequenceFilename)
 }
@@ -238,6 +226,7 @@ func (c Context) NoErrorOrFatal(err error) {
 		log.Fatal(err)
 	}
 }
+*/
 
 type GlobalContext struct {
 	Token string
@@ -315,49 +304,29 @@ func (c SuiteContext) TestTitle() (title string) {
 	cfg := c.Config
 	timecode := int(time.Since(cfg.SuiteStartTime.Get()).Milliseconds())
 	qualifiedName := c.TestQualifiedName()
-	seq := c.TestCount()
+	seq := c.Repo.TestCount(c.Config.TestSuite.Get())
 	title = fmt.Sprintf("[%05d] Test: %s #%02d... ", timecode, qualifiedName, seq)
 	return
 }
 
-func (c SuiteContext) TestCount() (n int) {
-	return c.Repo.ReadSuiteSeq(c.Config.TestName.Get(), model.TestSequenceFilename)
-}
-
-func (c SuiteContext) PassedCount() (n int) {
-	return c.Repo.ReadSuiteSeq(c.Config.TestName.Get(), model.PassedSequenceFilename)
-}
-
-func (c SuiteContext) IgnoredCount() (n int) {
-	return c.Repo.ReadSuiteSeq(c.Config.TestName.Get(), model.IgnoredSequenceFilename)
-}
-
-func (c SuiteContext) FailedCount() (n int) {
-	return c.Repo.ReadSuiteSeq(c.Config.TestName.Get(), model.FailedSequenceFilename)
-}
-
-func (c SuiteContext) ErroredCount() (n int) {
-	return c.Repo.ReadSuiteSeq(c.Config.TestName.Get(), model.ErroredSequenceFilename)
-}
-
 func (c SuiteContext) IncrementTestCount() (n int) {
-	return c.Repo.IncrementSuiteSeq(c.Config.TestName.Get(), model.TestSequenceFilename)
+	return c.Repo.IncrementSuiteSeq(c.Config.TestSuite.Get(), model.TestSequenceFilename)
 }
 
 func (c SuiteContext) IncrementPassedCount() (n int) {
-	return c.Repo.IncrementSuiteSeq(c.Config.TestName.Get(), model.PassedSequenceFilename)
+	return c.Repo.IncrementSuiteSeq(c.Config.TestSuite.Get(), model.PassedSequenceFilename)
 }
 
 func (c SuiteContext) IncrementIgnoredCount() (n int) {
-	return c.Repo.IncrementSuiteSeq(c.Config.TestName.Get(), model.IgnoredSequenceFilename)
+	return c.Repo.IncrementSuiteSeq(c.Config.TestSuite.Get(), model.IgnoredSequenceFilename)
 }
 
 func (c SuiteContext) IncrementFailedCount() (n int) {
-	return c.Repo.IncrementSuiteSeq(c.Config.TestName.Get(), model.FailedSequenceFilename)
+	return c.Repo.IncrementSuiteSeq(c.Config.TestSuite.Get(), model.FailedSequenceFilename)
 }
 
 func (c SuiteContext) IncrementErroredCount() (n int) {
-	return c.Repo.IncrementSuiteSeq(c.Config.TestName.Get(), model.ErroredSequenceFilename)
+	return c.Repo.IncrementSuiteSeq(c.Config.TestSuite.Get(), model.ErroredSequenceFilename)
 }
 
 func (c SuiteContext) SuiteError(v ...any) error {
@@ -392,11 +361,134 @@ func (c SuiteContext) NoErrorOrFatal(err error) {
 type TestContext struct {
 	SuiteContext
 
-	Cmd         cmdz.Executer
+	CmdExec     cmdz.Executer
 	TestOutcome utilz.AnyOptional[model.TestOutcome]
 }
 
-func testNameFromCmd(cmd cmdz.Executer) string {
+func (c TestContext) AssertCmdExecBlocking(seq int, assertions []model.Assertion) (outcome model.TestOutcome) {
+	testSuite := c.Config.TestSuite.Get()
+	exitCode, err := c.CmdExec.BlockRun()
+
+	c.Repo.UpdateLastTestTime(testSuite)
+	outcome.TestSuite = testSuite
+	outcome.Seq = seq
+	outcome.TestQualifiedName = c.TestQualifiedName()
+	outcome.ExitCode = -1
+	outcome.CmdTitle = cmdTitle(c.CmdExec)
+	outcome.Duration = c.CmdExec.Duration()
+	outcome.Stdout = c.CmdExec.StdoutRecord()
+	outcome.Stderr = c.CmdExec.StderrRecord()
+
+	if err != nil {
+		// Timeout error is managed
+		if errors.Is(err, context.DeadlineExceeded) {
+			// Swallow error
+			err = nil
+			outcome.Outcome = model.TIMEOUT
+		} else {
+			outcome.Err = err
+			outcome.Outcome = model.ERRORED
+		}
+		c.IncrementErroredCount()
+	} else {
+		outcome.ExitCode = exitCode
+
+		var failedResults []model.AssertionResult
+		for _, assertion := range assertions {
+			var result model.AssertionResult
+			result, err = assertion.Asserter(c.CmdExec)
+			result.Assertion = assertion
+			if err != nil {
+				// FIXME: aggregate errors
+				result.ErrMessage += fmt.Sprintf("%s ", err)
+				result.Success = false
+			}
+			if !result.Success {
+				failedResults = append(failedResults, result)
+			}
+		}
+		outcome.AssertionResults = failedResults
+
+		if len(failedResults) == 0 {
+			outcome.Outcome = model.PASSED
+			c.IncrementPassedCount()
+		} else {
+			outcome.Outcome = model.FAILED
+			c.IncrementFailedCount()
+		}
+	}
+
+	// TODO: Record outcome
+	err = c.Repo.SaveTestOutcome(outcome)
+	c.NoErrorOrFatal(err)
+
+	return
+}
+
+func (c TestContext) initExecuter() (err error) {
+	cfg := c.Config
+	cmdAndArgs := cfg.CmdAndArgs
+	if len(cmdAndArgs) == 0 {
+		err := fmt.Errorf("no command supplied to test")
+		c.Fatal(err)
+	}
+	cmd := cmdz.Cmd(cmdAndArgs[0])
+	if len(cmdAndArgs) > 1 {
+		cmd.AddArgs(cmdAndArgs[1:]...)
+	}
+
+	// Timeout
+	if cfg.Timeout.IsPresent() {
+		cmd.Timeout(cfg.Timeout.Get())
+	}
+
+	// Input / Outputs
+	var stdout, stderr io.Writer
+	if cfg.KeepStdout.Is(true) {
+		stdout = os.Stdout
+	}
+	if cfg.KeepStderr.Is(true) {
+		stderr = os.Stderr
+	}
+	cmd.SetOutputs(stdout, stderr)
+
+	stat, _ := os.Stdin.Stat()
+	if (stat.Mode() & os.ModeCharDevice) == 0 {
+		cmd.SetInput(os.Stdin)
+	}
+
+	for _, environ := range os.Environ() {
+		if !strings.HasPrefix(environ, "PATH=") {
+			cmd.AddEnviron(environ)
+		}
+	}
+
+	// Mocking
+	currentPath := os.Getenv("PATH")
+	if len(cfg.Mocks) > 0 {
+		// Put mockDir in PATH
+		testWorkDir := c.Repo.BackingFilepath()
+		var mockDir string
+		mockDir, err = mock.ProcessMocking(testWorkDir, cfg.Mocks)
+		if err != nil {
+			return
+		}
+		cmd.AddEnv("ORIGINAL_PATH", currentPath)
+		newPath := fmt.Sprintf("%s:%s", mockDir, currentPath)
+		cmd.AddEnv("PATH", newPath)
+		err = os.Setenv("PATH", newPath)
+		if err != nil {
+			return
+		}
+	} else {
+		cmd.AddEnv("PATH", currentPath)
+	}
+
+	c.CmdExec = cmd
+	return
+}
+
+func cmdTitle(cmd cmdz.Executer) string {
 	cmdNameParts := strings.Split(cmd.String(), " ")
 	shortenedCmd := filepath.Base(cmdNameParts[0])
 	shortenCmdNameParts := cmdNameParts

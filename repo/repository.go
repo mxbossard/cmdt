@@ -68,13 +68,33 @@ func (r FileRepo) LoadSuiteConfig(testSuite string) (cfg model.Config, err error
 	return loadSuiteConfig(r.token, testSuite)
 }
 
-func (r FileRepo) ReadSuiteSeq(testSuite, name string) (n int) {
+func (r FileRepo) readSuiteSeq(testSuite, name string) (n int) {
 	suiteDir, err := testSuiteDirectoryPath(testSuite, r.token)
 	if err != nil {
 		log.Fatal(err)
 	}
 	n = utils.ReadSeq(suiteDir, name)
 	return
+}
+
+func (r FileRepo) TestCount(testSuite string) (n int) {
+	return r.readSuiteSeq(testSuite, model.TestSequenceFilename)
+}
+
+func (r FileRepo) PassedCount(testSuite string) (n int) {
+	return r.readSuiteSeq(testSuite, model.PassedSequenceFilename)
+}
+
+func (r FileRepo) IgnoredCount(testSuite string) (n int) {
+	return r.readSuiteSeq(testSuite, model.IgnoredSequenceFilename)
+}
+
+func (r FileRepo) FailedCount(testSuite string) (n int) {
+	return r.readSuiteSeq(testSuite, model.FailedSequenceFilename)
+}
+
+func (r FileRepo) ErroredCount(testSuite string) (n int) {
+	return r.readSuiteSeq(testSuite, model.ErroredSequenceFilename)
 }
 
 func (r FileRepo) IncrementSuiteSeq(testSuite, name string) (n int) {
@@ -87,14 +107,68 @@ func (r FileRepo) IncrementSuiteSeq(testSuite, name string) (n int) {
 }
 
 func (r FileRepo) SaveTestOutcome(outcome model.TestOutcome) (err error) {
-	// TODO
-	err = fmt.Errorf("not implemented yet")
+	var stdoutLog, stderrLog, reportLog *os.File
+	stdoutLog, stderrLog, reportLog, err = cmdLogFiles(outcome.TestSuite, r.token, outcome.Seq)
+	if err != nil {
+		return
+	}
+	defer stdoutLog.Close()
+	defer stderrLog.Close()
+	defer reportLog.Close()
+
+	_, err = stdoutLog.WriteString(outcome.Stdout)
+	if err != nil {
+		return
+	}
+	_, err = stderrLog.WriteString(outcome.Stderr)
+	if err != nil {
+		return
+	}
+
+	switch outcome.Outcome {
+	case model.PASSED:
+		// Nothing to do
+	case model.FAILED:
+		failedAssertionsReport := ""
+		for _, result := range outcome.AssertionResults {
+			assertPrefix := result.Assertion.Prefix
+			assertName := result.Assertion.Name
+			assertOp := result.Assertion.Op
+			expected := result.Assertion.Expected
+			failedAssertionsReport += assertPrefix + assertName + assertOp + expected + " "
+		}
+		_, err = reportLog.WriteString(outcome.TestQualifiedName + "  => " + failedAssertionsReport)
+	case model.IGNORED:
+		// Nothing to do
+	case model.ERRORED:
+		_, err = reportLog.WriteString(outcome.TestQualifiedName + "  =>  not executed")
+	case model.TIMEOUT:
+		_, err = reportLog.WriteString(outcome.TestQualifiedName + "  =>  timed out")
+	default:
+		log.Fatalf("outcome %s not supported", outcome.Outcome)
+	}
 	return
 }
 
 func (r FileRepo) LoadSuiteOutcome(testSuite string) (outcome model.SuiteOutcome, err error) {
-	// TODO
-	err = fmt.Errorf("not implemented yet")
+	var suiteCfg model.Config
+	suiteCfg, err = r.LoadSuiteConfig(testSuite)
+	if err != nil {
+		return
+	}
+
+	outcome.TestSuite = testSuite
+	outcome.TestCount = r.TestCount(testSuite)
+	outcome.PassedCount = r.PassedCount(testSuite)
+	outcome.FailedCount = r.FailedCount(testSuite)
+	outcome.ErroredCount = r.ErroredCount(testSuite)
+	outcome.IgnoredCount = r.IgnoredCount(testSuite)
+	outcome.Duration = suiteCfg.LastTestTime.Get().Sub(suiteCfg.SuiteStartTime.Get())
+	failureReports, err := failureReports(testSuite, r.token)
+	if err != nil {
+		return
+	}
+	outcome.FailureReports = failureReports
 	return
 }
 
@@ -110,9 +184,9 @@ func (r FileRepo) UpdateLastTestTime(testSuite string) {
 	}
 }
 
-func (r FileRepo) ListTestSuites(token string) (suites []string, err error) {
+func (r FileRepo) ListTestSuites() (suites []string, err error) {
 	var tmpDir string
-	tmpDir, err = forgeWorkDirectoryPath(token)
+	tmpDir, err = forgeWorkDirectoryPath(r.token)
 	if err != nil {
 		return
 	}

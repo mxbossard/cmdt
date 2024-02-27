@@ -38,13 +38,15 @@ func TestApplyConfig(t *testing.T) {
 	ok, _, err = ApplyConfig(&cfg, fmt.Sprintf("@fork=%d", expectedFork))
 	assert.NoError(t, err)
 	assert.True(t, ok)
+	require.True(t, cfg.ForkCount.IsPresent())
 	assert.Equal(t, expectedFork, cfg.ForkCount.Get())
 
 	expectedFork = 7
 	ok, _, err = ApplyConfig(&cfg, fmt.Sprintf("@fork=%d", expectedFork))
 	assert.Error(t, err)
 	assert.True(t, ok)
-
+	require.True(t, cfg.ForkCount.IsPresent())
+	assert.Equal(t, expectedFork, cfg.ForkCount.Get())
 }
 
 func TestBuildAssertion(t *testing.T) {
@@ -111,7 +113,7 @@ func TestParseArgs(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"foo", "bar", "baz"}, cfg.CmdAndArgs)
 	assert.Equal(t, model.DefaultTestSuiteName, cfg.TestSuite.Get())
-	assert.Equal(t, "", cfg.TestName.Get())
+	require.False(t, cfg.TestName.IsPresent())
 	assert.Len(t, assertions, 1)
 
 	// Parse command and args with a not existing rule
@@ -123,6 +125,7 @@ func TestParseArgs(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"foo", "bar"}, cfg.CmdAndArgs)
 	assert.Equal(t, model.DefaultTestSuiteName, cfg.TestSuite.Get())
+	require.True(t, cfg.TestName.IsPresent())
 	assert.Equal(t, "pif", cfg.TestName.Get())
 	assert.Len(t, assertions, 1)
 
@@ -131,6 +134,7 @@ func TestParseArgs(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"foo", "bar"}, cfg.CmdAndArgs)
 	assert.Equal(t, "paf", cfg.TestSuite.Get())
+	require.True(t, cfg.TestName.IsPresent())
 	assert.Equal(t, "", cfg.TestName.Get())
 	assert.Len(t, assertions, 2)
 
@@ -139,13 +143,14 @@ func TestParseArgs(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, []string{"foo", "bar"}, cfg.CmdAndArgs)
 	assert.Equal(t, model.DefaultTestSuiteName, cfg.TestSuite.Get())
-	assert.Equal(t, "", cfg.TestName.Get())
+	require.False(t, cfg.TestName.IsPresent())
 	assert.Len(t, assertions, 2)
 
 	// Parse command and args with a test name
 	cfg, assertions, err = ParseArgs([]string{"foo", "bar", "@test=foo", "@success"})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"foo", "bar"}, cfg.CmdAndArgs)
+	require.True(t, cfg.TestName.IsPresent())
 	assert.Equal(t, "foo", cfg.TestName.Get())
 	assert.Len(t, assertions, 1)
 
@@ -154,6 +159,7 @@ func TestParseArgs(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"foo", "bar"}, cfg.CmdAndArgs)
 	assert.Equal(t, "bar", cfg.TestSuite.Get())
+	require.True(t, cfg.TestName.IsPresent())
 	assert.Equal(t, "foo", cfg.TestName.Get())
 	assert.Len(t, assertions, 1)
 

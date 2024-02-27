@@ -322,6 +322,7 @@ func TranslateOptional[T comparable](rule model.Rule, m model.Mapper[T], validat
 }
 
 func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, err error) {
+	c.Prefix.Default(model.DefaultRulePrefix)
 	ok, rule = c.SplitRuleExpr(ruleExpr)
 	if !ok {
 		return
@@ -628,7 +629,7 @@ func BuildAssertion(cfg model.Config, ruleExpr string) (ok bool, assertion model
 			stat, err = os.Stat(path)
 			if errors.Is(err, os.ErrNotExist) {
 				res.Success = false
-				res.Message = fmt.Sprintf("file %s does not exists", path)
+				res.ErrMessage = fmt.Sprintf("file %s does not exists", path)
 				err = nil
 				return
 			} else if err != nil {
@@ -639,7 +640,7 @@ func BuildAssertion(cfg model.Config, ruleExpr string) (ok bool, assertion model
 				if expectedPerms != actualPerms {
 					res.Success = false
 					res.Value = stat.Mode().String()
-					res.Message = fmt.Sprintf("file %s have wrong permissions. Expected: [%s] but got: [%s] ", path, expectedPerms, actualPerms)
+					res.ErrMessage = fmt.Sprintf("file %s have wrong permissions. Expected: [%s] but got: [%s] ", path, expectedPerms, actualPerms)
 					return
 				}
 			}
@@ -659,19 +660,13 @@ func BuildAssertion(cfg model.Config, ruleExpr string) (ok bool, assertion model
 }
 
 func ParseArgs(args []string) (cfg model.Config, assertions []model.Assertion, err error) {
-	/*
-		cfg.Silent = nil
-		cfg.ContainerId = nil
-		cfg.ContainerScope = nil
-		cfg.ContainerDisabled = nil
-	*/
+	cfg.Prefix.Default(model.DefaultRulePrefix)
 	var rules []model.Rule
-	var cmdAndArgs []string
 	//var rule model.Rule
 	parseRules := true
 	for _, arg := range args {
 		var ok bool
-		if len(cmdAndArgs) == 0 && arg == "--" {
+		if len(cfg.CmdAndArgs) == 0 && arg == "--" {
 			// If no command found yet first -- param is interpreted as a rule parsing stopper
 			// stop parsing rules
 			parseRules = false
@@ -700,7 +695,7 @@ func ParseArgs(args []string) (cfg model.Config, assertions []model.Assertion, e
 			err = fmt.Errorf("rule %s does not exists", arg)
 			return
 		} else {
-			cmdAndArgs = append(cmdAndArgs, arg)
+			cfg.CmdAndArgs = append(cfg.CmdAndArgs, arg)
 		}
 	}
 
@@ -728,7 +723,7 @@ func ParseArgs(args []string) (cfg model.Config, assertions []model.Assertion, e
 		cfg.TestSuite = utilz.OptionalOf(model.DefaultTestSuiteName)
 	}
 
-	if (cfg.Action.Is(model.InitAction) || cfg.Action.Is(model.ReportAction)) && len(cmdAndArgs) > 0 {
+	if (cfg.Action.Is(model.InitAction) || cfg.Action.Is(model.ReportAction)) && len(cfg.CmdAndArgs) > 0 {
 		err = fmt.Errorf("you cannot run commands with action %s%s", cfg.Prefix.Get(), cfg.Action.Get())
 		return
 	}
@@ -755,8 +750,6 @@ func ParseArgs(args []string) (cfg model.Config, assertions []model.Assertion, e
 	if cfg.ContainerImage.IsPresent() {
 		cfg.ContainerScope = utilz.OptionalOf(cfgScope)
 	}
-
-	cfg.CmdAndArgs = cmdAndArgs
 
 	//log.Printf("build context: %s Silent: %v\n", args, cfg.Silent)
 	return
