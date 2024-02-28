@@ -1,6 +1,7 @@
 package model
 
 import (
+	"log/slog"
 	"regexp"
 	"strings"
 	"time"
@@ -8,12 +9,23 @@ import (
 	"mby.fr/utils/utilz"
 )
 
+const (
+	DefaultVerboseLevel = BETTER_ASSERTION_REPORT
+	DefaultDebugLevel   = INFO
+)
+
+var (
+	DefaultLoggerOpts = &slog.HandlerOptions{
+		Level: slog.LevelWarn,
+	}
+)
+
 func NewGlobalDefaultConfig() Config {
 	return Config{
-		Token:             utilz.OptionalOf(""),
 		Prefix:            utilz.OptionalOf(DefaultRulePrefix),
+		Verbose:           utilz.OptionalOf(DefaultVerboseLevel),
+		Debug:             utilz.OptionalOf(DefaultDebugLevel),
 		GlobalStartTime:   utilz.OptionalOf(time.Now()),
-		TestSuite:         utilz.OptionalOf(DefaultTestSuiteName),
 		ForkCount:         utilz.OptionalOf(1),
 		Quiet:             utilz.OptionalOf(false),
 		Ignore:            utilz.OptionalOf(false),
@@ -73,6 +85,15 @@ const (
 	SHOW_PASSED_AND_OUTPUTS
 )
 
+type DebugLevel int
+
+const (
+	DEBUG DebugLevel = iota
+	INFO
+	WARN
+	ERROR
+)
+
 type CmdMock struct {
 	Op               string
 	Cmd              string
@@ -88,7 +109,7 @@ type CmdMock struct {
 
 type Config struct {
 	// TestSuite only
-	Token     utilz.Optional[string] `yaml:""`
+	Token     utilz.Optional[string]
 	Action    utilz.Optional[Action] `yaml:""`
 	TestSuite utilz.Optional[string] `yaml:""`
 	TestName  utilz.Optional[string] `yaml:""`
@@ -108,6 +129,7 @@ type Config struct {
 	ExportToken   utilz.Optional[bool]          `yaml:""`
 	ReportAll     utilz.Optional[bool]          `yaml:""`
 	Verbose       utilz.Optional[VerboseLevel]  `yaml:""`
+	Debug         utilz.Optional[DebugLevel]    `yaml:""`
 	Quiet         utilz.Optional[bool]          `yaml:""`
 	Ignore        utilz.Optional[bool]          `yaml:""`
 	StopOnFailure utilz.Optional[bool]          `yaml:""`
@@ -148,96 +170,55 @@ func (c Config) SplitRuleExpr(ruleExpr string) (ok bool, r Rule) {
 	return
 }
 
-func (c *Config) Merge(new Config) {
-	if new.TestSuite.IsPresent() {
-		c.TestSuite = new.TestSuite
+func (c *Config) Merge(right Config) {
+	c.Action.Merge(right.Action)
+	c.TestSuite.Merge(right.TestSuite)
+	c.TestSuite.Merge(right.TestSuite)
+	c.TestName.Merge(right.TestName)
+
+	c.Prefix.Merge(right.Prefix)
+	c.SuiteStartTime.Merge(right.SuiteStartTime)
+	c.SuiteStartTime.Merge(right.SuiteStartTime)
+	c.LastTestTime.Merge(right.LastTestTime)
+	c.SuiteTimeout.Merge(right.SuiteTimeout)
+	c.ForkCount.Merge(right.ForkCount)
+	if len(right.CmdAndArgs) > 0 {
+		c.CmdAndArgs = right.CmdAndArgs
 	}
-	if new.TestName.IsPresent() {
-		c.TestName = new.TestName
+	if len(right.BeforeSuite) > 0 {
+		c.BeforeSuite = append(c.BeforeSuite, right.BeforeSuite...)
+	}
+	if len(right.AfterSuite) > 0 {
+		c.AfterSuite = append(c.AfterSuite, right.AfterSuite...)
 	}
 
-	if new.Prefix.IsPresent() {
-		c.Prefix = new.Prefix
+	c.PrintToken.Merge(right.PrintToken)
+	c.ExportToken.Merge(right.ExportToken)
+	c.ReportAll.Merge(right.ReportAll)
+	c.Quiet.Merge(right.Quiet)
+	c.Ignore.Merge(right.Ignore)
+	c.StopOnFailure.Merge(right.StopOnFailure)
+	c.KeepStdout.Merge(right.KeepStdout)
+	c.KeepStderr.Merge(right.KeepStderr)
+	c.Timeout.Merge(right.Timeout)
+	c.RunCount.Merge(right.RunCount)
+	c.Parallel.Merge(right.Parallel)
+	c.Verbose.Merge(right.Verbose)
+	c.Debug.Merge(right.Debug)
+
+	if len(right.Mocks) > 0 {
+		c.Mocks = append(c.Mocks, right.Mocks...)
 	}
-	if len(new.CmdAndArgs) > 0 {
-		c.CmdAndArgs = new.CmdAndArgs
+	if len(right.Before) > 0 {
+		c.Before = append(c.Before, right.Before...)
 	}
-	if new.SuiteStartTime.IsPresent() {
-		c.SuiteStartTime = new.SuiteStartTime
-	}
-	if new.LastTestTime.IsPresent() {
-		c.LastTestTime = new.LastTestTime
-	}
-	if new.SuiteTimeout.IsPresent() {
-		c.SuiteTimeout = new.SuiteTimeout
-	}
-	if new.ForkCount.IsPresent() {
-		c.ForkCount = new.ForkCount
-	}
-	if len(new.BeforeSuite) > 0 {
-		c.BeforeSuite = append(c.BeforeSuite, new.BeforeSuite...)
-	}
-	if len(new.AfterSuite) > 0 {
-		c.AfterSuite = append(c.AfterSuite, new.AfterSuite...)
+	if len(right.After) > 0 {
+		c.After = append(c.After, right.After...)
 	}
 
-	if new.PrintToken.IsPresent() {
-		c.PrintToken = new.PrintToken
-	}
-	if new.ExportToken.IsPresent() {
-		c.ExportToken = new.ExportToken
-	}
-	if new.ReportAll.IsPresent() {
-		c.ReportAll = new.ReportAll
-	}
-	if new.Quiet.IsPresent() {
-		c.Quiet = new.Quiet
-	}
-	if new.Ignore.IsPresent() {
-		c.Ignore = new.Ignore
-	}
-	if new.StopOnFailure.IsPresent() {
-		c.StopOnFailure = new.StopOnFailure
-	}
-	if new.KeepStdout.IsPresent() {
-		c.KeepStdout = new.KeepStdout
-	}
-	if new.KeepStderr.IsPresent() {
-		c.KeepStderr = new.KeepStderr
-	}
-	if new.Timeout.IsPresent() {
-		c.Timeout = new.Timeout
-	}
-	if new.RunCount.IsPresent() {
-		c.RunCount = new.RunCount
-	}
-	if new.Parallel.IsPresent() {
-		c.Parallel = new.Parallel
-	}
-
-	if len(new.Mocks) > 0 {
-		c.Mocks = append(c.Mocks, new.Mocks...)
-	}
-	if len(new.Before) > 0 {
-		c.Before = append(c.Before, new.Before...)
-	}
-	if len(new.After) > 0 {
-		c.After = append(c.After, new.After...)
-	}
-
-	if new.ContainerDisabled.IsPresent() {
-		c.ContainerDisabled = new.ContainerDisabled
-	}
-	if new.ContainerImage.IsPresent() {
-		c.ContainerImage = new.ContainerImage
-	}
-	if new.ContainerDirties.IsPresent() {
-		c.ContainerDirties = new.ContainerDirties
-	}
-	if new.ContainerId.IsPresent() {
-		c.ContainerId = new.ContainerId
-	}
-	if new.ContainerScope.IsPresent() {
-		c.ContainerScope = new.ContainerScope
-	}
+	c.ContainerDisabled.Merge(right.ContainerDisabled)
+	c.ContainerImage.Merge(right.ContainerImage)
+	c.ContainerDirties.Merge(right.ContainerDirties)
+	c.ContainerId.Merge(right.ContainerId)
+	c.ContainerScope.Merge(right.ContainerScope)
 }

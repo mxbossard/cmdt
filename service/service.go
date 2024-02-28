@@ -18,7 +18,7 @@ import (
 
 var dpl = display.New()
 
-var logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
+var logger = slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 
 func usage() {
 	usagePrinter := printz.NewStandard()
@@ -194,6 +194,7 @@ func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int, err error) {
 		return
 	}
 
+	logger.Info("Reporting all suites", "token", token, "suites", testSuites)
 	if len(testSuites) > 0 {
 		exitCode = 0
 		logger.Debug("reporting found suites", "suites", testSuites)
@@ -217,14 +218,20 @@ func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int, err error) {
 func ReportTestSuite(ctx facade.SuiteContext) (exitCode int, err error) {
 	exitCode = 1
 	cfg := ctx.Config
+	logger.Info("Reporting suite", "ctx", ctx)
 
 	var suiteOutcome model.SuiteOutcome
 	suiteOutcome, err = ctx.Repo.LoadSuiteOutcome(cfg.TestSuite.Get())
+	if err != nil {
+		return
+	}
 	dpl.ReportSuite(ctx, suiteOutcome)
 
 	if suiteOutcome.FailedCount == 0 && suiteOutcome.ErroredCount == 0 {
 		exitCode = 0
 	}
+
+	err = ctx.Repo.ClearTestSuite(suiteOutcome.TestSuite)
 
 	return
 }
@@ -235,11 +242,11 @@ func PerformTest(ctx facade.TestContext, assertions []model.Assertion) (exitCode
 
 	seq := ctx.IncrementTestCount()
 
-	dpl.TestTitle(ctx)
+	dpl.TestTitle(ctx, seq)
 
 	if cfg.Ignore.Is(true) {
 		ctx.IncrementIgnoredCount()
-		dpl.TestOutcome(ctx, seq, "IGNORED", nil, 0, nil)
+		dpl.TestOutcome(ctx, ctx.IgnoredTestOutcome(seq))
 		exitCode = 0
 		return
 	}
@@ -257,6 +264,8 @@ func PerformTest(ctx facade.TestContext, assertions []model.Assertion) (exitCode
 
 	outcome := ctx.AssertCmdExecBlocking(seq, assertions)
 
+	dpl.TestOutcome(ctx, outcome)
+
 	for _, after := range cfg.After {
 		cmdAfter := cmdz.Cmd(after...)
 		afterExit, afterErr := cmdAfter.BlockRun()
@@ -265,6 +274,10 @@ func PerformTest(ctx facade.TestContext, assertions []model.Assertion) (exitCode
 		if afterErr != nil {
 			err = fmt.Errorf("error running after cmd: [%s]: %w", cmdAfter.String(), afterErr)
 		}
+	}
+
+	for _, asseriontResult := range outcome.AssertionResults {
+		dpl.AssertionResult(asseriontResult)
 	}
 
 	if cfg.StopOnFailure.Is(true) && outcome.Outcome != model.PASSED {
@@ -277,78 +290,74 @@ func PerformTest(ctx facade.TestContext, assertions []model.Assertion) (exitCode
 	return
 }
 
-func ProcessArgs(allArgs []string) {
-	exitCode := 1
-	defer func() { os.Exit(exitCode) }()
+func ProcessArgs(allArgs []string) (exitCode int) {
+	exitCode = 1
 
 	if len(allArgs) == 1 {
 		usage()
 		return
 	}
 
-	config, assertions, err := ParseArgs(allArgs[1:])
-	token := config.Token.Get()
+	// FIXME: if token supplied by ENV should be retrieved FIRST to get token and load Global config
+
+	args := allArgs[1:]
+	logger.Debug("Processing cmdt args", "args", args)
+	config, assertions, agg := ParseArgs(args)
+	if config.Debug.IsPresent() {
+		model.DefaultLoggerOpts.Level = slog.Level(config.Debug.Get()*4 - 4)
+	}
+
+	logger.Debug("Parsed args", "config", config, "assertions", assertions, "error", agg)
+	token := config.Token.GetOr("")
 	action := config.Action.Get()
 
+	var err error
 	switch action {
 	case model.GlobalAction:
-		if err != nil {
-			log.Fatal(err)
+		if agg.GotError() {
+			log.Fatal(agg)
 		}
 		globalCtx := facade.NewGlobalContext(token, config)
+		logger.Debug("Forged context", "ctx", globalCtx)
+		logger.Info("Processing global action", "token", token)
 		exitCode, err = GlobalConfig(globalCtx, true)
 	case model.InitAction:
 		testSuite := config.TestSuite.Get()
 		suiteCtx := facade.NewSuiteContext(token, testSuite, action, config)
-		suiteCtx.NoErrorOrFatal(err)
+		logger.Debug("Forged context", "ctx", suiteCtx)
+		suiteCtx.NoErrorOrFatal(agg.Return())
+		logger.Info("Processing init action", "token", token)
 		exitCode, err = InitTestSuite(suiteCtx)
 	case model.ReportAction:
 		if config.ReportAll.Is(true) {
-			if err != nil {
-				log.Fatal(err)
+			if agg.GotError() {
+				log.Fatal(agg)
 			}
 			globalCtx := facade.NewGlobalContext(token, config)
+			logger.Debug("Forged context", "ctx", globalCtx)
+			logger.Info("Processing report all action", "token", token)
 			exitCode, err = ReportAllTestSuites(globalCtx)
 		} else {
 			testSuite := config.TestSuite.Get()
 			suiteCtx := facade.NewSuiteContext(token, testSuite, action, config)
-			suiteCtx.NoErrorOrFatal(err)
+			logger.Debug("Forged context", "ctx", suiteCtx)
+			suiteCtx.NoErrorOrFatal(agg.Return())
+			logger.Info("Processing report suite action", "token", token)
 			exitCode, err = ReportTestSuite(suiteCtx)
 		}
 	case model.TestAction:
 		testSuite := config.TestSuite.Get()
 		testCtx := facade.NewTestContext(token, testSuite, config)
-		testCtx.NoErrorOrFatal(err)
-
-		/*
-			suiteContext, err := LoadSuiteContext(testSuite, token)
-			if err != nil {
-				if os.IsNotExist(err) {
-					// test suite does not exists yet
-					suiteCtx := model.Context{Token: token, TestSuite: testSuite}
-					exitCode, err = InitTestSuite(suiteCtx)
-					if err != nil {
-						return
-					}
-					if exitCode > 0 {
-						return
-					}
-				} else {
-					err = fmt.Errorf("cannot load context: %w", err)
-					NoErrorOrFatal(config, err)
-				}
-			}
-			defer updateLastTestTime(testSuite, token)
-
-			config = model.MergeContext(suiteContext, config)
-		*/
+		logger.Debug("Forged context", "ctx", testCtx)
+		testCtx.NoErrorOrFatal(agg.Return())
+		logger.Info("Processing test action", "token", token)
 
 		if config.ContainerDisabled.Is(true) || config.ContainerImage.IsEmpty() {
 			//logger.Debug("Performing test outside container", "context", config, "image", config.ContainerImage, "containerDisabled", config.ContainerDisabled)
 			exitCode, err = PerformTest(testCtx, assertions)
 			testCtx.NoErrorOrFatal(err)
 		} else {
-			logger.Debug("Performing test inside container", "context", config, "image", config.ContainerImage, "containerDisabled", config.ContainerDisabled)
+			logger.Info("Performing test inside container", "context", config, "image", config.ContainerImage, "containerDisabled", config.ContainerDisabled)
 			var ctId string
 			ctId, exitCode, err = PerformTestInContainer(testCtx)
 			if config.ContainerScope.Is(model.GLOBAL_SCOPE) {
@@ -371,7 +380,10 @@ func ProcessArgs(allArgs []string) {
 		err = fmt.Errorf("action: [%v] not known", config.Action)
 	}
 
+	logger.Info("exiting", "exitCode", exitCode)
+
 	if err != nil {
 		log.Fatal(config.TestSuite, config.Token, err)
 	}
+	return
 }

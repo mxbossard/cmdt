@@ -1,6 +1,6 @@
 module mby.fr/cmdtest
 
-go 1.22
+go 1.21
 
 replace mby.fr/utils => ../utils
 

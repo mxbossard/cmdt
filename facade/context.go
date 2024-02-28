@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"mby.fr/cmdtest/mock"
 	"mby.fr/cmdtest/model"
@@ -19,7 +19,7 @@ import (
 	"mby.fr/utils/utilz"
 )
 
-//var logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
+var logger = slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 
 func NewGlobalContext(token string, inputCfg model.Config) GlobalContext {
 	if token == "" {
@@ -56,8 +56,11 @@ func NewSuiteContext(token, testSuite string, action model.Action, inputCfg mode
 	}
 
 	mergedCfg := globalCtx.Config
+	logger.Debug("before suite merge", "cfg", mergedCfg)
 	mergedCfg.Merge(suiteCfg)
+	logger.Debug("after suite merge", "suiteCfg", suiteCfg, "mergedCfg", mergedCfg)
 	mergedCfg.Merge(inputCfg)
+	logger.Debug("merged suite context", "testSuite", testSuite, "inputCfg", inputCfg, "mergedCfg", mergedCfg)
 	globalCtx.Config = mergedCfg
 
 	suiteCtx := SuiteContext{
@@ -289,26 +292,6 @@ func (c SuiteContext) InitSuite() error {
 	return c.Repo.InitSuite(c.Config)
 }
 
-func (c SuiteContext) TestId() (id string) {
-	// TODO
-	log.Fatal("not implemented yet")
-	return
-}
-
-func (c SuiteContext) TestQualifiedName() (name string) {
-	name = fmt.Sprintf("[%s]/%s", c.Config.TestSuite.Get(), c.Config.TestName.Get())
-	return
-}
-
-func (c SuiteContext) TestTitle() (title string) {
-	cfg := c.Config
-	timecode := int(time.Since(cfg.SuiteStartTime.Get()).Milliseconds())
-	qualifiedName := c.TestQualifiedName()
-	seq := c.Repo.TestCount(c.Config.TestSuite.Get())
-	title = fmt.Sprintf("[%05d] Test: %s #%02d... ", timecode, qualifiedName, seq)
-	return
-}
-
 func (c SuiteContext) IncrementTestCount() (n int) {
 	return c.Repo.IncrementSuiteSeq(c.Config.TestSuite.Get(), model.TestSequenceFilename)
 }
@@ -365,11 +348,25 @@ type TestContext struct {
 	TestOutcome utilz.AnyOptional[model.TestOutcome]
 }
 
-func (c TestContext) AssertCmdExecBlocking(seq int, assertions []model.Assertion) (outcome model.TestOutcome) {
-	testSuite := c.Config.TestSuite.Get()
-	exitCode, err := c.CmdExec.BlockRun()
+func (c SuiteContext) TestId() (id string) {
+	// TODO
+	log.Fatal("not implemented yet")
+	return
+}
 
-	c.Repo.UpdateLastTestTime(testSuite)
+func (c TestContext) TestQualifiedName() (name string) {
+	var testName string
+	if c.Config.TestName.IsPresent() && !c.Config.TestName.Is("") {
+		testName = c.Config.TestName.Get()
+	} else {
+		testName = cmdTitle(c.CmdExec)
+	}
+	name = fmt.Sprintf("[%s]/%s", c.Config.TestSuite.Get(), testName)
+	return
+}
+
+func (c TestContext) initTestOutcome(seq int) (outcome model.TestOutcome) {
+	testSuite := c.Config.TestSuite.Get()
 	outcome.TestSuite = testSuite
 	outcome.Seq = seq
 	outcome.TestQualifiedName = c.TestQualifiedName()
@@ -378,6 +375,21 @@ func (c TestContext) AssertCmdExecBlocking(seq int, assertions []model.Assertion
 	outcome.Duration = c.CmdExec.Duration()
 	outcome.Stdout = c.CmdExec.StdoutRecord()
 	outcome.Stderr = c.CmdExec.StderrRecord()
+	return
+}
+
+func (c TestContext) IgnoredTestOutcome(seq int) (outcome model.TestOutcome) {
+	outcome = c.initTestOutcome(seq)
+	outcome.Outcome = model.IGNORED
+	return
+}
+
+func (c TestContext) AssertCmdExecBlocking(seq int, assertions []model.Assertion) (outcome model.TestOutcome) {
+	testSuite := c.Config.TestSuite.Get()
+	exitCode, err := c.CmdExec.BlockRun()
+
+	c.Repo.UpdateLastTestTime(testSuite)
+	outcome = c.initTestOutcome(seq)
 
 	if err != nil {
 		// Timeout error is managed
@@ -425,7 +437,7 @@ func (c TestContext) AssertCmdExecBlocking(seq int, assertions []model.Assertion
 	return
 }
 
-func (c TestContext) initExecuter() (err error) {
+func (c *TestContext) initExecuter() (err error) {
 	cfg := c.Config
 	cmdAndArgs := cfg.CmdAndArgs
 	if len(cmdAndArgs) == 0 {
@@ -495,6 +507,7 @@ func cmdTitle(cmd cmdz.Executer) string {
 	shortenCmdNameParts[0] = shortenedCmd
 	cmdName := strings.Join(shortenCmdNameParts, " ")
 	//testName = fmt.Sprintf("cmd: <|%s|>", cmdName)
-	testName := fmt.Sprintf("<|%s|>", cmdName)
+	//testName := fmt.Sprintf("[%s]", cmdName)
+	testName := cmdName
 	return testName
 }

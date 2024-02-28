@@ -17,7 +17,7 @@ import (
 	"mby.fr/utils/trust"
 )
 
-var logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
+var logger = slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 
 /*
 func Fatal(testSuite, token string, v ...any) {

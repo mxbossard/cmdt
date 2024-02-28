@@ -80,9 +80,10 @@ var (
 		ruleDef("stopOnFailure", "", "="), ruleDef("keepStdout", "", "="), ruleDef("keepStderr", "", "="),
 		ruleDef("keepOutputs", "", "="), ruleDef("silent", "", "="), ruleDef("timeout", "="),
 		ruleDef("parallel", "="), ruleDef("runCount", "="), ruleDef("mock", "=", ":"),
-		ruleDef("before", "="), ruleDef("after", "="), ruleDef("container", "", "="), ruleDef("dirtyContainer", "=")}
+		ruleDef("before", "="), ruleDef("after", "="), ruleDef("container", "", "="),
+		ruleDef("dirtyContainer", "=")}
 	// Config of test flow (init -> test -> report)
-	FlowConfigs = []RuleDefinition{ruleDef("token", "=")}
+	FlowConfigs = []RuleDefinition{ruleDef("token", "="), ruleDef("verbose", "", "="), ruleDef("debug", "", "=")}
 	Assertions  = []RuleDefinition{ruleDef("success", ""), ruleDef("fail", ""), ruleDef("exit", "="),
 		ruleDef("cmd", "="), ruleDef("stdout", "=", ":", "~", "!=", "!:", "!~"),
 		ruleDef("stderr", "=", ":", "~", "!=", "!:", "!~"), ruleDef("exists", "=")}

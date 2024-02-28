@@ -13,6 +13,7 @@ import (
 	"mby.fr/cmdtest/model"
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/collections"
+	"mby.fr/utils/errorz"
 	"mby.fr/utils/filez"
 	"mby.fr/utils/utilz"
 )
@@ -362,12 +363,16 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 			err = Validate[string](rule, suiteName, TestNameValidater)
 			c.Action = utilz.OptionalOf(model.Action(rule.Name))
 			if suiteName != "" {
-				c.TestSuite = utilz.OptionalOf(suiteName)
+				c.TestSuite.Set(suiteName)
 			}
 			if rule.Name == "report" && rule.Expected == "" {
-				c.ReportAll = utilz.OptionalOf(true)
+				c.ReportAll.Set(true)
+				c.TestSuite.Clear()
+			} else {
+				c.TestSuite.Default(model.DefaultTestSuiteName)
 			}
 		case "test":
+			c.TestSuite.Default(model.DefaultTestSuiteName)
 			testName := rule.Expected
 			err = Validate[string](rule, testName, TestNameValidater)
 			c.Action = utilz.OptionalOf(model.Action(rule.Name))
@@ -455,6 +460,22 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 			c.ContainerId = utilz.EmptyOptional[string]()
 		case "dirtyContainer":
 			c.ContainerDirties, err = TranslateOptional(rule, DirtiesMapper, OperatorValidater[model.DirtyScope]("="))
+		case "verbose":
+			if rule.Op == "" {
+				rule.Op = "="
+				rule.Expected = fmt.Sprintf("%d", model.DefaultVerboseLevel)
+			}
+			var level int
+			level, err = Translate(rule, IntMapper, OperatorValidater[int]("="), IntValueValidater(0, 3))
+			c.Verbose.Set(model.VerboseLevel(level))
+		case "debug":
+			if rule.Op == "" {
+				rule.Op = "="
+				rule.Expected = fmt.Sprintf("%d", model.DefaultDebugLevel)
+			}
+			var level int
+			level, err = Translate(rule, IntMapper, OperatorValidater[int]("="), IntValueValidater(0, 3))
+			c.Debug.Set(model.DebugLevel(level))
 		default:
 			ok = false
 		}
@@ -659,10 +680,11 @@ func BuildAssertion(cfg model.Config, ruleExpr string) (ok bool, assertion model
 	return
 }
 
-func ParseArgs(args []string) (cfg model.Config, assertions []model.Assertion, err error) {
+func ParseArgs(args []string) (cfg model.Config, assertions []model.Assertion, agg errorz.Aggregated) {
+	var err error
 	cfg.Prefix.Default(model.DefaultRulePrefix)
+
 	var rules []model.Rule
-	//var rule model.Rule
 	parseRules := true
 	for _, arg := range args {
 		var ok bool
@@ -676,7 +698,7 @@ func ParseArgs(args []string) (cfg model.Config, assertions []model.Assertion, e
 			var rule model.Rule
 			ok, rule, err = ApplyConfig(&cfg, arg)
 			if err != nil {
-				return
+				agg.Add(err)
 			}
 			if ok {
 				rules = append(rules, rule)
@@ -685,7 +707,7 @@ func ParseArgs(args []string) (cfg model.Config, assertions []model.Assertion, e
 			var assertion model.Assertion
 			ok, assertion, err = BuildAssertion(cfg, arg)
 			if err != nil {
-				return
+				agg.Add(err)
 			}
 			if ok {
 				assertions = append(assertions, assertion)
@@ -693,20 +715,22 @@ func ParseArgs(args []string) (cfg model.Config, assertions []model.Assertion, e
 				continue
 			}
 			err = fmt.Errorf("rule %s does not exists", arg)
-			return
+			agg.Add(err)
 		} else {
 			cfg.CmdAndArgs = append(cfg.CmdAndArgs, arg)
 		}
 	}
 
-	statusAssertionFound := false
-	for _, a := range assertions {
+	if cfg.Action.Is(model.TestAction) {
 		// If no status assertion found add an implicit success rule
-		statusAssertionFound = statusAssertionFound || a.Name == "success" || a.Name == "fail" || a.Name == "exit" // || a.Name == "cmd"
-	}
-	if !statusAssertionFound {
-		_, successAssertion, _ := BuildAssertion(cfg, cfg.Prefix.Get()+"success")
-		assertions = append(assertions, successAssertion)
+		statusAssertionFound := false
+		for _, a := range assertions {
+			statusAssertionFound = statusAssertionFound || a.Name == "success" || a.Name == "fail" || a.Name == "exit" // || a.Name == "cmd"
+		}
+		if !statusAssertionFound {
+			_, successAssertion, _ := BuildAssertion(cfg, cfg.Prefix.Get()+"success")
+			assertions = append(assertions, successAssertion)
+		}
 	}
 
 	if cfg.Action.IsEmpty() {
@@ -714,27 +738,25 @@ func ParseArgs(args []string) (cfg model.Config, assertions []model.Assertion, e
 		var rule model.Rule
 		_, rule, err = ApplyConfig(&cfg, cfg.Prefix.Get()+"test")
 		if err != nil {
-			return
+			agg.Add(err)
 		}
 		rules = append(rules, rule)
-	}
-
-	if cfg.TestSuite.IsEmpty() {
-		cfg.TestSuite = utilz.OptionalOf(model.DefaultTestSuiteName)
+		cfg.Action.Default(model.TestAction)
+		cfg.TestSuite.Default(model.DefaultTestSuiteName)
 	}
 
 	if (cfg.Action.Is(model.InitAction) || cfg.Action.Is(model.ReportAction)) && len(cfg.CmdAndArgs) > 0 {
 		err = fmt.Errorf("you cannot run commands with action %s%s", cfg.Prefix.Get(), cfg.Action.Get())
-		return
+		agg.Add(err)
 	}
 
 	err = ValidateMutualyExclusiveRules(rules...)
 	if err != nil {
-		return
+		agg.Add(err)
 	}
 	err = ValidateOnceOnlyDefinedRule(rules...)
 	if err != nil {
-		return
+		agg.Add(err)
 	}
 
 	var cfgScope model.ConfigScope

@@ -12,6 +12,7 @@ cd "$scriptDir"
 #CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go install -ldflags '-extldflags "-static"'
 #CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go install -a -tags netgo -ldflags '-w'
 #CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go install -a -tags netgo -ldflags '-w -extldflags "-static"'
+
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go install -tags netgo -ldflags '-w'
 
 cd - > /dev/null
@@ -134,7 +135,7 @@ $cmdt0 @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" -- $cmdt1 
 # Without token, cmdt run with different pid should run in differents workspaces
 $cmdt0 @test=meta1/"without token one" @stderr:"PASSED" @stderr:"#01" -- $cmdt1 true
 $cmdt0 @test=meta1/"without token two" @stderr:"PASSED" @stderr:"#01" -- $cmdt1 true
-$cmdt0 @test=meta1/ @fail -- $cmdt1 @report
+$cmdt0 @test=meta1/ @exit=0 @stderr:"2 success" -- $cmdt1 @report
 
 >&2 echo "## Test printed token"
 tk0=$( $cmdt @init @printToken 2> /dev/null )

@@ -16,6 +16,7 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"mby.fr/cmdtest/service"
@@ -277,6 +278,15 @@ Features :
   - Optional instead of pointer ? => cleaner for Merging
 */
 
+func RecoverExiting() {
+	if r := recover(); r != nil {
+		fmt.Printf("Cause of panic ==>> %q\n", r)
+		os.Exit(1)
+	}
+}
+
 func main() {
-	service.ProcessArgs(os.Args)
+	//defer RecoverExiting()
+	exitCode := service.ProcessArgs(os.Args)
+	os.Exit(exitCode)
 }

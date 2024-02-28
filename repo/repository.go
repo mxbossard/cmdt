@@ -22,7 +22,7 @@ const (
 )
 
 var (
-	logger                        = slog.New(slog.NewTextHandler(os.Stderr, nil))
+	logger                        = slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 	testSuiteNameSanitizerPattern = regexp.MustCompile("[^a-zA-Z0-9]")
 )
 
@@ -43,7 +43,7 @@ func (r FileRepo) BackingFilepath() string {
 }
 
 func (r FileRepo) InitSuite(cfg model.Config) (err error) {
-	err = clearSuiteWorkspace(r.token, cfg)
+	err = r.ClearTestSuite(cfg.TestSuite.Get())
 	if err != nil {
 		return
 	}
@@ -52,12 +52,23 @@ func (r FileRepo) InitSuite(cfg model.Config) (err error) {
 }
 
 func (r FileRepo) SaveGlobalConfig(cfg model.Config) (err error) {
-	cfg.TestSuite = utilz.OptionalOf(model.GlobalConfigTestSuiteName)
+	cfg.TestSuite.Set(model.GlobalConfigTestSuiteName)
 	return persistSuiteConfig(r.token, cfg)
 }
 
 func (r FileRepo) LoadGlobalConfig() (cfg model.Config, err error) {
-	return loadGlobalConfig(r.token)
+	cfg, err = loadGlobalConfig(r.token)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			// global config does not exists yet
+			// create a new default one
+			cfg = model.NewGlobalDefaultConfig()
+			cfg.Token.Set(r.token)
+			cfg.GlobalStartTime.Set(time.Now())
+			err = r.SaveGlobalConfig(cfg)
+		}
+	}
+	return
 }
 
 func (r FileRepo) SaveSuiteConfig(cfg model.Config) (err error) {
@@ -65,7 +76,18 @@ func (r FileRepo) SaveSuiteConfig(cfg model.Config) (err error) {
 }
 
 func (r FileRepo) LoadSuiteConfig(testSuite string) (cfg model.Config, err error) {
-	return loadSuiteConfig(r.token, testSuite)
+	cfg, err = loadSuiteConfig(testSuite, r.token)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			// suite config does not exists yet
+			// create a new default one
+			cfg = model.NewSuiteDefaultConfig()
+			cfg.TestSuite.Set(testSuite)
+			cfg.SuiteStartTime.Set(time.Now())
+			err = r.SaveSuiteConfig(cfg)
+		}
+	}
+	return
 }
 
 func (r FileRepo) readSuiteSeq(testSuite, name string) (n int) {
@@ -163,7 +185,9 @@ func (r FileRepo) LoadSuiteOutcome(testSuite string) (outcome model.SuiteOutcome
 	outcome.FailedCount = r.FailedCount(testSuite)
 	outcome.ErroredCount = r.ErroredCount(testSuite)
 	outcome.IgnoredCount = r.IgnoredCount(testSuite)
-	outcome.Duration = suiteCfg.LastTestTime.Get().Sub(suiteCfg.SuiteStartTime.Get())
+	startTime := suiteCfg.SuiteStartTime.Get()
+	endTime := suiteCfg.LastTestTime.GetOr(time.Now())
+	outcome.Duration = endTime.Sub(startTime)
 	failureReports, err := failureReports(testSuite, r.token)
 	if err != nil {
 		return
@@ -182,6 +206,11 @@ func (r FileRepo) UpdateLastTestTime(testSuite string) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func (r FileRepo) ClearTestSuite(testSuite string) (err error) {
+	err = clearSuiteWorkspace(r.token, testSuite)
+	return
 }
 
 func (r FileRepo) ListTestSuites() (suites []string, err error) {
@@ -348,8 +377,7 @@ func persistSuiteContext1(config model.Context) (err error) {
 }
 */
 
-func clearSuiteWorkspace(token string, cfg model.Config) (err error) {
-	testSuite := cfg.TestSuite.Get()
+func clearSuiteWorkspace(token, testSuite string) (err error) {
 	var workDir string
 	workDir, err = testSuiteDirectoryPath(testSuite, token)
 	if err != nil {
@@ -371,11 +399,11 @@ func persistSuiteConfig(token string, cfg model.Config) (err error) {
 	if err2 != nil {
 		return err2
 	}
-	content, err2 := yaml.Marshal(cfg)
+	content, err2 := yaml.Marshal(&cfg)
 	if err2 != nil {
 		return err2
 	}
-	logger.Debug("Persisting config", "suite", testSuite, "file", contextFilepath)
+	logger.Debug("Persisting config", "suite", testSuite, "file", contextFilepath, "cfg", cfg)
 	err2 = os.WriteFile(contextFilepath, content, 0600)
 	if err2 != nil {
 		err2 = fmt.Errorf("cannot persist context: %w", err2)
@@ -413,7 +441,7 @@ func loadGlobalConfig(token string) (config model.Config, err error) {
 	if err != nil {
 		return
 	}
-	loaded.TestSuite = utilz.OptionalOf("")
+	loaded.TestSuite.Clear()
 	config.Merge(loaded)
 	return
 }
