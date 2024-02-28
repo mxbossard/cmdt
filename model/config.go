@@ -10,21 +10,24 @@ import (
 )
 
 const (
-	DefaultVerboseLevel = BETTER_ASSERTION_REPORT
+	DefaultInitedVerboseLevel = BETTER_ASSERTION_REPORT
+	DefaultInitlessVerboseLevel = SHOW_PASSED
+	StartDebugLevel   = ERROR
 	DefaultDebugLevel   = INFO
 )
 
 var (
+	LoggerLevel slog.LevelVar
 	DefaultLoggerOpts = &slog.HandlerOptions{
-		Level: slog.LevelWarn,
+		Level: &LoggerLevel,
 	}
 )
 
 func NewGlobalDefaultConfig() Config {
 	return Config{
 		Prefix:            utilz.OptionalOf(DefaultRulePrefix),
-		Verbose:           utilz.OptionalOf(DefaultVerboseLevel),
-		Debug:             utilz.OptionalOf(DefaultDebugLevel),
+		Verbose:           utilz.OptionalOf(DefaultInitlessVerboseLevel),
+		//Debug:             utilz.OptionalOf(DefaultDebugLevel),
 		GlobalStartTime:   utilz.OptionalOf(time.Now()),
 		ForkCount:         utilz.OptionalOf(1),
 		Quiet:             utilz.OptionalOf(false),
@@ -88,10 +91,11 @@ const (
 type DebugLevel int
 
 const (
-	DEBUG DebugLevel = iota
-	INFO
+	ERROR DebugLevel = iota
 	WARN
-	ERROR
+	INFO
+	DEBUG
+	TRACE
 )
 
 type CmdMock struct {
@@ -177,7 +181,7 @@ func (c *Config) Merge(right Config) {
 	c.TestName.Merge(right.TestName)
 
 	c.Prefix.Merge(right.Prefix)
-	c.SuiteStartTime.Merge(right.SuiteStartTime)
+	c.GlobalStartTime.Merge(right.GlobalStartTime)
 	c.SuiteStartTime.Merge(right.SuiteStartTime)
 	c.LastTestTime.Merge(right.LastTestTime)
 	c.SuiteTimeout.Merge(right.SuiteTimeout)

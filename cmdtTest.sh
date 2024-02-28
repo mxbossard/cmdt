@@ -23,6 +23,7 @@ cmd="TO_REPLACE"
 cmdt="$GOBIN/cmdtest"
 ls -lh "$cmdt"
 
+cmdt="$cmdt $@"
 cmdt0="$cmdt @silent"
 #cmdt0="$cmdt"
 cmdt1="$cmdt"
@@ -122,8 +123,8 @@ $cmdt0 @init=should_error @stopOnFailure=false
 ! $cmdt0 @test=should_error/ true @stderr~"" || die "should error because empty regex"
 
 $cmdt @report=should_succeed
-! $cmdt @report=should_fail 2>&1 | grep "0 success" | grep "0 error" || die "should_fail test suite should have no success nor error"
-! $cmdt @report=should_error 2>&1 | grep "0 success" | grep "0 failure" || die "should_error test suite should have no success nor failure"
+! $cmdt @report=should_fail 2>&1 | grep "17 failure" || die "should_fail test suite should have failures"
+! $cmdt @report=should_error 2>&1 | grep "4 error" || die "should_error test suite should have errors"
 
 nothingToReportExpectedStderrMsg="you must perform some test prior to report"
 >&2 echo "## Test @report without test"
@@ -135,7 +136,7 @@ $cmdt0 @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" -- $cmdt1 
 # Without token, cmdt run with different pid should run in differents workspaces
 $cmdt0 @test=meta1/"without token one" @stderr:"PASSED" @stderr:"#01" -- $cmdt1 true
 $cmdt0 @test=meta1/"without token two" @stderr:"PASSED" @stderr:"#01" -- $cmdt1 true
-$cmdt0 @test=meta1/ @exit=0 @stderr:"2 success" -- $cmdt1 @report
+$cmdt0 @test=meta1/ @exit=1 @stderr:"$nothingToReportExpectedStderrMsg" -- $cmdt1 @report
 
 >&2 echo "## Test printed token"
 tk0=$( $cmdt @init @printToken 2> /dev/null )
@@ -175,13 +176,13 @@ $cmdt0 @stdout="foo @success @fail\n" -- echo foo @success @fail
 $cmdt0 @init=reinit
 $cmdt0 @test=reinit/ -- $cmdt1 @test=sub1/ true
 $cmdt0 @test=reinit/ -- $cmdt1 @init=sub1
-$cmdt0 @test=reinit/ @stderr:"0 test" -- $cmdt1 @report=sub1
+$cmdt0 @test=reinit/ @fail @stderr:"$nothingToReportExpectedStderrMsg" -- $cmdt1 @report=sub1
 
 $cmdt0 @test=reinit/ -- $cmdt1 @keepOutputs @test=sub2/ true
 $cmdt0 @test=reinit/ -- $cmdt1 @keepOutputs @init=sub2
 $cmdt0 @test=reinit/ -- $cmdt1 @keepOutputs @test=sub2/ true
 $cmdt0 @test=reinit/ -- $cmdt1 @keepOutputs @test=sub2/ true
-$cmdt0 @test=reinit/ @stderr:"2 test" -- $cmdt1 @report=sub2
+$cmdt0 @test=reinit/ @stderr:"2 success" -- $cmdt1 @report=sub2
 
 $cmdt0 @test=reinit/ @fail @stderr:"$nothingToReportExpectedStderrMsg" -- $cmdt1 @report=sub3
 $cmdt0 @test=reinit/ -- $cmdt1 @test=sub3/ true
@@ -190,7 +191,7 @@ $cmdt0 @test=reinit/ -- $cmdt1 @test=sub3/ true
 $cmdt0 @test=reinit/ -- $cmdt1 @report=sub3
 $cmdt0 @test=reinit/ -- $cmdt1 @init=sub3
 $cmdt0 @test=reinit/ -- $cmdt1 @test=sub3/ true
-$cmdt0 @test=reinit/ @stderr:"1 test" -- $cmdt1 @report=sub3
+$cmdt0 @test=reinit/ @stderr:"1 success" -- $cmdt1 @report=sub3
 
 
 >&2 echo "## Test usage"
@@ -242,14 +243,14 @@ $cmdt0 @test=meta/ @fail @stderr:"Failures in [t1] test suite (3 success, 1 fail
 >&2 echo "## Test namings"
 $cmdt @init=main 2> /dev/null
 $cmdt0 @init=naming
-$cmdt0 @test=naming/ @stderr:"Test [main]/name1 #01..." @stderr:"PASSED" -- $cmdt true @test=name1
-$cmdt0 @test=naming/ @stderr:"Test [main]/name2 #02..." @stderr:"PASSED" -- $cmdt true @test=name2
-$cmdt0 @test=naming/ @stderr:"Test [main]/" @stderr:"true" @stderr:"#03..." @stderr:"PASSED" -- $cmdt true
-$cmdt0 @test=naming/ @stderr:"Test [main]/" @stderr:"true" @stderr:"#04..." @stderr:"PASSED" -- $cmdt true
-$cmdt0 @test=naming/ @stderr:"Test [suite1]/name1 #01..." @stderr:"PASSED" -- $cmdt true @test=suite1/name1
-$cmdt0 @test=naming/ @stderr:"Test [suite1]/name2 #02..." @stderr:"PASSED" -- $cmdt true @test=suite1/name2
-$cmdt0 @test=naming/ @stderr:"Test [suite2]/" @stderr:"#01..." @stderr:"PASSED" -- $cmdt true @test=suite2/
-$cmdt0 @test=naming/ @stderr:"Test [suite2]/" @stderr:"#02..." @stderr:"PASSED" -- $cmdt true @test=suite2/
+$cmdt0 @test=naming/ @stderr:"Test [main]/name1 #01..." @stderr:"PASSED" -- $cmdt true @test=name1 @verbose=2
+$cmdt0 @test=naming/ @stderr:"Test [main]/name2 #02..." @stderr:"PASSED" -- $cmdt true @test=name2 @verbose=2
+$cmdt0 @test=naming/ @stderr:"Test [main]/" @stderr:"true" @stderr:"#03..." @stderr:"PASSED" -- $cmdt true @verbose=2
+$cmdt0 @test=naming/ @stderr:"Test [main]/" @stderr:"true" @stderr:"#04..." @stderr:"PASSED" -- $cmdt true @verbose=2
+$cmdt0 @test=naming/ @stderr:"Test [suite1]/name1 #01..." @stderr:"PASSED" -- $cmdt true @test=suite1/name1 @verbose=2
+$cmdt0 @test=naming/ @stderr:"Test [suite1]/name2 #02..." @stderr:"PASSED" -- $cmdt true @test=suite1/name2 @verbose=2
+$cmdt0 @test=naming/ @stderr:"Test [suite2]/" @stderr:"#01..." @stderr:"PASSED" -- $cmdt true @test=suite2/ @verbose=2
+$cmdt0 @test=naming/ @stderr:"Test [suite2]/" @stderr:"#02..." @stderr:"PASSED" -- $cmdt true @test=suite2/ @verbose=2
 $cmdt0 @test=naming/ @stderr:"Successfuly ran [suite1] test suite" -- $cmdt  @report=suite1
 $cmdt0 @test=naming/ @stderr:"Successfuly ran [suite2] test suite" -- $cmdt @report=suite2
 $cmdt0 @test=naming/ @stderr:"Successfuly ran [main] test suite" -- $cmdt @report=main
@@ -290,7 +291,7 @@ $cmdt0 @test=test_config/ @stdout~/^foo$/m @stderr!:bar @stderr:PASSED -- $cmdt1
 $cmdt0 @test=test_config/ @stdout!:foo @stderr:bar @stderr:PASSED -- $cmdt1 @test=test_keepouts sh -c "echo foo; >&2 echo bar" @keepStderr
 $cmdt0 @test=test_config/ @stdout~/^foo$/m @stderr:bar @stderr:PASSED -- $cmdt1 @test=test_keepouts sh -c "echo foo; >&2 echo bar" @keepOutputs
 
-$cmdt0 @test=test_config/ @stderr:FAILED -- $cmdt1 sleep 0.01 @timeout=5ms
+$cmdt0 @test=test_config/ @stderr:TIMEOUT -- $cmdt1 sleep 0.01 @timeout=5ms
 $cmdt0 @test=test_config/ @stderr:PASSED -- $cmdt1 sleep 0.01 @timeout=30ms
 
 $cmdt0 @test=test_config/ @stderr:FAILED @success -- $cmdt1 false
@@ -308,7 +309,7 @@ $cmdt0 @test=test_config/ @fail -- $cmdt1 @report=main
 $cmdt @init=suite_config_silent @silent
 $cmdt0 @init=suite_config
 $cmdt0 @test=suite_config/ @stdout= @stderr= -- $cmdt1 @test=suite_config_silent/ echo foo
-$cmdt0 @test=suite_config/ @stderr:PASSED -- $cmdt1 @test=suite_config_silent/ echo foo @silent=false
+$cmdt0 @test=suite_config/ @stderr:PASSED -- $cmdt1 @test=suite_config_silent/ echo foo @silent=false @verbose=2
 $cmdt0 @test=suite_config/ @stdout="foo\n" @stderr= -- $cmdt1 @test=suite_config_silent/ echo foo @keepOutputs
 $cmdt0 @test=suite_config/ @stdout= @stderr="bar\n" -- $cmdt1 @test=suite_config_silent/ sh -c ">&2 echo bar" @keepOutputs
 $cmdt0 @test=suite_config/ -- $cmdt1 @report=suite_config_silent

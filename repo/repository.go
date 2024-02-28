@@ -14,6 +14,7 @@ import (
 	"gopkg.in/yaml.v2"
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/utils"
+	"mby.fr/utils/format"
 	"mby.fr/utils/utilz"
 )
 
@@ -125,6 +126,7 @@ func (r FileRepo) IncrementSuiteSeq(testSuite, name string) (n int) {
 		log.Fatal(err)
 	}
 	n = utils.IncrementSeq(suiteDir, name)
+	logger.Debug("Incrementing seq", "testSuite", testSuite, "name", name, "next", n)
 	return
 }
 
@@ -147,6 +149,7 @@ func (r FileRepo) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 		return
 	}
 
+	testTitle := format.PadRight(outcome.TestQualifiedName, 60)
 	switch outcome.Outcome {
 	case model.PASSED:
 		// Nothing to do
@@ -159,15 +162,15 @@ func (r FileRepo) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 			expected := result.Assertion.Expected
 			failedAssertionsReport += assertPrefix + assertName + assertOp + expected + " "
 		}
-		_, err = reportLog.WriteString(outcome.TestQualifiedName + "  => " + failedAssertionsReport)
+		_, err = reportLog.WriteString(testTitle + "  => " + failedAssertionsReport)
 	case model.IGNORED:
 		// Nothing to do
 	case model.ERRORED:
-		_, err = reportLog.WriteString(outcome.TestQualifiedName + "  =>  not executed")
+		_, err = reportLog.WriteString(testTitle + "  =>  not executed")
 	case model.TIMEOUT:
-		_, err = reportLog.WriteString(outcome.TestQualifiedName + "  =>  timed out")
+		_, err = reportLog.WriteString(testTitle + "  =>  timed out")
 	default:
-		log.Fatalf("outcome %s not supported", outcome.Outcome)
+		err = fmt.Errorf("outcome %s not supported", outcome.Outcome)
 	}
 	return
 }
@@ -193,6 +196,7 @@ func (r FileRepo) LoadSuiteOutcome(testSuite string) (outcome model.SuiteOutcome
 		return
 	}
 	outcome.FailureReports = failureReports
+	logger.Debug("Loaded suite outcome", "testSuite", testSuite, "outcome", outcome)
 	return
 }
 

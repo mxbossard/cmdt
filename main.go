@@ -17,8 +17,10 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 
+	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/service"
 )
 
@@ -117,6 +119,10 @@ Done:
 	- @container=IMAGE : Fournir une image pour tester l'éxecution dans cette image
 	- Utiliser une image par défaut pour les cas d'usage simples
 - improve printer. Writer stdout & stder with prefix stdout> stderr> in descriptions
+- New Config/Context
+- Introduce @verbose=N to manage test verbosity
+- Introduce @debug=N to log
+- rework failure description : hard to read (remove colors ? remove \n ?)
 
 TODO:
 Bugs:
@@ -128,11 +134,7 @@ Bugs:
 - - @global config updates does not works
 
 Features :
-- New Config/Context
-
-- Introduce @verbose=N
-- Replace @silent by @quiet
-- rework failure description : hard to read (remove colors ? remove \n ?)
+- Replace @silent by @quiet => with @quiet do not loq anything except cmd outputs if enabled with @keepOutputs
 
 - List unmockable commands and give error feedback if attempting to mock unmockable command
 - Use podman or docker binary
@@ -287,6 +289,7 @@ func RecoverExiting() {
 
 func main() {
 	//defer RecoverExiting()
+	model.LoggerLevel.Set(slog.Level(8-model.StartDebugLevel*4))
 	exitCode := service.ProcessArgs(os.Args)
 	os.Exit(exitCode)
 }

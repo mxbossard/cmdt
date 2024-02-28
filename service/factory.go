@@ -358,18 +358,24 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 			if rule.Op != "" || rule.Expected != "" {
 				err = fmt.Errorf("rule %s%s does not accept an operator nor a value", rule.Prefix, rule.Name)
 			}
-		case "init", "report":
+		case "init":
 			suiteName := rule.Expected
 			err = Validate[string](rule, suiteName, TestNameValidater)
 			c.Action = utilz.OptionalOf(model.Action(rule.Name))
 			if suiteName != "" {
 				c.TestSuite.Set(suiteName)
 			}
-			if rule.Name == "report" && rule.Expected == "" {
-				c.ReportAll.Set(true)
-				c.TestSuite.Clear()
+			c.TestSuite.Default(model.DefaultTestSuiteName)
+			c.Verbose.Default(model.DefaultInitedVerboseLevel)
+		case "report":
+			suiteName := rule.Expected
+			err = Validate[string](rule, suiteName, TestNameValidater)
+			c.Action = utilz.OptionalOf(model.Action(rule.Name))
+			if suiteName != "" {
+				c.TestSuite.Set(suiteName)
 			} else {
-				c.TestSuite.Default(model.DefaultTestSuiteName)
+				c.ReportAll.Set(true)
+				//c.TestSuite.Clear()
 			}
 		case "test":
 			c.TestSuite.Default(model.DefaultTestSuiteName)
@@ -463,7 +469,7 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 		case "verbose":
 			if rule.Op == "" {
 				rule.Op = "="
-				rule.Expected = fmt.Sprintf("%d", model.DefaultVerboseLevel)
+				rule.Expected = fmt.Sprintf("%d", model.DefaultInitedVerboseLevel + 1)
 			}
 			var level int
 			level, err = Translate(rule, IntMapper, OperatorValidater[int]("="), IntValueValidater(0, 3))
@@ -680,9 +686,9 @@ func BuildAssertion(cfg model.Config, ruleExpr string) (ok bool, assertion model
 	return
 }
 
-func ParseArgs(args []string) (cfg model.Config, assertions []model.Assertion, agg errorz.Aggregated) {
+func ParseArgs(rulePrefix string, args []string) (cfg model.Config, assertions []model.Assertion, agg errorz.Aggregated) {
 	var err error
-	cfg.Prefix.Default(model.DefaultRulePrefix)
+	cfg.Prefix.Default(rulePrefix)
 
 	var rules []model.Rule
 	parseRules := true
@@ -721,18 +727,6 @@ func ParseArgs(args []string) (cfg model.Config, assertions []model.Assertion, a
 		}
 	}
 
-	if cfg.Action.Is(model.TestAction) {
-		// If no status assertion found add an implicit success rule
-		statusAssertionFound := false
-		for _, a := range assertions {
-			statusAssertionFound = statusAssertionFound || a.Name == "success" || a.Name == "fail" || a.Name == "exit" // || a.Name == "cmd"
-		}
-		if !statusAssertionFound {
-			_, successAssertion, _ := BuildAssertion(cfg, cfg.Prefix.Get()+"success")
-			assertions = append(assertions, successAssertion)
-		}
-	}
-
 	if cfg.Action.IsEmpty() {
 		// If no action supplied add implicit test rule.
 		var rule model.Rule
@@ -743,6 +737,18 @@ func ParseArgs(args []string) (cfg model.Config, assertions []model.Assertion, a
 		rules = append(rules, rule)
 		cfg.Action.Default(model.TestAction)
 		cfg.TestSuite.Default(model.DefaultTestSuiteName)
+	}
+
+	if cfg.Action.Is(model.TestAction) {
+		// If no status assertion found add an implicit success rule
+		statusAssertionFound := false
+		for _, a := range assertions {
+			statusAssertionFound = statusAssertionFound || a.Name == "success" || a.Name == "fail" || a.Name == "exit" // || a.Name == "cmd"
+		}
+		if !statusAssertionFound {
+			_, successAssertion, _ := BuildAssertion(cfg, cfg.Prefix.Get()+"success")
+			assertions = append(assertions, successAssertion)
+		}
 	}
 
 	if (cfg.Action.Is(model.InitAction) || cfg.Action.Is(model.ReportAction)) && len(cfg.CmdAndArgs) > 0 {

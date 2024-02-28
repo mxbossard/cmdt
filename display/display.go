@@ -49,14 +49,14 @@ type BasicDisplay struct {
 func (d BasicDisplay) Global(ctx facade.GlobalContext) {
 	defer d.Flush()
 	// Do nothing ?
-	if ctx.Config.Verbose.Get() <= model.BETTER_ASSERTION_REPORT {
+	if ctx.Config.Verbose.Get() >= model.BETTER_ASSERTION_REPORT {
 		d.printer.ColoredErrf(messageColor, "## New config (token: %s)\n", ctx.Token)
 	}
 }
 
 func (d BasicDisplay) Suite(ctx facade.SuiteContext) {
 	defer d.Flush()
-	if ctx.Config.Verbose.Get() <= model.BETTER_ASSERTION_REPORT {
+	if ctx.Config.Verbose.Get() >= model.BETTER_ASSERTION_REPORT {
 		d.printer.ColoredErrf(messageColor, "## New test suite: [%s] (token: %s)\n", ctx.Config.TestSuite.Get(), ctx.Token)
 	}
 }
@@ -68,21 +68,23 @@ func (d BasicDisplay) TestTitle(ctx facade.TestContext, seq int) {
 	cfg := ctx.Config
 	timecode := int(time.Since(cfg.SuiteStartTime.Get()).Milliseconds())
 	qualifiedName := ctx.TestQualifiedName()
-	//seq := c.Repo.TestCount(c.Config.TestSuite.Get())
 	qualifiedName = format.TruncateRight(qualifiedName, maxTestNameLength)
 
-	title := fmt.Sprintf("[%05d] Test: %s #%02d... ", timecode, qualifiedName, seq)
+	title := fmt.Sprintf("[%05d] Test %s #%02d... ", timecode, qualifiedName, seq)
 	title = format.PadRight(title, maxTestNameLength+23)
 
-	//title := ctx.TestTitle()
-
 	if ctx.Config.Ignore.Is(true) {
-		if ctx.Config.Verbose.Get() <= model.BETTER_ASSERTION_REPORT {
+		if ctx.Config.Verbose.Get() >= model.BETTER_ASSERTION_REPORT {
 			d.printer.ColoredErrf(warningColor, title)
 		}
 		return
 	}
 
+	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
+		d.printer.ColoredErrf(testColor, title)
+	}
+
+	/*
 	if ctx.Config.Verbose.Get() <= model.SHOW_PASSED {
 		d.printer.ColoredErrf(testColor, title)
 		if ctx.Config.KeepStdout.Is(true) || ctx.Config.KeepStderr.Is(true) {
@@ -90,55 +92,73 @@ func (d BasicDisplay) TestTitle(ctx facade.TestContext, seq int) {
 			//d.printer.Errf("\n")
 		}
 	}
+	*/
 }
 
 func (d BasicDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutcome) {
 	// FIXME get outcome from ctx
+	cfg := ctx.Config
+	verbose := cfg.Verbose.Get()
 	testDuration := outcome.Duration
 	defer d.Flush()
+	
+	if verbose < model.SHOW_PASSED && outcome.Outcome != model.PASSED && outcome.Outcome != model.IGNORED {
+		// Print back test title not printed yed
+		clone := ctx
+		clone.Config.Verbose.Set(model.SHOW_PASSED)
+		d.TestTitle(clone, outcome.Seq)
+	}
+
 	switch outcome.Outcome {
 	case model.PASSED:
-		if ctx.Config.Verbose.Get() <= model.SHOW_PASSED {
+		if verbose >= model.SHOW_PASSED {
 			d.printer.ColoredErrf(successColor, "PASSED")
 			d.printer.Errf(" (in %s)\n", testDuration)
 		}
 	case model.FAILED:
-		if ctx.Config.Verbose.Get() > model.SHOW_PASSED {
-			ctx.Config.Verbose.Set(model.SHOW_PASSED)
-			d.TestTitle(ctx, outcome.Seq)
-		}
 		d.printer.ColoredErrf(failureColor, "FAILED")
 		d.printer.Errf(" (in %s)\n", testDuration)
-		d.printer.Errf("\tFailure calling cmd: \t[%s]\n", outcome.CmdTitle)
 	case model.TIMEOUT:
-		d.printer.ColoredErrf(failureColor, "FAILED")
-		d.printer.Errf(" (timed out after %s)\n", ctx.Config.Timeout.Get())
+		d.printer.ColoredErrf(failureColor, "TIMEOUT")
+		d.printer.Errf(" (after %s)\n", ctx.Config.Timeout.Get())
 	case model.ERRORED:
 		d.printer.ColoredErrf(warningColor, "ERRORED")
 		d.printer.Errf(" (not executed)\n")
-		d.printer.Errf("\tFailure calling cmd: \t[%s]\n", outcome.CmdTitle)
 	case model.IGNORED:
-		if ctx.Config.Verbose.Get() >= model.BETTER_ASSERTION_REPORT {
+		if verbose >= model.BETTER_ASSERTION_REPORT {
 			d.printer.ColoredErrf(warningColor, "IGNORED")
 			d.printer.Err("\n")
 		}
 	default:
 	}
+
+	if outcome.Outcome != model.PASSED && outcome.Outcome != model.IGNORED || verbose > model.SHOW_PASSED {
+		d.printer.Errf("\tExecuting cmd: \t\t[%s]\n", outcome.CmdTitle)
+	}
+
 	if outcome.Err != nil {
 		d.printer.ColoredErrf(model.ErrorColor, "\t%s\n", outcome.Err)
 	}
 
-	if ctx.Config.Verbose.Get() <= model.SHOW_PASSED &&
+	if verbose >= model.SHOW_PASSED &&
 		(ctx.Config.KeepStdout.Is(true) || ctx.Config.KeepStderr.Is(true)) {
 		// NewLine in printer to print test result in a new line
 		//d.printer.Errf("        ")
 		d.printer.Flush()
 	}
+
+	if len(outcome.AssertionResults) > 0 {
+		for _, asseriontResult := range outcome.AssertionResults {
+			d.assertionResult(asseriontResult)
+		}
+		 d.printer.Errf("\n")
+	}
+
 }
 
-func (d BasicDisplay) AssertionResult(result model.AssertionResult) {
+func (d BasicDisplay) assertionResult(result model.AssertionResult) {
 	defer d.Flush()
-	hlClr := messageColor
+	hlClr := reportColor
 	//log.Printf("failedResult: %v\n", result)
 	assertPrefix := result.Assertion.Prefix
 	assertName := result.Assertion.Name
@@ -234,8 +254,11 @@ func (d BasicDisplay) ReportSuite(ctx facade.SuiteContext, outcome model.SuiteOu
 	passedCount := outcome.PassedCount
 
 	testSuite := ctx.Config.TestSuite.Get()
-	if ctx.Config.Verbose.Get() <= model.SHOW_PASSED {
-		d.printer.ColoredErrf(messageColor, "Reporting [%s] test suite (%s) ...\n", testSuite, ctx.Token)
+	//testSuiteLabel := fmt.Sprintf("%s%s%s", testColor, testSuite, resetColor)
+	testSuiteLabel := testSuite
+
+	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
+		d.printer.ColoredErrf(messageColor, "Reporting [%s] test suite (%s) ...\n", testSuiteLabel, ctx.Token)
 	}
 
 	ignoredMessage := ""
@@ -247,11 +270,11 @@ func (d BasicDisplay) ReportSuite(ctx facade.SuiteContext, outcome model.SuiteOu
 	duration := endTime.Sub(startTime)
 	fmtDuration := NormalizeDurationInSec(duration)
 	if failedCount == 0 && errorCount == 0 {
-		d.printer.ColoredErrf(successColor, "Successfuly ran [%s] test suite (%d success in %s)", testSuite, passedCount, fmtDuration)
+		d.printer.ColoredErrf(successColor, "Successfuly ran [%s] test suite (%d success in %s)", testSuiteLabel, passedCount, fmtDuration)
 		d.printer.ColoredErrf(warningColor, "%s", ignoredMessage)
 		d.printer.Errf("\n")
 	} else {
-		d.printer.ColoredErrf(failureColor, "Failures in [%s] test suite (%d success, %d failures, %d errors on %d tests in %s)", testSuite, passedCount, failedCount, errorCount, testCount, fmtDuration)
+		d.printer.ColoredErrf(failureColor, "Failures in [%s] test suite (%d success, %d failures, %d errors on %d tests in %s)", testSuiteLabel, passedCount, failedCount, errorCount, testCount, fmtDuration)
 		d.printer.ColoredErrf(warningColor, "%s", ignoredMessage)
 		d.printer.Errf("\n")
 		for _, report := range outcome.FailureReports {
