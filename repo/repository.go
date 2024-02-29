@@ -76,13 +76,19 @@ func (r FileRepo) SaveSuiteConfig(cfg model.Config) (err error) {
 	return persistSuiteConfig(r.token, cfg)
 }
 
-func (r FileRepo) LoadSuiteConfig(testSuite string) (cfg model.Config, err error) {
+func (r FileRepo) LoadSuiteConfig(testSuite string, initless bool) (cfg model.Config, err error) {
 	cfg, err = loadSuiteConfig(testSuite, r.token)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			// suite config does not exists yet
 			// create a new default one
-			cfg = model.NewSuiteDefaultConfig()
+			if initless {
+				//logger.Warn("Saving new initless config", "testSuite", testSuite)
+				cfg = model.NewInitlessSuiteDefaultConfig()
+			} else {
+				//logger.Warn("Saving new inited config", "testSuite", testSuite)
+				cfg = model.NewSuiteDefaultConfig()
+			}
 			cfg.TestSuite.Set(testSuite)
 			cfg.SuiteStartTime.Set(time.Now())
 			err = r.SaveSuiteConfig(cfg)
@@ -118,6 +124,10 @@ func (r FileRepo) FailedCount(testSuite string) (n int) {
 
 func (r FileRepo) ErroredCount(testSuite string) (n int) {
 	return r.readSuiteSeq(testSuite, model.ErroredSequenceFilename)
+}
+
+func (r FileRepo) TooMuchCount(testSuite string) (n int) {
+	return r.readSuiteSeq(testSuite, model.TooMuchSequenceFilename)
 }
 
 func (r FileRepo) IncrementSuiteSeq(testSuite, name string) (n int) {
@@ -177,7 +187,7 @@ func (r FileRepo) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 
 func (r FileRepo) LoadSuiteOutcome(testSuite string) (outcome model.SuiteOutcome, err error) {
 	var suiteCfg model.Config
-	suiteCfg, err = r.LoadSuiteConfig(testSuite)
+	suiteCfg, err = r.LoadSuiteConfig(testSuite, false)
 	if err != nil {
 		return
 	}
@@ -188,6 +198,7 @@ func (r FileRepo) LoadSuiteOutcome(testSuite string) (outcome model.SuiteOutcome
 	outcome.FailedCount = r.FailedCount(testSuite)
 	outcome.ErroredCount = r.ErroredCount(testSuite)
 	outcome.IgnoredCount = r.IgnoredCount(testSuite)
+	outcome.TooMuchCount = r.TooMuchCount(testSuite)
 	startTime := suiteCfg.SuiteStartTime.Get()
 	endTime := suiteCfg.LastTestTime.GetOr(time.Now())
 	outcome.Duration = endTime.Sub(startTime)

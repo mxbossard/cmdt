@@ -37,6 +37,10 @@ func ProcessMocking(testWorkDir string, mocks []model.CmdMock) (mockDir string, 
 	// for each cmd mocked add link to the mock wrapper
 	for _, mock := range mocks {
 		linkName := filepath.Join(mockDir, mock.Cmd)
+		err = os.RemoveAll(linkName)
+		if err != nil {
+			return
+		}
 		linkSource := wrapperFilepath
 		err = os.Symlink(linkSource, linkName)
 		if err != nil {

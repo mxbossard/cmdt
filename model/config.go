@@ -10,14 +10,17 @@ import (
 )
 
 const (
-	DefaultInitedVerboseLevel = BETTER_ASSERTION_REPORT
-	DefaultInitlessVerboseLevel = SHOW_PASSED
-	StartDebugLevel   = ERROR
-	DefaultDebugLevel   = INFO
+	DefaultVerboseLevel         = SHOW_PASSED
+	DefaultInitedVerboseLevel   = BETTER_ASSERTION_REPORT
+	DefaultInitlessVerboseLevel = DefaultVerboseLevel
+	StartDebugLevel             = WARN
+	DefaultDebugLevel           = INFO
+	DefaultTooMuchFailures      = 4
+	TooMuchFailuresNoLimit      = -1
 )
 
 var (
-	LoggerLevel slog.LevelVar
+	LoggerLevel       slog.LevelVar
 	DefaultLoggerOpts = &slog.HandlerOptions{
 		Level: &LoggerLevel,
 	}
@@ -25,12 +28,11 @@ var (
 
 func NewGlobalDefaultConfig() Config {
 	return Config{
-		Prefix:            utilz.OptionalOf(DefaultRulePrefix),
-		Verbose:           utilz.OptionalOf(DefaultInitlessVerboseLevel),
-		//Debug:             utilz.OptionalOf(DefaultDebugLevel),
+		Prefix: utilz.OptionalOf(DefaultRulePrefix),
+		//Verbose: utilz.OptionalOf(DefaultInitlessVerboseLevel),
+		//Verbose:           utilz.OptionalOf(DefaultInitedVerboseLevel),
 		GlobalStartTime:   utilz.OptionalOf(time.Now()),
 		ForkCount:         utilz.OptionalOf(1),
-		Quiet:             utilz.OptionalOf(false),
 		Ignore:            utilz.OptionalOf(false),
 		StopOnFailure:     utilz.OptionalOf(false),
 		KeepStdout:        utilz.OptionalOf(false),
@@ -47,15 +49,19 @@ func NewGlobalDefaultConfig() Config {
 
 func NewSuiteDefaultConfig() Config {
 	return Config{
-		SuiteStartTime: utilz.OptionalOf(time.Now()),
-		SuiteTimeout:   utilz.OptionalOf(120 * time.Second),
+		TooMuchFailures: utilz.OptionalOf(DefaultTooMuchFailures),
+		SuiteStartTime:  utilz.OptionalOf(time.Now()),
+		SuiteTimeout:    utilz.OptionalOf(120 * time.Second),
+		Verbose:         utilz.OptionalOf(DefaultInitedVerboseLevel),
 	}
 }
 
 func NewInitlessSuiteDefaultConfig() Config {
 	return Config{
-		SuiteStartTime: utilz.OptionalOf(time.Now()),
-		SuiteTimeout:   utilz.OptionalOf(3600 * time.Second),
+		TooMuchFailures: utilz.OptionalOf(TooMuchFailuresNoLimit),
+		SuiteStartTime:  utilz.OptionalOf(time.Now()),
+		SuiteTimeout:    utilz.OptionalOf(3600 * time.Second),
+		Verbose:         utilz.OptionalOf(DefaultInitlessVerboseLevel),
 	}
 }
 
@@ -84,6 +90,7 @@ type VerboseLevel int
 const (
 	FAILED_ONLY VerboseLevel = iota
 	BETTER_ASSERTION_REPORT
+	NO_FAILURES_LIMIT
 	SHOW_PASSED
 	SHOW_PASSED_AND_OUTPUTS
 )
@@ -122,6 +129,7 @@ type Config struct {
 	CmdAndArgs      []string                      `yaml:""`
 	GlobalStartTime utilz.Optional[time.Time]     `yaml:""`
 	SuiteStartTime  utilz.Optional[time.Time]     `yaml:""`
+	TooMuchFailures utilz.Optional[int]           `yaml:""`
 	LastTestTime    utilz.Optional[time.Time]     `yaml:""`
 	SuiteTimeout    utilz.Optional[time.Duration] `yaml:""`
 	ForkCount       utilz.Optional[int]           `yaml:""`
@@ -181,6 +189,7 @@ func (c *Config) Merge(right Config) {
 	c.TestName.Merge(right.TestName)
 
 	c.Prefix.Merge(right.Prefix)
+	c.TooMuchFailures.Merge(right.TooMuchFailures)
 	c.GlobalStartTime.Merge(right.GlobalStartTime)
 	c.SuiteStartTime.Merge(right.SuiteStartTime)
 	c.LastTestTime.Merge(right.LastTestTime)

@@ -11,6 +11,7 @@ import (
 	"mby.fr/utils/format"
 	"mby.fr/utils/inout"
 	"mby.fr/utils/printz"
+	"mby.fr/utils/utilz"
 )
 
 var (
@@ -41,6 +42,7 @@ var (
 */
 type BasicDisplay struct {
 	printer            printz.Printer
+	notQuietPrinter    printz.Printer
 	clearAnsiFormatter inout.Formatter
 	outFormatter       inout.Formatter
 	errFormatter       inout.Formatter
@@ -56,8 +58,8 @@ func (d BasicDisplay) Global(ctx facade.GlobalContext) {
 
 func (d BasicDisplay) Suite(ctx facade.SuiteContext) {
 	defer d.Flush()
-	if ctx.Config.Verbose.Get() >= model.BETTER_ASSERTION_REPORT {
-		d.printer.ColoredErrf(messageColor, "## New test suite: [%s] (token: %s)\n", ctx.Config.TestSuite.Get(), ctx.Token)
+	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
+		d.printer.ColoredErrf(messageColor, "## Test suite [%s] (token: %s)\n", ctx.Config.TestSuite.Get(), ctx.Token)
 	}
 }
 
@@ -73,7 +75,7 @@ func (d BasicDisplay) TestTitle(ctx facade.TestContext, seq int) {
 	title := fmt.Sprintf("[%05d] Test %s #%02d... ", timecode, qualifiedName, seq)
 	title = format.PadRight(title, maxTestNameLength+23)
 
-	if ctx.Config.Ignore.Is(true) {
+	if ctx.Config.Verbose.Get() > model.BETTER_ASSERTION_REPORT && ctx.Config.Ignore.Is(true) {
 		if ctx.Config.Verbose.Get() >= model.BETTER_ASSERTION_REPORT {
 			d.printer.ColoredErrf(warningColor, title)
 		}
@@ -85,13 +87,13 @@ func (d BasicDisplay) TestTitle(ctx facade.TestContext, seq int) {
 	}
 
 	/*
-	if ctx.Config.Verbose.Get() <= model.SHOW_PASSED {
-		d.printer.ColoredErrf(testColor, title)
-		if ctx.Config.KeepStdout.Is(true) || ctx.Config.KeepStderr.Is(true) {
-			// NewLine because we expect cmd outputs
-			//d.printer.Errf("\n")
+		if ctx.Config.Verbose.Get() <= model.SHOW_PASSED {
+			d.printer.ColoredErrf(testColor, title)
+			if ctx.Config.KeepStdout.Is(true) || ctx.Config.KeepStderr.Is(true) {
+				// NewLine because we expect cmd outputs
+				//d.printer.Errf("\n")
+			}
 		}
-	}
 	*/
 }
 
@@ -101,7 +103,7 @@ func (d BasicDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutc
 	verbose := cfg.Verbose.Get()
 	testDuration := outcome.Duration
 	defer d.Flush()
-	
+
 	if verbose < model.SHOW_PASSED && outcome.Outcome != model.PASSED && outcome.Outcome != model.IGNORED {
 		// Print back test title not printed yed
 		clone := ctx
@@ -125,7 +127,7 @@ func (d BasicDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutc
 		d.printer.ColoredErrf(warningColor, "ERRORED")
 		d.printer.Errf(" (not executed)\n")
 	case model.IGNORED:
-		if verbose >= model.BETTER_ASSERTION_REPORT {
+		if verbose > model.BETTER_ASSERTION_REPORT {
 			d.printer.ColoredErrf(warningColor, "IGNORED")
 			d.printer.Err("\n")
 		}
@@ -151,7 +153,9 @@ func (d BasicDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutc
 		for _, asseriontResult := range outcome.AssertionResults {
 			d.assertionResult(asseriontResult)
 		}
-		 d.printer.Errf("\n")
+		d.printer.Errf(d.outFormatter.Format(outcome.Stdout))
+		d.printer.Errf(d.errFormatter.Format(outcome.Stderr))
+		d.printer.Errf("\n")
 	}
 
 }
@@ -252,6 +256,7 @@ func (d BasicDisplay) ReportSuite(ctx facade.SuiteContext, outcome model.SuiteOu
 	errorCount := outcome.ErroredCount
 	//passedCount := testCount - failedCount - ignoredCount
 	passedCount := outcome.PassedCount
+	tooMuchCount := outcome.TooMuchCount
 
 	testSuite := ctx.Config.TestSuite.Get()
 	//testSuiteLabel := fmt.Sprintf("%s%s%s", testColor, testSuite, resetColor)
@@ -285,6 +290,9 @@ func (d BasicDisplay) ReportSuite(ctx facade.SuiteContext, outcome model.SuiteOu
 			}
 		}
 	}
+	if tooMuchCount > 0 {
+		d.printer.ColoredErrf(warningColor, "Too much failures (%d tests not executed)\n", tooMuchCount)
+	}
 }
 
 func (d BasicDisplay) ReportAllFooter(globalCtx facade.GlobalContext) {
@@ -295,15 +303,20 @@ func (d BasicDisplay) ReportAllFooter(globalCtx facade.GlobalContext) {
 	d.printer.ColoredErrf(messageColor, "Global duration time: %s\n", globalDuration)
 }
 
+func (d BasicDisplay) TooMuchFailures(testSuite string) {
+	defer d.Flush()
+	d.printer.ColoredErrf(warningColor, "Too much failure for [%s] test suite. Stop testing.\n", testSuite)
+}
+
 func (d BasicDisplay) Stdout(s string) {
 	if s != "" {
-		d.printer.Err(d.outFormatter.Format(s))
+		d.notQuietPrinter.Out(d.outFormatter.Format(s))
 	}
 }
 
 func (d BasicDisplay) Stderr(s string) {
 	if s != "" {
-		d.printer.Err(d.errFormatter.Format(s))
+		d.notQuietPrinter.Err(d.errFormatter.Format(s))
 	}
 }
 
@@ -315,13 +328,24 @@ func (d BasicDisplay) Flush() error {
 	return d.printer.Flush()
 }
 
-func New() BasicDisplay {
-	return BasicDisplay{
-		printer:            printz.NewStandard(),
-		clearAnsiFormatter: inout.AnsiFormatter{AnsiFormat: ansi.Reset},
-		outFormatter:       inout.PrefixFormatter{Prefix: "out> "},
-		errFormatter:       inout.PrefixFormatter{Prefix: "err> "},
+func (d *BasicDisplay) Quiet(quiet utilz.Optional[bool]) {
+	if quiet.Is(true) {
+		d.printer = printz.NewDiscarding()
+	} else {
+		d.printer = d.notQuietPrinter
 	}
+
+}
+
+func New() BasicDisplay {
+	d := BasicDisplay{
+		notQuietPrinter:    printz.NewStandard(),
+		clearAnsiFormatter: inout.AnsiFormatter{AnsiFormat: ansi.Reset},
+		outFormatter:       inout.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", testColor, resetColor)},
+		errFormatter:       inout.PrefixFormatter{Prefix: fmt.Sprintf("%serr%s>", reportColor, resetColor)},
+	}
+	d.printer = d.notQuietPrinter
+	return d
 }
 
 func NormalizeDurationInSec(d time.Duration) (duration string) {

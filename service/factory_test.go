@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"mby.fr/cmdtest/model"
+	"mby.fr/utils/errorz"
 )
 
 func TestApplyConfig(t *testing.T) {
@@ -106,23 +107,23 @@ func TestBuildAssertion(t *testing.T) {
 func TestParseArgs(t *testing.T) {
 	var cfg model.Config
 	var assertions []model.Assertion
-	var err error
+	var agg errorz.Aggregated
 
 	// Parse command and args without config nor assertions
-	cfg, assertions, err = ParseArgs([]string{"foo", "bar", "baz"})
-	require.NoError(t, err)
+	cfg, assertions, agg = ParseArgs("@", []string{"foo", "bar", "baz"})
+	require.NoError(t, agg.Return())
 	assert.Equal(t, []string{"foo", "bar", "baz"}, cfg.CmdAndArgs)
 	assert.Equal(t, model.DefaultTestSuiteName, cfg.TestSuite.Get())
 	require.False(t, cfg.TestName.IsPresent())
 	assert.Len(t, assertions, 1)
 
 	// Parse command and args with a not existing rule
-	_, _, err = ParseArgs([]string{"foo", "bar", "@foo"})
-	assert.Error(t, err)
+	_, _, agg = ParseArgs("@", []string{"foo", "bar", "@foo"})
+	assert.Error(t, agg.Return())
 
 	// Parse command and args with an existing rule
-	cfg, assertions, err = ParseArgs([]string{"foo", "bar", "@fail", "@test=pif"})
-	require.NoError(t, err)
+	cfg, assertions, agg = ParseArgs("@", []string{"foo", "bar", "@fail", "@test=pif"})
+	require.NoError(t, agg.Return())
 	assert.Equal(t, []string{"foo", "bar"}, cfg.CmdAndArgs)
 	assert.Equal(t, model.DefaultTestSuiteName, cfg.TestSuite.Get())
 	require.True(t, cfg.TestName.IsPresent())
@@ -130,8 +131,8 @@ func TestParseArgs(t *testing.T) {
 	assert.Len(t, assertions, 1)
 
 	// Parse command and args with an existing rule
-	cfg, assertions, err = ParseArgs([]string{"foo", "bar", "@fail", "@stdout=", "@test=paf/"})
-	require.NoError(t, err)
+	cfg, assertions, agg = ParseArgs("@", []string{"foo", "bar", "@fail", "@stdout=", "@test=paf/"})
+	require.NoError(t, agg.Return())
 	assert.Equal(t, []string{"foo", "bar"}, cfg.CmdAndArgs)
 	assert.Equal(t, "paf", cfg.TestSuite.Get())
 	require.True(t, cfg.TestName.IsPresent())
@@ -139,24 +140,24 @@ func TestParseArgs(t *testing.T) {
 	assert.Len(t, assertions, 2)
 
 	// Parse command and args with mutualy exclusive rules
-	cfg, assertions, err = ParseArgs([]string{"foo", "bar", "@fail", "@success"})
-	require.Error(t, err)
+	cfg, assertions, agg = ParseArgs("@", []string{"foo", "bar", "@fail", "@success"})
+	require.Error(t, agg.Return())
 	assert.Equal(t, []string{"foo", "bar"}, cfg.CmdAndArgs)
 	assert.Equal(t, model.DefaultTestSuiteName, cfg.TestSuite.Get())
 	require.False(t, cfg.TestName.IsPresent())
 	assert.Len(t, assertions, 2)
 
 	// Parse command and args with a test name
-	cfg, assertions, err = ParseArgs([]string{"foo", "bar", "@test=foo", "@success"})
-	require.NoError(t, err)
+	cfg, assertions, agg = ParseArgs("@", []string{"foo", "bar", "@test=foo", "@success"})
+	require.NoError(t, agg.Return())
 	assert.Equal(t, []string{"foo", "bar"}, cfg.CmdAndArgs)
 	require.True(t, cfg.TestName.IsPresent())
 	assert.Equal(t, "foo", cfg.TestName.Get())
 	assert.Len(t, assertions, 1)
 
 	// Parse command and args with an absolute test name
-	cfg, assertions, err = ParseArgs([]string{"foo", "bar", "@test=bar/foo", "@success"})
-	require.NoError(t, err)
+	cfg, assertions, agg = ParseArgs("@", []string{"foo", "bar", "@test=bar/foo", "@success"})
+	require.NoError(t, agg.Return())
 	assert.Equal(t, []string{"foo", "bar"}, cfg.CmdAndArgs)
 	assert.Equal(t, "bar", cfg.TestSuite.Get())
 	require.True(t, cfg.TestName.IsPresent())

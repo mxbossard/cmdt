@@ -434,7 +434,7 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 		case "exportToken":
 			c.ExportToken, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
 		case "parallel":
-		case "silent":
+		case "quiet":
 			c.Quiet, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
 		case "mock":
 			var mock model.CmdMock
@@ -469,7 +469,7 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 		case "verbose":
 			if rule.Op == "" {
 				rule.Op = "="
-				rule.Expected = fmt.Sprintf("%d", model.DefaultInitedVerboseLevel + 1)
+				rule.Expected = fmt.Sprintf("%d", model.SHOW_PASSED)
 			}
 			var level int
 			level, err = Translate(rule, IntMapper, OperatorValidater[int]("="), IntValueValidater(0, 3))
@@ -778,8 +778,6 @@ func ParseArgs(rulePrefix string, args []string) (cfg model.Config, assertions [
 	if cfg.ContainerImage.IsPresent() {
 		cfg.ContainerScope = utilz.OptionalOf(cfgScope)
 	}
-
-	//log.Printf("build context: %s Silent: %v\n", args, cfg.Silent)
 	return
 }
 

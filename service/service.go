@@ -104,7 +104,7 @@ func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int, err error) {
 
 	exitCode = 0
 	for _, testSuite := range testSuites {
-		suiteCtx := facade.NewSuiteContext(token, testSuite, model.ReportAction, ctx.Config)
+		suiteCtx := facade.NewSuiteContext(token, testSuite, false, model.ReportAction, ctx.Config)
 		if suiteCtx.Repo.TestCount(testSuite) > 0 {
 			code := 0
 			code, err = ReportTestSuite(suiteCtx)
@@ -202,6 +202,11 @@ func PerformTest(ctx facade.TestContext, seq int, assertions []model.Assertion) 
 func ProcessArgs(allArgs []string) (exitCode int) {
 	exitCode = 1
 
+	if len(allArgs) == 1 {
+		usage()
+		return
+	}
+
 	// FIXME: if token supplied by ENV should be retrieved FIRST to get token and load Global config
 	defaultCfg := model.NewGlobalDefaultConfig()
 	envToken := readEnvToken()
@@ -214,17 +219,15 @@ func ProcessArgs(allArgs []string) (exitCode int) {
 	args := allArgs[1:]
 	logger.Debug("Processing cmdt args", "args", args)
 	inputConfig, assertions, agg := ParseArgs(rulePrefix, args)
-	//defaultCfg.Merge(inputConfig)
-	config := inputConfig 
-	config.Token.Default(envToken)
-	if config.Debug.IsPresent() {
-		model.LoggerLevel.Set(slog.Level(8-config.Debug.Get()*4))
-		//model.DefaultLoggerOpts.Level = slog.LevelDebug
+	mergedConfig := inputConfig
+	mergedConfig.Token.Default(envToken)
+	logger.Debug("Parsed args", "mergedConfig", mergedConfig, "assertions", assertions, "error", agg)
+	if mergedConfig.Debug.IsPresent() {
+		model.LoggerLevel.Set(slog.Level(8 - mergedConfig.Debug.Get()*4))
 	}
 
-	logger.Debug("Parsed args", "config", config, "assertions", assertions, "error", agg)
-	token := config.Token.GetOr("")
-	action := config.Action.Get()
+	token := mergedConfig.Token.GetOr("")
+	action := mergedConfig.Action.Get()
 
 	var err error
 	switch action {
@@ -232,63 +235,76 @@ func ProcessArgs(allArgs []string) (exitCode int) {
 		if agg.GotError() {
 			log.Fatal(agg)
 		}
-		globalCtx := facade.NewGlobalContext(token, config)
+		globalCtx := facade.NewGlobalContext(token, mergedConfig)
 		logger.Debug("Forged context", "ctx", globalCtx)
 		logger.Info("Processing global action", "token", token)
+		dpl.Quiet(globalCtx.Config.Quiet)
 		exitCode, err = GlobalConfig(globalCtx)
 	case model.InitAction:
-		testSuite := config.TestSuite.Get()
-		suiteCtx := facade.NewSuiteContext(token, testSuite, action, config)
+		testSuite := mergedConfig.TestSuite.Get()
+		suiteCtx := facade.NewSuiteContext(token, testSuite, false, action, mergedConfig)
 		logger.Debug("Forged context", "ctx", suiteCtx)
 		suiteCtx.NoErrorOrFatal(agg.Return())
 		logger.Info("Processing init action", "token", token)
+		dpl.Quiet(suiteCtx.Config.Quiet)
 		exitCode, err = InitTestSuite(suiteCtx)
 	case model.ReportAction:
-		if config.ReportAll.Is(true) {
+		if mergedConfig.ReportAll.Is(true) {
 			if agg.GotError() {
 				log.Fatal(agg)
 			}
-			globalCtx := facade.NewGlobalContext(token, config)
+			globalCtx := facade.NewGlobalContext(token, mergedConfig)
 			logger.Debug("Forged context", "ctx", globalCtx)
 			logger.Info("Processing report all action", "token", token)
+			dpl.Quiet(globalCtx.Config.Quiet)
 			exitCode, err = ReportAllTestSuites(globalCtx)
 		} else {
-			testSuite := config.TestSuite.Get()
-			suiteCtx := facade.NewSuiteContext(token, testSuite, action, config)
+			testSuite := mergedConfig.TestSuite.Get()
+			suiteCtx := facade.NewSuiteContext(token, testSuite, false, action, mergedConfig)
 			logger.Debug("Forged context", "ctx", suiteCtx)
 			suiteCtx.NoErrorOrFatal(agg.Return())
 			logger.Info("Processing report suite action", "token", token)
+			dpl.Quiet(suiteCtx.Config.Quiet)
 			exitCode, err = ReportTestSuite(suiteCtx)
 		}
 	case model.TestAction:
-		if len(config.CmdAndArgs) == 0 {
-			usage()
-			return
+		testSuite := mergedConfig.TestSuite.Get()
+		testCtx := facade.NewTestContext(token, testSuite, mergedConfig)
+		logger.Debug("Forged context", "ctx", testCtx)
+
+		seq := testCtx.IncrementTestCount()
+
+		tooMuchFailures := testCtx.ProcessTooMuchFailures()
+
+		if tooMuchFailures == 1 {
+			// First time detecting TOO MUCH FAILURES
+			// TODO: report TOO MUCH FAILURES DO NOT EXECUTING TEST ANYMORE
+			dpl.TooMuchFailures(testSuite)
+		}
+		if tooMuchFailures > 0 {
+			return 0
 		}
 
-		testSuite := config.TestSuite.Get()
-		testCtx := facade.NewTestContext(token, testSuite, config)
-		logger.Debug("Forged context", "ctx", testCtx)
-		seq := testCtx.IncrementTestCount()
 		testCtx.NoErrorOrFatal(agg.Return())
 		logger.Info("Processing test action", "token", token)
 
-		if config.ContainerDisabled.Is(true) || config.ContainerImage.IsEmpty() {
+		dpl.Quiet(testCtx.Config.Quiet)
+		if mergedConfig.ContainerDisabled.Is(true) || mergedConfig.ContainerImage.IsEmpty() {
 			//logger.Debug("Performing test outside container", "context", config, "image", config.ContainerImage, "containerDisabled", config.ContainerDisabled)
 			exitCode, err = PerformTest(testCtx, seq, assertions)
 			testCtx.NoErrorOrFatal(err)
 		} else {
-			logger.Info("Performing test inside container", "context", config, "image", config.ContainerImage, "containerDisabled", config.ContainerDisabled)
+			logger.Warn("Performing test inside container", "image", mergedConfig.ContainerImage, "containerDisabled", mergedConfig.ContainerDisabled, "context", mergedConfig)
 			var ctId string
 			ctId, exitCode, err = PerformTestInContainer(testCtx)
-			if config.ContainerScope.Is(model.GLOBAL_SCOPE) {
+			if mergedConfig.ContainerScope.Is(model.GLOBAL_SCOPE) {
 				globalCfg, err2 := testCtx.Repo.LoadGlobalConfig()
 				testCtx.NoErrorOrFatal(err2)
 				globalCfg.ContainerId = utilz.OptionalOf(ctId)
 				err2 = testCtx.Repo.SaveGlobalConfig(globalCfg)
 				testCtx.NoErrorOrFatal(err2)
-			} else if config.ContainerScope.Is(model.SUITE_SCOPE) {
-				suiteCfg, err2 := testCtx.Repo.LoadSuiteConfig(testSuite)
+			} else if mergedConfig.ContainerScope.Is(model.SUITE_SCOPE) {
+				suiteCfg, err2 := testCtx.Repo.LoadSuiteConfig(testSuite, true)
 				testCtx.NoErrorOrFatal(err2)
 				suiteCfg.ContainerId = utilz.OptionalOf(ctId)
 				err2 = testCtx.Repo.SaveSuiteConfig(suiteCfg)
@@ -298,13 +314,13 @@ func ProcessArgs(allArgs []string) (exitCode int) {
 
 		}
 	default:
-		err = fmt.Errorf("action: [%v] not known", config.Action)
+		err = fmt.Errorf("action: [%v] not known", mergedConfig.Action)
 	}
 
 	logger.Info("exiting", "exitCode", exitCode)
 
 	if err != nil {
-		log.Fatal(config.TestSuite, config.Token, err)
+		log.Fatal(mergedConfig.TestSuite, mergedConfig.Token, err)
 	}
 	return
 }

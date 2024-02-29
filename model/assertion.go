@@ -51,4 +51,5 @@ type SuiteOutcome struct {
 	FailedCount    int
 	ErroredCount   int
 	IgnoredCount   int
+	TooMuchCount   int
 }

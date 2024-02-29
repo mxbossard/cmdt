@@ -23,7 +23,7 @@ cmd="TO_REPLACE"
 cmdt="$GOBIN/cmdtest"
 ls -lh "$cmdt"
 
-#cmdt0="$cmdt @silent"
+#cmdt0="$cmdt @quiet"
 cmdt0="$cmdt $@"
 
 die() {
