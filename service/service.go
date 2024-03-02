@@ -36,18 +36,6 @@ func usage() {
 	usagePrinter.Flush()
 }
 
-func readEnvToken() (token string) {
-	// Search uniqKey in env
-	for _, env := range os.Environ() {
-		if strings.HasPrefix(env, model.ContextTokenEnvVarName+"=") {
-			splitted := strings.Split(env, "=")
-			token = strings.Join(splitted[1:], "")
-		}
-	}
-	logger.Debug("Found a token in env: " + token)
-	return
-}
-
 func GlobalConfig(ctx facade.GlobalContext) (exitCode int, err error) {
 	// Init or Update Global config
 	exitCode = 0
@@ -175,6 +163,9 @@ func PerformTest(ctx facade.TestContext, seq int, assertions []model.Assertion) 
 		}
 	}
 
+	err = ctx.ConfigMocking()
+	ctx.NoErrorOrFatal(err)
+
 	outcome := ctx.AssertCmdExecBlocking(seq, assertions)
 
 	dpl.TestOutcome(ctx, outcome)
@@ -209,7 +200,7 @@ func ProcessArgs(allArgs []string) (exitCode int) {
 
 	// FIXME: if token supplied by ENV should be retrieved FIRST to get token and load Global config
 	defaultCfg := model.NewGlobalDefaultConfig()
-	envToken := readEnvToken()
+	envToken := utils.ReadEnvToken()
 	if envToken != "" {
 		envCtx := facade.NewGlobalContext(envToken, defaultCfg)
 		defaultCfg = envCtx.Config
@@ -219,15 +210,15 @@ func ProcessArgs(allArgs []string) (exitCode int) {
 	args := allArgs[1:]
 	logger.Debug("Processing cmdt args", "args", args)
 	inputConfig, assertions, agg := ParseArgs(rulePrefix, args)
-	mergedConfig := inputConfig
-	mergedConfig.Token.Default(envToken)
-	logger.Debug("Parsed args", "mergedConfig", mergedConfig, "assertions", assertions, "error", agg)
-	if mergedConfig.Debug.IsPresent() {
-		model.LoggerLevel.Set(slog.Level(8 - mergedConfig.Debug.Get()*4))
+	loadedConfig := inputConfig
+	loadedConfig.Token.Default(envToken)
+	logger.Debug("Parsed args", "loadedConfig", loadedConfig, "assertions", assertions, "error", agg)
+	if loadedConfig.Debug.IsPresent() {
+		model.LoggerLevel.Set(slog.Level(8 - loadedConfig.Debug.Get()*4))
 	}
 
-	token := mergedConfig.Token.GetOr("")
-	action := mergedConfig.Action.Get()
+	token := loadedConfig.Token.GetOr("")
+	action := loadedConfig.Action.Get()
 
 	var err error
 	switch action {
@@ -235,32 +226,32 @@ func ProcessArgs(allArgs []string) (exitCode int) {
 		if agg.GotError() {
 			log.Fatal(agg)
 		}
-		globalCtx := facade.NewGlobalContext(token, mergedConfig)
+		globalCtx := facade.NewGlobalContext(token, loadedConfig)
 		logger.Debug("Forged context", "ctx", globalCtx)
 		logger.Info("Processing global action", "token", token)
 		dpl.Quiet(globalCtx.Config.Quiet)
 		exitCode, err = GlobalConfig(globalCtx)
 	case model.InitAction:
-		testSuite := mergedConfig.TestSuite.Get()
-		suiteCtx := facade.NewSuiteContext(token, testSuite, false, action, mergedConfig)
+		testSuite := loadedConfig.TestSuite.Get()
+		suiteCtx := facade.NewSuiteContext(token, testSuite, false, action, loadedConfig)
 		logger.Debug("Forged context", "ctx", suiteCtx)
 		suiteCtx.NoErrorOrFatal(agg.Return())
 		logger.Info("Processing init action", "token", token)
 		dpl.Quiet(suiteCtx.Config.Quiet)
 		exitCode, err = InitTestSuite(suiteCtx)
 	case model.ReportAction:
-		if mergedConfig.ReportAll.Is(true) {
+		if loadedConfig.ReportAll.Is(true) {
 			if agg.GotError() {
 				log.Fatal(agg)
 			}
-			globalCtx := facade.NewGlobalContext(token, mergedConfig)
+			globalCtx := facade.NewGlobalContext(token, loadedConfig)
 			logger.Debug("Forged context", "ctx", globalCtx)
 			logger.Info("Processing report all action", "token", token)
 			dpl.Quiet(globalCtx.Config.Quiet)
 			exitCode, err = ReportAllTestSuites(globalCtx)
 		} else {
-			testSuite := mergedConfig.TestSuite.Get()
-			suiteCtx := facade.NewSuiteContext(token, testSuite, false, action, mergedConfig)
+			testSuite := loadedConfig.TestSuite.Get()
+			suiteCtx := facade.NewSuiteContext(token, testSuite, false, action, loadedConfig)
 			logger.Debug("Forged context", "ctx", suiteCtx)
 			suiteCtx.NoErrorOrFatal(agg.Return())
 			logger.Info("Processing report suite action", "token", token)
@@ -268,10 +259,10 @@ func ProcessArgs(allArgs []string) (exitCode int) {
 			exitCode, err = ReportTestSuite(suiteCtx)
 		}
 	case model.TestAction:
-		testSuite := mergedConfig.TestSuite.Get()
-		testCtx := facade.NewTestContext(token, testSuite, mergedConfig)
+		testSuite := loadedConfig.TestSuite.Get()
+		testCtx := facade.NewTestContext(token, testSuite, loadedConfig)
 		logger.Debug("Forged context", "ctx", testCtx)
-
+		testCfg := testCtx.Config
 		seq := testCtx.IncrementTestCount()
 
 		tooMuchFailures := testCtx.ProcessTooMuchFailures()
@@ -288,25 +279,27 @@ func ProcessArgs(allArgs []string) (exitCode int) {
 		testCtx.NoErrorOrFatal(agg.Return())
 		logger.Info("Processing test action", "token", token)
 
-		dpl.Quiet(testCtx.Config.Quiet)
-		if mergedConfig.ContainerDisabled.Is(true) || mergedConfig.ContainerImage.IsEmpty() {
-			//logger.Debug("Performing test outside container", "context", config, "image", config.ContainerImage, "containerDisabled", config.ContainerDisabled)
+		dpl.Quiet(testCfg.Quiet)
+		if testCfg.ContainerDisabled.Is(true) || testCfg.ContainerImage.IsEmpty() {
+			//logger.Warn("Performing test outside container", "image", testCfg.ContainerImage, "containerDisabled", testCfg.ContainerDisabled, "testConfig", testCfg)
+			err = validateMockedCmdNotAbsolute(testCtx)
+			testCtx.NoErrorOrFatal(err)
 			exitCode, err = PerformTest(testCtx, seq, assertions)
 			testCtx.NoErrorOrFatal(err)
 		} else {
-			logger.Warn("Performing test inside container", "image", mergedConfig.ContainerImage, "containerDisabled", mergedConfig.ContainerDisabled, "context", mergedConfig)
+			logger.Warn("Performing test inside container", "image", testCfg.ContainerImage, "containeriId", testCfg.ContainerId, "testConfig", testCfg)
 			var ctId string
 			ctId, exitCode, err = PerformTestInContainer(testCtx)
-			if mergedConfig.ContainerScope.Is(model.GLOBAL_SCOPE) {
+			if testCfg.ContainerScope.Is(model.GLOBAL_SCOPE) {
 				globalCfg, err2 := testCtx.Repo.LoadGlobalConfig()
 				testCtx.NoErrorOrFatal(err2)
-				globalCfg.ContainerId = utilz.OptionalOf(ctId)
+				globalCfg.ContainerId.Set(ctId)
 				err2 = testCtx.Repo.SaveGlobalConfig(globalCfg)
 				testCtx.NoErrorOrFatal(err2)
-			} else if mergedConfig.ContainerScope.Is(model.SUITE_SCOPE) {
+			} else if testCfg.ContainerScope.Is(model.SUITE_SCOPE) {
 				suiteCfg, err2 := testCtx.Repo.LoadSuiteConfig(testSuite, true)
 				testCtx.NoErrorOrFatal(err2)
-				suiteCfg.ContainerId = utilz.OptionalOf(ctId)
+				suiteCfg.ContainerId.Set(ctId)
 				err2 = testCtx.Repo.SaveSuiteConfig(suiteCfg)
 				testCtx.NoErrorOrFatal(err2)
 			}
@@ -314,13 +307,22 @@ func ProcessArgs(allArgs []string) (exitCode int) {
 
 		}
 	default:
-		err = fmt.Errorf("action: [%v] not known", mergedConfig.Action)
+		err = fmt.Errorf("action: [%v] not known", loadedConfig.Action)
 	}
 
 	logger.Info("exiting", "exitCode", exitCode)
 
 	if err != nil {
-		log.Fatal(mergedConfig.TestSuite, mergedConfig.Token, err)
+		log.Fatal(loadedConfig.TestSuite, loadedConfig.Token, err)
 	}
 	return
+}
+
+func validateMockedCmdNotAbsolute(testCtx facade.TestContext) error {
+	for _, mock := range testCtx.Config.Mocks {
+		if strings.HasPrefix(mock.Cmd, "/") {
+			return fmt.Errorf("cannot mock absolute path command: %s", mock.Cmd)
+		}
+	}
+	return nil
 }

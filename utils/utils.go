@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"mby.fr/cmdtest/model"
+	"mby.fr/utils/cmdz"
 	"mby.fr/utils/trust"
 )
 
@@ -150,7 +151,7 @@ func GetProcessStartTime(pid int) (int64, error) {
 	return starttime, nil
 }
 
-func readEnvToken() (token string) {
+func ReadEnvToken() (token string) {
 	// Search uniqKey in env
 	for _, env := range os.Environ() {
 		if strings.HasPrefix(env, model.ContextTokenEnvVarName+"=") {
@@ -163,7 +164,7 @@ func readEnvToken() (token string) {
 }
 
 func ForgeContextualToken() (string, error) {
-	token := readEnvToken()
+	token := ReadEnvToken()
 	if token != "" {
 		return token, nil
 	}
@@ -187,4 +188,23 @@ func ForgeContextualToken() (string, error) {
 	}
 	//log.Printf("contextual token: %s base on workDirPath: %s and ppid: %s\n", token, workDirPath, ppid)
 	return token, err
+}
+
+func IsShellBuiltin(cmd string) (ok bool, err error) {
+	exec := cmdz.Sh("type", cmd).CombinedOutputs()
+	rc, err := exec.BlockRun()
+	if err != nil {
+		err = fmt.Errorf("cannot evaluate if command %s is a shell builtin: %w", cmd, err)
+		return
+	} else if rc > 0 {
+		if strings.Contains(exec.StdoutRecord(), "not found") {
+			err = fmt.Errorf("command %s not found in path", cmd)
+			return
+		} else {
+			err = fmt.Errorf("cannot evaluate if command %s is a shell builtin: %s", cmd, exec.StdoutRecord())
+			return
+		}
+	}
+	ok = strings.Contains(exec.StdoutRecord(), "shell builtin")
+	return
 }

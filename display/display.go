@@ -51,7 +51,7 @@ type BasicDisplay struct {
 func (d BasicDisplay) Global(ctx facade.GlobalContext) {
 	defer d.Flush()
 	// Do nothing ?
-	if ctx.Config.Verbose.Get() >= model.BETTER_ASSERTION_REPORT {
+	if ctx.Config.Verbose.Get() >= model.SHOW_FAILED_OUTS {
 		d.printer.ColoredErrf(messageColor, "## New config (token: %s)\n", ctx.Token)
 	}
 }
@@ -75,8 +75,8 @@ func (d BasicDisplay) TestTitle(ctx facade.TestContext, seq int) {
 	title := fmt.Sprintf("[%05d] Test %s #%02d... ", timecode, qualifiedName, seq)
 	title = format.PadRight(title, maxTestNameLength+23)
 
-	if ctx.Config.Verbose.Get() > model.BETTER_ASSERTION_REPORT && ctx.Config.Ignore.Is(true) {
-		if ctx.Config.Verbose.Get() >= model.BETTER_ASSERTION_REPORT {
+	if ctx.Config.Verbose.Get() > model.SHOW_FAILED_OUTS && ctx.Config.Ignore.Is(true) {
+		if ctx.Config.Verbose.Get() >= model.SHOW_FAILED_OUTS {
 			d.printer.ColoredErrf(warningColor, title)
 		}
 		return
@@ -127,14 +127,14 @@ func (d BasicDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutc
 		d.printer.ColoredErrf(warningColor, "ERRORED")
 		d.printer.Errf(" (not executed)\n")
 	case model.IGNORED:
-		if verbose > model.BETTER_ASSERTION_REPORT {
+		if verbose > model.SHOW_FAILED_OUTS {
 			d.printer.ColoredErrf(warningColor, "IGNORED")
 			d.printer.Err("\n")
 		}
 	default:
 	}
 
-	if outcome.Outcome != model.PASSED && outcome.Outcome != model.IGNORED || verbose > model.SHOW_PASSED {
+	if verbose >= model.SHOW_FAILED_ONLY && outcome.Outcome != model.PASSED && outcome.Outcome != model.IGNORED || verbose >= model.SHOW_PASSED_OUTS {
 		d.printer.Errf("\tExecuting cmd: \t\t[%s]\n", outcome.CmdTitle)
 	}
 
@@ -142,17 +142,13 @@ func (d BasicDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutc
 		d.printer.ColoredErrf(model.ErrorColor, "\t%s\n", outcome.Err)
 	}
 
-	if verbose >= model.SHOW_PASSED &&
-		(ctx.Config.KeepStdout.Is(true) || ctx.Config.KeepStderr.Is(true)) {
-		// NewLine in printer to print test result in a new line
-		//d.printer.Errf("        ")
-		d.printer.Flush()
-	}
-
 	if len(outcome.AssertionResults) > 0 {
 		for _, asseriontResult := range outcome.AssertionResults {
 			d.assertionResult(asseriontResult)
 		}
+	}
+
+	if verbose >= model.SHOW_FAILED_OUTS && len(outcome.AssertionResults) > 0 || verbose >= model.SHOW_PASSED_OUTS {
 		d.printer.Errf(d.outFormatter.Format(outcome.Stdout))
 		d.printer.Errf(d.errFormatter.Format(outcome.Stderr))
 		d.printer.Errf("\n")

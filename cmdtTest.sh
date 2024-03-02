@@ -26,7 +26,7 @@ ls -lh "$cmdt"
 cmdt="$cmdt"
 cmdt0="$cmdt $@"
 #cmdt0="$cmdt"
-cmdt1="$cmdt @verbose"
+cmdt1="$cmdt @verbose @failuresLimit=-1" # Default verbose show passed test + perform all test beyond failures limit
 
 mkdir -p "$scriptDir/.tmp"
 reportFile="$( mktemp "$scriptDir/.tmp/XXXXXX.log" )"
@@ -92,7 +92,7 @@ $cmdt0 @test=should_succeed/ sh -c ">&2 echo foo bar" @stderr:foo @stderr:bar
 $cmdt0 @test=should_succeed/ sh -c ">&2 echo foo bar" @stderr="foo bar\n" @stdout=
 
 >&2 echo "## Test cmdt basic assertions should failed"
-$cmdt0 @init=should_fail @stopOnFailure=false
+$cmdt0 @init=should_fail @failuresLimit=-1
 
 $cmdt0 @test=should_fail/ false 2> /dev/null
 $cmdt0 @test=should_fail/ true @fail 2> /dev/null
@@ -115,7 +115,7 @@ $cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stderr:foo @stderr:baz 2> /d
 $cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stdout:foo 2> /dev/null
 
 >&2 echo "## Test cmdt basic assertions should error"
-$cmdt0 @init=should_error @stopOnFailure=false
+$cmdt0 @init=should_error @failuresLimit=-1
 
 ! $cmdt0 @test=should_error/ true @stdout:"" || die "should error because empty contains"
 ! $cmdt0 @test=should_error/ true @stdout~"" || die "should error because empty regex"
@@ -258,6 +258,26 @@ $cmdt0 @test=naming/ @stderr:"Successfuly ran [suite2] test suite" -- $cmdt1 @re
 $cmdt0 @test=naming/ @stderr:"Successfuly ran [main] test suite" -- $cmdt1 @report=main
 
 
+>&2 echo "## Test display verbosity"
+$cmdt0 @init=display_verbosity
+# verbose=SHOW_FAILED_ONLY
+$cmdt0 @test=display_verbosity/ @stdout= @stderr=                                                   -- $cmdt @verbose=0 echo foo 
+$cmdt0 @test=display_verbosity/ @stdout= @stderr:FAILED @stderr:"Executing cmd" @stderr!:">foo"     -- $cmdt @verbose=0 echo foo @fail
+$cmdt0 @test=display_verbosity/ @stdout= @stderr:ERRORED @stderr:"Executing cmd"                    -- $cmdt @verbose=0 foo
+# verbose=SHOW_FAILED_OUTS
+$cmdt0 @test=display_verbosity/ @stdout= @stderr=                                                   -- $cmdt @verbose=1 echo foo
+$cmdt0 @test=display_verbosity/ @stdout= @stderr:FAILED @stderr:"Executing cmd" @stderr:">foo"      -- $cmdt @verbose=1 echo foo @fail
+$cmdt0 @test=display_verbosity/ @stdout= @stderr:ERRORED @stderr:"Executing cmd"                    -- $cmdt @verbose=1 foo
+# verbose=SHOW_PASSED
+$cmdt0 @test=display_verbosity/ @stdout= @stderr:PASSED @stderr!:"Executing cmd" @stderr!:">foo"    -- $cmdt @verbose=2 echo foo
+$cmdt0 @test=display_verbosity/ @stdout= @stderr:FAILED @stderr:"Executing cmd" @stderr:">foo"      -- $cmdt @verbose=2 echo foo @fail
+$cmdt0 @test=display_verbosity/ @stdout= @stderr:ERRORED @stderr:"Executing cmd"                    -- $cmdt @verbose=2 foo
+# verbose=SHOW_PASSED_OUTS
+$cmdt0 @test=display_verbosity/ @stdout= @stderr:PASSED @stderr:"Executing cmd" @stderr:">foo"      -- $cmdt @verbose=3 echo foo
+$cmdt0 @test=display_verbosity/ @stdout= @stderr:FAILED @stderr:"Executing cmd" @stderr:">foo"      -- $cmdt @verbose=3 echo foo @fail
+$cmdt0 @test=display_verbosity/ @stdout= @stderr:ERRORED @stderr:"Executing cmd"                    -- $cmdt @verbose=3 foo
+
+
 >&2 echo "## Test rules missusage"
 $cmdt0 @init=failing_rule_missusage
 $cmdt0 @test=failing_rule_missusage/ @fail -- $cmdt1 @init true
@@ -288,10 +308,10 @@ $cmdt0 @test=test_config/ @stderr:IGNORED @stderr!:FAILED @stderr!:PASSED -- $cm
 $cmdt0 @test=test_config/ @stderr:IGNORED @stderr!:FAILED @stderr!:PASSED -- $cmdt1 false @ignore
 $cmdt0 @test=test_config/ @stderr!:IGNORED @stderr:PASSED -- $cmdt1 true
 
-$cmdt0 @test=test_config/ @stdout!:foo @stderr!:bar @stderr:PASSED -- $cmdt1 @test=test_keepouts sh -c "echo foo; >&2 echo bar"
-$cmdt0 @test=test_config/ @stdout~/^foo$/m @stderr!:bar @stderr:PASSED -- $cmdt1 @test=test_keepouts sh -c "echo foo; >&2 echo bar" @keepStdout
-$cmdt0 @test=test_config/ @stdout!:foo @stderr:bar @stderr:PASSED -- $cmdt1 @test=test_keepouts sh -c "echo foo; >&2 echo bar" @keepStderr
-$cmdt0 @test=test_config/ @stdout~/^foo$/m @stderr:bar @stderr:PASSED -- $cmdt1 @test=test_keepouts sh -c "echo foo; >&2 echo bar" @keepOutputs
+$cmdt0 @test=test_config/ @stdout!:foo @stderr!:bar @stderr:PASSED -- $cmdt1 @test=hide_name sh -c "echo foo; >&2 echo bar"
+$cmdt0 @test=test_config/ @stdout~/^foo$/m @stderr!:bar @stderr:PASSED -- $cmdt1 @test=hide_name sh -c "echo foo; >&2 echo bar" @keepStdout
+$cmdt0 @test=test_config/ @stdout!:foo @stderr:bar @stderr:PASSED -- $cmdt1 @test=hide_name sh -c "echo foo; >&2 echo bar" @keepStderr
+$cmdt0 @test=test_config/ @stdout~/^foo$/m @stderr:bar @stderr:PASSED -- $cmdt1 @test=hide_name sh -c "echo foo; >&2 echo bar" @keepOutputs
 
 $cmdt0 @test=test_config/ @stderr:TIMEOUT -- $cmdt1 sleep 0.01 @timeout=5ms
 $cmdt0 @test=test_config/ @stderr:PASSED -- $cmdt1 sleep 0.01 @timeout=30ms
@@ -473,7 +493,36 @@ rm -f -- foo bar baz 2> /dev/null || true
 expectedFooErrMsg="$( 2>&1 ls foo || true )"
 expectedBarErrMsg="$( 2>&1 ls bar || true )"
 expectedBazErrMsg="$( 2>&1 ls baz || true )"
-$cmdt0 @init=cmd_mock
+$cmdt0 @init=cmd_mock #@verbose=3
+$cmdt0 @test=cmd_mock/ @fail @stdout= @stderr:"shell builtin" -- $cmdt1 echo foo @mock="echo" # cannot mock shell builtin
+$cmdt0 @test=cmd_mock/ @fail @stdout= @stderr:"not found" -- $cmdt1 echo foo @mock="fooNotExists" # cannot mock not found command
+
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls @mock="ls,stdout=foo" @stdout=foo @stderr=
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls @mock="ls"
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls @mock="ls,exit=1" @fail
+$cmdt0 @test=cmd_mock/ @fail @stderr:"absolute path" -- $cmdt1 ls @mock="/bin/ls" # cannot mock absolute path outside container
+
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls @mock="ls,exit=42" @mock="ls foo,exit=43" @exit=42
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls @mock="ls foo,exit=43" @mock="ls,exit=42" @exit=42
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls foo @mock="ls,exit=42" @mock="ls foo,exit=43" @exit=43
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls foo @mock="ls foo,exit=43" @mock="ls,exit=42" @exit=43
+
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls @mock:"ls,exit=42" @mock:"ls foo,exit=43" @exit=42
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls @mock:"ls foo,exit=43" @mock:"ls,exit=42" @exit=42
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls foo @mock:"ls,exit=42" @mock:"ls foo,exit=43" @exit=43
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls foo @mock:"ls foo,exit=43" @mock:"ls,exit=42" @exit=43
+
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls @mock="ls *,exit=42" @mock="ls foo *,exit=43" @exit=42
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls @mock="ls foo *,exit=43" @mock="ls *,exit=42" @exit=42
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls foo @mock="ls *,exit=42" @mock="ls foo *,exit=43" @exit=42
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls foo @mock="ls foo *,exit=43" @mock="ls *,exit=42" @exit=43
+
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls foo bar @mock:"ls,exit=42" @mock:"ls foo,exit=43" @mock:"ls foo bar,exit=44" @exit=44
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls bar foo @mock:"ls,exit=42" @mock:"ls foo,exit=43" @mock:"ls foo bar,exit=44" @exit=44
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls bar foo @mock:"ls *,exit=42" @mock:"ls foo,exit=43" @mock:"ls foo bar,exit=44" @exit=42
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls foo bar @mock:"ls,exit=42" @mock:"ls foo *,exit=43" @mock:"ls foo bar,exit=44" @exit=43
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls bar foo @mock:"ls,exit=42" @mock:"ls foo *,exit=43" @mock:"ls foo bar,exit=44" @exit=43
+
 $cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 sh -c "echo \${PATH}" "$mockCfg1" @stdout:/mock:/
 $cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 which ls "$mockCfg1" @stderr= @stdout:/mock/ls
 $cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 sh -c "ls foo" "$mockCfg1" @stdout=baz @exit=41 @keepOutputs
@@ -505,7 +554,7 @@ $cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls bar foo "$mockCfg7" @stdout=b
 $cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls foo bar "$mockCfg7" @stdout=baz @exit=47
 $cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls foo bar baz "$mockCfg7" @stdout=baz @exit=47
 
-$cmdt0 @test=cmd_mock/ -- $cmdt1 @report=main
+$cmdt0 @test=cmd_mock/ @fail -- $cmdt1 @report=main
 
 
 >&2 echo "## Test @before & @after"
@@ -525,14 +574,16 @@ $cmdt0 @test=before_after/ -- $cmdt1 @report=main
 
 >&2 echo "## Test @container"
 $cmdt0 @init=container #@ignore #@keepOutputs
-$cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 true @container
-$cmdt0 @test=container/ @stderr:FAILED -- $cmdt1 false @container
-$cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 ls /bin/busybox @container
-$cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 true @container=alpine
-$cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 cat '/etc/os-release' @container=alpine @stdout:alpine
-$cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 foo @container=alpine @mock=foo,exit=0
-$cmdt0 @test=container/ @stderr:FAILED -- $cmdt1 foo @container=alpine @mock=foo,exit=1
-$cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 /bar @container=alpine @mock=/bar,exit=0
+$cmdt0 @test=container/run_off_container @stderr:PASSED -- $cmdt1 sh -c "cat --help 2>&1 | head -1" @stdout!:BusyBox
+$cmdt0 @test=container/run_in_container @stderr:PASSED -- $cmdt1 @container sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox
+$cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 @container true
+$cmdt0 @test=container/ @stderr:FAILED -- $cmdt1 @container false
+$cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 ls /etc/alpine-release @fail
+$cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 @container=alpine ls /etc/alpine-release
+$cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 @container=alpine true
+$cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 @container=alpine ls @mock=ls,exit=0
+$cmdt0 @test=container/ @stderr:FAILED -- $cmdt1 @container=alpine ls @mock=ls,exit=1
+$cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 @container=alpine ls @mock=/bin/ls,exit=42 @exit=42
 
 $cmdt0 @test=container/ @fail -- $cmdt1 @report=main
 
@@ -542,10 +593,11 @@ token="$__CMDT_TOKEN"
 export -n __CMDT_TOKEN
 
 $cmdt0 @init=container_wo_token #@ignore #@keepOutputs
+$cmdt0 @test=container_wo_token/run_in_container @stderr:PASSED -- $cmdt1 @container sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox
 $cmdt0 @test=container_wo_token/ @stderr:PASSED -- $cmdt1 @container true
 $cmdt0 @test=container_wo_token/ @stderr:PASSED -- $cmdt1 @container @fail false
 
-$cmdt @report=container_wo_token || true
+$cmdt0 @test=container_wo_token/ @fail @stderr:"$nothingToReportExpectedStderrMsg" -- $cmdt1 @report=main
 
 export __CMDT_TOKEN="$token"
 
@@ -556,33 +608,32 @@ hostFile="/tmp/thisFileExistsOnHost.txt"
 rm -f -- "$testFile" 2> /dev/null || true
 touch "$hostFile"
 $cmdt0 @init=ephemeralContainer #@ignore #@keepOutputs
-$cmdt0 @test=ephemeralContainer/ @stderr:PASSED -- $cmdt1 ls "$testFile" @fail @stdout= @stderr:"$testFile" # file should not exist on host
+$cmdt0 @test=ephemeralContainer/run_in_container @stderr:PASSED -- $cmdt1 @container sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox #check run inside container
 $cmdt0 @test=ephemeralContainer/ @stderr:PASSED -- $cmdt1 ls "$hostFile" @stdout:"$hostFile" # file exists on host
-$cmdt0 @test=ephemeralContainer/ @stderr:PASSED -- $cmdt1 sh -c "cat --help 2>&1 | head -1" @stdout!:BusyBox #should not exists outside container
-$cmdt0 @test=ephemeralContainer/ @stderr:PASSED -- $cmdt1 sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox @container #check run inside container
-$cmdt0 @test=ephemeralContainer/ @stderr:PASSED -- $cmdt1 ls "$testFile" @fail @stdout= @stderr:"$testFile" @container # file should not exist in container
-$cmdt0 @test=ephemeralContainer/ @stderr:PASSED -- $cmdt1 ls "$hostFile" @fail @stdout= @stderr:"$hostFile" @container # file should not exist in container
-$cmdt0 @test=ephemeralContainer/ @stderr:PASSED -- $cmdt1 touch "$testFile" @container # create file in ephemeral container
-$cmdt0 @test=ephemeralContainer/ @stderr:PASSED -- $cmdt1 ls "$testFile" @fail @stdout= @stderr:"$testFile" @container # file should not exist in container
-$cmdt0 @test=ephemeralContainer/ @stderr:PASSED -- $cmdt1 ls "$hostFile" @fail @stdout= @stderr:"$hostFile" @container # file should not exist in container
+$cmdt0 @test=ephemeralContainer/ @stderr:PASSED -- $cmdt1 ls "$testFile" @fail @stdout= @stderr:"$testFile" # file should not exist on host
+$cmdt0 @test=ephemeralContainer/ @stderr:PASSED -- $cmdt1 @container ls "$testFile" @fail @stdout= @stderr:"$testFile" # file should not exist in container
+$cmdt0 @test=ephemeralContainer/ @stderr:PASSED -- $cmdt1 @container ls "$hostFile" @fail @stdout= @stderr:"$hostFile" # file should not exist in container
+$cmdt0 @test=ephemeralContainer/ @stderr:PASSED -- $cmdt1 @container touch "$testFile" # create file in ephemeral container
+$cmdt0 @test=ephemeralContainer/ @stderr:PASSED -- $cmdt1 @container ls "$testFile" @fail @stdout= @stderr:"$testFile" # file should not exist in container
+$cmdt0 @test=ephemeralContainer/ @stderr:PASSED -- $cmdt1 @container ls "$hostFile" @fail @stdout= @stderr:"$hostFile" # file should not exist in container
 $cmdt0 @test=ephemeralContainer/ @stderr:PASSED -- $cmdt1 ls "$testFile" @fail @stdout= @stderr:"$testFile" # file should not exist on host
 $cmdt0 @test=ephemeralContainer/ -- $cmdt1 @report=main
 
-$cmdt0 @init=suiteContainer #@keepOutputs
+$cmdt0 @init=suiteContainer
 $cmdt @init=sub @container 2> /dev/null # container should live the test suite
-$cmdt0 @test=suiteContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox #check run inside container
+$cmdt0 @test=suiteContainer/run_in_container @stderr:PASSED -- $cmdt1 @test=sub/ sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox #check run inside container
 $cmdt0 @test=suiteContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$testFile" @fail @stdout= @stderr:"$testFile" # file should not exist in suite container
 $cmdt0 @test=suiteContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$hostFile" @fail @stdout= @stderr:"$hostFile" # file should not exist in suite container
 $cmdt0 @test=suiteContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ touch "$testFile" # create file in suite container
-$cmdt0 @test=suiteContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$testFile" @stdout="$testFile" # file should exist in suite container
+$cmdt0 @test=suiteContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$testFile" @stdout:"$testFile" # file should exist in suite container
 $cmdt0 @test=suiteContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$hostFile" @fail @stdout= @stderr:"$hostFile" # file should not exist in suite container
 $cmdt0 @test=suiteContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$testFile" @container @fail @stdout= @stderr:"$testFile" # file should not exists in ephemeral container
-$cmdt0 @test=suiteContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$testFile" @stdout:"$testFile" # file should exist in suite container
+$cmdt0 @test=suiteContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$testFile" @stdout:"$testFile" @debug=0 # file should exist in suite container
 $cmdt0 @test=suiteContainer/ -- $cmdt1 @report=sub
 
 $cmdt0 @init=dirtyContainer #@keepOutputs
 $cmdt @init=sub @container 2> /dev/null # container should live the test suite
-$cmdt0 @test=dirtyContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox #check run inside container
+$cmdt0 @test=dirtyContainer/run_in_container @stderr:PASSED -- $cmdt1 @test=sub/ sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox #check run inside container
 $cmdt0 @test=dirtyContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$testFile" @fail @stderr:"$testFile" # file should not exist in container
 $cmdt0 @test=dirtyContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$hostFile" @fail @stderr:"$hostFile" # file should not exist in container
 $cmdt0 @test=dirtyContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ touch "$testFile" # create file in suite container
@@ -599,7 +650,7 @@ $cmdt0 @test=dirtyContainer/ -- $cmdt1 @report=sub
 
 $cmdt0 @init=testContainer #@keepOutputs
 $cmdt @init=sub @container @dirtyContainer=beforeTest 2> /dev/null # container should live for each test
-$cmdt0 @test=testContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox #check run inside container
+$cmdt0 @test=testContainer/run_in_container @stderr:PASSED -- $cmdt1 @test=sub/ sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox #check run inside container
 $cmdt0 @test=testContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$testFile" @fail @stderr:"$testFile" # file should not exist in container
 $cmdt0 @test=testContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ ls "$hostFile" @fail @stderr:"$hostFile" # file should not exist in container
 $cmdt0 @test=testContainer/ @stderr:PASSED -- $cmdt1 @test=sub/ touch "$testFile" # create file in test container

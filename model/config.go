@@ -11,11 +11,11 @@ import (
 
 const (
 	DefaultVerboseLevel         = SHOW_PASSED
-	DefaultInitedVerboseLevel   = BETTER_ASSERTION_REPORT
+	DefaultInitedVerboseLevel   = SHOW_FAILED_OUTS
 	DefaultInitlessVerboseLevel = DefaultVerboseLevel
 	StartDebugLevel             = WARN
 	DefaultDebugLevel           = INFO
-	DefaultTooMuchFailures      = 4
+	DefaultTooMuchFailures      = 3
 	TooMuchFailuresNoLimit      = -1
 )
 
@@ -88,11 +88,11 @@ const (
 type VerboseLevel int
 
 const (
-	FAILED_ONLY VerboseLevel = iota
-	BETTER_ASSERTION_REPORT
-	NO_FAILURES_LIMIT
+	SHOW_FAILED_ONLY VerboseLevel = iota
+	SHOW_FAILED_OUTS
 	SHOW_PASSED
-	SHOW_PASSED_AND_OUTPUTS
+	SHOW_PASSED_OUTS
+	SHOW_ALL
 )
 
 type DebugLevel int

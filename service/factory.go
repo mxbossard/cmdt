@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"mby.fr/cmdtest/model"
+	"mby.fr/cmdtest/utils"
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/collections"
 	"mby.fr/utils/errorz"
@@ -100,59 +101,72 @@ func CmdMapper(s, op string) (v []string, err error) {
 }
 
 func MockMapper(s, op string) (m model.CmdMock, err error) {
+	var splitted, mockedCmdAndArgs []string
 	if len(s) > 1 {
-		splitted := strings.Split(s, ",")
+		splitted = strings.Split(s, ",")
 		// cmd always defined first
-		var mockedCmdAndArgs []string
-		mockedCmdAndArgs, err = CmdMapper(splitted[0], op)
-		if err != nil {
-			return
-		}
-		m.Op = op
-		m.Cmd = mockedCmdAndArgs[0]
-		if len(mockedCmdAndArgs) > 1 {
-			m.Args = mockedCmdAndArgs[1:]
-		}
-		m.Delegate = true
-		if len(splitted) > 1 {
-			for _, rule := range splitted[1:] {
-				ruleSplit := strings.Split(rule, "=")
-				if len(ruleSplit) < 2 {
-					err = fmt.Errorf("bad format for mock rule: expect an = sign")
-					return
-				}
-				key := ruleSplit[0]
-				value := strings.Join(ruleSplit[1:], "=")
-				switch key {
-				case "stdin":
-					m.Stdin = &value
-				case "stdout":
-					m.Delegate = false
-					m.Stdout = value
-				case "stderr":
-					m.Delegate = false
-					m.Stderr = value
-				case "exit":
-					m.Delegate = false
-					m.ExitCode, err = IntMapper(value, "=")
-					if err != nil {
-						// FIXME: aggregate errors
-						return
-					}
-				case "cmd":
-					m.Delegate = false
-					m.OnCallCmdAndArgs, err = CmdMapper(value, "=")
-					if err != nil {
-						// FIXME: aggregate errors
-						return
-					}
-				default:
-					err = fmt.Errorf("mock rule: %s does not exists", key)
+	} else {
+		splitted = append(splitted, s)
+	}
+
+	mockedCmdAndArgs, err = CmdMapper(splitted[0], op)
+	if err != nil {
+		return
+	}
+
+	m.Op = op
+	m.Cmd = mockedCmdAndArgs[0]
+	if len(mockedCmdAndArgs) > 1 {
+		m.Args = mockedCmdAndArgs[1:]
+	}
+	m.Delegate = true
+	if len(splitted) > 1 {
+		for _, rule := range splitted[1:] {
+			ruleSplit := strings.Split(rule, "=")
+			if len(ruleSplit) < 2 {
+				err = fmt.Errorf("bad format for mock rule: expect an = sign")
+				return
+			}
+			key := ruleSplit[0]
+			value := strings.Join(ruleSplit[1:], "=")
+			switch key {
+			case "stdin":
+				m.Stdin = &value
+			case "stdout":
+				m.Delegate = false
+				m.Stdout = value
+			case "stderr":
+				m.Delegate = false
+				m.Stderr = value
+			case "exit":
+				m.Delegate = false
+				m.ExitCode, err = IntMapper(value, "=")
+				if err != nil {
 					// FIXME: aggregate errors
 					return
 				}
+			case "cmd":
+				m.Delegate = false
+				m.OnCallCmdAndArgs, err = CmdMapper(value, "=")
+				if err != nil {
+					// FIXME: aggregate errors
+					return
+				}
+			default:
+				err = fmt.Errorf("mock rule: %s does not exists", key)
+				// FIXME: aggregate errors
+				return
 			}
 		}
+	}
+
+	var ok bool
+	ok, err = utils.IsShellBuiltin(m.Cmd)
+	if err != nil {
+		return
+	}
+	if ok {
+		err = fmt.Errorf("command %s is not mockable (shell builtin)", m.Cmd)
 	}
 	return
 }
@@ -284,9 +298,9 @@ func BooleanValidater(rule model.Rule, v bool) (err error) {
 }
 
 func MockValidater(rule model.Rule, v model.CmdMock) (err error) {
-	if strings.Contains(v.Cmd, "/") {
-		err = fmt.Errorf("rule %s%s command does not support slash", rule.Prefix, rule.Name)
-	}
+	// if strings.Contains(v.Cmd, "/") {
+	// 	err = fmt.Errorf("rule %s%s command does not support slash", rule.Prefix, rule.Name)
+	// }
 	return
 }
 
@@ -456,14 +470,21 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 			}
 			c.After = append(c.After, cmdAndArgs)
 		case "container":
-			c.ContainerImage, err = TranslateOptional(rule, DummyMapper, OperatorValidater[string]("", "="))
-			if c.ContainerImage.Is("") || c.ContainerImage.Is("true") {
-				c.ContainerImage = utilz.OptionalOf(model.DefaultContainerImage)
-			} else if c.ContainerImage.Is("false") {
-				c.ContainerDisabled = utilz.OptionalOf(true)
-			}
+			var image string
+			image, err = Translate(rule, DummyMapper, OperatorValidater[string]("", "="))
+			c.ContainerDisabled.Set(false)
 			// Erase ContainerId because we will want a new Container
-			c.ContainerId = utilz.EmptyOptional[string]()
+			c.ContainerId.Set("")
+			if image == "true" {
+				c.ContainerImage.Set(model.DefaultContainerImage)
+			} else if image == "false" {
+				c.ContainerImage.Clear()
+				c.ContainerDisabled.Set(true)
+			} else if image != "" {
+				c.ContainerImage.Set(image)
+			} else {
+				c.ContainerImage.Set(model.DefaultContainerImage)
+			}
 		case "dirtyContainer":
 			c.ContainerDirties, err = TranslateOptional(rule, DirtiesMapper, OperatorValidater[model.DirtyScope]("="))
 		case "verbose":
@@ -472,7 +493,7 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 				rule.Expected = fmt.Sprintf("%d", model.SHOW_PASSED)
 			}
 			var level int
-			level, err = Translate(rule, IntMapper, OperatorValidater[int]("="), IntValueValidater(0, 3))
+			level, err = Translate(rule, IntMapper, OperatorValidater[int]("="), IntValueValidater(0, int(model.SHOW_ALL)))
 			c.Verbose.Set(model.VerboseLevel(level))
 		case "debug":
 			if rule.Op == "" {
@@ -480,8 +501,10 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 				rule.Expected = fmt.Sprintf("%d", model.DefaultDebugLevel)
 			}
 			var level int
-			level, err = Translate(rule, IntMapper, OperatorValidater[int]("="), IntValueValidater(0, 3))
+			level, err = Translate(rule, IntMapper, OperatorValidater[int]("="), IntValueValidater(0, int(model.TRACE)))
 			c.Debug.Set(model.DebugLevel(level))
+		case "failuresLimit":
+			c.TooMuchFailures, err = TranslateOptional(rule, IntMapper, OperatorValidater[int]("="), IntValueValidater(-1, 1000))
 		default:
 			ok = false
 		}
@@ -812,7 +835,7 @@ func ValidateOnceOnlyDefinedRule(rules ...model.Rule) (err error) {
 		{"stdout", "~"}, {"stderr", "~"}, {"stdout", "!~"}, {"stderr", "!~"},
 		{"stdout", "!="}, {"stderr", "!="},
 		{"stdout", ":"}, {"stderr", ":"}, {"stdout", "!:"}, {"stderr", "!:"},
-		{"before", "="}, {"after", "="}, {"mock", "="},
+		{"before", "="}, {"after", "="}, {"mock", "="}, {"mock", ":"}, {"verbose", "="},
 	}
 	matches := map[model.RuleKey][]model.Rule{}
 	for _, rule := range rules {

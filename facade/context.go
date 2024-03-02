@@ -75,28 +75,10 @@ func NewTestContext(token, testSuite string, inputCfg model.Config) TestContext 
 	mergedCfg.Merge(inputCfg)
 
 	/*
-		cmdAndArgs := mergedCfg.CmdAndArgs
-		if len(cmdAndArgs) > 0 {
-			cmd := cmdz.Cmd(cmdAndArgs[0])
-			if len(cmdAndArgs) > 1 {
-				cmd.AddArgs(cmdAndArgs[1:]...)
-			}
-			if mergedCfg.Timeout.IsPresent() {
-				cmd.Timeout(mergedCfg.Timeout.Get())
-			}
-
-			if !mergedCfg.TestName.IsPresent() || mergedCfg.TestName.Is("") {
-				mergedCfg.TestName = utilz.OptionalOf(cmdTitle(cmd))
-			}
-		} else {
-			// err := fmt.Errorf("no command supplied to test")
-			// suiteCtx.Fatal(err)
+		if mergedCfg.Verbose.Get() >= model.NO_FAILURES_LIMIT {
+			mergedCfg.TooMuchFailures.Set(model.TooMuchFailuresNoLimit)
 		}
 	*/
-
-	if mergedCfg.Verbose.Get() >= model.NO_FAILURES_LIMIT {
-		mergedCfg.TooMuchFailures.Set(model.TooMuchFailuresNoLimit)
-	}
 
 	testCtx := TestContext{
 		SuiteContext: suiteCtx,
@@ -341,7 +323,14 @@ func (c *TestContext) initExecuter() (err error) {
 		}
 	}
 
-	// Mocking
+	c.CmdExec = cmd
+	return
+}
+
+func (c TestContext) ConfigMocking() (err error) {
+	cfg := c.Config
+	cmd := c.CmdExec
+	// Mocking config
 	currentPath := os.Getenv("PATH")
 	if len(cfg.Mocks) > 0 {
 		// Put mockDir in PATH
@@ -361,8 +350,6 @@ func (c *TestContext) initExecuter() (err error) {
 	} else {
 		cmd.AddEnv("PATH", currentPath)
 	}
-
-	c.CmdExec = cmd
 	return
 }
 

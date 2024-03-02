@@ -35,7 +35,7 @@ $cmdt0 @test=initless/passed true
 $cmdt0 @test=initless/failed false
 
 
-$cmdt0 @init=display
+$cmdt0 @init=display @failuresLimit=-1
 
 $cmdt0 @test=display/passed true
 $cmdt0 @test=display/failed false
@@ -48,5 +48,6 @@ $cmdt0 @test=display/ echo foo bar baz
 $cmdt0 @test=display/compare_expect_not_empty_out true @stdout=foo
 $cmdt0 @test=display/compare_expect_empty_out echo "foo bar" @stdout=
 $cmdt0 @test=display/compare_bad_outs echo "foo bar" @stdout=foo @stderr=bar
+$cmdt0 @test=display/compare_multiple_failures echo "foo" @stdout:foo @stdout:bar @stdout:baz
 
 $cmdt0 @report

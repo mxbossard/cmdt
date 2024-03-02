@@ -101,7 +101,9 @@ func writeMockWrapperScript(wrapperFilepath string, mocks []model.CmdMock) (err 
 			wrapperScript += fmt.Sprintf("\t"+`if [ "$stdin" = "%s" ]; then`+"\n", *mock.Stdin)
 		}
 
-		// FIXME: add stdin management
+		// Add at least one command
+		wrapperScript += "true\n"
+
 		if mock.Stdout != "" {
 			wrapperScript += fmt.Sprintf("\t"+`echo -n "%s"`+"\n", mock.Stdout)
 		}

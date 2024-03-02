@@ -123,6 +123,15 @@ Done:
 - Introduce @verbose=N to manage test verbosity
 - Introduce @debug=N to log
 - rework failure description : hard to read (remove colors ? remove \n ?)
+- Replace @silent by @quiet => with @quiet do not loq anything except cmd outputs if enabled with @keepOutputs
+- option @failuresLimit=N to controll TOO MUCH FAILURES
+- Rework @verbose : Default not verbose lvl: FAILED_ONLY ; Default verbose lvl: PASSED
+  - FAILED_ONLY: Display only Failed tests + assertions
+  - FAILED_OUTPUTS: Display+ failed stout & stderr
+  - PASSED: Display Passed test without assrtions
+  - PASSED_OUTPUTS: Display+ passed outputs
+- Forbid mock of shell builtin command (we can use type CMD)
+- multiple @mock
 
 TODO:
 Bugs:
@@ -134,13 +143,7 @@ Bugs:
 - - @global config updates does not works
 
 Features :
-- Replace @silent by @quiet => with @quiet do not loq anything except cmd outputs if enabled with @keepOutputs
-
-- List unmockable commands and give error feedback if attempting to mock unmockable command
-- Use podman or docker binary
-
 - Mock les executable avec un chemin absolu dans les conteneur
-- multiple @mock
 - with -- report an error if commands before --
 - with -- auto concatenat args until next delim or --
 - @beforeSuite=CMD_ANG_ARGS & @afterSuite=CMD_ANG_ARGS
@@ -148,22 +151,20 @@ Features :
 - @called[=:]CMD ARG_S,stdin=IN,count=N assertion => verify a mock was called
 - use rule definitions in usage
 - move seq into utils module
-- change default test suite with @init=foo => foo become default test suite
+- Use podman or docker binary
 
+- change default test suite with @init=foo => foo become default test suite
 - possibilité de passer un scénario ligne à ligne dans le stdin de cmdtest
 	- cmdt cmd arg1 argN @scenario=filepath
 	- pour chaque ligne du scenario concat la ligne du scenario avec les arguments fournit en paramétre de cmdt
-
 - @runCount=N + @parallel=FORK_COUNT (min, max, median exec time) run in separate context or in same context (before/after) guided by @dirtyRun
-
 - @fork=5 suite/global config only by default instead of @parallel. Fork = 5 increment and decrement a seq file
   - what is forked ?
   - by default suites forked but test serial in a suite
   - optionaly all tests forked in a suite
   - fork in a container ? or one container by fork ? (forking implies test independency @dirtyContainer only should guide for new container)
+
 - Clean old temp dir (older than 2 min ?)
-
-
 - may chroot be interesting for tests ?
 - mock web spawning a web server ?
 - test port opening if daemon ; test sending data on port ???
@@ -289,7 +290,7 @@ func RecoverExiting() {
 
 func main() {
 	//defer RecoverExiting()
-	model.LoggerLevel.Set(slog.Level(8-model.StartDebugLevel*4))
+	model.LoggerLevel.Set(slog.Level(8 - model.StartDebugLevel*4))
 	exitCode := service.ProcessArgs(os.Args)
 	os.Exit(exitCode)
 }
