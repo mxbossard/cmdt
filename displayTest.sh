@@ -31,23 +31,29 @@ die() {
 	exit 1
 }
 
+>&2 echo "## Initless tests"
 $cmdt0 @test=initless/passed true
 $cmdt0 @test=initless/failed false
+$cmdt0 @test=display/ @container=alpine ls /etc/alpine-release
 
-
+>&2 echo
+>&2 echo "## Initted tests"
 $cmdt0 @init=display @failuresLimit=-1
 
 $cmdt0 @test=display/passed true
-$cmdt0 @test=display/failed false
 $cmdt0 @test=display/ignored true @ignore
+$cmdt0 @test=display/ @keepOutputs echo foo bar baz
+$cmdt0 @test=display/ @quiet @fail @keepOutputs echo foo bar baz quiet failure
+$cmdt0 @test=display/ @fail @keepOutputs echo foo bar baz failure
+$cmdt0 @test=display/failed false
 $cmdt0 @test=display/timeouted sleep 1 @timeout=10ms
 $cmdt0 @test=display/errored foo
-
-$cmdt0 @test=display/ echo foo bar baz
+#$cmdt0 @test=display/bad_args @init 
 
 $cmdt0 @test=display/compare_expect_not_empty_out true @stdout=foo
 $cmdt0 @test=display/compare_expect_empty_out echo "foo bar" @stdout=
 $cmdt0 @test=display/compare_bad_outs echo "foo bar" @stdout=foo @stderr=bar
 $cmdt0 @test=display/compare_multiple_failures echo "foo" @stdout:foo @stdout:bar @stdout:baz
+
 
 $cmdt0 @report

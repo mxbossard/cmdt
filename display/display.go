@@ -2,6 +2,7 @@ package display
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -65,11 +66,11 @@ func (d BasicDisplay) Suite(ctx facade.SuiteContext) {
 
 func (d BasicDisplay) TestTitle(ctx facade.TestContext, seq int) {
 	defer d.Flush()
-	maxTestNameLength := 50
+	maxTestNameLength := 70
 
 	cfg := ctx.Config
 	timecode := int(time.Since(cfg.SuiteStartTime.Get()).Milliseconds())
-	qualifiedName := ctx.TestQualifiedName()
+	qualifiedName := testQualifiedName(ctx, testColor)
 	qualifiedName = format.TruncateRight(qualifiedName, maxTestNameLength)
 
 	title := fmt.Sprintf("[%05d] Test %s #%02d... ", timecode, qualifiedName, seq)
@@ -135,7 +136,7 @@ func (d BasicDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutc
 	}
 
 	if verbose >= model.SHOW_FAILED_ONLY && outcome.Outcome != model.PASSED && outcome.Outcome != model.IGNORED || verbose >= model.SHOW_PASSED_OUTS {
-		d.printer.Errf("\tExecuting cmd: \t\t[%s]\n", outcome.CmdTitle)
+		d.printer.Errf("\tExecuting cmd: \t\t[%s]\n", cmdTitle(ctx))
 	}
 
 	if outcome.Err != nil {
@@ -256,7 +257,7 @@ func (d BasicDisplay) ReportSuite(ctx facade.SuiteContext, outcome model.SuiteOu
 
 	testSuite := ctx.Config.TestSuite.Get()
 	//testSuiteLabel := fmt.Sprintf("%s%s%s", testColor, testSuite, resetColor)
-	testSuiteLabel := testSuite
+	testSuiteLabel := printz.NewAnsi(testColor, testSuite)
 
 	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
 		d.printer.ColoredErrf(messageColor, "Reporting [%s] test suite (%s) ...\n", testSuiteLabel, ctx.Token)
@@ -347,4 +348,35 @@ func New() BasicDisplay {
 func NormalizeDurationInSec(d time.Duration) (duration string) {
 	duration = fmt.Sprintf("%.3f s", float32(d.Milliseconds())/1000)
 	return
+}
+
+func testQualifiedName(ctx facade.TestContext, color ansi.Color) (name string) {
+	cfg := ctx.Config
+	var testName string
+	if cfg.TestName.IsPresent() && !cfg.TestName.Is("") {
+		testName = cfg.TestName.Get()
+	} else {
+		testName = cmdTitle(ctx)
+	}
+
+	containerLabel := printz.NewAnsi(testColor, "on host")
+	if ctx.ContainerImage != "" {
+		containerLabel = printz.NewAnsi(warningColor, ctx.ContainerImage)
+	}
+
+	name = printz.SColoredPrintf(color, "[%s](%s)>%s", cfg.TestSuite.Get(), containerLabel, testName)
+	return
+}
+
+func cmdTitle(ctx facade.TestContext) string {
+	cmd := ctx.CmdExec
+	cmdNameParts := strings.Split(cmd.String(), " ")
+	shortenedCmd := filepath.Base(cmdNameParts[0])
+	shortenCmdNameParts := cmdNameParts
+	shortenCmdNameParts[0] = shortenedCmd
+	cmdName := strings.Join(shortenCmdNameParts, " ")
+	//testName = fmt.Sprintf("cmd: <|%s|>", cmdName)
+	//testName := fmt.Sprintf("[%s]", cmdName)
+	testName := cmdName
+	return testName
 }

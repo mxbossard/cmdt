@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v2"
@@ -41,6 +42,21 @@ func (r FileRepo) BackingFilepath() string {
 		log.Fatal(err)
 	}
 	return path
+}
+
+func (r FileRepo) MockDirectoryPath(testSuite string, testId int) (mockDir string, err error) {
+	var path string
+	path, err = testSuiteDirectoryPath(testSuite, r.token)
+	if err != nil {
+		return
+	}
+	mockDir = filepath.Join(path, fmt.Sprintf("__mock_%d", testId))
+	// create a mock dir
+	err = os.MkdirAll(mockDir, 0755)
+	if err != nil {
+		return
+	}
+	return
 }
 
 func (r FileRepo) InitSuite(cfg model.Config) (err error) {
@@ -159,7 +175,8 @@ func (r FileRepo) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 		return
 	}
 
-	testTitle := format.PadRight(outcome.TestQualifiedName, 60)
+	qualifiedName := fmt.Sprintf("[%s]>%s", outcome.TestSuite, outcome.TestName)
+	testTitle := format.PadRight(qualifiedName, 70)
 	switch outcome.Outcome {
 	case model.PASSED:
 		// Nothing to do
@@ -248,7 +265,7 @@ func (r FileRepo) ListTestSuites() (suites []string, err error) {
 	// Add success
 	for _, m := range matches {
 		testSuite := filepath.Base(m)
-		if testSuite != model.GlobalConfigTestSuiteName {
+		if !strings.HasPrefix(testSuite, "_") {
 			failedCount := utils.ReadSeq(tmpDir, testSuite, model.FailedSequenceFilename)
 			errorCount := utils.ReadSeq(tmpDir, testSuite, model.ErroredSequenceFilename)
 			if failedCount == 0 && errorCount == 0 {
@@ -259,7 +276,7 @@ func (r FileRepo) ListTestSuites() (suites []string, err error) {
 	// Add failures
 	for _, m := range matches {
 		testSuite := filepath.Base(m)
-		if testSuite != model.GlobalConfigTestSuiteName {
+		if !strings.HasPrefix(testSuite, "_") {
 			failedCount := utils.ReadSeq(tmpDir, testSuite, model.FailedSequenceFilename)
 			errorCount := utils.ReadSeq(tmpDir, testSuite, model.ErroredSequenceFilename)
 			if failedCount > 0 && errorCount == 0 {
@@ -270,7 +287,7 @@ func (r FileRepo) ListTestSuites() (suites []string, err error) {
 	// Add errors
 	for _, m := range matches {
 		testSuite := filepath.Base(m)
-		if testSuite != model.GlobalConfigTestSuiteName {
+		if !strings.HasPrefix(testSuite, "_") {
 			errorCount := utils.ReadSeq(tmpDir, testSuite, model.ErroredSequenceFilename)
 			if errorCount > 0 {
 				suites = append(suites, testSuite)

@@ -27,17 +27,18 @@ type AssertionResult struct {
 }
 
 type TestOutcome struct {
-	TestSuite         string
-	Seq               int
-	TestQualifiedName string
-	CmdTitle          string
-	ExitCode          int
-	Err               error
-	Duration          time.Duration
-	Stdout            string
-	Stderr            string
-	Outcome           Outcome
-	AssertionResults  []AssertionResult
+	TestSuite string
+	TestName  string
+	Seq       int
+	//TestQualifiedName string
+	CmdTitle         string
+	ExitCode         int
+	Err              error
+	Duration         time.Duration
+	Stdout           string
+	Stderr           string
+	Outcome          Outcome
+	AssertionResults []AssertionResult
 }
 
 type SuiteOutcome struct {

@@ -132,6 +132,7 @@ Done:
   - PASSED_OUTPUTS: Display+ passed outputs
 - Forbid mock of shell builtin command (we can use type CMD)
 - multiple @mock
+- Mock les executable avec un chemin absolu dans les conteneur
 
 TODO:
 Bugs:
@@ -141,17 +142,19 @@ Bugs:
 - Check for container existance before exec in running container
 - Suite Timeout not managed (should error if timeout exceeded) Should ask for suite clear and no test should pass; initless suite should have a greater default timeout
 - - @global config updates does not works
+- serialize test outcome instead of writing in report file
 
 Features :
-- Mock les executable avec un chemin absolu dans les conteneur
 - with -- report an error if commands before --
 - with -- auto concatenat args until next delim or --
 - @beforeSuite=CMD_ANG_ARGS & @afterSuite=CMD_ANG_ARGS
 - @mock stdin=@FILEPATH stdin:PARTIAL_CONTENT stdout=@FILEPATH @stderr=@FILEPATH
 - @called[=:]CMD ARG_S,stdin=IN,count=N assertion => verify a mock was called
 - use rule definitions in usage
-- move seq into utils module
 - Use podman or docker binary
+- move seq into utils module
+- move contianer use into utils module
+
 
 - change default test suite with @init=foo => foo become default test suite
 - possibilité de passer un scénario ligne à ligne dans le stdin de cmdtest

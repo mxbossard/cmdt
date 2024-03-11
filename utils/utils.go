@@ -151,14 +151,21 @@ func GetProcessStartTime(pid int) (int64, error) {
 	return starttime, nil
 }
 
-func ReadEnvToken() (token string) {
-	// Search uniqKey in env
+func ReadEnvValue(key string) (ok bool, value string) {
 	for _, env := range os.Environ() {
-		if strings.HasPrefix(env, model.ContextTokenEnvVarName+"=") {
+
+		if ok = strings.HasPrefix(env, key+"="); ok {
 			splitted := strings.Split(env, "=")
-			token = strings.Join(splitted[1:], "")
+			value = strings.Join(splitted[1:], "")
+			return
 		}
 	}
+	return
+}
+
+func ReadEnvToken() (token string) {
+	// Search uniqKey in env
+	_, token = ReadEnvValue(model.ContextTokenEnvVarName)
 	logger.Debug("Found a token in env: " + token)
 	return
 }
@@ -191,14 +198,14 @@ func ForgeContextualToken() (string, error) {
 }
 
 func IsShellBuiltin(cmd string) (ok bool, err error) {
-	exec := cmdz.Sh("type", cmd).CombinedOutputs()
+	exec := cmdz.Sh("type", cmd).CombinedOutputs().AddEnviron(os.Environ()...)
 	rc, err := exec.BlockRun()
 	if err != nil {
 		err = fmt.Errorf("cannot evaluate if command %s is a shell builtin: %w", cmd, err)
 		return
 	} else if rc > 0 {
 		if strings.Contains(exec.StdoutRecord(), "not found") {
-			err = fmt.Errorf("command %s not found in path", cmd)
+			err = fmt.Errorf("command %s not found in path: %s", cmd, exec.StdoutRecord())
 			return
 		} else {
 			err = fmt.Errorf("cannot evaluate if command %s is a shell builtin: %s", cmd, exec.StdoutRecord())
@@ -206,5 +213,10 @@ func IsShellBuiltin(cmd string) (ok bool, err error) {
 		}
 	}
 	ok = strings.Contains(exec.StdoutRecord(), "shell builtin")
+	return
+}
+
+func IsWithinContainer() (ok bool) {
+	ok, _ = ReadEnvValue(model.EnvContainerIdKey)
 	return
 }

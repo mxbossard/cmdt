@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"mby.fr/cmdtest/model"
-	"mby.fr/cmdtest/utils"
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/collections"
 	"mby.fr/utils/errorz"
@@ -160,14 +159,6 @@ func MockMapper(s, op string) (m model.CmdMock, err error) {
 		}
 	}
 
-	var ok bool
-	ok, err = utils.IsShellBuiltin(m.Cmd)
-	if err != nil {
-		return
-	}
-	if ok {
-		err = fmt.Errorf("command %s is not mockable (shell builtin)", m.Cmd)
-	}
 	return
 }
 
@@ -453,8 +444,13 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 		case "mock":
 			var mock model.CmdMock
 			mock, err = Translate(rule, MockMapper, OperatorValidater[model.CmdMock]("=", ":"), NotEmptyValidater[model.CmdMock], MockValidater)
-
-			c.Mocks = append(c.Mocks, mock)
+			if err == nil {
+				if strings.HasPrefix(mock.Cmd, string(os.PathSeparator)) {
+					c.RootMocks = append(c.RootMocks, mock)
+				} else {
+					c.Mocks = append(c.Mocks, mock)
+				}
+			}
 		case "before":
 			var cmdAndArgs []string
 			cmdAndArgs, err = Translate(rule, CmdMapper, OperatorValidater[[]string]("="), CmdValidater)

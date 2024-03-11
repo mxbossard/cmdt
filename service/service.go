@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"mby.fr/cmdtest/display"
 	"mby.fr/cmdtest/facade"
@@ -152,6 +151,9 @@ func PerformTest(ctx facade.TestContext, seq int, assertions []model.Assertion) 
 		return
 	}
 
+	err = ctx.ConfigMocking()
+	ctx.NoErrorOrFatal(err)
+
 	for _, before := range cfg.Before {
 		cmdBefore := cmdz.Cmd(before...)
 		beforeExit, beforeErr := cmdBefore.BlockRun()
@@ -162,9 +164,6 @@ func PerformTest(ctx facade.TestContext, seq int, assertions []model.Assertion) 
 			return
 		}
 	}
-
-	err = ctx.ConfigMocking()
-	ctx.NoErrorOrFatal(err)
 
 	outcome := ctx.AssertCmdExecBlocking(seq, assertions)
 
@@ -263,7 +262,10 @@ func ProcessArgs(allArgs []string) (exitCode int) {
 		testCtx := facade.NewTestContext(token, testSuite, loadedConfig)
 		logger.Debug("Forged context", "ctx", testCtx)
 		testCfg := testCtx.Config
-		seq := testCtx.IncrementTestCount()
+		var seq int
+		if testCfg.ContainerDisabled.Is(true) || testCfg.ContainerImage.IsEmpty() {
+			seq = testCtx.IncrementTestCount()
+		}
 
 		tooMuchFailures := testCtx.ProcessTooMuchFailures()
 
@@ -277,17 +279,21 @@ func ProcessArgs(allArgs []string) (exitCode int) {
 		}
 
 		testCtx.NoErrorOrFatal(agg.Return())
+
+		if !utils.IsWithinContainer() && (testCfg.ContainerDisabled.Is(true) || testCfg.ContainerImage.IsEmpty()) && len(testCfg.RootMocks) > 0 {
+			err = fmt.Errorf("cannot mock absolute path outside a container")
+			testCtx.NoErrorOrFatal(err)
+		}
+
 		logger.Info("Processing test action", "token", token)
 
 		dpl.Quiet(testCfg.Quiet)
 		if testCfg.ContainerDisabled.Is(true) || testCfg.ContainerImage.IsEmpty() {
-			//logger.Warn("Performing test outside container", "image", testCfg.ContainerImage, "containerDisabled", testCfg.ContainerDisabled, "testConfig", testCfg)
-			err = validateMockedCmdNotAbsolute(testCtx)
-			testCtx.NoErrorOrFatal(err)
+			logger.Debug("Performing test outside container", "image", testCfg.ContainerImage, "containerDisabled", testCfg.ContainerDisabled, "testConfig", testCfg)
 			exitCode, err = PerformTest(testCtx, seq, assertions)
 			testCtx.NoErrorOrFatal(err)
 		} else {
-			logger.Warn("Performing test inside container", "image", testCfg.ContainerImage, "containeriId", testCfg.ContainerId, "testConfig", testCfg)
+			logger.Info("Performing test inside container", "image", testCfg.ContainerImage, "containeriId", testCfg.ContainerId, "testConfig", testCfg)
 			var ctId string
 			ctId, exitCode, err = PerformTestInContainer(testCtx)
 			if testCfg.ContainerScope.Is(model.GLOBAL_SCOPE) {
@@ -316,13 +322,4 @@ func ProcessArgs(allArgs []string) (exitCode int) {
 		log.Fatal(loadedConfig.TestSuite, loadedConfig.Token, err)
 	}
 	return
-}
-
-func validateMockedCmdNotAbsolute(testCtx facade.TestContext) error {
-	for _, mock := range testCtx.Config.Mocks {
-		if strings.HasPrefix(mock.Cmd, "/") {
-			return fmt.Errorf("cannot mock absolute path command: %s", mock.Cmd)
-		}
-	}
-	return nil
 }

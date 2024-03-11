@@ -8,34 +8,37 @@ import (
 	"strings"
 
 	"mby.fr/cmdtest/model"
+	"mby.fr/cmdtest/utils"
 )
 
-func mockDirectoryPath(testWorkDir string) (mockDir string) {
-	mockDir = filepath.Join(testWorkDir, "mock")
+func MockWrapperPath(mockDir string) (path string) {
+	// get test dir
+	path = filepath.Join(mockDir, "mockWrapper.sh")
 	return
 }
 
-func ProcessMocking(testWorkDir string, mocks []model.CmdMock) (mockDir string, err error) {
-	// get test dir
-	// create a mock dir
-	mockDir = mockDirectoryPath(testWorkDir)
-	if err != nil {
-		return
-	}
-	err = os.MkdirAll(mockDir, 0755)
-	if err != nil {
-		return
-	}
-	wrapperFilepath := filepath.Join(mockDir, "mockWrapper.sh")
-	// add mockdir to PATH TODO in perform test
+func ProcessMocking(mockDir string, rootMocks, mocks []model.CmdMock) (err error) {
+	wrapperFilepath := MockWrapperPath(mockDir)
 
-	// write the mocke wrapper
-	err = writeMockWrapperScript(wrapperFilepath, mocks)
+	// write the mock wrapper
+	allMocks := rootMocks
+	allMocks = append(allMocks, mocks...)
+	err = writeMockWrapperScript(wrapperFilepath, allMocks)
 	if err != nil {
 		return
 	}
 	// for each cmd mocked add link to the mock wrapper
 	for _, mock := range mocks {
+		var ok bool
+		ok, err = utils.IsShellBuiltin(mock.Cmd)
+		if err != nil {
+			return
+		}
+		if ok {
+			err = fmt.Errorf("command %s is not mockable (shell builtin)", mock.Cmd)
+			return
+		}
+
 		linkName := filepath.Join(mockDir, mock.Cmd)
 		err = os.RemoveAll(linkName)
 		if err != nil {
@@ -58,18 +61,20 @@ func writeMockWrapperScript(wrapperFilepath string, mocks []model.CmdMock) (err 
 	// Pour chaque CmdMock
 	// if "$@" match CmdMock
 	wrapperScript := "#! /bin/sh\nset -e\n"
-	wrapperScript += `export PATH="$ORIGINAL_PATH"` + "\n"
+	wrapperScript += `if [ -n "$ORIGINAL_PATH" ]; then` + "\n"
+	wrapperScript += "\t" + `export PATH="$ORIGINAL_PATH"` + "\n"
+	wrapperScript += `fi` + "\n"
 	//wrapperScript += ">&2 echo PATH:$PATH\n"
 	wrapperScript += `cmd=$( basename "$0" )` + "\n"
 
 	for _, mock := range mocks {
-		wrapperScript += fmt.Sprintf(`if [ "$cmd" = "%s" ]`, mock.Cmd)
+		wrapperScript += "if "
 		wildcard := false
 		if mock.Op == "=" {
 			// args must exactly match mock config
 			for pos, arg := range mock.Args {
 				if arg != "*" {
-					wrapperScript += fmt.Sprintf(` && [ "$%d" = "%s" ] `, pos+1, arg)
+					wrapperScript += fmt.Sprintf(`[ "$%d" = "%s" ] && `, pos+1, arg)
 				} else {
 					wildcard = true
 					break
@@ -88,12 +93,13 @@ func writeMockWrapperScript(wrapperFilepath string, mocks []model.CmdMock) (err 
 				}
 			}
 			for arg, count := range mockArgsCount {
-				wrapperScript += fmt.Sprintf(` && [ %d -eq $( echo "$@" | grep -c "%s" ) ]`, count, arg)
+				wrapperScript += fmt.Sprintf(`[ %d -eq $( echo "$@" | grep -c "%s" ) ] && `, count, arg)
 			}
 		}
 		if !wildcard {
-			wrapperScript += fmt.Sprintf(` && [ "$#" -eq %d ] `, len(mock.Args))
+			wrapperScript += fmt.Sprintf(`[ "$#" -eq %d ] && `, len(mock.Args))
 		}
+		wrapperScript += fmt.Sprintf(`[ "$cmd" = "%s" ] || [ "$0" = "%s" ]`, mock.Cmd, mock.Cmd)
 
 		wrapperScript += `; then` + "\n"
 		if mock.Stdin != nil {
@@ -121,8 +127,20 @@ func writeMockWrapperScript(wrapperFilepath string, mocks []model.CmdMock) (err 
 		}
 		wrapperScript += fmt.Sprintf(`fi` + "\n")
 	}
-	wrapperScript += `"$cmd" "$@"` + "\n"
+	wrapperScript += `if [ -e "/mocked$0" ]; then` + "\n"
+	//wrapperScript += "\t" + `>&2 echo calling "${0}.mocked" "$@" ...` + "\n"
+	//wrapperScript += "\t" + ` ls -l "${0}.mocked"` + "\n"
+	//wrapperScript += "\t" + `alias foo=${0}.mocked` + "\n"
+	wrapperScript += "\t" + `"/mocked$0" "$@"` + "\n"
+	wrapperScript += `else` + "\n"
+	//wrapperScript += "\t" + `>&2 echo calling "$cmd" "$@" ...` + "\n"
+	wrapperScript += "\t" + `"$cmd" "$@"` + "\n"
+	wrapperScript += `fi` + "\n"
 
+	err = os.Remove(wrapperScript)
+	if err != nil && !os.IsNotExist(err) {
+		return
+	}
 	err = os.WriteFile(wrapperFilepath, []byte(wrapperScript), 0755)
 	return
 }

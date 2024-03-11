@@ -17,6 +17,10 @@ const (
 	DefaultDebugLevel           = INFO
 	DefaultTooMuchFailures      = 3
 	TooMuchFailuresNoLimit      = -1
+
+	EnvContainerScopeKey = "__CMDT_CONTAINER_SCOPE"
+	EnvContainerImageKey = "__CMDT_CONTAINER_IMAGE"
+	EnvContainerIdKey    = "__CMDT_CONTAINER_ID"
 )
 
 var (
@@ -151,9 +155,10 @@ type Config struct {
 	RunCount      utilz.Optional[int]           `yaml:""`
 	Parallel      utilz.Optional[int]           `yaml:""`
 
-	Mocks  []CmdMock  `yaml:""`
-	Before [][]string `yaml:""`
-	After  [][]string `yaml:""`
+	Mocks     []CmdMock  `yaml:""`
+	RootMocks []CmdMock  `yaml:""`
+	Before    [][]string `yaml:""`
+	After     [][]string `yaml:""`
 
 	ContainerDisabled utilz.Optional[bool]        `yaml:""`
 	ContainerImage    utilz.Optional[string]      `yaml:""`
@@ -221,6 +226,9 @@ func (c *Config) Merge(right Config) {
 
 	if len(right.Mocks) > 0 {
 		c.Mocks = append(c.Mocks, right.Mocks...)
+	}
+	if len(right.RootMocks) > 0 {
+		c.RootMocks = append(c.RootMocks, right.RootMocks...)
 	}
 	if len(right.Before) > 0 {
 		c.Before = append(c.Before, right.Before...)

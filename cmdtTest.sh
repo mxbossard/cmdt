@@ -234,28 +234,28 @@ $cmdt0 @test=meta/ @stderr:"PASSED" -- $cmdt sh -c ">&2 echo foo bar" @stderr!=f
 
 >&2 echo "## Test assertions outputs"
 # Init the context used in t1 test suite
-$cmdt0 @init=meta
-$cmdt0 @test=meta/ @stderr:"#01..." @stderr:"PASSED" -- $cmdt true @test=t1/
-$cmdt0 @test=meta/ @stderr:"#02..." @stderr:"PASSED" -- $cmdt true @test=t1/
-$cmdt0 @test=meta/ @stderr:"#03..." @stderr:"FAILED" -- $cmdt false @test=t1/
-$cmdt0 @test=meta/ @stderr:"#04..." @stderr:"PASSED" -- $cmdt false @fail @test=t1/
-$cmdt0 @test=meta/ @fail @stderr:"Failures in [t1] test suite (3 success, 1 failures, 0 errors on 4 tests in" -- $cmdt @report=t1
+$cmdt0 @init=outputs_assertions
+$cmdt0 @test=outputs_assertions/ @stderr:"#01..." @stderr:"PASSED" -- $cmdt true @test=t1/
+$cmdt0 @test=outputs_assertions/ @stderr:"#02..." @stderr:"PASSED" -- $cmdt true @test=t1/
+$cmdt0 @test=outputs_assertions/ @stderr:"#03..." @stderr:"FAILED" -- $cmdt false @test=t1/
+$cmdt0 @test=outputs_assertions/ @stderr:"#04..." @stderr:"PASSED" -- $cmdt false @fail @test=t1/
+$cmdt0 @test=outputs_assertions/ @fail @stderr~"/Failures in \[.*t1.*\] test suite \(3 success, 1 failures, 0 errors on 4 tests in/" -- $cmdt @report=t1
 
 
 >&2 echo "## Test namings"
 $cmdt @init=main 2> /dev/null
 $cmdt0 @init=naming
-$cmdt0 @test=naming/ @stderr:"Test [main]/name1 #01..." @stderr:"PASSED" -- $cmdt1 true @test=name1
-$cmdt0 @test=naming/ @stderr:"Test [main]/name2 #02..." @stderr:"PASSED" -- $cmdt1 true @test=name2
-$cmdt0 @test=naming/ @stderr:"Test [main]/" @stderr:"true" @stderr:"#03..." @stderr:"PASSED" -- $cmdt1 true
-$cmdt0 @test=naming/ @stderr:"Test [main]/" @stderr:"true" @stderr:"#04..." @stderr:"PASSED" -- $cmdt1 true
-$cmdt0 @test=naming/ @stderr:"Test [suite1]/name1 #01..." @stderr:"PASSED" -- $cmdt1 true @test=suite1/name1
-$cmdt0 @test=naming/ @stderr:"Test [suite1]/name2 #02..." @stderr:"PASSED" -- $cmdt1 true @test=suite1/name2
-$cmdt0 @test=naming/ @stderr:"Test [suite2]/" @stderr:"#01..." @stderr:"PASSED" -- $cmdt1 true @test=suite2/
-$cmdt0 @test=naming/ @stderr:"Test [suite2]/" @stderr:"#02..." @stderr:"PASSED" -- $cmdt1 true @test=suite2/
-$cmdt0 @test=naming/ @stderr:"Successfuly ran [suite1] test suite" -- $cmdt1  @report=suite1
-$cmdt0 @test=naming/ @stderr:"Successfuly ran [suite2] test suite" -- $cmdt1 @report=suite2
-$cmdt0 @test=naming/ @stderr:"Successfuly ran [main] test suite" -- $cmdt1 @report=main
+$cmdt0 @test=naming/ @stderr~"/Test \[main\].*name1 #01.../" @stderr:"PASSED" -- $cmdt1 true @test=name1
+$cmdt0 @test=naming/ @stderr~"/Test \[main\].*name2 #02.../" @stderr:"PASSED" -- $cmdt1 true @test=name2
+$cmdt0 @test=naming/ @stderr~"/Test \[main\].*/" @stderr:"true" @stderr:"#03..." @stderr:"PASSED" -- $cmdt1 true
+$cmdt0 @test=naming/ @stderr~"/Test \[main\].*/" @stderr:"true" @stderr:"#04..." @stderr:"PASSED" -- $cmdt1 true
+$cmdt0 @test=naming/ @stderr~"/Test \[suite1\].*name1 #01.../" @stderr:"PASSED" -- $cmdt1 true @test=suite1/name1
+$cmdt0 @test=naming/ @stderr~"/Test \[suite1\].*name2 #02.../" @stderr:"PASSED" -- $cmdt1 true @test=suite1/name2
+$cmdt0 @test=naming/ @stderr~"/Test \[suite2\].*/" @stderr:"#01..." @stderr:"PASSED" -- $cmdt1 true @test=suite2/
+$cmdt0 @test=naming/ @stderr~"/Test \[suite2\].*/" @stderr:"#02..." @stderr:"PASSED" -- $cmdt1 true @test=suite2/
+$cmdt0 @test=naming/ @stderr~"/Successfuly ran \[.*suite1.*\] test suite/" -- $cmdt1  @report=suite1
+$cmdt0 @test=naming/ @stderr~"/Successfuly ran \[.*suite2.*\] test suite/" -- $cmdt1 @report=suite2
+$cmdt0 @test=naming/ @stderr~"/Successfuly ran \[.*main.*\] test suite/" -- $cmdt1 @report=main
 
 
 >&2 echo "## Test display verbosity"
@@ -523,8 +523,8 @@ $cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls bar foo @mock:"ls *,exit=42" 
 $cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls foo bar @mock:"ls,exit=42" @mock:"ls foo *,exit=43" @mock:"ls foo bar,exit=44" @exit=43
 $cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls bar foo @mock:"ls,exit=42" @mock:"ls foo *,exit=43" @mock:"ls foo bar,exit=44" @exit=43
 
-$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 sh -c "echo \${PATH}" "$mockCfg1" @stdout:/mock:/
-$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 which ls "$mockCfg1" @stderr= @stdout:/mock/ls
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 sh -c "echo \${PATH}" "$mockCfg1" "@stdout~/__mock_\d+:/"
+$cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 which ls "$mockCfg1" @stderr= "@stdout~|__mock_\d+/ls|"
 $cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 sh -c "ls foo" "$mockCfg1" @stdout=baz @exit=41 @keepOutputs
 $cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 ls foo "$mockCfg1" @stdout=baz @exit=41
 $cmdt0 @test=cmd_mock/ @stderr:PASSED -- $cmdt1 sh -c "echo foo | ls foo" "$mockCfg1" @fail @stdout= @stderr:"$expectedFooErrMsg"
@@ -583,7 +583,9 @@ $cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 @container=alpine ls /etc/alpin
 $cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 @container=alpine true
 $cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 @container=alpine ls @mock=ls,exit=0
 $cmdt0 @test=container/ @stderr:FAILED -- $cmdt1 @container=alpine ls @mock=ls,exit=1
-$cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 @container=alpine ls @mock=/bin/ls,exit=42 @exit=42
+#$cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 @container=alpine sh -c "ls -l /bin/cat*" @mock=/bin/cat,exit=42 @stdout= @debug=4
+$cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 @container=alpine /bin/cat @mock=/bin/cat,exit=42 @exit=42 @debug=0
+$cmdt0 @test=container/ @stderr:PASSED -- $cmdt1 @container=alpine cat @mock=/bin/cat,exit=42 @exit=42
 
 $cmdt0 @test=container/ @fail -- $cmdt1 @report=main
 

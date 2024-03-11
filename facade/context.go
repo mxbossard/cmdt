@@ -90,6 +90,12 @@ func NewTestContext(token, testSuite string, inputCfg model.Config) TestContext 
 		testCtx.NoErrorOrFatal(err)
 	}
 
+	if ok, ctId := utils.ReadEnvValue(model.EnvContainerIdKey); ok {
+		testCtx.ContainerId = ctId
+		_, testCtx.ContainerScope = utils.ReadEnvValue(model.EnvContainerScopeKey)
+		_, testCtx.ContainerImage = utils.ReadEnvValue(model.EnvContainerImageKey)
+	}
+
 	return testCtx
 }
 
@@ -180,8 +186,12 @@ func (c SuiteContext) NoErrorOrFatal(err error) {
 type TestContext struct {
 	SuiteContext
 
-	CmdExec     cmdz.Executer
-	TestOutcome utilz.AnyOptional[model.TestOutcome]
+	//MockDir        string
+	ContainerId    string
+	ContainerScope string
+	ContainerImage string
+	CmdExec        cmdz.Executer
+	TestOutcome    utilz.AnyOptional[model.TestOutcome]
 }
 
 func (c TestContext) TestId() (id string) {
@@ -201,14 +211,21 @@ func (c TestContext) ProcessTooMuchFailures() (n int) {
 	return
 }
 
-func (c TestContext) TestQualifiedName() (name string) {
+func (c TestContext) TestQualifiedName0() (name string) {
+	cfg := c.Config
 	var testName string
-	if c.Config.TestName.IsPresent() && !c.Config.TestName.Is("") {
-		testName = c.Config.TestName.Get()
+	if cfg.TestName.IsPresent() && !cfg.TestName.Is("") {
+		testName = cfg.TestName.Get()
 	} else {
 		testName = cmdTitle(c.CmdExec)
 	}
-	name = fmt.Sprintf("[%s]/%s", c.Config.TestSuite.Get(), testName)
+
+	containerPart := ""
+	if c.ContainerImage != "" {
+		containerPart = fmt.Sprintf("(%s)", c.ContainerImage)
+	}
+
+	name = fmt.Sprintf("[%s]%s/%s", cfg.TestSuite.Get(), containerPart, testName)
 	return
 }
 
@@ -216,9 +233,9 @@ func (c TestContext) initTestOutcome(seq int) (outcome model.TestOutcome) {
 	testSuite := c.Config.TestSuite.Get()
 	outcome.TestSuite = testSuite
 	outcome.Seq = seq
-	outcome.TestQualifiedName = c.TestQualifiedName()
+	//outcome.TestQualifiedName = c.TestQualifiedName()
 	outcome.ExitCode = -1
-	outcome.CmdTitle = cmdTitle(c.CmdExec)
+	//outcome.CmdTitle = cmdTitle(c.CmdExec)
 	outcome.Duration = c.CmdExec.Duration()
 	outcome.Stdout = c.CmdExec.StdoutRecord()
 	outcome.Stderr = c.CmdExec.StderrRecord()
@@ -324,6 +341,13 @@ func (c *TestContext) initExecuter() (err error) {
 	}
 
 	c.CmdExec = cmd
+
+	// get test dir
+	// create a mock dir
+	//c.MockDir, err = mockDirectoryPath(testWorkDir)
+	if err != nil {
+		return
+	}
 	return
 }
 
@@ -332,11 +356,16 @@ func (c TestContext) ConfigMocking() (err error) {
 	cmd := c.CmdExec
 	// Mocking config
 	currentPath := os.Getenv("PATH")
-	if len(cfg.Mocks) > 0 {
+	var mockDir string
+	mockDir, err = c.MockDirectoryPath(c.Repo.TestCount(cfg.TestSuite.Get()))
+	if err != nil {
+		return
+	}
+	//logger.Warn("configuring mocking", "dir", mockDir, "count", len(cfg.Mocks)+len(cfg.RootMocks))
+
+	if len(cfg.Mocks)+len(cfg.RootMocks) > 0 {
 		// Put mockDir in PATH
-		testWorkDir := c.Repo.BackingFilepath()
-		var mockDir string
-		mockDir, err = mock.ProcessMocking(testWorkDir, cfg.Mocks)
+		err = mock.ProcessMocking(mockDir, cfg.RootMocks, cfg.Mocks)
 		if err != nil {
 			return
 		}
@@ -351,6 +380,10 @@ func (c TestContext) ConfigMocking() (err error) {
 		cmd.AddEnv("PATH", currentPath)
 	}
 	return
+}
+
+func (c TestContext) MockDirectoryPath(testId int) (mockDir string, err error) {
+	return c.Repo.MockDirectoryPath(c.Config.TestSuite.Get(), testId)
 }
 
 func cmdTitle(cmd cmdz.Executer) string {
