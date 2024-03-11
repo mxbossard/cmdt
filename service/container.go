@@ -17,13 +17,7 @@ const ()
 
 func StartContainer(testCtx facade.TestContext) (id string, err error) {
 	image := testCtx.Config.ContainerImage.Get()
-	mocks := testCtx.Config.Mocks
-	// FIXME: implements Mocking in caontainer
-	_ = mocks
 
-	// Start container with :
-	// - cmdtest
-	// - configured mock
 	id, err = utils.ForgeUuid()
 	if err != nil {
 		return
@@ -32,30 +26,22 @@ func StartContainer(testCtx facade.TestContext) (id string, err error) {
 
 	cmdtestVol := os.Args[0] + ":/opt/cmdtest:ro"
 	ctxDirVol := repoDir + ":" + repoDir + ":rw"
-	dr := container.DockerRunner{
+	dr := container.RunConfig{
 		Name:       id,
 		Image:      image,
 		Entrypoint: "/bin/sh",
-		CmdArgs:    []string{"-c", "sleep 120"}, //FIXME use suite timeout or test timeout
+		CmdArgs:    []string{"-c", "sleep 300"}, //FIXME use suite timeout or test timeout
 		Remove:     true,
 		Detach:     true,
+		User:       "1000:1000",
 		Volumes:    []string{cmdtestVol, ctxDirVol},
 	}
-	//stdout := &inout.RecordingWriter{}
-	//stderr := &inout.RecordingWriter{}
-	stdout := os.Stdout
-	stderr := os.Stderr
-	err = dr.Wait(stdout, stderr)
 
-	/*
-		args = []string{"docker", "run", "--rm", "-d", "--entrypoint=/bin/sh", "--name="+id, image, "-c" "sleep inf"}
-		c := cmdz.Cmd("docker", "run", "--rm", id)
-		var exitCode int
-		exitCode, err = c.BlockRun()
-		if err != nil {
-			return
-		}
-	*/
+	e := container.NewRunBuilder(dr).RunExecuter()
+	e.SetOutputs(os.Stdout, os.Stderr)
+
+	logger.Debug("starting container", "id", id)
+	_, err = e.BlockRun()
 
 	return
 }
@@ -69,6 +55,7 @@ func MockInContainer(testCtx facade.TestContext, id string) (err error) {
 	}
 	mockWrapperPath := mock.MockWrapperPath(mockDir)
 	for _, mock := range testCtx.Config.RootMocks {
+		logger.Debug("mocking container root cmd", "cmd", mock.Cmd)
 		var ok bool
 		ok, err = IsShellBuiltin(testCtx, id, mock.Cmd)
 		if err != nil {
@@ -104,6 +91,7 @@ func UnmockInContainer(testCtx facade.TestContext, id string) (err error) {
 func RemoveContainer(id string) (err error) {
 	c := cmdz.Cmd("docker", "rm", "-f", id)
 	var exitCode int
+	logger.Debug("removing container", "id", id)
 	exitCode, err = c.BlockRun()
 	if err != nil {
 		return
@@ -131,6 +119,7 @@ func ExecInContainer(testCtx facade.TestContext, id string, cmdAndArgs []string)
 	//c.AddEnviron(os.Environ()...)
 	exec.SetOutputs(os.Stdout, os.Stderr)
 	//log.Printf("Will execute: [%s]\n", c)
+	logger.Debug("executing in container", "id", id, "cmdAndArgs", cmdAndArgs)
 	_, err = exec.BlockRun()
 	return
 }

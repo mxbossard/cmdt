@@ -271,7 +271,6 @@ func ProcessArgs(allArgs []string) (exitCode int) {
 
 		if tooMuchFailures == 1 {
 			// First time detecting TOO MUCH FAILURES
-			// TODO: report TOO MUCH FAILURES DO NOT EXECUTING TEST ANYMORE
 			dpl.TooMuchFailures(testSuite)
 		}
 		if tooMuchFailures > 0 {
@@ -296,6 +295,7 @@ func ProcessArgs(allArgs []string) (exitCode int) {
 			logger.Info("Performing test inside container", "image", testCfg.ContainerImage, "containeriId", testCfg.ContainerId, "testConfig", testCfg)
 			var ctId string
 			ctId, exitCode, err = PerformTestInContainer(testCtx)
+			testCtx.NoErrorOrFatal(err)
 			if testCfg.ContainerScope.Is(model.GLOBAL_SCOPE) {
 				globalCfg, err2 := testCtx.Repo.LoadGlobalConfig()
 				testCtx.NoErrorOrFatal(err2)

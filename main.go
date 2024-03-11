@@ -145,13 +145,13 @@ Bugs:
 - serialize test outcome instead of writing in report file
 
 Features :
+- Use podman or docker binary
 - with -- report an error if commands before --
 - with -- auto concatenat args until next delim or --
 - @beforeSuite=CMD_ANG_ARGS & @afterSuite=CMD_ANG_ARGS
 - @mock stdin=@FILEPATH stdin:PARTIAL_CONTENT stdout=@FILEPATH @stderr=@FILEPATH
 - @called[=:]CMD ARG_S,stdin=IN,count=N assertion => verify a mock was called
 - use rule definitions in usage
-- Use podman or docker binary
 - move seq into utils module
 - move contianer use into utils module
 
