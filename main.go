@@ -133,6 +133,7 @@ Done:
 - Forbid mock of shell builtin command (we can use type CMD)
 - multiple @mock
 - Mock les executable avec un chemin absolu dans les conteneur
+- Use podman or docker binary
 
 TODO:
 Bugs:
@@ -145,7 +146,6 @@ Bugs:
 - serialize test outcome instead of writing in report file
 
 Features :
-- Use podman or docker binary
 - with -- report an error if commands before --
 - with -- auto concatenat args until next delim or --
 - @beforeSuite=CMD_ANG_ARGS & @afterSuite=CMD_ANG_ARGS

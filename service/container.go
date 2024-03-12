@@ -25,7 +25,7 @@ func StartContainer(testCtx facade.TestContext) (id string, err error) {
 	repoDir := testCtx.Repo.BackingFilepath()
 
 	cmdtestVol := os.Args[0] + ":/opt/cmdtest:ro"
-	ctxDirVol := repoDir + ":" + repoDir + ":rw"
+	ctxDirVol := repoDir + ":" + repoDir + ":rw,z"
 	dr := container.RunConfig{
 		Name:       id,
 		Image:      image,
@@ -34,6 +34,7 @@ func StartContainer(testCtx facade.TestContext) (id string, err error) {
 		Remove:     true,
 		Detach:     true,
 		User:       "1000:1000",
+		Userns:     "keep-id",
 		Volumes:    []string{cmdtestVol, ctxDirVol},
 	}
 
@@ -68,8 +69,10 @@ func MockInContainer(testCtx facade.TestContext, id string) (err error) {
 		script += fmt.Sprintf(`mkdir -p $( dirname /mocked%[1]s ) ; mv "%[1]s" "/mocked/%[1]s" ; ln -s "%[2]s" "%[1]s"`, mock.Cmd, mockWrapperPath)
 	}
 	if script != "" {
-		c := cmdz.Cmd("docker", "exec", "-u", "0", id, "sh", "-e", "-c", script).ErrorOnFailure(true)
-		_, err = c.BlockRun()
+		//c := cmdz.Cmd("docker", "exec", "-u", "0", id, "sh", "-e", "-c", script).ErrorOnFailure(true)
+		cmdAndArgs := []string{"sh", "-e", "-c", script}
+		e := container.NewExecBuilder(container.ExecConfig{Name: id, User: "0", CmdAndArgs: cmdAndArgs}).ExecExecuter()
+		_, err = e.BlockRun()
 	}
 	return
 }
@@ -82,17 +85,20 @@ func UnmockInContainer(testCtx facade.TestContext, id string) (err error) {
 		}
 	}
 	if script != "" {
-		c := cmdz.Cmd("docker", "exec", "-u", "0", id, "sh", "-e", "-c", script).ErrorOnFailure(true)
-		_, err = c.BlockRun()
+		//c := cmdz.Cmd("docker", "exec", "-u", "0", id, "sh", "-e", "-c", script).ErrorOnFailure(true)
+		cmdAndArgs := []string{"sh", "-e", "-c", script}
+		e := container.NewExecBuilder(container.ExecConfig{Name: id, User: "0", CmdAndArgs: cmdAndArgs}).ExecExecuter()
+		_, err = e.BlockRun()
 	}
 	return
 }
 
 func RemoveContainer(id string) (err error) {
-	c := cmdz.Cmd("docker", "rm", "-f", id)
+	e := container.NewLifeCycleBuilder(container.LifeCycleConfig{Name: id}).RmExecuter()
+	//c := cmdz.Cmd("docker", "rm", "-f", id)
 	var exitCode int
 	logger.Debug("removing container", "id", id)
-	exitCode, err = c.BlockRun()
+	exitCode, err = e.BlockRun()
 	if err != nil {
 		return
 	}
@@ -103,19 +109,21 @@ func RemoveContainer(id string) (err error) {
 }
 
 func ExecInContainer(testCtx facade.TestContext, id string, cmdAndArgs []string) (exec cmdz.Executer, err error) {
-	var envArgs []string
-	envArgs = append(envArgs, "-e", model.ContextTokenEnvVarName+"="+testCtx.Token)
-	envArgs = append(envArgs, "-e", model.EnvContainerScopeKey+"="+fmt.Sprintf("%d", testCtx.Config.ContainerScope.Get()))
-	envArgs = append(envArgs, "-e", model.EnvContainerImageKey+"="+testCtx.Config.ContainerImage.Get())
-	envArgs = append(envArgs, "-e", model.EnvContainerIdKey+"="+id)
+	envArgs := make(map[string]string)
+	envArgs[model.ContextTokenEnvVarName] = testCtx.Token
+	envArgs[model.EnvContainerScopeKey] = fmt.Sprintf("%d", testCtx.Config.ContainerScope.Get())
+	envArgs[model.EnvContainerImageKey] = testCtx.Config.ContainerImage.Get()
+	envArgs[model.EnvContainerIdKey]= id
 
 	user := fmt.Sprintf("%d", os.Getuid())
 	//workDir := "/tmp"
-	args := []string{"docker", "exec", "-u", user}
-	args = append(args, envArgs...)
-	args = append(args, id)
-	args = append(args, cmdAndArgs...)
-	exec = cmdz.Cmd(args...)
+	//args := []string{"docker", "exec", "-u", user}
+	//args = append(args, envArgs...)
+	//args = append(args, id)
+	//args = append(args, cmdAndArgs...)
+	//exec = cmdz.Cmd(args...)
+
+	exec = container.NewExecBuilder(container.ExecConfig{Name: id, User: user, EnvArgs: envArgs, CmdAndArgs: cmdAndArgs}).ExecExecuter()
 	//c.AddEnviron(os.Environ()...)
 	exec.SetOutputs(os.Stdout, os.Stderr)
 	//log.Printf("Will execute: [%s]\n", c)
