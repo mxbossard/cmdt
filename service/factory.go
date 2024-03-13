@@ -708,13 +708,68 @@ func BuildAssertion(cfg model.Config, ruleExpr string) (ok bool, assertion model
 func ParseArgs(rulePrefix string, args []string) (cfg model.Config, assertions []model.Assertion, agg errorz.Aggregated) {
 	var err error
 	cfg.Prefix.Default(rulePrefix)
+	ruleParsingStopper := rulePrefix + "--"
+
+	// Check if ruleParsingStopper is present
+	ruleParsingStopperPresent := false
+	for _, arg := range args {
+		if arg == ruleParsingStopper {
+			ruleParsingStopperPresent = true
+			break
+		}
+	}
+
+	// Concatenate args with space before ruleParsingStopper
+	if ruleParsingStopperPresent {
+		var concatenatedArgs []string
+		// Check all args before ruleParsingStopper
+		var buffer string
+		for p, arg := range args {
+			if arg == ruleParsingStopper {
+				if buffer != "" {
+					concatenatedArgs = append(concatenatedArgs, buffer)
+				}
+				concatenatedArgs = append(concatenatedArgs, args[p:]...)
+				break
+			} else if model.MatchRuleDef(rulePrefix, arg, model.Concatenables...) {
+				// Concatenable rule
+				if buffer != "" {
+					// flush buffer
+					concatenatedArgs = append(concatenatedArgs, buffer)
+				}
+				// init buffer
+				buffer = arg
+			} else if strings.HasPrefix(arg, rulePrefix) {
+				if buffer != "" {
+					// flush buffer
+					concatenatedArgs = append(concatenatedArgs, buffer)
+				}
+				buffer = ""
+				concatenatedArgs = append(concatenatedArgs, arg)
+			} else if buffer == "" {
+				concatenatedArgs = append(concatenatedArgs, arg)
+			} else {
+				buffer += " " + arg
+			}
+		}
+
+		logger.Debug("concatenated args", "args", args, "concatenated", concatenatedArgs)
+		// replace args by concatenated ones
+		args = concatenatedArgs
+	}
 
 	var rules []model.Rule
 	parseRules := true
 	for _, arg := range args {
+
 		var ok bool
-		if len(cfg.CmdAndArgs) == 0 && arg == "--" {
-			// If no command found yet first -- param is interpreted as a rule parsing stopper
+		if parseRules && arg == ruleParsingStopper {
+			// Reached rule parsing stopper
+			if len(cfg.CmdAndArgs) > 0 {
+				err = fmt.Errorf("found some cmd: [%s] before rule parsing stopper %s", cfg.CmdAndArgs, ruleParsingStopper)
+				agg.Add(err)
+				//continue
+			}
 			// stop parsing rules
 			parseRules = false
 			continue

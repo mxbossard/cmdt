@@ -134,20 +134,23 @@ Done:
 - multiple @mock
 - Mock les executable avec un chemin absolu dans les conteneur
 - Use podman or docker binary
+- with @-- report an error if commands before @--
+- with @-- auto concatenate args until next delim or @--
 
 TODO:
 Bugs:
-- @FILEPATH empeche de tester un contenu qui commence par @ sans passer par un fichier. Il faudrait pouvoir échapper @ ou bien utiliser un operator dédié à la lécture d'un fichier (ex: @stderr@=FILEPATH @stdin@:FILEPATH)
+- probably too slow podman/docker abstraction
+- dirtyContainer capricieux avec podman (Timeout de 10 sec atteint)
 - remove docker run container generated ID from stdout
+- clean model0.go
 - use suite timeout for container duration
 - Check for container existance before exec in running container
 - Suite Timeout not managed (should error if timeout exceeded) Should ask for suite clear and no test should pass; initless suite should have a greater default timeout
 - - @global config updates does not works
 - serialize test outcome instead of writing in report file
+- @FILEPATH empeche de tester un contenu qui commence par @ sans passer par un fichier. Il faudrait pouvoir échapper @ ou bien utiliser un operator dédié à la lécture d'un fichier (ex: @stderr@=FILEPATH @stdin@:FILEPATH)
 
 Features :
-- with -- report an error if commands before --
-- with -- auto concatenat args until next delim or --
 - @beforeSuite=CMD_ANG_ARGS & @afterSuite=CMD_ANG_ARGS
 - @mock stdin=@FILEPATH stdin:PARTIAL_CONTENT stdout=@FILEPATH @stderr=@FILEPATH
 - @called[=:]CMD ARG_S,stdin=IN,count=N assertion => verify a mock was called

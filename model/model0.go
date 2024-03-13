@@ -3,6 +3,7 @@ package model
 import (
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	"mby.fr/utils/ansi"
@@ -27,7 +28,6 @@ type Validater[T any] func(rule Rule, value T) error
 type Asserter func(cmdz.Executer) (AssertionResult, error)
 
 const (
-	DefaultRulePrefix             = "@"
 	ContextTokenEnvVarName        = "__CMDT_TOKEN"
 	DefaultTestSuiteName          = "main"
 	GlobalConfigTestSuiteName     = "__global"
@@ -81,14 +81,20 @@ var (
 		ruleDef("stopOnFailure", "", "="), ruleDef("keepStdout", "", "="), ruleDef("keepStderr", "", "="),
 		ruleDef("keepOutputs", "", "="), ruleDef("quiet", "", "="), ruleDef("timeout", "="),
 		ruleDef("parallel", "="), ruleDef("runCount", "="), ruleDef("mock", "=", ":"),
-		ruleDef("before", "="), ruleDef("after", "="), ruleDef("container", "", "="),
-		ruleDef("dirtyContainer", "=")}
+		ruleDef("container", "", "="), ruleDef("dirtyContainer", "=")}
 	// Config of test flow (init -> test -> report)
 	FlowConfigs = []RuleDefinition{ruleDef("token", "="), ruleDef("verbose", "", "="),
 		ruleDef("debug", "", "="), ruleDef("failuresLimit", "=")}
 	Assertions = []RuleDefinition{ruleDef("success", ""), ruleDef("fail", ""), ruleDef("exit", "="),
 		ruleDef("cmd", "="), ruleDef("stdout", "=", ":", "~", "!=", "!:", "!~"),
 		ruleDef("stderr", "=", ":", "~", "!=", "!:", "!~"), ruleDef("exists", "=")}
+	Concatenables = []RuleDefinition{
+		ruleDef("init", "="), ruleDef("test", "="), ruleDef("report", "="),
+		ruleDef("before", "="), ruleDef("after", "="),
+		ruleDef("cmd", "="), ruleDef("exists", "="),
+		ruleDef("stdout", "=", ":", "~", "!=", "!:", "!~"),
+		ruleDef("stderr", "=", ":", "~", "!=", "!:", "!~"),
+	}
 )
 
 type Rule struct {
@@ -115,6 +121,17 @@ func ruleDef(name string, ops ...string) (r RuleDefinition) {
 	r.Name = name
 	r.Ops = ops
 	return
+}
+
+func MatchRuleDef(rulePrefix, ruleStatement string, ruleDefs ...RuleDefinition) bool {
+	for _, def := range ruleDefs {
+		for _, op := range def.Ops {
+			if strings.HasPrefix(ruleStatement, rulePrefix+def.Name+op) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func IsRuleOfKind(ruleDefs []RuleDefinition, r Rule) (ok bool, err error) {

@@ -193,9 +193,9 @@ func (r FileRepo) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 	case model.IGNORED:
 		// Nothing to do
 	case model.ERRORED:
-		_, err = reportLog.WriteString(testTitle + "  =>  not executed")
+		_, err = reportLog.WriteString(testTitle + "  => not executed")
 	case model.TIMEOUT:
-		_, err = reportLog.WriteString(testTitle + "  =>  timed out")
+		_, err = reportLog.WriteString(testTitle + "  => timed out")
 	default:
 		err = fmt.Errorf("outcome %s not supported", outcome.Outcome)
 	}

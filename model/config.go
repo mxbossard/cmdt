@@ -10,6 +10,7 @@ import (
 )
 
 const (
+	DefaultRulePrefix           = "@"
 	DefaultVerboseLevel         = SHOW_PASSED
 	DefaultInitedVerboseLevel   = SHOW_FAILED_OUTS
 	DefaultInitlessVerboseLevel = DefaultVerboseLevel
