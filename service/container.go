@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -39,7 +40,8 @@ func StartContainer(testCtx facade.TestContext) (id string, err error) {
 	}
 
 	e := container.NewRunBuilder(dr).RunExecuter()
-	e.SetOutputs(os.Stdout, os.Stderr)
+	// discard stdout which should contain only container id (because of Detach option)
+	e.SetOutputs(io.Discard, os.Stderr)
 
 	logger.Debug("starting container", "id", id)
 	_, err = e.BlockRun()

@@ -176,7 +176,7 @@ func (c Config) IsRule(s string) bool {
 func (c Config) SplitRuleExpr(ruleExpr string) (ok bool, r Rule) {
 	ok = false
 	prefix := c.Prefix.Get()
-	assertionRulePattern := regexp.MustCompile("^" + prefix + "([a-zA-Z]+)([=~:!]{1,2})?(.+)?$")
+	assertionRulePattern := regexp.MustCompile("^" + prefix + "([a-zA-Z]+)([=~:!@]{1,2})?(.+)?$")
 	submatch := assertionRulePattern.FindStringSubmatch(ruleExpr)
 	if submatch != nil {
 		ok = true

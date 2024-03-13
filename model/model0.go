@@ -86,14 +86,15 @@ var (
 	FlowConfigs = []RuleDefinition{ruleDef("token", "="), ruleDef("verbose", "", "="),
 		ruleDef("debug", "", "="), ruleDef("failuresLimit", "=")}
 	Assertions = []RuleDefinition{ruleDef("success", ""), ruleDef("fail", ""), ruleDef("exit", "="),
-		ruleDef("cmd", "="), ruleDef("stdout", "=", ":", "~", "!=", "!:", "!~"),
-		ruleDef("stderr", "=", ":", "~", "!=", "!:", "!~"), ruleDef("exists", "=")}
+		ruleDef("cmd", "="), ruleDef("exists", "="),
+		ruleDef("stdout", "=", ":", "~", "!=", "!:", "!~", "@=", "@:"),
+		ruleDef("stderr", "=", ":", "~", "!=", "!:", "!~", "@=", "@:")}
 	Concatenables = []RuleDefinition{
 		ruleDef("init", "="), ruleDef("test", "="), ruleDef("report", "="),
 		ruleDef("before", "="), ruleDef("after", "="),
 		ruleDef("cmd", "="), ruleDef("exists", "="),
-		ruleDef("stdout", "=", ":", "~", "!=", "!:", "!~"),
-		ruleDef("stderr", "=", ":", "~", "!=", "!:", "!~"),
+		ruleDef("stdout", "=", ":", "~", "!=", "!:", "!~", "@=", "@:"),
+		ruleDef("stderr", "=", ":", "~", "!=", "!:", "!~", "@=", "@:"),
 	}
 )
 

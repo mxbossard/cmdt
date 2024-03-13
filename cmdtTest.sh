@@ -400,6 +400,19 @@ $cmdt0 @init=stdin
 echo foo | $cmdt0 @test=stdin/ @stdout="foo\n" cat
 
 
+>&2 echo "## Test file ref content in assertions"
+$cmdt0 @init=file_ref_content
+echo foo > /tmp/fileRefContent
+$cmdt0 @test=file_ref_content/ @stderr:PASSED @-- $cmdt1 @stdout@=/tmp/fileRefContent echo foo
+$cmdt0 @test=file_ref_content/ @stderr:FAILED @-- $cmdt1 @stdout@=/tmp/fileRefContent echo -n foo
+echo -n foo > /tmp/fileRefContent
+$cmdt0 @test=file_ref_content/ @stderr:PASSED @-- $cmdt1 @stdout@=/tmp/fileRefContent echo -n foo
+$cmdt0 @test=file_ref_content/ @stderr:FAILED @-- $cmdt1 @stdout@=/tmp/fileRefContent echo foo
+$cmdt0 @test=file_ref_content/ @stderr:PASSED @-- $cmdt1 @stdout@:/tmp/fileRefContent echo foo
+$cmdt0 @test=file_ref_content/ @stderr:FAILED @-- $cmdt1 @stdout@:/tmp/fileRefContent echo bar
+
+$cmdt0 @test=file_ref_content/ @fail @-- $cmdt1 @report=main 
+
 >&2 echo "## Test export"
 export foo=bar
 $cmdt0 @init=export

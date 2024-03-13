@@ -1,0 +1,24 @@
+
+# cmdt is a tool to test command line interface programs
+# cmdt will execute the command with the arguments you supply 
+# cmdt will perform the assertions you supply on the execution
+
+cmdt true
+# true is a program wich always exit with success
+
+cmdt false
+# false is a program which always exit with failure
+
+# cmdt assertions are described with @ prefix
+
+cmdt @fail false
+# you can read it like: "assert my command fail"
+
+cmdt @stdout:foo echo foo
+# you can read it like: "assert my command output 'foo'"
+
+cmdt @stdout:bar echo foo
+
+# for complex cases, you can  params with an @ prefix after a special param @-- 
+cmdt @stdout:"@foo" echo @foo
+cmdt @stdout:@foo @-- echo @foo

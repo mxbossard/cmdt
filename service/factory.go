@@ -3,7 +3,6 @@ package service
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"regexp"
 	"strconv"
@@ -74,11 +73,11 @@ func DirtiesMapper(s, op string) (v model.DirtyScope, err error) {
 }
 
 func FileContentMapper(s, op string) (v string, err error) {
-	if strings.HasPrefix(s, "@") {
+	if strings.HasPrefix(op, "@") {
 		// treat supplied value as a filepath
-		path := s[1:]
+		path := s
 		v, err = filez.ReadString(path)
-		log.Printf("Reading file: %s => [%s]\n", path, v)
+		logger.Debug("reading file", "path", path, "content", v)
 	} else {
 		v = strings.ReplaceAll(s, "\\n", "\n")
 	}
@@ -575,16 +574,16 @@ func BuildAssertion(cfg model.Config, ruleExpr string) (ok bool, assertion model
 			}
 		} else {
 			var fileContent string
-			fileContent, err = Translate(assertion.Rule, FileContentMapper, OperatorValidater[string]("=", ":", "!=", "!:"), NotEmptyForOpValidater[string](":", "!:"))
+			fileContent, err = Translate(assertion.Rule, FileContentMapper, OperatorValidater[string]("=", ":", "!=", "!:", "@=", "@:"), NotEmptyForOpValidater[string](":", "!:"))
 			if err != nil {
 				return
 			}
 			assertion.Expected = fileContent
 			assertion.Asserter = func(cmd cmdz.Executer) (res model.AssertionResult, err error) {
 				res.Value = cmd.StdoutRecord()
-				if assertion.Rule.Op == "=" {
+				if assertion.Rule.Op == "=" || assertion.Rule.Op == "@=" {
 					res.Success = cmd.StdoutRecord() == fileContent
-				} else if assertion.Rule.Op == ":" {
+				} else if assertion.Rule.Op == ":" || assertion.Rule.Op == "@:" {
 					res.Success = strings.Contains(cmd.StdoutRecord(), fileContent)
 				} else if assertion.Rule.Op == "!=" {
 					res.Success = cmd.StdoutRecord() != fileContent
@@ -617,16 +616,16 @@ func BuildAssertion(cfg model.Config, ruleExpr string) (ok bool, assertion model
 			}
 		} else {
 			var fileContent string
-			fileContent, err = Translate(assertion.Rule, FileContentMapper, OperatorValidater[string]("=", ":", "!=", "!:"), NotEmptyForOpValidater[string](":", "!:"))
+			fileContent, err = Translate(assertion.Rule, FileContentMapper, OperatorValidater[string]("=", ":", "!=", "!:", "@=", "@:"), NotEmptyForOpValidater[string](":", "!:"))
 			if err != nil {
 				return
 			}
 			assertion.Expected = fileContent
 			assertion.Asserter = func(cmd cmdz.Executer) (res model.AssertionResult, err error) {
 				res.Value = cmd.StderrRecord()
-				if assertion.Rule.Op == "=" {
+				if assertion.Rule.Op == "=" || assertion.Rule.Op == "@=" {
 					res.Success = cmd.StderrRecord() == fileContent
-				} else if assertion.Rule.Op == ":" {
+				} else if assertion.Rule.Op == ":" || assertion.Rule.Op == "@:" {
 					res.Success = strings.Contains(cmd.StderrRecord(), fileContent)
 				} else if assertion.Rule.Op == "!=" {
 					res.Success = cmd.StderrRecord() != fileContent
@@ -886,6 +885,7 @@ func ValidateOnceOnlyDefinedRule(rules ...model.Rule) (err error) {
 		{"stdout", "~"}, {"stderr", "~"}, {"stdout", "!~"}, {"stderr", "!~"},
 		{"stdout", "!="}, {"stderr", "!="},
 		{"stdout", ":"}, {"stderr", ":"}, {"stdout", "!:"}, {"stderr", "!:"},
+		{"stdout", "@:"}, {"stderr", "@:"},
 		{"before", "="}, {"after", "="}, {"mock", "="}, {"mock", ":"}, {"verbose", "="},
 	}
 	matches := map[model.RuleKey][]model.Rule{}
@@ -919,8 +919,8 @@ func ValidateMutualyExclusiveRules(rules ...model.Rule) (err error) {
 	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(model.RuleKey{"report", "all"}, ruleKeys(model.Assertions, model.TestConfigs, model.SuiteConfigs)...)...)
 	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(model.RuleKey{"test", "all"}, model.RuleKey{"suiteTimeout", "all"}, model.RuleKey{"fork", "all"})...)
 	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("keepOutputs"), ruleKey("keepStdout"), ruleKey("keepStderr"))...)
-	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("stdout", "="), ruleKey("stdout", "~"), ruleKey("stdout", "!~"), ruleKey("stdout", "!="), ruleKey("stdout", ":"), ruleKey("stdout", "!:"))...)
-	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("stderr", "="), ruleKey("stderr", "~"), ruleKey("stderr", "!~"), ruleKey("stderr", "!="), ruleKey("stderr", ":"), ruleKey("stderr", "!:"))...)
+	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("stdout", "="), ruleKey("stdout", "~"), ruleKey("stdout", "!~"), ruleKey("stdout", "!="), ruleKey("stdout", ":"), ruleKey("stdout", "!:"), ruleKey("stdout", "@:"))...)
+	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("stderr", "="), ruleKey("stderr", "~"), ruleKey("stderr", "!~"), ruleKey("stderr", "!="), ruleKey("stderr", ":"), ruleKey("stderr", "!:"), ruleKey("stderr", "@:"))...)
 
 	// Compter le nombre de match pour chaque key
 	// Pour chaque MER compter le nombre de key

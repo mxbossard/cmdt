@@ -192,7 +192,7 @@ func (d BasicDisplay) assertionResult(result model.AssertionResult) {
 	}
 
 	if expected != got {
-
+		expected = strings.ReplaceAll(expected, "\n", "\\n")
 		if s, ok := got.(string); ok {
 			got = strings.ReplaceAll(s, "\n", "\\n")
 			/*
@@ -229,9 +229,9 @@ func (d BasicDisplay) assertionResult(result model.AssertionResult) {
 			*/
 		}
 
-		if assertOp == "=" {
+		if assertOp == "=" || assertOp == "@=" {
 			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto be%s: \t\t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, got)
-		} else if assertOp == ":" {
+		} else if assertOp == ":" || assertOp == "@:" {
 			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto contains%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, got)
 		} else if assertOp == "!:" {
 			d.printer.Errf("\t%sExpected%s %s \n\t\t%snot to contains%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, got)

@@ -24,47 +24,51 @@ import (
 	"mby.fr/cmdtest/service"
 )
 
-/**
-Tester des commandes.
-
-## cmdt @init
-Initialize the test suite with the supplied configuration.
-Options:
-- @stopOnFailure : Stop test suite on first failure and report.
-- @logOnSuccess : Always log cmd output.
-
-This should initialize a uniq context shared by all test suite. How ?
-- Export vars ?
-- Produce a hidden file ?
-- Produce a hidden dir ?
-
-This could be ommited => testSuite name will then be empty and all following tests placed in this test suite.
-
-
-## cmdt @report
-Display a test suite report and return a failure if at least one test failed.
-
-## cmdt <testName>
-Launch a command test and do some assertion.
-Assertions:
-- @fail : cmd should fail (rc > 0)
-- @success : cmd should succeed (rc = 0)
-- @stdout=string : cmd stdout should be exactly message
-- @stdout~string : cmd stdout should match message
-- @stderr=string : cmd stderr should be exactly message
-- @stderr~string : cmd stderr should match message
-- @exists=path,perms,owners : a file should be produced at path with perms and owners
-
-## Principes
-- eval $( cmdt [testSuite] @init @stopOnFailure @logOnSuccess )
-- cmdt <[testSuite/]testName> <myCommand> myArg1 ... myArgN @fail @rc=
-- cmdt <[testSuite/]testName> <myCommand> myArg1 ... myArgN @success @stdout="MyOut" @stderr="MyErr" @exists="MyFile,Perms,Owners"
-- cmdt [testSuite] @report
-
-*/
-
 /*
-Done:
+## TODO:
+
+Bugs:
+- Check for container existance before exec in running container
+- probably too slow podman/docker abstraction (check for podman & docker in path everytime)
+- dirtyContainer capricieux avec podman (Timeout de 10 sec atteint)
+- use suite timeout for container duration
+- Suite Timeout not managed (should error if timeout exceeded) Should ask for suite clear and no test should pass; initless suite should have a greater default timeout
+- @global config updates does not works
+- serialize test outcome instead of writing in report file
+
+
+Cleaning:
+- clean model0.go
+- move seq into utils module
+- move contianer use into utils module
+
+
+Features:
+- use rule definitions in usage
+- @beforeSuite=CMD_ANG_ARGS & @afterSuite=CMD_ANG_ARGS
+- @mock stdin@=FILEPATH stdin:PARTIAL_CONTENT stdout@=FILEPATH @stderr@=FILEPATH
+- @called[=:]CMD ARG_S,stdin=IN,count=N assertion => verify a mock was called
+
+- rewrite mock wrapper script inside cmdt to not depend on shell to mock
+- change default test suite with @init=foo => foo become default test suite
+- possibilité de passer un scénario ligne à ligne dans le stdin de cmdtest
+	- cmdt cmd arg1 argN @scenario=filepath
+	- pour chaque ligne du scenario concat la ligne du scenario avec les arguments fournit en paramétre de cmdt
+- @runCount=N + @parallel=FORK_COUNT (min, max, median exec time) run in separate context or in same context (before/after) guided by @dirtyRun
+- @fork=5 suite/global config only by default instead of @parallel. Fork = 5 increment and decrement a seq file
+  - what is forked ?
+  - by default suites forked but test serial in a suite
+  - optionaly all tests forked in a suite
+  - fork in a container ? or one container by fork ? (forking implies test independency @dirtyContainer only should guide for new container)
+
+- Clean old temp dir (older than 2 min ?)
+- may chroot be interesting for tests ?
+- mock web spawning a web server ?
+- test port opening if daemon ; test sending data on port ???
+
+
+## DONE:
+
 - @timeout=N
 - @cmd="CMD_WITH_ARGS_THAT_SHOULD_BE_OK_IF_OR_FAIL_TEST"
 - @exists=FILEPATH,PERMS,OWNERS
@@ -136,44 +140,26 @@ Done:
 - Use podman or docker binary
 - with @-- report an error if commands before @--
 - with @-- auto concatenate args until next delim or @--
-
-TODO:
-Bugs:
-- probably too slow podman/docker abstraction (check for podman & docker in path everytime)
-- dirtyContainer capricieux avec podman (Timeout de 10 sec atteint)
+- new operators @= et @: to read content from file
 - remove docker run container generated ID from stdout
-- clean model0.go
-- use suite timeout for container duration
-- Check for container existance before exec in running container
-- Suite Timeout not managed (should error if timeout exceeded) Should ask for suite clear and no test should pass; initless suite should have a greater default timeout
-- - @global config updates does not works
-- serialize test outcome instead of writing in report file
-- @FILEPATH empeche de tester un contenu qui commence par @ sans passer par un fichier. Il faudrait pouvoir échapper @ ou bien utiliser un operator dédié à la lécture d'un fichier (ex: @stderr@=FILEPATH @stdin@:FILEPATH)
 
-Features :
-- @beforeSuite=CMD_ANG_ARGS & @afterSuite=CMD_ANG_ARGS
-- @mock stdin=@FILEPATH stdin:PARTIAL_CONTENT stdout=@FILEPATH @stderr=@FILEPATH
-- @called[=:]CMD ARG_S,stdin=IN,count=N assertion => verify a mock was called
-- use rule definitions in usage
-- move seq into utils module
-- move contianer use into utils module
+*/
 
-- rewrite mock wrapper script inside cmdt to not depend on shell to mock
-- change default test suite with @init=foo => foo become default test suite
-- possibilité de passer un scénario ligne à ligne dans le stdin de cmdtest
-	- cmdt cmd arg1 argN @scenario=filepath
-	- pour chaque ligne du scenario concat la ligne du scenario avec les arguments fournit en paramétre de cmdt
-- @runCount=N + @parallel=FORK_COUNT (min, max, median exec time) run in separate context or in same context (before/after) guided by @dirtyRun
-- @fork=5 suite/global config only by default instead of @parallel. Fork = 5 increment and decrement a seq file
-  - what is forked ?
-  - by default suites forked but test serial in a suite
-  - optionaly all tests forked in a suite
-  - fork in a container ? or one container by fork ? (forking implies test independency @dirtyContainer only should guide for new container)
+func RecoverExiting() {
+	if r := recover(); r != nil {
+		fmt.Printf("Cause of panic ==>> %q\n", r)
+		os.Exit(1)
+	}
+}
 
-- Clean old temp dir (older than 2 min ?)
-- may chroot be interesting for tests ?
-- mock web spawning a web server ?
-- test port opening if daemon ; test sending data on port ???
+func main() {
+	//defer RecoverExiting()
+	model.LoggerLevel.Set(slog.Level(8 - model.StartDebugLevel*4))
+	exitCode := service.ProcessArgs(os.Args)
+	os.Exit(exitCode)
+}
+
+/*
 
 ## Idées pour la commande de mock
     insérer dans le $PATH un repertoire temp binMocked
@@ -286,17 +272,3 @@ Features :
   - Functionnal options pattern : https://dev.to/kittipat1413/understanding-the-options-pattern-in-go-390c + persist a collection of options
   - Optional instead of pointer ? => cleaner for Merging
 */
-
-func RecoverExiting() {
-	if r := recover(); r != nil {
-		fmt.Printf("Cause of panic ==>> %q\n", r)
-		os.Exit(1)
-	}
-}
-
-func main() {
-	//defer RecoverExiting()
-	model.LoggerLevel.Set(slog.Level(8 - model.StartDebugLevel*4))
-	exitCode := service.ProcessArgs(os.Args)
-	os.Exit(exitCode)
-}
