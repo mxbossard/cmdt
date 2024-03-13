@@ -139,7 +139,7 @@ Done:
 
 TODO:
 Bugs:
-- probably too slow podman/docker abstraction
+- probably too slow podman/docker abstraction (check for podman & docker in path everytime)
 - dirtyContainer capricieux avec podman (Timeout de 10 sec atteint)
 - remove docker run container generated ID from stdout
 - clean model0.go
@@ -158,7 +158,7 @@ Features :
 - move seq into utils module
 - move contianer use into utils module
 
-
+- rewrite mock wrapper script inside cmdt to not depend on shell to mock
 - change default test suite with @init=foo => foo become default test suite
 - possibilité de passer un scénario ligne à ligne dans le stdin de cmdtest
 	- cmdt cmd arg1 argN @scenario=filepath
