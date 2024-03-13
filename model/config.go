@@ -1,11 +1,13 @@
 package model
 
 import (
+	"fmt"
 	"log/slog"
 	"regexp"
 	"strings"
 	"time"
 
+	"mby.fr/utils/ansi"
 	"mby.fr/utils/utilz"
 )
 
@@ -19,15 +21,87 @@ const (
 	DefaultTooMuchFailures      = 3
 	TooMuchFailuresNoLimit      = -1
 
-	EnvContainerScopeKey = "__CMDT_CONTAINER_SCOPE"
-	EnvContainerImageKey = "__CMDT_CONTAINER_IMAGE"
-	EnvContainerIdKey    = "__CMDT_CONTAINER_ID"
+	ContextTokenEnvVarName    = "__CMDT_TOKEN"
+	GlobalConfigTestSuiteName = "__global"
+	DefaultTestSuiteName      = "main"
+
+	DefaultContainerDirtiesPolicy = "beforeSuite"
+	DefaultContainerImage         = "busybox"
+	EnvContainerScopeKey          = "__CMDT_CONTAINER_SCOPE"
+	EnvContainerImageKey          = "__CMDT_CONTAINER_IMAGE"
+	EnvContainerIdKey             = "__CMDT_CONTAINER_ID"
+
+	NamePattern = "[a-zA-Z][^/]*[a-zA-Z0-9]"
+
+	TempDirPrefix           = "cmdtest"
+	ContextFilename         = "context.yaml"
+	TestSequenceFilename    = "test-seq.txt"
+	PassedSequenceFilename  = "passed-seq.txt"
+	FailedSequenceFilename  = "failed-seq.txt"
+	IgnoredSequenceFilename = "ignored-seq.txt"
+	ErroredSequenceFilename = "errored-seq.txt"
+	TooMuchSequenceFilename = "tooMuch-seq.txt"
+	StdoutFilename          = "stdout.log"
+	StderrFilename          = "stderr.log"
+	ReportFilename          = "report.log"
+
+	MessageColor = ansi.HiPurple
+	TestColor    = ansi.HiCyan
+	SuccessColor = ansi.BoldGreen
+	FailureColor = ansi.BoldRed
+	ReportColor  = ansi.Yellow
+	WarningColor = ansi.BoldHiYellow
+	ErrorColor   = ansi.Red
+)
+
+const (
+	GlobalAction = Action("global")
+	InitAction   = Action("init")
+	TestAction   = Action("test")
+	ReportAction = Action("report")
 )
 
 var (
 	LoggerLevel       slog.LevelVar
 	DefaultLoggerOpts = &slog.HandlerOptions{
 		Level: &LoggerLevel,
+	}
+)
+
+var (
+	DefaultTestTimeout, _ = time.ParseDuration("24h")
+	AbsNamePattern        = fmt.Sprintf("(%s/)?(%s)?", NamePattern, NamePattern)
+	NameRegexp            = regexp.MustCompile("^" + NamePattern + "$")
+	AbsNameRegexp         = regexp.MustCompile("^" + AbsNamePattern + "$")
+)
+
+var (
+	Actions = []RuleDefinition{ruleDef("global", ""), ruleDef("init", "", "="), ruleDef("test", "", "="),
+		ruleDef("report", "", "=")}
+	// Global config available to global
+	GlobalConfigs = []RuleDefinition{ruleDef("fork", "="), ruleDef("suiteTimeout", "="), ruleDef("prefix", "=")}
+	// Suite config available to suite
+	SuiteConfigs = append(GlobalConfigs, []RuleDefinition{
+		ruleDef("exportToken", ""), ruleDef("printToken", "")}...)
+	// Test config available at all levels (global, suite and test)
+	TestConfigs = []RuleDefinition{ruleDef("before", "="), ruleDef("after", "="), ruleDef("ignore", "", "="),
+		ruleDef("stopOnFailure", "", "="), ruleDef("keepStdout", "", "="), ruleDef("keepStderr", "", "="),
+		ruleDef("keepOutputs", "", "="), ruleDef("quiet", "", "="), ruleDef("timeout", "="),
+		ruleDef("parallel", "="), ruleDef("runCount", "="), ruleDef("mock", "=", ":"),
+		ruleDef("container", "", "="), ruleDef("dirtyContainer", "=")}
+	// Config of test flow (init -> test -> report)
+	FlowConfigs = []RuleDefinition{ruleDef("token", "="), ruleDef("verbose", "", "="),
+		ruleDef("debug", "", "="), ruleDef("failuresLimit", "=")}
+	Assertions = []RuleDefinition{ruleDef("success", ""), ruleDef("fail", ""), ruleDef("exit", "="),
+		ruleDef("cmd", "="), ruleDef("exists", "="),
+		ruleDef("stdout", "=", ":", "~", "!=", "!:", "!~", "@=", "@:"),
+		ruleDef("stderr", "=", ":", "~", "!=", "!:", "!~", "@=", "@:")}
+	Concatenables = []RuleDefinition{
+		ruleDef("init", "="), ruleDef("test", "="), ruleDef("report", "="),
+		ruleDef("before", "="), ruleDef("after", "="),
+		ruleDef("cmd", "="), ruleDef("exists", "="),
+		ruleDef("stdout", "=", ":", "~", "!=", "!:", "!~", "@=", "@:"),
+		ruleDef("stderr", "=", ":", "~", "!=", "!:", "!~", "@=", "@:"),
 	}
 )
 

@@ -120,41 +120,118 @@ func MockMapper(s, op string) (m model.CmdMock, err error) {
 	m.Delegate = true
 	if len(splitted) > 1 {
 		for _, rule := range splitted[1:] {
-			ruleSplit := strings.Split(rule, "=")
-			if len(ruleSplit) < 2 {
-				err = fmt.Errorf("bad format for mock rule: expect an = sign")
-				return
-			}
-			key := ruleSplit[0]
-			value := strings.Join(ruleSplit[1:], "=")
-			switch key {
-			case "stdin":
+			if strings.HasPrefix(rule, "stdin=") {
+				value := rule[6:]
 				m.Stdin = &value
-			case "stdout":
+				m.StdinOp = "="
+			} else if strings.HasPrefix(rule, "stdin:") {
+				value := rule[6:]
+				m.Stdin = &value
+				m.StdinOp = ":"
+			} else if strings.HasPrefix(rule, "stdin@=") {
+				path := rule[7:]
+				var value string
+				value, err = filez.ReadString(path)
+				if err != nil {
+					return
+				}
+				logger.Warn("mock stdin @=", "path", path, "content", value)
+				m.Stdin = &value
+				m.StdinOp = "="
+			} else if strings.HasPrefix(rule, "stdin@:") {
+				path := rule[7:]
+				var value string
+				value, err = filez.ReadString(path)
+				if err != nil {
+					return
+				}
+				m.Stdin = &value
+				m.StdinOp = ":"
+			} else if strings.HasPrefix(rule, "stdout=") {
+				value := rule[7:]
 				m.Delegate = false
 				m.Stdout = value
-			case "stderr":
+			} else if strings.HasPrefix(rule, "stdout@=") {
+				path := rule[8:]
+				var value string
+				value, err = filez.ReadString(path)
+				if err != nil {
+					return
+				}
+				m.Delegate = false
+				m.Stdout = value
+			} else if strings.HasPrefix(rule, "stderr=") {
+				value := rule[7:]
 				m.Delegate = false
 				m.Stderr = value
-			case "exit":
+			} else if strings.HasPrefix(rule, "stderr@=") {
+				path := rule[8:]
+				var value string
+				value, err = filez.ReadString(path)
+				if err != nil {
+					return
+				}
+				m.Delegate = false
+				m.Stderr = value
+			} else if strings.HasPrefix(rule, "exit=") {
+				value := rule[5:]
 				m.Delegate = false
 				m.ExitCode, err = IntMapper(value, "=")
 				if err != nil {
 					// FIXME: aggregate errors
 					return
 				}
-			case "cmd":
+			} else if strings.HasPrefix(rule, "cmd=") {
+				value := rule[4:]
 				m.Delegate = false
 				m.OnCallCmdAndArgs, err = CmdMapper(value, "=")
 				if err != nil {
 					// FIXME: aggregate errors
 					return
 				}
-			default:
-				err = fmt.Errorf("mock rule: %s does not exists", key)
+			} else {
+				err = fmt.Errorf("mock rule: %s does not exists", rule)
 				// FIXME: aggregate errors
 				return
 			}
+
+			/*
+				ruleSplit := strings.Split(rule, "=")
+				if len(ruleSplit) < 2 {
+					err = fmt.Errorf("bad format for mock rule: expect an = sign")
+					return
+				}
+				key := ruleSplit[0]
+				value := strings.Join(ruleSplit[1:], "=")
+				switch key {
+				case "stdin":
+					m.Stdin = &value
+				case "stdout":
+					m.Delegate = false
+					m.Stdout = value
+				case "stderr":
+					m.Delegate = false
+					m.Stderr = value
+				case "exit":
+					m.Delegate = false
+					m.ExitCode, err = IntMapper(value, "=")
+					if err != nil {
+						// FIXME: aggregate errors
+						return
+					}
+				case "cmd":
+					m.Delegate = false
+					m.OnCallCmdAndArgs, err = CmdMapper(value, "=")
+					if err != nil {
+						// FIXME: aggregate errors
+						return
+					}
+				default:
+					err = fmt.Errorf("mock rule: %s does not exists", key)
+					// FIXME: aggregate errors
+					return
+				}
+			*/
 		}
 	}
 

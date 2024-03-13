@@ -38,7 +38,6 @@ Bugs:
 
 
 Cleaning:
-- clean model0.go
 - move seq into utils module
 - move contianer use into utils module
 
@@ -46,7 +45,6 @@ Cleaning:
 Features:
 - use rule definitions in usage
 - @beforeSuite=CMD_ANG_ARGS & @afterSuite=CMD_ANG_ARGS
-- @mock stdin@=FILEPATH stdin:PARTIAL_CONTENT stdout@=FILEPATH @stderr@=FILEPATH
 - @called[=:]CMD ARG_S,stdin=IN,count=N assertion => verify a mock was called
 
 - rewrite mock wrapper script inside cmdt to not depend on shell to mock
@@ -142,6 +140,8 @@ Features:
 - with @-- auto concatenate args until next delim or @--
 - new operators @= et @: to read content from file
 - remove docker run container generated ID from stdout
+- clean model.go
+- @mock stdin@=FILEPATH stdin:PARTIAL_CONTENT stdout@=FILEPATH stderr@=FILEPATH
 
 */
 

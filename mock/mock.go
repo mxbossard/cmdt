@@ -104,7 +104,15 @@ func writeMockWrapperScript(wrapperFilepath string, mocks []model.CmdMock) (err 
 		wrapperScript += `; then` + "\n"
 		if mock.Stdin != nil {
 			wrapperScript += fmt.Sprintf("\t" + `stdin="$( cat )"` + "\n")
-			wrapperScript += fmt.Sprintf("\t"+`if [ "$stdin" = "%s" ]; then`+"\n", *mock.Stdin)
+			wrapperScript += fmt.Sprintf("\t"+`expected="%s"`+"\n", *mock.Stdin)
+			if mock.StdinOp == "=" {
+				wrapperScript += fmt.Sprintf("\t" + `if [ "$stdin" = "$( echo $expected )" ]; then` + "\n")
+			} else if mock.StdinOp == ":" {
+				wrapperScript += fmt.Sprintf("\t" + `if echo "$stdin" | grep "$expected" > /dev/null; then` + "\n")
+			} else {
+				err = fmt.Errorf("not supported stdin op: %s", mock.StdinOp)
+				panic(err)
+			}
 		}
 
 		// Add at least one command

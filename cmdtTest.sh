@@ -499,6 +499,7 @@ mockCfg1="@mock=ls foo,stdin=,stdout=baz,exit=41"
 mockCfg2="@mock=ls foo,cmd=sh -c 'echo -n baz; exit 42'"
 mockCfg3="@mock=ls foo *,cmd=sh -c 'echo -n baz; exit 43'"
 mockCfg4="@mock=ls foo,stdin=baz,exit=44"
+mockCfg5="@mock=ls foo,stdin:baz,exit=44"
 mockCfg6="@mock:ls foo bar,stdout=baz,exit=46"
 mockCfg7="@mock:ls foo bar *,stdout=baz,exit=47"
 rm -f @-- foo bar baz 2> /dev/null || true
@@ -508,11 +509,23 @@ rm -f @-- foo bar baz 2> /dev/null || true
 expectedFooErrMsg="$( 2>&1 ls foo || true )"
 expectedBarErrMsg="$( 2>&1 ls bar || true )"
 expectedBazErrMsg="$( 2>&1 ls baz || true )"
+echo foo > /tmp/fooFileContent
+echo baz > /tmp/bazFileContent
+
 $cmdt0 @init=cmd_mock #@verbose=3
 $cmdt0 @test=cmd_mock/ @fail @stdout= @stderr:"shell builtin" @-- $cmdt1 echo foo @mock="echo" # cannot mock shell builtin
 $cmdt0 @test=cmd_mock/ @fail @stdout= @stderr:"not found" @-- $cmdt1 echo foo @mock="fooNotExists" # cannot mock not found command
 
 $cmdt0 @test=cmd_mock/ @stderr:PASSED @-- $cmdt1 ls @mock="ls,stdout=foo" @stdout=foo @stderr=
+$cmdt0 @test=cmd_mock/ @stderr:PASSED @-- $cmdt1 ls @mock="ls,stdout@=/tmp/fooFileContent" @stdout@=/tmp/fooFileContent @stderr=
+$cmdt0 @test=cmd_mock/ @stderr:PASSED @-- $cmdt1 ls @mock="ls,stderr=foo" @stdout= @stderr=foo
+$cmdt0 @test=cmd_mock/ @stderr:PASSED @-- $cmdt1 ls @mock="ls,stderr@=/tmp/fooFileContent" @stdout= @stderr@=/tmp/fooFileContent
+$cmdt0 @test=cmd_mock/ @stderr:PASSED @-- $cmdt1 ls @mock="ls,stdin@=/tmp/fooFileContent,stdout=foo" @stdout!:foo @stderr=
+$cmdt0 @test=cmd_mock/ @stderr:PASSED @-- $cmdt1 sh -c "echo foo | ls" @mock="ls,stdin@=/tmp/fooFileContent,stdout=foo" @stdout=foo @stderr=
+$cmdt0 @test=cmd_mock/ @stderr:PASSED @-- $cmdt1 sh -c "cat /tmp/fooFileContent | ls" @mock="ls,stdin@=/tmp/fooFileContent,stdout=foo" @stdout=foo @stderr=
+$cmdt0 @test=cmd_mock/ @stderr:PASSED @-- $cmdt1 sh -c "echo fooo | ls" @mock="ls,stdin@=/tmp/fooFileContent,stdout=foo" @stdout!:foo @stderr=
+$cmdt0 @test=cmd_mock/ @stderr:PASSED @-- $cmdt1 sh -c "cat /tmp/fooFileContent | ls" @mock="ls,stdin@:/tmp/fooFileContent,stdout=foo" @stdout=foo @stderr=
+$cmdt0 @test=cmd_mock/ @stderr:PASSED @-- $cmdt1 sh -c "echo fooo | ls" @mock="ls,stdin@:/tmp/fooFileContent,stdout=foo" @stdout=foo @stderr=
 $cmdt0 @test=cmd_mock/ @stderr:PASSED @-- $cmdt1 ls @mock="ls"
 $cmdt0 @test=cmd_mock/ @stderr:PASSED @-- $cmdt1 ls @mock="ls,exit=1" @fail
 $cmdt0 @test=cmd_mock/ @fail @stderr:"absolute path" @-- $cmdt1 ls @mock="/bin/ls" # cannot mock absolute path outside container
@@ -555,7 +568,10 @@ $cmdt0 @test=cmd_mock/ @stderr:PASSED @-- $cmdt1 ls bar foo "$mockCfg3" @fail @s
 $cmdt0 @test=cmd_mock/ @stderr:PASSED @-- $cmdt1 ls foo bar "$mockCfg3" @stdout=baz @exit=43
 
 $cmdt0 @test=cmd_mock/ @stderr:PASSED @-- $cmdt1 ls foo "$mockCfg4" @fail @stderr:"$expectedFooErrMsg"
+$cmdt0 @test=cmd_mock/ @stderr:PASSED @-- $cmdt1 sh -c "echo bazo | ls foo" "$mockCfg4" @exit=2
 $cmdt0 @test=cmd_mock/ @stderr:PASSED @-- $cmdt1 sh -c "echo baz | ls foo" "$mockCfg4" @stderr= @exit=44
+$cmdt0 @test=cmd_mock/ @stderr:PASSED @-- $cmdt1 sh -c "echo bazo | ls foo" "$mockCfg5" @stderr= @exit=44
+$cmdt0 @test=cmd_mock/ @stderr:PASSED @-- $cmdt1 sh -c "echo baz | ls foo" "$mockCfg5" @stderr= @exit=44
 
 $cmdt0 @test=cmd_mock/ @stderr:PASSED @-- $cmdt1 ls foo "$mockCfg6" @fail @stderr:"$expectedFooErrMsg"
 $cmdt0 @test=cmd_mock/ @stderr:PASSED @-- $cmdt1 ls bar "$mockCfg6" @fail @stderr:"$expectedBarErrMsg"
