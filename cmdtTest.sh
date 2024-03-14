@@ -604,7 +604,7 @@ $cmdt0 @test=before_after/ @-- $cmdt1 @report=main
 
 
 >&2 echo "## Test @container"
-$cmdt0 @init=container #@ignore #@keepOutputs
+$cmdt0 @init=container #@keepOutputs #@debug=4 #@ignore #@keepOutputs
 $cmdt0 @test=container/run_off_container @stderr:PASSED @-- $cmdt1 sh -c "cat --help 2>&1 | head -1" @stdout!:BusyBox
 $cmdt0 @test=container/run_in_container @stderr:PASSED @-- $cmdt1 @container sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox
 $cmdt0 @test=container/ @stderr:PASSED @-- $cmdt1 @container true
@@ -625,7 +625,7 @@ $cmdt0 @test=container/ @fail @-- $cmdt1 @report=main
 token="$__CMDT_TOKEN"
 export -n __CMDT_TOKEN
 
-$cmdt0 @init=container_wo_token #@ignore #@keepOutputs
+$cmdt0 @init=container_wo_token #@keepOutputs #@ignore #@keepOutputs
 $cmdt0 @test=container_wo_token/run_in_container @stderr:PASSED @-- $cmdt1 @container sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox
 $cmdt0 @test=container_wo_token/ @stderr:PASSED @-- $cmdt1 @container true
 $cmdt0 @test=container_wo_token/ @stderr:PASSED @-- $cmdt1 @container @fail false
@@ -640,7 +640,7 @@ testFile="/tmp/thisFileDoesNotExistsYet.txt"
 hostFile="/tmp/thisFileExistsOnHost.txt"
 rm -f @-- "$testFile" 2> /dev/null || true
 touch "$hostFile"
-$cmdt0 @init=ephemeralContainer #@ignore #@keepOutputs
+$cmdt0 @init=ephemeralContainer #@keepOutputs #@ignore #@keepOutputs
 $cmdt0 @test=ephemeralContainer/run_in_container @stderr:PASSED @-- $cmdt1 @container sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox #check run inside container
 $cmdt0 @test=ephemeralContainer/ @stderr:PASSED @-- $cmdt1 ls "$hostFile" @stdout:"$hostFile" # file exists on host
 $cmdt0 @test=ephemeralContainer/ @stderr:PASSED @-- $cmdt1 ls "$testFile" @fail @stdout= @stderr:"$testFile" # file should not exist on host
@@ -652,7 +652,7 @@ $cmdt0 @test=ephemeralContainer/ @stderr:PASSED @-- $cmdt1 @container ls "$hostF
 $cmdt0 @test=ephemeralContainer/ @stderr:PASSED @-- $cmdt1 ls "$testFile" @fail @stdout= @stderr:"$testFile" # file should not exist on host
 $cmdt0 @test=ephemeralContainer/ @-- $cmdt1 @report=main
 
-$cmdt0 @init=suiteContainer
+$cmdt0 @init=suiteContainer #@keepOutputs
 $cmdt @init=sub @container 2> /dev/null # container should live the test suite
 $cmdt0 @test=suiteContainer/run_in_container @stderr:PASSED @-- $cmdt1 @test=sub/ sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox #check run inside container
 $cmdt0 @test=suiteContainer/ @stderr:PASSED @-- $cmdt1 @test=sub/ ls "$testFile" @fail @stdout= @stderr:"$testFile" # file should not exist in suite container

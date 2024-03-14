@@ -2,7 +2,6 @@ package mock
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -51,7 +50,7 @@ func ProcessMocking(mockDir string, rootMocks, mocks []model.CmdMock) (err error
 		}
 	}
 
-	log.Printf("mock wrapper: %s\n", wrapperFilepath)
+	//log.Printf("mock wrapper: %s\n", wrapperFilepath)
 	return
 }
 

@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"mby.fr/cmdtest/facade"
 	"mby.fr/cmdtest/mock"
@@ -17,6 +18,7 @@ import (
 const ()
 
 func StartContainer(testCtx facade.TestContext) (id string, err error) {
+	start := time.Now()
 	image := testCtx.Config.ContainerImage.Get()
 
 	id, err = utils.ForgeUuid()
@@ -43,9 +45,10 @@ func StartContainer(testCtx facade.TestContext) (id string, err error) {
 	// discard stdout which should contain only container id (because of Detach option)
 	e.SetOutputs(io.Discard, os.Stderr)
 
-	logger.Debug("starting container", "id", id)
+	logger.Debug("starting container", "id", id, "image", image)
 	_, err = e.BlockRun()
-
+	duration := time.Since(start)
+	logger.Debug("started container", "duration", duration, "id", id, "image", image)
 	return
 }
 
@@ -94,7 +97,9 @@ func UnmockInContainer(testCtx facade.TestContext, id string) (err error) {
 }
 
 func RemoveContainer(id string) (err error) {
-	e := container.NewLifeCycleBuilder(container.LifeCycleConfig{Name: id}).RmExecuter()
+	start := time.Now()
+	timeout := 0 * time.Second
+	e := container.NewLifeCycleBuilder(container.LifeCycleConfig{Name: id, Timeout: &timeout}).StopExecuter() //.SetOutputs(os.Stdout, os.Stderr)
 	var exitCode int
 	logger.Debug("removing container", "id", id)
 	exitCode, err = e.BlockRun()
@@ -104,22 +109,28 @@ func RemoveContainer(id string) (err error) {
 	if exitCode != 0 {
 		err = fmt.Errorf("error stopping container: RC=%d", exitCode)
 	}
+	duration := time.Since(start)
+	logger.Debug("removed container", "duration", duration, "id", id)
 	return
 }
 
 func ExecInContainer(testCtx facade.TestContext, id string, cmdAndArgs []string) (exec cmdz.Executer, err error) {
+	start := time.Now()
 	envArgs := make(map[string]string)
 	envArgs[model.ContextTokenEnvVarName] = testCtx.Token
 	envArgs[model.EnvContainerScopeKey] = fmt.Sprintf("%d", testCtx.Config.ContainerScope.Get())
 	envArgs[model.EnvContainerImageKey] = testCtx.Config.ContainerImage.Get()
 	envArgs[model.EnvContainerIdKey] = id
 
-	user := fmt.Sprintf("%d", os.Getuid())
+	//user := fmt.Sprintf("%d", os.Getuid())
 
-	exec = container.NewExecBuilder(container.ExecConfig{Name: id, User: user, EnvArgs: envArgs, CmdAndArgs: cmdAndArgs}).ExecExecuter()
+	//exec = container.NewExecBuilder(container.ExecConfig{Name: id, User: user, EnvArgs: envArgs, CmdAndArgs: cmdAndArgs}).ExecExecuter()
+	exec = container.NewExecBuilder(container.ExecConfig{Name: id, EnvArgs: envArgs, CmdAndArgs: cmdAndArgs}).ExecExecuter()
 	exec.SetOutputs(os.Stdout, os.Stderr)
 	logger.Debug("executing in container", "id", id, "cmdAndArgs", cmdAndArgs)
 	_, err = exec.BlockRun()
+	duration := time.Since(start)
+	logger.Debug("executed in container", "duration", duration, "id", id, "cmdAndArgs", cmdAndArgs)
 	return
 }
 

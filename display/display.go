@@ -149,7 +149,7 @@ func (d BasicDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutc
 		}
 	}
 
-	if verbose >= model.SHOW_FAILED_OUTS && len(outcome.AssertionResults) > 0 || verbose >= model.SHOW_PASSED_OUTS {
+	if verbose >= model.SHOW_FAILED_OUTS && (len(outcome.AssertionResults) > 0 || outcome.Outcome == model.TIMEOUT || outcome.Outcome == model.ERRORED) || verbose >= model.SHOW_PASSED_OUTS {
 		d.printer.Errf(d.outFormatter.Format(outcome.Stdout))
 		d.printer.Errf(d.errFormatter.Format(outcome.Stderr))
 		d.printer.Errf("\n")

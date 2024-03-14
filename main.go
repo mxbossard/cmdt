@@ -25,16 +25,31 @@ import (
 )
 
 /*
+
+## Container abstraction ideas
+- decorelate binary resolution => can store ans reuse it
+- API ideas :
+  - engine := containerz.Engine()
+  - engine.Container(name).Run(image, cmdAndArgs).Detach().Rm() => containerz.Runner
+  - engine.Container(name).Exec(cmdAndArgs).User(user) => containerz.Executer
+  - engine.Container(name).Start().Timeout() => containerz.Starter
+  - engine.Container(name).Stop() => containerz.Stopper
+  - engine.Container(name).Rm().Force() => containerz.Rmer
+  - engine.Container(name).Ps() => containerz.Pser
+  - engine.Container(name).Inspect() => containerz.Insecter
+  - engine.Build(dir).NoCache() => containerz.Builder
+  - engine.Pull(image) => containerz.Puller
+  - engine.Push(image) => containerz.Pusher
+
 ## TODO:
 
 Bugs:
 - Check for container existance before exec in running container
-- probably too slow podman/docker abstraction (check for podman & docker in path everytime)
-- dirtyContainer capricieux avec podman (Timeout de 10 sec atteint)
-- use suite timeout for container duration
 - Suite Timeout not managed (should error if timeout exceeded) Should ask for suite clear and no test should pass; initless suite should have a greater default timeout
+- use suite timeout for container duration
 - @global config updates does not works
 - serialize test outcome instead of writing in report file
+- slower podman exec than docker exec
 
 
 Cleaning:
@@ -42,13 +57,21 @@ Cleaning:
 - move contianer use into utils module
 
 
+Optims:
+- stoping container can be done async (no need to block for end of stop)
+
+
 Features:
 - use rule definitions in usage
 - @beforeSuite=CMD_ANG_ARGS & @afterSuite=CMD_ANG_ARGS
 - @called[=:]CMD ARG_S,stdin=IN,count=N assertion => verify a mock was called
+- probably too slow podman/docker abstraction (check for podman & docker in path everytime)
+- docker/podman image pre pull once outside of test timeout (store pull in global context)
+- docker/podman image pre build once if supplied ref is a buildable context dir
+- docker/podman container engine resolution once stored in global context
+- docker/podman checkpoint for dirties to avoid container rm/creation
 
 - rewrite mock wrapper script inside cmdt to not depend on shell to mock
-- change default test suite with @init=foo => foo become default test suite
 - possibilité de passer un scénario ligne à ligne dans le stdin de cmdtest
 	- cmdt cmd arg1 argN @scenario=filepath
 	- pour chaque ligne du scenario concat la ligne du scenario avec les arguments fournit en paramétre de cmdt
@@ -58,6 +81,7 @@ Features:
   - by default suites forked but test serial in a suite
   - optionaly all tests forked in a suite
   - fork in a container ? or one container by fork ? (forking implies test independency @dirtyContainer only should guide for new container)
+- change default test suite with @init=foo => foo become default test suite
 
 - Clean old temp dir (older than 2 min ?)
 - may chroot be interesting for tests ?
