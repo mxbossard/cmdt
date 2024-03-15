@@ -12,7 +12,7 @@ import (
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/utils"
 	"mby.fr/utils/cmdz"
-	"mby.fr/utils/container"
+	"mby.fr/utils/ctnrz"
 )
 
 const ()
@@ -29,19 +29,16 @@ func StartContainer(testCtx facade.TestContext) (id string, err error) {
 
 	cmdtestVol := os.Args[0] + ":/opt/cmdtest:ro"
 	ctxDirVol := repoDir + ":" + repoDir + ":rw,z"
-	dr := container.RunConfig{
-		Name:       id,
-		Image:      image,
-		Entrypoint: "/bin/sh",
-		CmdArgs:    []string{"-c", "sleep 300"}, //FIXME use suite timeout or test timeout
-		Remove:     true,
-		Detach:     true,
-		User:       "1000:1000",
-		Userns:     "keep-id",
-		Volumes:    []string{cmdtestVol, ctxDirVol},
-	}
 
-	e := container.NewRunBuilder(dr).RunExecuter()
+	// FIXME: sleep test or suite timeout
+	e := ctnrz.Engine().Container(id).Run(image, "-c", "sleep 300").
+		Entrypoint("/bin/sh").
+		Rm().
+		Detach().
+		User("1000:1000").
+		AddVolumes(cmdtestVol, ctxDirVol).
+		Executer()
+
 	// discard stdout which should contain only container id (because of Detach option)
 	e.SetOutputs(io.Discard, os.Stderr)
 
@@ -75,7 +72,7 @@ func MockInContainer(testCtx facade.TestContext, id string) (err error) {
 	}
 	if script != "" {
 		cmdAndArgs := []string{"sh", "-e", "-c", script}
-		e := container.NewExecBuilder(container.ExecConfig{Name: id, User: "0", CmdAndArgs: cmdAndArgs}).ExecExecuter()
+		e := ctnrz.Engine().Container(id).Exec(cmdAndArgs...).User("0").Executer()
 		_, err = e.BlockRun()
 	}
 	return
@@ -90,7 +87,7 @@ func UnmockInContainer(testCtx facade.TestContext, id string) (err error) {
 	}
 	if script != "" {
 		cmdAndArgs := []string{"sh", "-e", "-c", script}
-		e := container.NewExecBuilder(container.ExecConfig{Name: id, User: "0", CmdAndArgs: cmdAndArgs}).ExecExecuter()
+		e := ctnrz.Engine().Container(id).Exec(cmdAndArgs...).User("0").Executer()
 		_, err = e.BlockRun()
 	}
 	return
@@ -98,19 +95,21 @@ func UnmockInContainer(testCtx facade.TestContext, id string) (err error) {
 
 func RemoveContainer(id string) (err error) {
 	start := time.Now()
-	timeout := 0 * time.Second
-	e := container.NewLifeCycleBuilder(container.LifeCycleConfig{Name: id, Timeout: &timeout}).StopExecuter() //.SetOutputs(os.Stdout, os.Stderr)
-	var exitCode int
-	logger.Debug("removing container", "id", id)
-	exitCode, err = e.BlockRun()
-	if err != nil {
-		return
-	}
-	if exitCode != 0 {
-		err = fmt.Errorf("error stopping container: RC=%d", exitCode)
-	}
-	duration := time.Since(start)
-	logger.Debug("removed container", "duration", duration, "id", id)
+	e := ctnrz.Engine().Container(id).Stop().Timeout(0 * time.Second).Executer()
+	e.SetOutputs(os.Stdout, os.Stderr)
+
+	go func() {
+		logger.Debug("removing container", "id", id)
+		exitCode, err := e.BlockRun()
+		if err != nil {
+			logger.Error("error stopping container", "error", err)
+		}
+		if exitCode != 0 {
+			logger.Error("error stopping container", "exitCode", exitCode)
+		}
+		duration := time.Since(start)
+		logger.Debug("removed container", "duration", duration, "id", id)
+	}()
 	return
 }
 
@@ -122,10 +121,8 @@ func ExecInContainer(testCtx facade.TestContext, id string, cmdAndArgs []string)
 	envArgs[model.EnvContainerImageKey] = testCtx.Config.ContainerImage.Get()
 	envArgs[model.EnvContainerIdKey] = id
 
-	//user := fmt.Sprintf("%d", os.Getuid())
-
-	//exec = container.NewExecBuilder(container.ExecConfig{Name: id, User: user, EnvArgs: envArgs, CmdAndArgs: cmdAndArgs}).ExecExecuter()
-	exec = container.NewExecBuilder(container.ExecConfig{Name: id, EnvArgs: envArgs, CmdAndArgs: cmdAndArgs}).ExecExecuter()
+	user := fmt.Sprintf("%d", os.Getuid())
+	exec = ctnrz.Engine().Container(id).Exec(cmdAndArgs...).AddEnvMap(envArgs).User(user).Executer()
 	exec.SetOutputs(os.Stdout, os.Stderr)
 	logger.Debug("executing in container", "id", id, "cmdAndArgs", cmdAndArgs)
 	_, err = exec.BlockRun()

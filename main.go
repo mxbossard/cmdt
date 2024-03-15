@@ -51,6 +51,7 @@ Bugs:
 - @global config updates does not works
 - serialize test outcome instead of writing in report file
 - slower podman exec than docker exec
+- colors ok on black background but should not work on white background
 
 
 Cleaning:
@@ -59,7 +60,9 @@ Cleaning:
 
 
 Optims:
-- stoping container can be done async (no need to block for end of stop)
+- DONE: stoping container can be done async (no need to block for end of stop)
+- mocking container can all be done in //
+- start container can be call async but execs need to wait container to be started
 
 
 Features:
@@ -74,8 +77,10 @@ Features:
 
 - rewrite mock wrapper script inside cmdt to not depend on shell to mock
 - possibilité de passer un scénario ligne à ligne dans le stdin de cmdtest
+	- un scenario pourrait-il être de la forme d'un script shell ? => être executable comme scenario et comme script ?
 	- cmdt cmd arg1 argN @scenario=filepath
 	- pour chaque ligne du scenario concat la ligne du scenario avec les arguments fournit en paramétre de cmdt
+- @testAll[=dirToScan] by default scan current dir in search for scenarios or script to execute (could run .cmdt scenarios & scripts)
 - @runCount=N + @parallel=FORK_COUNT (min, max, median exec time) run in separate context or in same context (before/after) guided by @dirtyRun
 - @fork=5 suite/global config only by default instead of @parallel. Fork = 5 increment and decrement a seq file
   - what is forked ?
