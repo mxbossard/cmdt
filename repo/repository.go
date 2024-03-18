@@ -297,6 +297,16 @@ func (r FileRepo) ListTestSuites() (suites []string, err error) {
 	return
 }
 
+func (r FileRepo) QueueTest(test model.Test) (err error) {
+	// TODO
+	return
+}
+
+func (r FileRepo) UnqueueTest() (test model.Test, err error) {
+	// TODO
+	return
+}
+
 func forgeWorkDirectoryPath(token string) (tempDirPath string, err error) {
 	if token == "" {
 		token, err = utils.ForgeContextualToken()

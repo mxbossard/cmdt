@@ -20,26 +20,25 @@ import (
 	"log/slog"
 	"os"
 
+	"mby.fr/cmdtest/daemon"
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/service"
 )
 
 /*
 
-## Container abstraction ideas
-- decorelate binary resolution => can store ans reuse it
-- API ideas :
-  - engine := containerz.Engine()
-  - engine.Container(name).Run(image, cmdAndArgs).Detach().Rm() => containerz.Runner
-  - engine.Container(name).Exec(cmdAndArgs).User(user) => containerz.Executer
-  - engine.Container(name).Start().Timeout() => containerz.Starter
-  - engine.Container(name).Stop() => containerz.Stopper
-  - engine.Container(name).Rm().Force() => containerz.Rmer
-  - engine.Container(name).Ps() => containerz.Pser
-  - engine.Container(name).Inspect() => containerz.Insecter
-  - engine.Build(dir).NoCache() => containerz.Builder
-  - engine.Pull(image) => containerz.Puller
-  - engine.Push(image) => containerz.Pusher
+## Fork ideas:
+- before/after and dirtiesScope cause problems to run in //
+- @tests could always be added in a queue, a background process (daemon) in charge of executing it
+- one queue by test suite ?
+- group outputs by test suite : first output take output priority (like mass do)
+- new test : enqueue test, wait some ms ?, check daemon is started or start it
+- no test in queue : wait some secs, stop daemon
+- could wait @report before launching tests if necessary ?
+- @report could block until all tests done optionnaly ?
+- only one dameon running at a time
+- new rules @async[=true/false] @block[=true/false] @_daemon
+- do not run daemon in container
 
 
 ## TODO:
@@ -184,8 +183,13 @@ func RecoverExiting() {
 
 func main() {
 	//defer RecoverExiting()
+	fmt.Printf("Args: %v", os.Args)
+
+	daemon.TakeOver()
+
 	model.LoggerLevel.Set(slog.Level(8 - model.StartDebugLevel*4))
 	exitCode := service.ProcessArgs(os.Args)
+
 	os.Exit(exitCode)
 }
 
@@ -301,4 +305,20 @@ func main() {
   - Context.UpdateContainerId(ctId, scope)
   - Functionnal options pattern : https://dev.to/kittipat1413/understanding-the-options-pattern-in-go-390c + persist a collection of options
   - Optional instead of pointer ? => cleaner for Merging
+
+## Container abstraction ideas
+- decorelate binary resolution => can store ans reuse it
+- API ideas :
+  - engine := containerz.Engine()
+  - engine.Container(name).Run(image, cmdAndArgs).Detach().Rm() => containerz.Runner
+  - engine.Container(name).Exec(cmdAndArgs).User(user) => containerz.Executer
+  - engine.Container(name).Start().Timeout() => containerz.Starter
+  - engine.Container(name).Stop() => containerz.Stopper
+  - engine.Container(name).Rm().Force() => containerz.Rmer
+  - engine.Container(name).Ps() => containerz.Pser
+  - engine.Container(name).Inspect() => containerz.Insecter
+  - engine.Build(dir).NoCache() => containerz.Builder
+  - engine.Pull(image) => containerz.Puller
+  - engine.Push(image) => containerz.Pusher
+
 */
