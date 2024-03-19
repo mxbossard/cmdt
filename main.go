@@ -183,7 +183,7 @@ func RecoverExiting() {
 
 func main() {
 	//defer RecoverExiting()
-	fmt.Printf("Args: %v", os.Args)
+	//fmt.Printf("Args: %v", os.Args)
 
 	daemon.TakeOver()
 

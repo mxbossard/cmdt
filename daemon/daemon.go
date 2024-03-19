@@ -13,6 +13,7 @@ import (
 
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/repo"
+	"mby.fr/cmdtest/service"
 	"mby.fr/utils/filez"
 )
 
@@ -77,8 +78,9 @@ func (d daemon) run() {
 	}
 }
 
-func (d daemon) performTest(test model.Test) {
+func (d daemon) performTest(testDef model.TestDefinition) {
 	// TODO: perform the test
+	_ = service.ProcessTestDef(testDef)
 }
 
 func (d daemon) ReadPid() string {

@@ -16,9 +16,12 @@ type Validater[T any] func(rule Rule, value T) error
 
 type Asserter func(cmdz.Executer) (AssertionResult, error)
 
-type Test struct {
-	Config Config
-	Seq    int
+type TestDefinition struct {
+	Token      string
+	TestSuite  string
+	Seq        int
+	Config     Config
+	Assertions []Assertion
 }
 
 type Rule struct {

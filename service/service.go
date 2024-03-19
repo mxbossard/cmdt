@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"mby.fr/cmdtest/daemon"
 	"mby.fr/cmdtest/display"
 	"mby.fr/cmdtest/facade"
 	"mby.fr/cmdtest/model"
@@ -136,11 +137,11 @@ func ReportTestSuite(ctx facade.SuiteContext) (exitCode int, err error) {
 	return
 }
 
-func PerformTest(ctx facade.TestContext, seq int, assertions []model.Assertion) (exitCode int, err error) {
+func PerformTest(testDef model.TestDefinition) (exitCode int, err error) {
 	exitCode = 1
-	cfg := ctx.Config
-
-	//seq := ctx.IncrementTestCount()
+	cfg := testDef.Config
+	ctx := facade.NewTestContext2(testDef)
+	seq := testDef.Seq
 
 	dpl.TestTitle(ctx, seq)
 
@@ -165,7 +166,7 @@ func PerformTest(ctx facade.TestContext, seq int, assertions []model.Assertion) 
 		}
 	}
 
-	outcome := ctx.AssertCmdExecBlocking(seq, assertions)
+	outcome := ctx.AssertCmdExecBlocking(seq, testDef.Assertions)
 
 	dpl.TestOutcome(ctx, outcome)
 
@@ -185,6 +186,59 @@ func PerformTest(ctx facade.TestContext, seq int, assertions []model.Assertion) 
 		// FIXME do we need to call ReportTestSuite ?
 	} else {
 		exitCode = 0
+	}
+	return
+}
+
+func ProcessTestDef(testDef model.TestDefinition) (exitCode int) {
+	token := testDef.Token
+	testSuite := testDef.TestSuite
+	testCfg := testDef.Config
+	testCtx := facade.NewTestContext2(testDef)
+
+	tooMuchFailures := testCtx.ProcessTooMuchFailures()
+
+	if tooMuchFailures == 1 {
+		// First time detecting TOO MUCH FAILURES
+		dpl.TooMuchFailures(testSuite)
+	}
+	if tooMuchFailures > 0 {
+		exitCode = 0
+		return
+	}
+
+	var err error
+	if !utils.IsWithinContainer() && (testCfg.ContainerDisabled.Is(true) || testCfg.ContainerImage.IsEmpty()) && len(testCfg.RootMocks) > 0 {
+		err = fmt.Errorf("cannot mock absolute path outside a container")
+		testCtx.NoErrorOrFatal(err)
+	}
+
+	logger.Info("Processing test action", "token", token)
+
+	dpl.Quiet(testCfg.Quiet)
+	if testCfg.ContainerDisabled.Is(true) || testCfg.ContainerImage.IsEmpty() {
+		logger.Debug("Performing test outside container", "image", testCfg.ContainerImage, "containerDisabled", testCfg.ContainerDisabled, "testConfig", testCfg)
+		exitCode, err = PerformTest(testDef)
+		testCtx.NoErrorOrFatal(err)
+	} else {
+		logger.Info("Performing test inside container", "image", testCfg.ContainerImage, "containeriId", testCfg.ContainerId, "testConfig", testCfg)
+		var ctId string
+		ctId, exitCode, err = PerformTestInContainer(testCtx)
+		testCtx.NoErrorOrFatal(err)
+		if testCfg.ContainerScope.Is(model.GLOBAL_SCOPE) {
+			globalCfg, err2 := testCtx.Repo.LoadGlobalConfig()
+			testCtx.NoErrorOrFatal(err2)
+			globalCfg.ContainerId.Set(ctId)
+			err2 = testCtx.Repo.SaveGlobalConfig(globalCfg)
+			testCtx.NoErrorOrFatal(err2)
+		} else if testCfg.ContainerScope.Is(model.SUITE_SCOPE) {
+			suiteCfg, err2 := testCtx.Repo.LoadSuiteConfig(testSuite, true)
+			testCtx.NoErrorOrFatal(err2)
+			suiteCfg.ContainerId.Set(ctId)
+			err2 = testCtx.Repo.SaveSuiteConfig(suiteCfg)
+			testCtx.NoErrorOrFatal(err2)
+		}
+		//testCtx.NoErrorOrFatal(err)
 	}
 	return
 }
@@ -209,15 +263,15 @@ func ProcessArgs(allArgs []string) (exitCode int) {
 	args := allArgs[1:]
 	logger.Debug("Processing cmdt args", "args", args)
 	inputConfig, assertions, agg := ParseArgs(rulePrefix, args)
-	loadedConfig := inputConfig
-	loadedConfig.Token.Default(envToken)
-	logger.Debug("Parsed args", "loadedConfig", loadedConfig, "assertions", assertions, "error", agg)
-	if loadedConfig.Debug.IsPresent() {
-		model.LoggerLevel.Set(slog.Level(8 - loadedConfig.Debug.Get()*4))
+	//loadedConfig := inputConfig
+	inputConfig.Token.Default(envToken)
+	logger.Debug("Parsed args", "inputConfig", inputConfig, "assertions", assertions, "error", agg)
+	if inputConfig.Debug.IsPresent() {
+		model.LoggerLevel.Set(slog.Level(8 - inputConfig.Debug.Get()*4))
 	}
 
-	token := loadedConfig.Token.GetOr("")
-	action := loadedConfig.Action.Get()
+	token := inputConfig.Token.GetOr("")
+	action := inputConfig.Action.Get()
 
 	var err error
 	switch action {
@@ -225,32 +279,32 @@ func ProcessArgs(allArgs []string) (exitCode int) {
 		if agg.GotError() {
 			log.Fatal(agg)
 		}
-		globalCtx := facade.NewGlobalContext(token, loadedConfig)
+		globalCtx := facade.NewGlobalContext(token, inputConfig)
 		logger.Debug("Forged context", "ctx", globalCtx)
 		logger.Info("Processing global action", "token", token)
 		dpl.Quiet(globalCtx.Config.Quiet)
 		exitCode, err = GlobalConfig(globalCtx)
 	case model.InitAction:
-		testSuite := loadedConfig.TestSuite.Get()
-		suiteCtx := facade.NewSuiteContext(token, testSuite, false, action, loadedConfig)
+		testSuite := inputConfig.TestSuite.Get()
+		suiteCtx := facade.NewSuiteContext(token, testSuite, false, action, inputConfig)
 		logger.Debug("Forged context", "ctx", suiteCtx)
 		suiteCtx.NoErrorOrFatal(agg.Return())
 		logger.Info("Processing init action", "token", token)
 		dpl.Quiet(suiteCtx.Config.Quiet)
 		exitCode, err = InitTestSuite(suiteCtx)
 	case model.ReportAction:
-		if loadedConfig.ReportAll.Is(true) {
+		if inputConfig.ReportAll.Is(true) {
 			if agg.GotError() {
 				log.Fatal(agg)
 			}
-			globalCtx := facade.NewGlobalContext(token, loadedConfig)
+			globalCtx := facade.NewGlobalContext(token, inputConfig)
 			logger.Debug("Forged context", "ctx", globalCtx)
 			logger.Info("Processing report all action", "token", token)
 			dpl.Quiet(globalCtx.Config.Quiet)
 			exitCode, err = ReportAllTestSuites(globalCtx)
 		} else {
-			testSuite := loadedConfig.TestSuite.Get()
-			suiteCtx := facade.NewSuiteContext(token, testSuite, false, action, loadedConfig)
+			testSuite := inputConfig.TestSuite.Get()
+			suiteCtx := facade.NewSuiteContext(token, testSuite, false, action, inputConfig)
 			logger.Debug("Forged context", "ctx", suiteCtx)
 			suiteCtx.NoErrorOrFatal(agg.Return())
 			logger.Info("Processing report suite action", "token", token)
@@ -258,68 +312,31 @@ func ProcessArgs(allArgs []string) (exitCode int) {
 			exitCode, err = ReportTestSuite(suiteCtx)
 		}
 	case model.TestAction:
-		testSuite := loadedConfig.TestSuite.Get()
-		testCtx := facade.NewTestContext(token, testSuite, loadedConfig)
+		testSuite := inputConfig.TestSuite.Get()
+		testCtx := facade.NewTestContext(token, testSuite, inputConfig)
 		logger.Debug("Forged context", "ctx", testCtx)
 		testCfg := testCtx.Config
 		var seq int
-		if testCfg.ContainerDisabled.Is(true) || testCfg.ContainerImage.IsEmpty() {
-			seq = testCtx.IncrementTestCount()
-		}
-
-		tooMuchFailures := testCtx.ProcessTooMuchFailures()
-
-		if tooMuchFailures == 1 {
-			// First time detecting TOO MUCH FAILURES
-			dpl.TooMuchFailures(testSuite)
-		}
-		if tooMuchFailures > 0 {
-			return 0
-		}
+		//if testCfg.ContainerDisabled.Is(true) || testCfg.ContainerImage.IsEmpty() {
+		seq = testCtx.IncrementTestCount()
+		//}
 
 		testCtx.NoErrorOrFatal(agg.Return())
 
-		if !utils.IsWithinContainer() && (testCfg.ContainerDisabled.Is(true) || testCfg.ContainerImage.IsEmpty()) && len(testCfg.RootMocks) > 0 {
-			err = fmt.Errorf("cannot mock absolute path outside a container")
-			testCtx.NoErrorOrFatal(err)
-		}
+		testDef := model.TestDefinition{Token: token, TestSuite: testSuite, Seq: seq, Config: testCfg}
+		testCtx.Repo.QueueTest(testDef)
+		daemon.LanchProcessIfNeeded()
 
-		logger.Info("Processing test action", "token", token)
-
-		dpl.Quiet(testCfg.Quiet)
-		if testCfg.ContainerDisabled.Is(true) || testCfg.ContainerImage.IsEmpty() {
-			logger.Debug("Performing test outside container", "image", testCfg.ContainerImage, "containerDisabled", testCfg.ContainerDisabled, "testConfig", testCfg)
-			exitCode, err = PerformTest(testCtx, seq, assertions)
-			testCtx.NoErrorOrFatal(err)
-		} else {
-			logger.Info("Performing test inside container", "image", testCfg.ContainerImage, "containeriId", testCfg.ContainerId, "testConfig", testCfg)
-			var ctId string
-			ctId, exitCode, err = PerformTestInContainer(testCtx)
-			testCtx.NoErrorOrFatal(err)
-			if testCfg.ContainerScope.Is(model.GLOBAL_SCOPE) {
-				globalCfg, err2 := testCtx.Repo.LoadGlobalConfig()
-				testCtx.NoErrorOrFatal(err2)
-				globalCfg.ContainerId.Set(ctId)
-				err2 = testCtx.Repo.SaveGlobalConfig(globalCfg)
-				testCtx.NoErrorOrFatal(err2)
-			} else if testCfg.ContainerScope.Is(model.SUITE_SCOPE) {
-				suiteCfg, err2 := testCtx.Repo.LoadSuiteConfig(testSuite, true)
-				testCtx.NoErrorOrFatal(err2)
-				suiteCfg.ContainerId.Set(ctId)
-				err2 = testCtx.Repo.SaveSuiteConfig(suiteCfg)
-				testCtx.NoErrorOrFatal(err2)
-			}
-			testCtx.NoErrorOrFatal(err)
-
-		}
+		//exitCode = processTestDef(testDef)
+		exitCode = 0
 	default:
-		err = fmt.Errorf("action: [%v] not known", loadedConfig.Action)
+		err = fmt.Errorf("action: [%v] not known", inputConfig.Action)
 	}
 
 	logger.Info("exiting", "exitCode", exitCode)
 
 	if err != nil {
-		log.Fatal(loadedConfig.TestSuite, loadedConfig.Token, err)
+		log.Fatal(inputConfig.TestSuite, inputConfig.Token, err)
 	}
 	return
 }

@@ -489,6 +489,8 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 		case "suiteTimeout":
 			c.SuiteTimeout, err = TranslateOptional(rule, DurationMapper)
 
+		case "async":
+			c.Async, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
 		case "ignore":
 			c.Ignore, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
 		case "stopOnFailure":

@@ -297,12 +297,12 @@ func (r FileRepo) ListTestSuites() (suites []string, err error) {
 	return
 }
 
-func (r FileRepo) QueueTest(test model.Test) (err error) {
+func (r FileRepo) QueueTest(test model.TestDefinition) (err error) {
 	// TODO
 	return
 }
 
-func (r FileRepo) UnqueueTest() (test model.Test, err error) {
+func (r FileRepo) UnqueueTest() (test *model.TestDefinition, err error) {
 	// TODO
 	return
 }

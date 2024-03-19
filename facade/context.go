@@ -74,12 +74,6 @@ func NewTestContext(token, testSuite string, inputCfg model.Config) TestContext 
 	mergedCfg := suiteCtx.Config
 	mergedCfg.Merge(inputCfg)
 
-	/*
-		if mergedCfg.Verbose.Get() >= model.NO_FAILURES_LIMIT {
-			mergedCfg.TooMuchFailures.Set(model.TooMuchFailuresNoLimit)
-		}
-	*/
-
 	testCtx := TestContext{
 		SuiteContext: suiteCtx,
 	}
@@ -97,6 +91,10 @@ func NewTestContext(token, testSuite string, inputCfg model.Config) TestContext 
 	}
 
 	return testCtx
+}
+
+func NewTestContext2(testDef model.TestDefinition) (ctx TestContext) {
+	return NewTestContext(testDef.Token, testDef.TestSuite, testDef.Config)
 }
 
 type GlobalContext struct {
