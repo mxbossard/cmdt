@@ -19,9 +19,40 @@ type Asserter func(cmdz.Executer) (AssertionResult, error)
 type TestDefinition struct {
 	Token      string
 	TestSuite  string
+	TestName   string
 	Seq        int
 	Config     Config
 	Assertions []Assertion
+}
+
+type TestOutcome struct {
+	TestDefinition
+	//TestSuite string
+	//TestName  string
+	//Seq       int
+	//TestQualifiedName string
+	CmdTitle         string
+	ExitCode         int
+	Err              error
+	Duration         time.Duration
+	Stdout           string
+	Stderr           string
+	Outcome          Outcome
+	AssertionResults []AssertionResult
+}
+
+type SuiteOutcome struct {
+	TestSuite string
+	//ExitCode    int
+	Duration time.Duration
+	//Err         error
+	FailureReports []string
+	TestCount      int
+	PassedCount    int
+	FailedCount    int
+	ErroredCount   int
+	IgnoredCount   int
+	TooMuchCount   int
 }
 
 type Rule struct {

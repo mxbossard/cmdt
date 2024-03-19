@@ -1,9 +1,5 @@
 package model
 
-import (
-	"time"
-)
-
 type Outcome string
 
 const (
@@ -24,33 +20,4 @@ type AssertionResult struct {
 	Success    bool
 	Value      any
 	ErrMessage string
-}
-
-type TestOutcome struct {
-	TestSuite string
-	TestName  string
-	Seq       int
-	//TestQualifiedName string
-	CmdTitle         string
-	ExitCode         int
-	Err              error
-	Duration         time.Duration
-	Stdout           string
-	Stderr           string
-	Outcome          Outcome
-	AssertionResults []AssertionResult
-}
-
-type SuiteOutcome struct {
-	TestSuite string
-	//ExitCode    int
-	Duration time.Duration
-	//Err         error
-	FailureReports []string
-	TestCount      int
-	PassedCount    int
-	FailedCount    int
-	ErroredCount   int
-	IgnoredCount   int
-	TooMuchCount   int
 }

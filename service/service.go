@@ -7,10 +7,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"mby.fr/cmdtest/daemon"
 	"mby.fr/cmdtest/display"
 	"mby.fr/cmdtest/facade"
 	"mby.fr/cmdtest/model"
+	"mby.fr/cmdtest/repo"
 	"mby.fr/cmdtest/utils"
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/printz"
@@ -324,8 +324,8 @@ func ProcessArgs(allArgs []string) (exitCode int) {
 		testCtx.NoErrorOrFatal(agg.Return())
 
 		testDef := model.TestDefinition{Token: token, TestSuite: testSuite, Seq: seq, Config: testCfg}
-		testCtx.Repo.QueueTest(testDef)
-		daemon.LanchProcessIfNeeded()
+		testOp := repo.TestOperation{TestSuite: testSuite, Def: testDef, Blocking: !testCfg.Async.Get()}
+		testCtx.Repo.QueueOperation(&testOp)
 
 		//exitCode = processTestDef(testDef)
 		exitCode = 0

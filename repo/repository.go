@@ -28,12 +28,24 @@ var (
 	testSuiteNameSanitizerPattern = regexp.MustCompile("[^a-zA-Z0-9]")
 )
 
-func New(token string) FileRepo {
-	return FileRepo{token: token}
+func New(token string) (repo FileRepo) {
+	repo.token = token
+	path, err := forgeWorkDirectoryPath(token)
+	if err != nil {
+		log.Fatal(err)
+	}
+	queuesBackingFilepath := filepath.Join(path, "operationQueues.yaml")
+	queuesRepo, err := LoadOperationQueueRepo(queuesBackingFilepath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	repo.queuesRepo = queuesRepo
+	return
 }
 
 type FileRepo struct {
-	token string
+	token      string
+	queuesRepo OperationQueueRepo
 }
 
 func (r FileRepo) BackingFilepath() string {
@@ -297,13 +309,18 @@ func (r FileRepo) ListTestSuites() (suites []string, err error) {
 	return
 }
 
-func (r FileRepo) QueueTest(test model.TestDefinition) (err error) {
-	// TODO
+func (r FileRepo) QueueOperation(op *TestOperation) (err error) {
+	r.queuesRepo.Queue(*op)
+	err = r.queuesRepo.Persist()
 	return
 }
 
-func (r FileRepo) UnqueueTest() (test *model.TestDefinition, err error) {
-	// TODO
+func (r FileRepo) UnqueueOperation() (op *TestOperation, err error) {
+	var ok bool
+	ok, op = r.queuesRepo.Unqueue()
+	if ok {
+		err = r.queuesRepo.Persist()
+	}
 	return
 }
 
@@ -376,48 +393,6 @@ func initWorkspaceIfNot(token, testSuite string) (err error) {
 
 	return
 }
-
-/*
-func persistSuiteContext0(testSuite, token string, config model.Context) (err error) {
-	var contextFilepath string
-	contextFilepath, err = testsuiteConfigFilepath(testSuite, token)
-	if err != nil {
-		return
-	}
-	content, err := yaml.Marshal(config)
-	if err != nil {
-		return
-	}
-	logger.Debug("Persisting context", "context", content, "file", contextFilepath)
-	err = os.WriteFile(contextFilepath, content, 0600)
-	if err != nil {
-		err = fmt.Errorf("cannot persist context: %w", err)
-		return
-	}
-	return
-}
-
-func persistSuiteContext1(config model.Context) (err error) {
-	testSuite := config.TestSuite
-	token := config.Token
-	var contextFilepath string
-	contextFilepath, err = testsuiteConfigFilepath(testSuite, token)
-	if err != nil {
-		return
-	}
-	content, err := yaml.Marshal(config)
-	if err != nil {
-		return
-	}
-	logger.Debug("Persisting context", "context", content, "file", contextFilepath)
-	err = os.WriteFile(contextFilepath, content, 0600)
-	if err != nil {
-		err = fmt.Errorf("cannot persist context: %w", err)
-		return
-	}
-	return
-}
-*/
 
 func clearSuiteWorkspace(token, testSuite string) (err error) {
 	var workDir string

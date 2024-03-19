@@ -60,11 +60,11 @@ type daemon struct {
 func (d daemon) run() {
 	var lastUnqueue time.Time
 	for {
-		test, err := d.repo.UnqueueTest()
+		testOp, err := d.repo.UnqueueOperation()
 		if err != nil {
 			panic(err)
 		}
-		if test == nil {
+		if testOp == nil {
 			// nothing to unqueue wait 1ms
 			if time.Since(lastUnqueue) > ExtraRunningSecs*time.Second {
 				// More than ExtraRunningSecs since last unqueue
@@ -74,7 +74,7 @@ func (d daemon) run() {
 			continue
 		}
 		lastUnqueue = time.Now()
-		d.performTest(*test)
+		d.performTest(testOp.Def)
 	}
 }
 
@@ -154,12 +154,12 @@ func TakeOver() {
 		}
 
 		// Last unqueue
-		test, err := d.repo.UnqueueTest()
+		testOp, err := d.repo.UnqueueOperation()
 		if err != nil {
 			panic(err)
 		}
-		if test != nil {
-			d.performTest(*test)
+		if testOp != nil {
+			d.performTest(testOp.Def)
 		}
 
 		// Clear PID file
