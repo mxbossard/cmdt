@@ -334,6 +334,7 @@ func forgeWorkDirectoryPath(token string) (tempDirPath string, err error) {
 	tempDirName := fmt.Sprintf("%s-%s", tempDirPrefix, token)
 	tempDirPath = filepath.Join(os.TempDir(), tempDirName)
 	err = os.MkdirAll(tempDirPath, 0700)
+	logger.Warn("forgeWorkDirectoryPath", "workDir", tempDirPath)
 	return
 }
 

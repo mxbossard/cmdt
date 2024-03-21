@@ -59,6 +59,7 @@ import (
 - for async report log nothing until next waiting report
 
 ### Open questions:
+- how to wait a finished test by daemon ? (do we need queue wait vs queue block ?)
 - how to queue @report @async ? => "close" suite ? queue an operation (more extensible) ?
 - when outputs async test ? on waiting report ?
 - could wait @report before launching tests if necessary ?
@@ -68,6 +69,22 @@ import (
 - Implement Queue / Unqueue by suite
 - Delegate all test to daemon waiting => should be isofunctionnal with nodaemon
 - Wait only if @async=true
+
+
+## DEMO:
+### init_file.sh
+- init a config file if don't exists
+- stderr on inited file
+- stdout file content
+
+* test file init => it should work once
+* use @before or @after to rm config file
+* use @container to run script in a container
+
+### download_file.sh
+- download a file and cat it
+- if download faile retry 3 times
+- if cannot download return exit=2
 
 ## TODO:
 
@@ -79,7 +96,7 @@ Bugs:
 - serialize test outcome instead of writing in report file
 - slower podman exec than docker exec
 - colors ok on black background but should not work on white background
-
+- Rm Tmp dirs
 
 Cleaning:
 - move seq into utils module
@@ -216,9 +233,9 @@ func main() {
 	daemon.TakeOver()
 
 	model.LoggerLevel.Set(slog.Level(8 - model.StartDebugLevel*4))
-	exitCode := service.ProcessArgs(os.Args)
+	token, exitCode := service.ProcessArgs(os.Args)
 
-	daemon.LanchProcessIfNeeded()
+	daemon.LanchProcessIfNeeded(token)
 
 	os.Exit(exitCode)
 }

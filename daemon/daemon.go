@@ -86,7 +86,7 @@ func (d daemon) performTest(testDef model.TestDefinition) {
 func (d daemon) ReadPid() string {
 	pidFilepath := filepath.Join(d.repo.BackingFilepath(), DaemonPidFilename)
 	pid, err := filez.ReadString(pidFilepath)
-	if err == os.ErrNotExist {
+	if os.IsNotExist(err) {
 		return ""
 	} else if err != nil {
 		panic(err)
@@ -105,80 +105,91 @@ func (d daemon) WritePid() {
 func (d daemon) ClearPid() {
 	pidFilepath := filepath.Join(d.repo.BackingFilepath(), DaemonPidFilename)
 	err := os.Remove(pidFilepath)
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		panic(err)
 	}
 }
 
 func TakeOver() {
-	if len(os.Args) == 3 && os.Args[1] == "@_daemon" {
-		token := os.Args[2]
-		repo := repo.New(token)
-		d := daemon{repo: repo}
-		lockFilepath := filepath.Join(repo.BackingFilepath(), DaemonLockFilename)
-		fileLock := flock.New(lockFilepath)
-
-		// Wait to acquire file lock
-		lockCtx, cancel := context.WithTimeout(context.Background(), LockWatingSecs*time.Second)
-		defer cancel()
-		locked, err := fileLock.TryLockContext(lockCtx, time.Millisecond)
-		if err != nil {
-			panic(err)
+	if os.Args[1] == "@_daemon" {
+		//fmt.Printf("@_daemon args: %s", os.Args)
+		if len(os.Args) != 3 {
+			panic("bad usage of @_daemon")
 		}
-		if !locked {
-			os.Exit(2)
-		}
-
-		// If PID file already exists exit => already running
-		if d.ReadPid() != "" {
-			fileLock.Unlock()
-			os.Exit(3)
-		}
-
-		// Write PID file
-		d.WritePid()
-
-		// Release file lock
-		fileLock.Unlock()
-
-		// Run daemon
-		d.run()
-
-		// Lock prior last unqueue
-		locked, err = fileLock.TryLockContext(lockCtx, time.Millisecond)
-		if err != nil {
-			panic(err)
-		}
-		if !locked {
-			os.Exit(2)
-		}
-
-		// Last unqueue
-		testOp, err := d.repo.UnqueueOperation()
-		if err != nil {
-			panic(err)
-		}
-		if testOp != nil {
-			d.performTest(testOp.Def)
-		}
-
-		// Clear PID file
-		d.ClearPid()
-
-		// Release file lock
-		fileLock.Unlock()
-
-		os.Exit(0)
+	} else {
+		return
 	}
+
+	token := os.Args[2]
+	repo := repo.New(token)
+	d := daemon{repo: repo}
+	lockFilepath := filepath.Join(repo.BackingFilepath(), DaemonLockFilename)
+	fileLock := flock.New(lockFilepath)
+
+	// Wait to acquire file lock
+	lockCtx, cancel := context.WithTimeout(context.Background(), LockWatingSecs*time.Second)
+	defer cancel()
+	locked, err := fileLock.TryLockContext(lockCtx, time.Millisecond)
+	if err != nil {
+		panic(err)
+	}
+	if !locked {
+		os.Exit(2)
+	}
+
+	// If PID file already exists exit => already running
+	if d.ReadPid() != "" {
+		fileLock.Unlock()
+		os.Exit(3)
+	}
+
+	// Write PID file
+	d.WritePid()
+
+	// Release file lock
+	fileLock.Unlock()
+
+	// Run daemon
+	d.run()
+
+	// Lock prior last unqueue
+	locked, err = fileLock.TryLockContext(lockCtx, time.Millisecond)
+	if err != nil {
+		panic(err)
+	}
+	if !locked {
+		os.Exit(2)
+	}
+
+	// Last unqueue
+	testOp, err := d.repo.UnqueueOperation()
+	if err != nil {
+		panic(err)
+	}
+	if testOp != nil {
+		d.performTest(testOp.Def)
+	}
+
+	// Clear PID file
+	d.ClearPid()
+
+	// Release file lock
+	fileLock.Unlock()
+
+	os.Exit(0)
 }
 
-func LanchProcessIfNeeded() error {
+func LanchProcessIfNeeded(token string) error {
+	if token == "" {
+		// No token => no daemon to launch
+		return nil
+	}
 	// FIXME: add retries ?
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command(os.Args[0], "@_daemon")
+	cmd := exec.Command(os.Args[0], "@_daemon", token)
 	cmd.Dir = cwd
 	cmd.Env = os.Environ()
 	cmd.Stdout = os.Stdout

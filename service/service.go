@@ -243,7 +243,7 @@ func ProcessTestDef(testDef model.TestDefinition) (exitCode int) {
 	return
 }
 
-func ProcessArgs(allArgs []string) (exitCode int) {
+func ProcessArgs(allArgs []string) (token string, exitCode int) {
 	exitCode = 1
 
 	if len(allArgs) == 1 {
@@ -270,7 +270,7 @@ func ProcessArgs(allArgs []string) (exitCode int) {
 		model.LoggerLevel.Set(slog.Level(8 - inputConfig.Debug.Get()*4))
 	}
 
-	token := inputConfig.Token.GetOr("")
+	token = inputConfig.Token.GetOr("")
 	action := inputConfig.Action.Get()
 
 	var err error
@@ -316,6 +316,9 @@ func ProcessArgs(allArgs []string) (exitCode int) {
 		testCtx := facade.NewTestContext(token, testSuite, inputConfig)
 		logger.Debug("Forged context", "ctx", testCtx)
 		testCfg := testCtx.Config
+		if testCfg.Token.IsPresent() {
+			token = testCfg.Token.Get()
+		}
 		var seq int
 		//if testCfg.ContainerDisabled.Is(true) || testCfg.ContainerImage.IsEmpty() {
 		seq = testCtx.IncrementTestCount()
