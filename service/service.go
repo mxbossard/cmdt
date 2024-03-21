@@ -330,6 +330,7 @@ func ProcessArgs(allArgs []string) (token string, exitCode int) {
 		testOp := repo.TestOperation{TestSuite: testSuite, Def: testDef, Blocking: !testCfg.Async.Get()}
 		testCtx.Repo.QueueOperation(&testOp)
 
+		testCtx.Repo.State.WaitOperationDone(&testOp, testCfg.SuiteTimeout.Get())
 		//exitCode = processTestDef(testDef)
 		exitCode = 0
 	default:

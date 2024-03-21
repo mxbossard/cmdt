@@ -62,27 +62,27 @@ func IncrementSeq(pathes ...string) (seq int) {
 
 	file, err := os.OpenFile(seqFilepath, os.O_RDWR|os.O_CREATE, 0600)
 	if err != nil {
-		log.Fatalf("cannot open seq file (%s): %s", seqFilepath, err)
+		log.Fatalf("cannot open seq file (%s) to increment: %s", seqFilepath, err)
 	}
 	defer file.Close()
 	var strSeq string
 	_, err = fmt.Fscanln(file, &strSeq)
 	if err != nil && err != io.EOF {
-		log.Fatalf("cannot read seq file (%s): %s", seqFilepath, err)
+		log.Fatalf("cannot read seq file (%s) to increment: %s", seqFilepath, err)
 	}
 	if strSeq == "" {
 		seq = 0
 	} else {
 		seq, err = strconv.Atoi(strSeq)
 		if err != nil {
-			log.Fatalf("cannot read seq file (%s) as an integer: %s", seqFilepath, err)
+			log.Fatalf("cannot convert seq file (%s) to an integer to increment: %s", seqFilepath, err)
 		}
 	}
 
 	newSec := seq + 1
 	_, err = file.WriteAt([]byte(fmt.Sprint(newSec)), 0)
 	if err != nil {
-		log.Fatalf("cannot write seq file (%s): %s", seqFilepath, err)
+		log.Fatalf("cannot write seq file (%s) to increment: %s", seqFilepath, err)
 	}
 
 	//fmt.Printf("Incremented seq(%s %s %s): %d => %d\n", testSuite, token, filename, seq, newSec)
@@ -99,7 +99,7 @@ func ReadSeq(pathes ...string) (c int) {
 		if os.IsNotExist(err) {
 			return 0
 		}
-		log.Fatalf("cannot open seq file (%s): %s", seqFilepath, err)
+		log.Fatalf("cannot open seq file (%s) to read: %s", seqFilepath, err)
 	}
 	defer file.Close()
 	var strSeq string
@@ -108,11 +108,11 @@ func ReadSeq(pathes ...string) (c int) {
 		if err == io.EOF {
 			return 0
 		}
-		log.Fatalf("cannot read seq file (%s): %s", seqFilepath, err)
+		log.Fatalf("cannot read seq file (%s) to read: %s", seqFilepath, err)
 	}
 	c, err = strconv.Atoi(strSeq)
 	if err != nil {
-		log.Fatalf("cannot read seq file (%s) as an integer: %s", seqFilepath, err)
+		log.Fatalf("cannot convert seq file (%s) as an integer to read: %s", seqFilepath, err)
 	}
 	return
 }

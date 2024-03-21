@@ -135,7 +135,7 @@ func MockMapper(s, op string) (m model.CmdMock, err error) {
 				if err != nil {
 					return
 				}
-				logger.Warn("mock stdin @=", "path", path, "content", value)
+				//logger.Warn("mock stdin @=", "path", path, "content", value)
 				m.Stdin = &value
 				m.StdinOp = "="
 			} else if strings.HasPrefix(rule, "stdin@:") {

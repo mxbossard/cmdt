@@ -57,7 +57,7 @@ type daemon struct {
 	repo repo.FileRepo
 }
 
-func (d daemon) run() {
+func (d *daemon) run() {
 	var lastUnqueue time.Time
 	for {
 		testOp, err := d.repo.UnqueueOperation()
@@ -75,11 +75,12 @@ func (d daemon) run() {
 		}
 		lastUnqueue = time.Now()
 		d.performTest(testOp.Def)
+		d.repo.State.ReportOperationDone(testOp)
 	}
 }
 
 func (d daemon) performTest(testDef model.TestDefinition) {
-	// TODO: perform the test
+	//logger.Warn("daemon performing test", "testDef", testDef)
 	_ = service.ProcessTestDef(testDef)
 }
 
@@ -147,7 +148,10 @@ func TakeOver() {
 	d.WritePid()
 
 	// Release file lock
-	fileLock.Unlock()
+	err = fileLock.Unlock()
+	if err != nil {
+		panic(err)
+	}
 
 	// Run daemon
 	d.run()

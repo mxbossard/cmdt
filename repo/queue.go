@@ -1,8 +1,10 @@
 package repo
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"gopkg.in/yaml.v2"
 	"mby.fr/cmdtest/model"
@@ -45,8 +47,27 @@ type OperationQueueRepo struct {
 	QueuedSuites    []string
 	Queues          map[string]OperationQueue
 	OpenedSuites    []string
+	OperationsDone  []*TestOperation
 	//LastUnqueued map[string]*TestOperation
 	//BlockingOperations []*TestOperation
+}
+
+func (r *OperationQueueRepo) ReportOperationDone(op *TestOperation) (err error) {
+	r.OperationsDone = append(r.OperationsDone, op)
+	err = r.Persist()
+	return
+}
+
+func (r *OperationQueueRepo) WaitOperationDone(op *TestOperation, timeout time.Duration) (err error) {
+	start := time.Now()
+	for time.Since(start) < timeout {
+		if collections.Contains(&r.OperationsDone, op) {
+			return
+		}
+		time.Sleep(1 * time.Millisecond)
+	}
+	err = errors.New("timed out")
+	return
 }
 
 func (r *OperationQueueRepo) Queue(op TestOperation) {

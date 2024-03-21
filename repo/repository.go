@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	tempDirPrefix = "cmdtest"
+	TEMP_DIR_PREFIX = "cmdtest"
 )
 
 var (
@@ -40,12 +40,17 @@ func New(token string) (repo FileRepo) {
 		log.Fatal(err)
 	}
 	repo.queuesRepo = queuesRepo
+
+	stateBackingFilepath := filepath.Join(path, "state.yaml")
+	repo.State = FileState{backingFilepath: stateBackingFilepath}
 	return
 }
 
 type FileRepo struct {
 	token      string
 	queuesRepo OperationQueueRepo
+
+	State FileState
 }
 
 func (r FileRepo) BackingFilepath() string {
@@ -126,6 +131,7 @@ func (r FileRepo) LoadSuiteConfig(testSuite string, initless bool) (cfg model.Co
 }
 
 func (r FileRepo) readSuiteSeq(testSuite, name string) (n int) {
+	//logger.Warn("readSuiteSeq()", "testSuite", testSuite, "name", name)
 	suiteDir, err := testSuiteDirectoryPath(testSuite, r.token)
 	if err != nil {
 		log.Fatal(err)
@@ -147,6 +153,7 @@ func (r FileRepo) IgnoredCount(testSuite string) (n int) {
 }
 
 func (r FileRepo) FailedCount(testSuite string) (n int) {
+	//logger.Warn("failedCount()", "testSuite", testSuite)
 	return r.readSuiteSeq(testSuite, model.FailedSequenceFilename)
 }
 
@@ -269,7 +276,7 @@ func (r FileRepo) ListTestSuites() (suites []string, err error) {
 		return
 	}
 
-	matches, err := filepath.Glob(tmpDir + "/*")
+	matches, err := filepath.Glob(tmpDir + "/*/")
 	if err != nil {
 		err = fmt.Errorf("cannot list test suites: %w", err)
 		return
@@ -331,10 +338,10 @@ func forgeWorkDirectoryPath(token string) (tempDirPath string, err error) {
 	if err != nil {
 		return
 	}
-	tempDirName := fmt.Sprintf("%s-%s", tempDirPrefix, token)
+	tempDirName := fmt.Sprintf("%s-%s", TEMP_DIR_PREFIX, token)
 	tempDirPath = filepath.Join(os.TempDir(), tempDirName)
 	err = os.MkdirAll(tempDirPath, 0700)
-	logger.Warn("forgeWorkDirectoryPath", "workDir", tempDirPath)
+	//logger.Warn("forgeWorkDirectoryPath", "workDir", tempDirPath)
 	return
 }
 
