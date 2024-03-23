@@ -108,9 +108,11 @@ Optims:
 - DONE: stoping container can be done async (no need to block for end of stop)
 - mocking container can all be done in //
 - start container can be call async but execs need to wait container to be started
+- unqueue first waiting report
 
 
 Features:
+- replayable report in option
 - use rule definitions in usage
 - @beforeSuite=CMD_ANG_ARGS & @afterSuite=CMD_ANG_ARGS
 - @called[=:]CMD ARG_S,stdin=IN,count=N assertion => verify a mock was called
@@ -120,6 +122,7 @@ Features:
 - docker/podman container engine resolution once stored in global context
 - docker/podman checkpoint for dirties to avoid container rm/creation
 
+- Add stop daemon controll for big failures from cmdt ?
 - rewrite mock wrapper script inside cmdt to not depend on shell to mock
 - possibilité de passer un scénario ligne à ligne dans le stdin de cmdtest
 	- un scenario pourrait-il être de la forme d'un script shell ? => être executable comme scenario et comme script ?
