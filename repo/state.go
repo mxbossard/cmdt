@@ -104,7 +104,7 @@ func (s *FileState) ReportOperationDone(op *TestOperation) (err error) {
 	return
 }
 
-func (s *FileState) WaitOperationDone(op *TestOperation, timeout time.Duration) (err error) {
+func (s *FileState) WaitOperationDone(op *TestOperation, timeout time.Duration) (exitCode int, err error) {
 	logger.Debug("waiting operation done...", "operation", *op, "timeout", timeout)
 	start := time.Now()
 	for time.Since(start) < timeout {

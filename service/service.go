@@ -243,9 +243,9 @@ func ProcessTestDef(testDef model.TestDefinition) (exitCode int) {
 	return
 }
 
-func ProcessArgs(allArgs []string) (token string, wait func(), exitCode int) {
+func ProcessArgs(allArgs []string) (token string, wait func() int, exitCode int) {
 	exitCode = 1
-	wait = func() {}
+	wait = func() int { return 0 }
 
 	if len(allArgs) == 1 {
 		usage()
@@ -329,11 +329,12 @@ func ProcessArgs(allArgs []string) (token string, wait func(), exitCode int) {
 		testOp := repo.TestOperation{TestSuite: testSuite, Def: testDef, Blocking: !testCfg.Async.Get()}
 		testCtx.Repo.QueueOperation(&testOp)
 
-		wait = func() {
-			err := testCtx.Repo.State.WaitOperationDone(&testOp, testCfg.SuiteTimeout.Get())
+		wait = func() int {
+			exitCode, err := testCtx.Repo.State.WaitOperationDone(&testOp, testCfg.SuiteTimeout.Get())
 			if err != nil {
 				panic(err)
 			}
+			return exitCode
 		}
 		//exitCode = processTestDef(testDef)
 		exitCode = 0

@@ -79,20 +79,21 @@ func (d *daemon) run() {
 		}
 		logger.Debug("daemon: unqueued operation.")
 		lastUnqueue = time.Now()
-		d.performTest(testOp.Def)
+		testOp.ExitCode = d.performTest(testOp.Def)
 		err = d.repo.State.ReportOperationDone(testOp)
 		if err != nil {
 			panic(err)
 		}
 	}
-	logger.Info("daemon: stopping ...")
+	logger.Debug("daemon: stopping ...")
 }
 
-func (d daemon) performTest(testDef model.TestDefinition) {
+func (d daemon) performTest(testDef model.TestDefinition) (exitCode int) {
 	//logger.Warn("daemon performing test", "testDef", testDef)
 	logger.Debug("daemon: processing test...")
-	_ = service.ProcessTestDef(testDef)
+	exitCode = service.ProcessTestDef(testDef)
 	logger.Debug("daemon: test done.")
+	return
 }
 
 func (d daemon) ReadPid() string {

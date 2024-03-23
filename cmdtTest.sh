@@ -122,10 +122,9 @@ $cmdt0 @init=should_error @failuresLimit=-1
 ! $cmdt0 @test=should_error/ true @stderr:"" || die "should error because empty contains"
 ! $cmdt0 @test=should_error/ true @stderr~"" || die "should error because empty regex"
 
-$cmdt @report=should_succeed 2>&1 | grep "28 success" || die "should_succeed bad success count"
-#$cmdt @report=should_fail
-$cmdt @report=should_fail 2>&1 | grep "17 failures" || die "should_fail bad failures count"
-$cmdt @report=should_error 2>&1 | grep "4 errors" || die "should_error bad errors count"
+$cmdt @report=should_succeed 2>&1 | grep -v "28 success" && die "should_succeed bad success count" || true
+$cmdt @report=should_fail 2>&1 | grep -v "17 failures" && die "should_fail bad failures count" || true
+$cmdt @report=should_error 2>&1 | grep -v "4 errors" && die "should_error bad errors count" || true
 
 nothingToReportExpectedStderrMsg="you must perform some test prior to report"
 >&2 echo "## Test @report without test"

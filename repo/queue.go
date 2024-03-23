@@ -34,6 +34,7 @@ type TestOperation struct {
 	TestSuite string
 	Def       model.TestDefinition
 	Blocking  bool
+	ExitCode  int
 }
 
 type OperationQueue struct {

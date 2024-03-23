@@ -237,10 +237,10 @@ func main() {
 	daemon.TakeOver()
 
 	model.LoggerLevel.Set(slog.Level(8 - model.StartDebugLevel*4))
-	token, wait, exitCode := service.ProcessArgs(os.Args)
+	token, wait, _ := service.ProcessArgs(os.Args)
 
 	daemon.LanchProcessIfNeeded(token)
-	wait()
+	exitCode := wait()
 
 	os.Exit(exitCode)
 }
