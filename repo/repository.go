@@ -319,6 +319,7 @@ func (r FileRepo) ListTestSuites() (suites []string, err error) {
 func (r FileRepo) QueueOperation(op *TestOperation) (err error) {
 	r.queuesRepo.Queue(*op)
 	err = r.queuesRepo.Persist()
+	//logger.Warn("QueueOperation()", "operation", *op, "err", err)
 	return
 }
 
@@ -327,6 +328,7 @@ func (r FileRepo) UnqueueOperation() (op *TestOperation, err error) {
 	ok, op = r.queuesRepo.Unqueue()
 	if ok {
 		err = r.queuesRepo.Persist()
+		//logger.Warn("UnqueueOperation()", "operation", *op, "err", err)
 	}
 	return
 }

@@ -213,7 +213,7 @@ func ProcessTestDef(testDef model.TestDefinition) (exitCode int) {
 		testCtx.NoErrorOrFatal(err)
 	}
 
-	logger.Info("Processing test action", "token", token)
+	logger.Debug("Processing test action", "token", token)
 
 	dpl.Quiet(testCfg.Quiet)
 	if testCfg.ContainerDisabled.Is(true) || testCfg.ContainerImage.IsEmpty() {
@@ -243,8 +243,9 @@ func ProcessTestDef(testDef model.TestDefinition) (exitCode int) {
 	return
 }
 
-func ProcessArgs(allArgs []string) (token string, exitCode int) {
+func ProcessArgs(allArgs []string) (token string, wait func(), exitCode int) {
 	exitCode = 1
+	wait = func() {}
 
 	if len(allArgs) == 1 {
 		usage()
@@ -316,9 +317,7 @@ func ProcessArgs(allArgs []string) (token string, exitCode int) {
 		testCtx := facade.NewTestContext(token, testSuite, inputConfig)
 		logger.Debug("Forged context", "ctx", testCtx)
 		testCfg := testCtx.Config
-		if testCfg.Token.IsPresent() {
-			token = testCfg.Token.Get()
-		}
+		token = testCtx.Token
 		var seq int
 		//if testCfg.ContainerDisabled.Is(true) || testCfg.ContainerImage.IsEmpty() {
 		seq = testCtx.IncrementTestCount()
@@ -330,7 +329,12 @@ func ProcessArgs(allArgs []string) (token string, exitCode int) {
 		testOp := repo.TestOperation{TestSuite: testSuite, Def: testDef, Blocking: !testCfg.Async.Get()}
 		testCtx.Repo.QueueOperation(&testOp)
 
-		testCtx.Repo.State.WaitOperationDone(&testOp, testCfg.SuiteTimeout.Get())
+		wait = func() {
+			err := testCtx.Repo.State.WaitOperationDone(&testOp, testCfg.SuiteTimeout.Get())
+			if err != nil {
+				panic(err)
+			}
+		}
 		//exitCode = processTestDef(testDef)
 		exitCode = 0
 	default:

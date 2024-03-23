@@ -58,30 +58,41 @@ type daemon struct {
 }
 
 func (d *daemon) run() {
-	var lastUnqueue time.Time
+	logger.Info("daemon: running ...")
+	lastUnqueue := time.Now()
 	for {
+		//logger.Warn("daemon: unqueueing ...")
 		testOp, err := d.repo.UnqueueOperation()
 		if err != nil {
 			panic(err)
 		}
 		if testOp == nil {
 			// nothing to unqueue wait 1ms
-			if time.Since(lastUnqueue) > ExtraRunningSecs*time.Second {
+			d := time.Since(lastUnqueue)
+			if d > ExtraRunningSecs*time.Second {
+				logger.Info("daemon: nothing to unqueue", "for", d)
 				// More than ExtraRunningSecs since last unqueue
 				break
 			}
 			time.Sleep(time.Millisecond)
 			continue
 		}
+		logger.Debug("daemon: unqueued operation.")
 		lastUnqueue = time.Now()
 		d.performTest(testOp.Def)
-		d.repo.State.ReportOperationDone(testOp)
+		err = d.repo.State.ReportOperationDone(testOp)
+		if err != nil {
+			panic(err)
+		}
 	}
+	logger.Info("daemon: stopping ...")
 }
 
 func (d daemon) performTest(testDef model.TestDefinition) {
 	//logger.Warn("daemon performing test", "testDef", testDef)
+	logger.Debug("daemon: processing test...")
 	_ = service.ProcessTestDef(testDef)
+	logger.Debug("daemon: test done.")
 }
 
 func (d daemon) ReadPid() string {
@@ -112,6 +123,7 @@ func (d daemon) ClearPid() {
 }
 
 func TakeOver() {
+	//logger.Warn("daemon: should I take over ?", "args", os.Args)
 	if os.Args[1] == "@_daemon" {
 		//fmt.Printf("@_daemon args: %s", os.Args)
 		if len(os.Args) != 3 {
@@ -120,6 +132,8 @@ func TakeOver() {
 	} else {
 		return
 	}
+
+	logger.Debug("daemon: taking over ...")
 
 	token := os.Args[2]
 	repo := repo.New(token)
@@ -158,7 +172,7 @@ func TakeOver() {
 
 	// Lock prior last unqueue
 	locked, err = fileLock.TryLockContext(lockCtx, time.Millisecond)
-	if err != nil {
+	if err != nil && err != context.DeadlineExceeded {
 		panic(err)
 	}
 	if !locked {
@@ -184,6 +198,7 @@ func TakeOver() {
 }
 
 func LanchProcessIfNeeded(token string) error {
+	//logger.Warn("daemon: should I launch daemon ?", "token", token)
 	if token == "" {
 		// No token => no daemon to launch
 		return nil

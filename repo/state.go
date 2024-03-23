@@ -9,7 +9,6 @@ import (
 
 	"github.com/gofrs/flock"
 	"gopkg.in/yaml.v2"
-	"mby.fr/utils/collections"
 )
 
 type State struct {
@@ -20,10 +19,13 @@ type FileState struct {
 	backingFilepath string
 	fileLock        *flock.Flock
 	state           State
+	lastUpdate      time.Time
 }
 
-func (s FileState) lock() (err error) {
-	s.fileLock = flock.New(s.backingFilepath)
+func (s *FileState) lock() (err error) {
+	if s.fileLock == nil {
+		s.fileLock = flock.New(s.backingFilepath)
+	}
 	lockCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	locked, err := s.fileLock.TryLockContext(lockCtx, time.Millisecond)
@@ -48,7 +50,7 @@ func (s FileState) persist() (err error) {
 	if err != nil {
 		return
 	}
-	logger.Warn("persisting state...", "file", s.backingFilepath, "content", content)
+	//logger.Debug("persisting state...", "file", s.backingFilepath, "content", content)
 	err = os.WriteFile(s.backingFilepath, content, 0600)
 	if err != nil {
 		err = fmt.Errorf("cannot persist context: %w", err)
@@ -58,6 +60,10 @@ func (s FileState) persist() (err error) {
 }
 
 func (s *FileState) update() (err error) {
+	if time.Since(s.lastUpdate) < 10*time.Millisecond {
+		// Update once every 10 ms
+		return nil
+	}
 	var content []byte
 	err = s.lock()
 	if err != nil {
@@ -70,21 +76,27 @@ func (s *FileState) update() (err error) {
 	} else if err != nil {
 		return
 	}
-	logger.Warn("updating state...", "file", s.backingFilepath, "content", content)
+	//logger.Debug("updating state...", "file", s.backingFilepath, "content", content)
 	err = s.unlock()
 	if err != nil {
 		return
 	}
 	err = yaml.Unmarshal(content, &s.state)
+	//logger.Debug("updated state", "state", s.state)
+	s.lastUpdate = time.Now()
 	return
 }
-func (s FileState) ReportOperationDone(op *TestOperation) (err error) {
+func (s *FileState) ReportOperationDone(op *TestOperation) (err error) {
+	logger.Debug("ReportOperationDone()", "operation", op)
 	err = s.lock()
 	if err != nil {
 		return
 	}
 	s.state.OperationsDone = append(s.state.OperationsDone, op)
-	s.persist()
+	err = s.persist()
+	if err != nil {
+		return
+	}
 	err = s.unlock()
 	if err != nil {
 		return
@@ -92,13 +104,22 @@ func (s FileState) ReportOperationDone(op *TestOperation) (err error) {
 	return
 }
 
-func (s FileState) WaitOperationDone(op *TestOperation, timeout time.Duration) (err error) {
+func (s *FileState) WaitOperationDone(op *TestOperation, timeout time.Duration) (err error) {
+	logger.Debug("waiting operation done...", "operation", *op, "timeout", timeout)
 	start := time.Now()
 	for time.Since(start) < timeout {
 		s.update()
-		if collections.Contains(&s.state.OperationsDone, op) {
-			return
+		for _, done := range s.state.OperationsDone {
+			if done.TestSuite == op.TestSuite && done.Def.Seq == op.Def.Seq {
+				logger.Debug("operation finished.", "operation", *op)
+				return
+			}
 		}
+		/*
+			if collections.ContainsAny(&s.state.OperationsDone, op) {
+				return
+			}
+		*/
 		time.Sleep(1 * time.Millisecond)
 	}
 	err = errors.New("timed out")

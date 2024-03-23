@@ -104,6 +104,7 @@ Cleaning:
 
 
 Optims:
+- Use sqlite as DB
 - DONE: stoping container can be done async (no need to block for end of stop)
 - mocking container can all be done in //
 - start container can be call async but execs need to wait container to be started
@@ -233,9 +234,10 @@ func main() {
 	daemon.TakeOver()
 
 	model.LoggerLevel.Set(slog.Level(8 - model.StartDebugLevel*4))
-	token, exitCode := service.ProcessArgs(os.Args)
+	token, wait, exitCode := service.ProcessArgs(os.Args)
 
 	daemon.LanchProcessIfNeeded(token)
+	wait()
 
 	os.Exit(exitCode)
 }
