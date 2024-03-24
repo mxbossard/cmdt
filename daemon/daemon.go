@@ -54,11 +54,12 @@ Ideas:
 */
 
 type daemon struct {
-	repo repo.FileRepo
+	token string
+	repo  repo.FileRepo
 }
 
 func (d *daemon) run() {
-	logger.Info("daemon: running ...")
+	logger.Info("daemon: starting ...", "token", d.token)
 	lastUnqueue := time.Now()
 	for {
 		//logger.Warn("daemon: unqueueing ...")
@@ -68,9 +69,9 @@ func (d *daemon) run() {
 		}
 		if testOp == nil {
 			// nothing to unqueue wait 1ms
-			d := time.Since(lastUnqueue)
-			if d > ExtraRunningSecs*time.Second {
-				logger.Info("daemon: nothing to unqueue", "for", d)
+			duration := time.Since(lastUnqueue)
+			if duration > ExtraRunningSecs*time.Second {
+				logger.Info("daemon: nothing to unqueue", "duration", duration, "token", d.token)
 				// More than ExtraRunningSecs since last unqueue
 				break
 			}
@@ -85,7 +86,7 @@ func (d *daemon) run() {
 			panic(err)
 		}
 	}
-	logger.Debug("daemon: stopping ...")
+	logger.Debug("daemon: stopping ...", "token", d.token)
 }
 
 func (d daemon) performTest(testDef model.TestDefinition) (exitCode int) {
@@ -125,7 +126,7 @@ func (d daemon) ClearPid() {
 
 func TakeOver() {
 	//logger.Warn("daemon: should I take over ?", "args", os.Args)
-	if os.Args[1] == "@_daemon" {
+	if len(os.Args) > 1 && os.Args[1] == "@_daemon" {
 		//fmt.Printf("@_daemon args: %s", os.Args)
 		if len(os.Args) != 3 {
 			panic("bad usage of @_daemon")
@@ -138,7 +139,7 @@ func TakeOver() {
 
 	token := os.Args[2]
 	repo := repo.New(token)
-	d := daemon{repo: repo}
+	d := daemon{token: token, repo: repo}
 	lockFilepath := filepath.Join(repo.BackingFilepath(), DaemonLockFilename)
 	fileLock := flock.New(lockFilepath)
 
@@ -199,7 +200,7 @@ func TakeOver() {
 }
 
 func LanchProcessIfNeeded(token string) error {
-	//logger.Warn("daemon: should I launch daemon ?", "token", token)
+	logger.Warn("daemon: should I launch daemon ?", "token", token)
 	if token == "" {
 		// No token => no daemon to launch
 		return nil

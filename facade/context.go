@@ -78,6 +78,7 @@ func NewTestContext(token, testSuite string, inputCfg model.Config) TestContext 
 		SuiteContext: suiteCtx,
 	}
 	testCtx.Config = mergedCfg
+	testCtx.Suite = suiteCtx
 	//logger.Warn("NewTestContext", "testCtx", testCtx)
 	err := testCtx.initExecuter()
 	if err != nil {
@@ -183,6 +184,7 @@ func (c SuiteContext) NoErrorOrFatal(err error) {
 
 type TestContext struct {
 	SuiteContext
+	Suite SuiteContext
 
 	//MockDir        string
 	ContainerId    string
@@ -292,7 +294,6 @@ func (c TestContext) AssertCmdExecBlocking(seq int, assertions []model.Assertion
 		}
 	}
 
-	// TODO: Record outcome
 	err = c.Repo.SaveTestOutcome(outcome)
 	c.NoErrorOrFatal(err)
 

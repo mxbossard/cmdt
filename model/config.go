@@ -93,7 +93,7 @@ var (
 		ruleDef("container", "", "="), ruleDef("dirtyContainer", "=")}
 	// Config of test flow (init -> test -> report)
 	FlowConfigs = []RuleDefinition{ruleDef("token", "="), ruleDef("verbose", "", "="),
-		ruleDef("debug", "", "="), ruleDef("failuresLimit", "="), ruleDef("async", "", "=")}
+		ruleDef("debug", "", "="), ruleDef("failuresLimit", "="), ruleDef("async", "", "="), ruleDef("keep", "", "=")}
 	Assertions = []RuleDefinition{ruleDef("success", ""), ruleDef("fail", ""), ruleDef("exit", "="),
 		ruleDef("cmd", "="), ruleDef("exists", "="),
 		ruleDef("stdout", "=", ":", "~", "!=", "!:", "!~", "@=", "@:"),
@@ -171,7 +171,8 @@ const (
 type VerboseLevel int
 
 const (
-	SHOW_FAILED_ONLY VerboseLevel = iota
+	SHOW_REPORTS_ONLY VerboseLevel = iota
+	SHOW_FAILED_ONLY
 	SHOW_FAILED_OUTS
 	SHOW_PASSED
 	SHOW_PASSED_OUTS
@@ -224,6 +225,7 @@ type Config struct {
 	PrintToken    utilz.Optional[bool]          `yaml:""`
 	ExportToken   utilz.Optional[bool]          `yaml:""`
 	ReportAll     utilz.Optional[bool]          `yaml:""`
+	Keep          utilz.Optional[bool]          `yaml:""`
 	Verbose       utilz.Optional[VerboseLevel]  `yaml:""`
 	Debug         utilz.Optional[DebugLevel]    `yaml:""`
 	Quiet         utilz.Optional[bool]          `yaml:""`
@@ -294,6 +296,7 @@ func (c *Config) Merge(right Config) {
 	c.PrintToken.Merge(right.PrintToken)
 	c.ExportToken.Merge(right.ExportToken)
 	c.ReportAll.Merge(right.ReportAll)
+	c.Keep.Merge(right.Keep)
 	c.Quiet.Merge(right.Quiet)
 	c.Ignore.Merge(right.Ignore)
 	c.StopOnFailure.Merge(right.StopOnFailure)

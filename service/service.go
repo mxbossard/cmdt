@@ -85,6 +85,7 @@ func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int, err error) {
 	}
 
 	logger.Info("Reporting all suites", "token", token, "suites", testSuites)
+
 	if len(testSuites) == 0 {
 		err = fmt.Errorf("you must perform some test prior to report")
 		return
@@ -132,7 +133,9 @@ func ReportTestSuite(ctx facade.SuiteContext) (exitCode int, err error) {
 		exitCode = 0
 	}
 
-	err = ctx.Repo.ClearTestSuite(suiteOutcome.TestSuite)
+	if !cfg.Keep.Is(true) {
+		err = ctx.Repo.ClearTestSuite(suiteOutcome.TestSuite)
+	}
 
 	return
 }
@@ -166,7 +169,13 @@ func PerformTest(testDef model.TestDefinition) (exitCode int, err error) {
 		}
 	}
 
-	outcome := ctx.AssertCmdExecBlocking(seq, testDef.Assertions)
+	// Build assertions
+	_, assertions, agg := ParseArgs(testDef.SuitePrefix, testDef.CmdArgs)
+	if agg.GotError() {
+		err = agg.Return()
+		return
+	}
+	outcome := ctx.AssertCmdExecBlocking(seq, assertions)
 
 	dpl.TestOutcome(ctx, outcome)
 
@@ -200,7 +209,7 @@ func ProcessTestDef(testDef model.TestDefinition) (exitCode int) {
 
 	if tooMuchFailures == 1 {
 		// First time detecting TOO MUCH FAILURES
-		dpl.TooMuchFailures(testSuite)
+		dpl.TooMuchFailures(testCtx.SuiteContext, testSuite)
 	}
 	if tooMuchFailures > 0 {
 		exitCode = 0
@@ -243,9 +252,9 @@ func ProcessTestDef(testDef model.TestDefinition) (exitCode int) {
 	return
 }
 
-func ProcessArgs(allArgs []string) (token string, wait func() int, exitCode int) {
+func ProcessArgs(allArgs []string) (daemonToken string, wait func() int, exitCode int) {
 	exitCode = 1
-	wait = func() int { return 0 }
+	wait = func() int { return exitCode }
 
 	if len(allArgs) == 1 {
 		usage()
@@ -261,9 +270,9 @@ func ProcessArgs(allArgs []string) (token string, wait func() int, exitCode int)
 	}
 	rulePrefix := defaultCfg.Prefix.Get()
 
-	args := allArgs[1:]
-	logger.Debug("Processing cmdt args", "args", args)
-	inputConfig, assertions, agg := ParseArgs(rulePrefix, args)
+	signifientArgs := allArgs[1:]
+	logger.Debug("Processing cmdt args", "args", signifientArgs)
+	inputConfig, assertions, agg := ParseArgs(rulePrefix, signifientArgs)
 	//loadedConfig := inputConfig
 	inputConfig.Token.Default(envToken)
 	logger.Debug("Parsed args", "inputConfig", inputConfig, "assertions", assertions, "error", agg)
@@ -271,7 +280,7 @@ func ProcessArgs(allArgs []string) (token string, wait func() int, exitCode int)
 		model.LoggerLevel.Set(slog.Level(8 - inputConfig.Debug.Get()*4))
 	}
 
-	token = inputConfig.Token.GetOr("")
+	token := inputConfig.Token.GetOr("")
 	action := inputConfig.Action.Get()
 
 	var err error
@@ -325,19 +334,26 @@ func ProcessArgs(allArgs []string) (token string, wait func() int, exitCode int)
 
 		testCtx.NoErrorOrFatal(agg.Return())
 
-		testDef := model.TestDefinition{Token: token, TestSuite: testSuite, Seq: seq, Config: testCfg}
-		testOp := repo.TestOperation{TestSuite: testSuite, Def: testDef, Blocking: !testCfg.Async.Get()}
-		testCtx.Repo.QueueOperation(&testOp)
+		testDef := model.TestDefinition{Token: token, TestSuite: testSuite, Seq: seq, Config: testCfg,
+			SuitePrefix: testCtx.Suite.Config.Prefix.Get(), CmdArgs: signifientArgs}
 
-		wait = func() int {
-			exitCode, err := testCtx.Repo.State.WaitOperationDone(&testOp, testCfg.SuiteTimeout.Get())
-			if err != nil {
-				panic(err)
+		if testCfg.Async.Is(false) {
+			logger.Info("executing test blocking (not queueing test)", "suite", testSuite, "seq", seq)
+			exitCode = ProcessTestDef(testDef)
+		} else {
+			logger.Info("executing test async (queueing test)", "suite", testSuite, "seq", seq)
+			testOp := repo.TestOperation{TestSuite: testSuite, Def: testDef, Blocking: !testCfg.Async.Get()}
+			testCtx.Repo.QueueOperation(&testOp)
+
+			wait = func() int {
+				exitCode, err := testCtx.Repo.State.WaitOperationDone(&testOp, testCfg.SuiteTimeout.Get())
+				if err != nil {
+					panic(err)
+				}
+				return exitCode
 			}
-			return exitCode
+			daemonToken = token
 		}
-		//exitCode = processTestDef(testDef)
-		exitCode = 0
 	default:
 		err = fmt.Errorf("action: [%v] not known", inputConfig.Action)
 	}

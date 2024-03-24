@@ -47,10 +47,10 @@ import (
   - unqueue in priority of already unqueued suite
   - if previously unqueued a waiting test must not unqueue from this suite until test done
   - suite choice responsibility given to repo
-  - unqueue by suite ?
-  - if suite waiting how repo know it ?
+  - unqueue by suite
+  - if suite waiting how repo know it
   - SaveTestOutcome could release wait
-  - Unqueue should not block if possible but block if nothing to unqueue
+  - Unqueue should not block if possible but block if nothing to unqueue ???
 
 ### Possible behaviors:
 - for async test log when possible like async=false
@@ -68,7 +68,10 @@ import (
 ### Planning:
 - Implement Queue / Unqueue by suite
 - Delegate all test to daemon waiting => should be isofunctionnal with nodaemon
+- Run without daemon in option and use it in container
 - Wait only if @async=true
+- Report async in option
+
 
 
 ## DEMO:
@@ -86,9 +89,12 @@ import (
 - if download faile retry 3 times
 - if cannot download return exit=2
 
+
 ## TODO:
 
 Bugs:
+- cmdt cannot call cmdt with same token if 2 are blockings and fork=1
+- Daemon display is async whith blocking cmdt => Need a daemon display able to manage // running
 - Check for container existance before exec in running container
 - Suite Timeout not managed (should error if timeout exceeded) Should ask for suite clear and no test should pass; initless suite should have a greater default timeout
 - use suite timeout for container duration
@@ -105,14 +111,12 @@ Cleaning:
 
 Optims:
 - Use sqlite as DB
-- DONE: stoping container can be done async (no need to block for end of stop)
 - mocking container can all be done in //
 - start container can be call async but execs need to wait container to be started
 - unqueue first waiting report
 
 
 Features:
-- replayable report in option
 - use rule definitions in usage
 - @beforeSuite=CMD_ANG_ARGS & @afterSuite=CMD_ANG_ARGS
 - @called[=:]CMD ARG_S,stdin=IN,count=N assertion => verify a mock was called
@@ -144,6 +148,8 @@ Features:
 
 
 ## DONE:
+- replayable report in option with @keep
+- stoping container can be done async (no need to block for end of stop)
 
 - @timeout=N
 - @cmd="CMD_WITH_ARGS_THAT_SHOULD_BE_OK_IF_OR_FAIL_TEST"
@@ -237,9 +243,12 @@ func main() {
 	daemon.TakeOver()
 
 	model.LoggerLevel.Set(slog.Level(8 - model.StartDebugLevel*4))
-	token, wait, _ := service.ProcessArgs(os.Args)
+	daemonToken, wait, _ := service.ProcessArgs(os.Args)
 
-	daemon.LanchProcessIfNeeded(token)
+	if daemonToken != "" {
+		daemon.LanchProcessIfNeeded(daemonToken)
+	}
+
 	exitCode := wait()
 
 	os.Exit(exitCode)

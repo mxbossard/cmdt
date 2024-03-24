@@ -516,6 +516,8 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 			c.PrintToken, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
 		case "exportToken":
 			c.ExportToken, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
+		case "keep":
+			c.Keep, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
 		case "parallel":
 		case "quiet":
 			c.Quiet, err = TranslateOptional(rule, BoolMapper, BooleanValidater)

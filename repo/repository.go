@@ -276,13 +276,23 @@ func (r FileRepo) ListTestSuites() (suites []string, err error) {
 		return
 	}
 
-	matches, err := filepath.Glob(tmpDir + "/*/")
+	matches, err := filepath.Glob(tmpDir + "/*")
 	if err != nil {
 		err = fmt.Errorf("cannot list test suites: %w", err)
 		return
 	}
-	// Add success
+
+	// keep only dirs
+	var dirs []string
 	for _, m := range matches {
+		f, _ := os.Stat(m)
+		if f.IsDir() {
+			dirs = append(dirs, m)
+		}
+	}
+
+	// Add success
+	for _, m := range dirs {
 		testSuite := filepath.Base(m)
 		if !strings.HasPrefix(testSuite, "_") {
 			failedCount := utils.ReadSeq(tmpDir, testSuite, model.FailedSequenceFilename)
@@ -293,7 +303,7 @@ func (r FileRepo) ListTestSuites() (suites []string, err error) {
 		}
 	}
 	// Add failures
-	for _, m := range matches {
+	for _, m := range dirs {
 		testSuite := filepath.Base(m)
 		if !strings.HasPrefix(testSuite, "_") {
 			failedCount := utils.ReadSeq(tmpDir, testSuite, model.FailedSequenceFilename)
@@ -304,7 +314,7 @@ func (r FileRepo) ListTestSuites() (suites []string, err error) {
 		}
 	}
 	// Add errors
-	for _, m := range matches {
+	for _, m := range dirs {
 		testSuite := filepath.Base(m)
 		if !strings.HasPrefix(testSuite, "_") {
 			errorCount := utils.ReadSeq(tmpDir, testSuite, model.ErroredSequenceFilename)

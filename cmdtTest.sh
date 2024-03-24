@@ -26,7 +26,7 @@ ls -lh "$cmdt"
 cmdt="$cmdt"
 cmdt0="$cmdt $@"
 #cmdt0="$cmdt"
-cmdt1="$cmdt @verbose @failuresLimit=-1" # Default verbose show passed test + perform all test beyond failures limit
+cmdt1="$cmdt @async=false @verbose @failuresLimit=-1" # Default verbose show passed test + perform all test beyond failures limit
 
 mkdir -p "$scriptDir/.tmp"
 reportFile="$( mktemp "$scriptDir/.tmp/XXXXXX.log" )"
@@ -92,27 +92,27 @@ $cmdt0 @test=should_succeed/ sh -c ">&2 echo foo bar" @stderr:foo @stderr:bar
 $cmdt0 @test=should_succeed/ sh -c ">&2 echo foo bar" @stderr="foo bar\n" @stdout=
 
 >&2 echo "## Test cmdt basic assertions should failed"
-$cmdt0 @init=should_fail @failuresLimit=-1
+$cmdt0 @init=should_fail @failuresLimit=-1 @verbose=0
 
-$cmdt0 @test=should_fail/ false 2> /dev/null
-$cmdt0 @test=should_fail/ true @fail 2> /dev/null
-$cmdt0 @test=should_fail/ false @success 2> /dev/null
-$cmdt0 @test=should_fail/ true @exit=1 2> /dev/null
-$cmdt0 @test=should_fail/ false @exit=0 2> /dev/null
+$cmdt0 @test=should_fail/ false
+$cmdt0 @test=should_fail/ true @fail
+$cmdt0 @test=should_fail/ false @success
+$cmdt0 @test=should_fail/ true @exit=1
+$cmdt0 @test=should_fail/ false @exit=0
 
-$cmdt0 @test=should_fail/ echo foo bar @stdout= 2> /dev/null
-$cmdt0 @test=should_fail/ echo foo bar @stdout=foo 2> /dev/null
-$cmdt0 @test=should_fail/ echo foo bar @stdout=foo bar 2> /dev/null
-$cmdt0 @test=should_fail/ echo foo bar @stdout:baz 2> /dev/null
-$cmdt0 @test=should_fail/ echo foo bar @stdout:foo @stdout:baz 2> /dev/null
-$cmdt0 @test=should_fail/ echo foo bar @stderr:foo 2> /dev/null
+$cmdt0 @test=should_fail/ echo foo bar @stdout=
+$cmdt0 @test=should_fail/ echo foo bar @stdout=foo
+$cmdt0 @test=should_fail/ echo foo bar @stdout=foo bar
+$cmdt0 @test=should_fail/ echo foo bar @stdout:baz
+$cmdt0 @test=should_fail/ echo foo bar @stdout:foo @stdout:baz
+$cmdt0 @test=should_fail/ echo foo bar @stderr:foo
 
-$cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stderr= 2> /dev/null
-$cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stderr=foo 2> /dev/null
-$cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stderr=foo bar 2> /dev/null
-$cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stderr:baz 2> /dev/null
-$cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stderr:foo @stderr:baz 2> /dev/null
-$cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stdout:foo 2> /dev/null
+$cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stderr=
+$cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stderr=foo
+$cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stderr=foo bar
+$cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stderr:baz
+$cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stderr:foo @stderr:baz
+$cmdt0 @test=should_fail/ sh -c ">&2 echo foo bar" @stdout:foo
 
 >&2 echo "## Test cmdt basic assertions should error"
 $cmdt0 @init=should_error @failuresLimit=-1
@@ -122,9 +122,22 @@ $cmdt0 @init=should_error @failuresLimit=-1
 ! $cmdt0 @test=should_error/ true @stderr:"" || die "should error because empty contains"
 ! $cmdt0 @test=should_error/ true @stderr~"" || die "should error because empty regex"
 
-$cmdt @report=should_succeed 2>&1 | grep -v "28 success" && die "should_succeed bad success count" || true
-$cmdt @report=should_fail 2>&1 | grep -v "17 failures" && die "should_fail bad failures count" || true
-$cmdt @report=should_error 2>&1 | grep -v "4 errors" && die "should_error bad errors count" || true
+$cmdt @report=should_succeed @keep || die "reporting should_succeed should exit=0"
+$cmdt @report=should_succeed @keep 2>&1 | grep "28 success" > /dev/null || die "reporting should_succeed bad success count"
+
+! $cmdt @report=should_fail @keep >/dev/null 2>&1 || die "reporting should_fail shoud exit=1"
+if $cmdt @report=should_fail @keep 2>&1 | grep "17 failures"; then
+	$cmdt @report=should_fail @keep || true
+	die "reporting should_fail bad failures count"
+fi
+
+! $cmdt @report=should_error @keep >/dev/null 2>&1 || die "reporting should_error should exit=1" || true
+if $cmdt @report=should_error @keep 2>&1 | grep "4 errors"; then
+	$cmdt @report=should_error @keep || true
+	die "reporting should_error bad errors count"
+fi
+
+! $cmdt @report >/dev/null 2>&1 || die "reporting all should exit=1"
 
 nothingToReportExpectedStderrMsg="you must perform some test prior to report"
 >&2 echo "## Test @report without test"
@@ -262,22 +275,26 @@ $cmdt0 @test=naming/ @stderr~"/Successfuly ran \[.*main.*\] test suite/" @-- $cm
 
 >&2 echo "## Test display verbosity"
 $cmdt0 @init=display_verbosity
-# verbose=SHOW_FAILED_ONLY
+# verbose=SHOW_REPORTS_ONLY
 $cmdt0 @test=display_verbosity/ @stdout= @stderr=                                                   @-- $cmdt @verbose=0 echo foo 
-$cmdt0 @test=display_verbosity/ @stdout= @stderr:FAILED @stderr:"Executing cmd" @stderr!:">foo"     @-- $cmdt @verbose=0 echo foo @fail
-$cmdt0 @test=display_verbosity/ @stdout= @stderr:ERRORED @stderr:"Executing cmd"                    @-- $cmdt @verbose=0 foo
-# verbose=SHOW_FAILED_OUTS
-$cmdt0 @test=display_verbosity/ @stdout= @stderr=                                                   @-- $cmdt @verbose=1 echo foo
-$cmdt0 @test=display_verbosity/ @stdout= @stderr:FAILED @stderr:"Executing cmd" @stderr:">foo"      @-- $cmdt @verbose=1 echo foo @fail
+$cmdt0 @test=display_verbosity/ @stdout= @stderr=                                                   @-- $cmdt @verbose=0 echo foo @fail
+$cmdt0 @test=display_verbosity/ @stdout= @stderr=                                                   @-- $cmdt @verbose=0 foo
+# verbose=SHOW_FAILED_ONLY
+$cmdt0 @test=display_verbosity/ @stdout= @stderr=                                                   @-- $cmdt @verbose=1 echo foo 
+$cmdt0 @test=display_verbosity/ @stdout= @stderr:FAILED @stderr:"Executing cmd" @stderr!:">foo"     @-- $cmdt @verbose=1 echo foo @fail
 $cmdt0 @test=display_verbosity/ @stdout= @stderr:ERRORED @stderr:"Executing cmd"                    @-- $cmdt @verbose=1 foo
-# verbose=SHOW_PASSED
-$cmdt0 @test=display_verbosity/ @stdout= @stderr:PASSED @stderr!:"Executing cmd" @stderr!:">foo"    @-- $cmdt @verbose=2 echo foo
+# verbose=SHOW_FAILED_OUTS
+$cmdt0 @test=display_verbosity/ @stdout= @stderr=                                                   @-- $cmdt @verbose=2 echo foo
 $cmdt0 @test=display_verbosity/ @stdout= @stderr:FAILED @stderr:"Executing cmd" @stderr:">foo"      @-- $cmdt @verbose=2 echo foo @fail
 $cmdt0 @test=display_verbosity/ @stdout= @stderr:ERRORED @stderr:"Executing cmd"                    @-- $cmdt @verbose=2 foo
-# verbose=SHOW_PASSED_OUTS
-$cmdt0 @test=display_verbosity/ @stdout= @stderr:PASSED @stderr:"Executing cmd" @stderr:">foo"      @-- $cmdt @verbose=3 echo foo
+# verbose=SHOW_PASSED
+$cmdt0 @test=display_verbosity/ @stdout= @stderr:PASSED @stderr!:"Executing cmd" @stderr!:">foo"    @-- $cmdt @verbose=3 echo foo
 $cmdt0 @test=display_verbosity/ @stdout= @stderr:FAILED @stderr:"Executing cmd" @stderr:">foo"      @-- $cmdt @verbose=3 echo foo @fail
 $cmdt0 @test=display_verbosity/ @stdout= @stderr:ERRORED @stderr:"Executing cmd"                    @-- $cmdt @verbose=3 foo
+# verbose=SHOW_PASSED_OUTS
+$cmdt0 @test=display_verbosity/ @stdout= @stderr:PASSED @stderr:"Executing cmd" @stderr:">foo"      @-- $cmdt @verbose=4 echo foo
+$cmdt0 @test=display_verbosity/ @stdout= @stderr:FAILED @stderr:"Executing cmd" @stderr:">foo"      @-- $cmdt @verbose=4 echo foo @fail
+$cmdt0 @test=display_verbosity/ @stdout= @stderr:ERRORED @stderr:"Executing cmd"                    @-- $cmdt @verbose=4 foo
 
 
 >&2 echo "## Test rules missusage"
@@ -512,7 +529,7 @@ expectedBazErrMsg="$( 2>&1 ls baz || true )"
 echo foo > /tmp/fooFileContent
 echo baz > /tmp/bazFileContent
 
-$cmdt0 @init=cmd_mock #@verbose=3
+$cmdt0 @init=cmd_mock #@verbose=4
 $cmdt0 @test=cmd_mock/ @fail @stdout= @stderr:"shell builtin" @-- $cmdt1 echo foo @mock="echo" # cannot mock shell builtin
 $cmdt0 @test=cmd_mock/ @fail @stdout= @stderr:"not found" @-- $cmdt1 echo foo @mock="fooNotExists" # cannot mock not found command
 

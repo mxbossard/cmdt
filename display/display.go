@@ -65,6 +65,9 @@ func (d BasicDisplay) Suite(ctx facade.SuiteContext) {
 }
 
 func (d BasicDisplay) TestTitle(ctx facade.TestContext, seq int) {
+	if ctx.Config.Verbose.Get() == model.SHOW_REPORTS_ONLY {
+		return
+	}
 	defer d.Flush()
 	maxTestNameLength := 70
 
@@ -99,6 +102,9 @@ func (d BasicDisplay) TestTitle(ctx facade.TestContext, seq int) {
 }
 
 func (d BasicDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutcome) {
+	if ctx.Config.Verbose.Get() == model.SHOW_REPORTS_ONLY {
+		return
+	}
 	// FIXME get outcome from ctx
 	cfg := ctx.Config
 	verbose := cfg.Verbose.Get()
@@ -300,7 +306,10 @@ func (d BasicDisplay) ReportAllFooter(globalCtx facade.GlobalContext) {
 	d.printer.ColoredErrf(messageColor, "Global duration time: %s\n", globalDuration)
 }
 
-func (d BasicDisplay) TooMuchFailures(testSuite string) {
+func (d BasicDisplay) TooMuchFailures(ctx facade.SuiteContext, testSuite string) {
+	if ctx.Config.Verbose.Get() == model.SHOW_REPORTS_ONLY {
+		return
+	}
 	defer d.Flush()
 	d.printer.ColoredErrf(warningColor, "Too much failure for [%s] test suite. Stop testing.\n", testSuite)
 }
