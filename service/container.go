@@ -226,11 +226,11 @@ func PerformTestInContainer(testCtx facade.TestContext) (ctId string, exitCode i
 	// FIXME: Test if container is up and running
 
 	// Launch test in container
-	cmdAndArgs := []string{"/opt/cmdtest", "@container=false"}
+	cmdAndArgs := []string{"/opt/cmdtest", "@container=false", "@async=false"}
 	if len(os.Args) > 1 {
 		for _, arg := range os.Args[1:] {
 			// FIXME: how to not pass root mocks params ?
-			if !strings.HasPrefix(arg, "@container") { //&&
+			if !strings.HasPrefix(arg, "@container") && !strings.HasPrefix(arg, "@async") { //&&
 				cmdAndArgs = append(cmdAndArgs, arg)
 			}
 		}

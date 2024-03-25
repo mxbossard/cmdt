@@ -63,13 +63,14 @@ import (
 - how to queue @report @async ? => "close" suite ? queue an operation (more extensible) ?
 - when outputs async test ? on waiting report ?
 - could wait @report before launching tests if necessary ?
-- @wait = !@async ?
+- @wait = !@async ? => NO: @async=true ran by daemon ; @wait=true => block until operation done properly
 
 ### Planning:
-- Implement Queue / Unqueue by suite
-- Delegate all test to daemon waiting => should be isofunctionnal with nodaemon
-- Run without daemon in option and use it in container
-- Wait only if @async=true
+- Implement Queue / Unqueue by suite OK
+- Delegate all test to daemon waiting => should be isofunctionnal with nodaemon OK
+- Run without daemon in option and use it in container OK
+- Run by daemon only if @async=true OK
+- Wait only if @wait=true
 - Report async in option
 
 
@@ -93,6 +94,8 @@ import (
 ## TODO:
 
 Bugs:
+- @async test not compatible with stdin usage (because it's the daemon who shoud read from stdin
+- Environ not passed to test run by daemon => should embed cmdt environ into operation
 - cmdt cannot call cmdt with same token if 2 are blockings and fork=1
 - Daemon display is async whith blocking cmdt => Need a daemon display able to manage // running
 - Check for container existance before exec in running container

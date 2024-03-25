@@ -111,6 +111,16 @@ func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int, err error) {
 	return
 }
 
+func ProcessReportAllDef(def model.ReportDefinition) (exitCode int) {
+	var err error
+	ctx := facade.NewGlobalContext(def.Token, model.Config{})
+	exitCode, err = ReportAllTestSuites(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return
+}
+
 func ReportTestSuite(ctx facade.SuiteContext) (exitCode int, err error) {
 	exitCode = 1
 	cfg := ctx.Config
@@ -135,8 +145,17 @@ func ReportTestSuite(ctx facade.SuiteContext) (exitCode int, err error) {
 
 	if !cfg.Keep.Is(true) {
 		err = ctx.Repo.ClearTestSuite(suiteOutcome.TestSuite)
+		logger.Info("Cleared suite", "suite", suiteOutcome.TestSuite)
 	}
 
+	return
+}
+
+func ProcessReportDef(def model.ReportDefinition) (exitCode int) {
+	var err error
+	ctx := facade.NewSuiteContext(def.Token, def.TestSuite, false, model.ReportAction, model.Config{})
+	exitCode, err = ReportTestSuite(ctx)
+	ctx.NoErrorOrFatal(err)
 	return
 }
 
@@ -308,18 +327,75 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int, exitCod
 				log.Fatal(agg)
 			}
 			globalCtx := facade.NewGlobalContext(token, inputConfig)
-			logger.Debug("Forged context", "ctx", globalCtx)
-			logger.Info("Processing report all action", "token", token)
-			dpl.Quiet(globalCtx.Config.Quiet)
-			exitCode, err = ReportAllTestSuites(globalCtx)
+			if globalCtx.Config.Async.Is(false) {
+				logger.Debug("Forged context", "ctx", globalCtx)
+				logger.Info("executing report all blocking (not queueing test)")
+				dpl.Quiet(globalCtx.Config.Quiet)
+				exitCode, err = ReportAllTestSuites(globalCtx)
+			} else {
+				logger.Info("executing report all async (queueing report)")
+				def := model.ReportDefinition{
+					Token:  token,
+					Config: globalCtx.Config,
+				}
+				op := repo.ReportAllOperation{
+					OperationBase: repo.OperationBase{
+						Blocking: true, // FIXME should not block if test can be run simultaneously
+					},
+					Definition: def,
+				}
+				globalCtx.Repo.QueueOperation(&op)
+
+				if globalCtx.Config.Wait.Is(true) {
+					wait = func() int {
+						// FIXME: bad timeout
+						exitCode, err := globalCtx.Repo.State.WaitOperationDone(&op, globalCtx.Config.SuiteTimeout.Get())
+						if err != nil {
+							panic(err)
+						}
+						return exitCode
+					}
+				} else {
+					exitCode = 0
+				}
+			}
 		} else {
 			testSuite := inputConfig.TestSuite.Get()
 			suiteCtx := facade.NewSuiteContext(token, testSuite, false, action, inputConfig)
-			logger.Debug("Forged context", "ctx", suiteCtx)
 			suiteCtx.NoErrorOrFatal(agg.Return())
-			logger.Info("Processing report suite action", "token", token)
-			dpl.Quiet(suiteCtx.Config.Quiet)
-			exitCode, err = ReportTestSuite(suiteCtx)
+			if suiteCtx.Config.Async.Is(false) {
+				logger.Debug("Forged context", "ctx", suiteCtx)
+				logger.Info("executing report blocking (not queueing test)")
+				dpl.Quiet(suiteCtx.Config.Quiet)
+				exitCode, err = ReportTestSuite(suiteCtx)
+			} else {
+				logger.Info("executing report async (queueing report)")
+				def := model.ReportDefinition{
+					Token:  token,
+					Config: suiteCtx.Config,
+				}
+				op := repo.ReportOperation{
+					OperationBase: repo.OperationBase{
+						TestSuite: testSuite,
+						Blocking:  true, // FIXME should not block if test can be run simultaneously
+					},
+					Definition: def,
+				}
+				suiteCtx.Repo.QueueOperation(&op)
+
+				if suiteCtx.Config.Wait.Is(true) {
+					wait = func() int {
+						// FIXME: bad timeout
+						exitCode, err := suiteCtx.Repo.State.WaitOperationDone(&op, suiteCtx.Config.SuiteTimeout.Get())
+						if err != nil {
+							panic(err)
+						}
+						return exitCode
+					}
+				} else {
+					exitCode = 0
+				}
+			}
 		}
 	case model.TestAction:
 		testSuite := inputConfig.TestSuite.Get()
@@ -346,23 +422,31 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int, exitCod
 		}
 
 		if testCfg.Async.Is(false) {
+			// enforce wait
 			logger.Info("executing test blocking (not queueing test)", "suite", testSuite, "seq", seq)
 			exitCode = ProcessTestDef(testDef)
 		} else {
 			logger.Info("executing test async (queueing test)", "suite", testSuite, "seq", seq)
 			testOp := repo.TestOperation{
-				TestSuite: testSuite,
-				Def:       testDef,
-				Blocking:  !testCfg.Async.Get(),
+				OperationBase: repo.OperationBase{
+					TestSuite: testSuite,
+					Blocking:  true, // FIXME should not block if test can be run simultaneously
+				},
+				Definition: testDef,
 			}
 			testCtx.Repo.QueueOperation(&testOp)
 
-			wait = func() int {
-				exitCode, err := testCtx.Repo.State.WaitOperationDone(&testOp, testCfg.SuiteTimeout.Get())
-				if err != nil {
-					panic(err)
+			if testCfg.Wait.Is(true) {
+				wait = func() int {
+					exitCode, err := testCtx.Repo.State.WaitOperationDone(&testOp, testCfg.SuiteTimeout.Get())
+					if err != nil {
+						panic(err)
+					}
+					return exitCode
 				}
-				return exitCode
+			} else {
+				// Don't wait return exit code 0
+				exitCode = 0
 			}
 			daemonToken = token
 		}

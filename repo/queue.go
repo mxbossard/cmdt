@@ -15,32 +15,73 @@ import (
 type OperationKind string
 
 const (
-	TestOperation   = OperationKind("Test")
-	ReportOperation = OperationKind("Report")
+	TestKind   = OperationKind("test")
+	ReportKind = OperationKind("report")
 )
+*/
 
-type ReportOperation struct {
-	TestSuite string
-	Wait      bool
+type Operater interface {
+	//Kind() OperationKind
+	Suite() string
+	Seq() int
+	Block() bool
+	ExitCode() int
+	SetExitCode(int)
 }
 
-type Operation[T TestOperation | ReportOperation] interface {
-	Wait() bool
-	Op() T
+type OperationBase struct {
+	//Token     string
+	//Type      OperationKind
+	TestSuite string
+	Sequence  int
+	Blocking  bool
+	Exit      int
+}
+
+/*
+func (o OperationBase) Kind() OperationKind {
+	return o.Type
 }
 */
 
+func (o OperationBase) Suite() string {
+	return o.TestSuite
+}
+
+func (o OperationBase) Seq() int {
+	return o.Sequence
+}
+
+func (o OperationBase) Block() bool {
+	return o.Blocking
+}
+
+func (o OperationBase) ExitCode() int {
+	return o.Exit
+}
+
+func (o *OperationBase) SetExitCode(code int) {
+	o.Exit = code
+}
+
 type TestOperation struct {
-	Token     string
-	TestSuite string
-	Def       model.TestDefinition
-	Blocking  bool
-	ExitCode  int
+	OperationBase
+	Definition model.TestDefinition
+}
+
+type ReportOperation struct {
+	OperationBase
+	Definition model.ReportDefinition
+}
+
+type ReportAllOperation struct {
+	OperationBase
+	Definition model.ReportDefinition
 }
 
 type OperationQueue struct {
 	//TestSuite  string
-	Operations []TestOperation
+	Operations []Operater
 	Blocked    bool
 }
 
@@ -49,32 +90,11 @@ type OperationQueueRepo struct {
 	QueuedSuites    []string
 	Queues          map[string]OperationQueue
 	OpenedSuites    []string
-	OperationsDone  []*TestOperation
 	lastUpdate      time.Time
-	//LastUnqueued map[string]*TestOperation
-	//BlockingOperations []*TestOperation
 }
 
-func (r *OperationQueueRepo) ReportOperationDone(op *TestOperation) (err error) {
-	r.OperationsDone = append(r.OperationsDone, op)
-	err = r.Persist()
-	return
-}
-
-func (r *OperationQueueRepo) WaitOperationDone(op *TestOperation, timeout time.Duration) (err error) {
-	start := time.Now()
-	for time.Since(start) < timeout {
-		if collections.Contains(&r.OperationsDone, op) {
-			return
-		}
-		time.Sleep(1 * time.Millisecond)
-	}
-	err = errors.New("WaitOperationDone() timed out")
-	return
-}
-
-func (r *OperationQueueRepo) Queue(op TestOperation) {
-	testSuite := op.Def.TestSuite
+func (r *OperationQueueRepo) Queue(op Operater) {
+	testSuite := op.Suite()
 	q, ok := r.Queues[testSuite]
 	if !ok {
 		r.QueuedSuites = append(r.QueuedSuites, testSuite)
@@ -85,7 +105,7 @@ func (r *OperationQueueRepo) Queue(op TestOperation) {
 	r.Queues[testSuite] = q
 }
 
-func (r *OperationQueueRepo) Unqueue() (ok bool, op *TestOperation) {
+func (r *OperationQueueRepo) Unqueue() (ok bool, op Operater) {
 	err := r.Update()
 	if err != nil {
 		panic(err)
@@ -133,9 +153,9 @@ func (r *OperationQueueRepo) Unqueue() (ok bool, op *TestOperation) {
 	if size > 0 {
 		// Unqueue operation
 		ok = true
-		op = &q.Operations[0]
+		op = q.Operations[0]
 		q.Operations = q.Operations[1:]
-		q.Blocked = op.Blocking
+		q.Blocked = op.Block()
 		r.Queues[electedSuite] = q
 	}
 
@@ -156,6 +176,25 @@ func (r *OperationQueueRepo) Unqueue() (ok bool, op *TestOperation) {
 	}
 
 	return
+}
+
+func (r *OperationQueueRepo) WaitEmptyQueue(testSuite string, timeout time.Duration) {
+	start := time.Now()
+	for time.Since(start) < timeout {
+		err := r.Update()
+		if err != nil {
+			panic(err)
+		}
+		if q, ok := r.Queues[testSuite]; ok {
+			if len(q.Operations) == 0 {
+				// Queue is empty
+				return
+			}
+		}
+		time.Sleep(1 * time.Millisecond)
+	}
+	err := errors.New("WaitOperationDone() timed out")
+	panic(err)
 }
 
 func (r *OperationQueueRepo) Unblock(op *TestOperation) {

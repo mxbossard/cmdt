@@ -152,7 +152,7 @@ $cmdt0 @test=meta1/"without token two" @stderr:"PASSED" @stderr:"#02" @-- $cmdt1
 $cmdt0 @test=meta1/"command before rule stop" @fail @stderr:"before rule parsing stopper" @-- $cmdt1 true @-- @success
 $cmdt0 @test=meta1/"rule on 2 args" @stderr:"PASSED" @-- $cmdt1 @stdout:foo bar @-- echo foo bar
 #$cmdt0 @test=meta1/ @exit=1 @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt1 @report
-$cmdt0 @test=meta1/ @exit=1 @-- $cmdt1 @report
+$cmdt0 @test=meta1/ @exit=1 @-- $cmdt1 @report=main
 
 >&2 echo "## Test printed token"
 tk0=$( $cmdt @init @printToken 2> /dev/null )
@@ -160,7 +160,7 @@ tk0=$( $cmdt @init @printToken 2> /dev/null )
 $cmdt0 @init=meta2
 $cmdt0 @test=meta2/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt true @token=$tk0
 $cmdt0 @test=meta2/ @stderr:"PASSED" @stderr:"#02" @-- $cmdt true @token=$tk0
-$cmdt0 @test=meta2/ @fail @-- $cmdt @report
+$cmdt0 @test=meta2/ @fail @-- $cmdt @report=main
 $cmdt0 @test=meta2/ @stderr:"Successfuly ran" @-- $cmdt @report @token=$tk0
 $cmdt @report 2>&1 | grep -v "Failures"
 
@@ -171,7 +171,7 @@ $cmdt0 @init=meta3
 $cmdt0 @test=meta3/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt true
 $cmdt0 @test=meta3/ @stderr:"PASSED" @stderr:"#02" @-- $cmdt true
 $cmdt0 @test=meta3/ @stderr:"Successfuly ran" @-- $cmdt @report=main
-$cmdt0 @test=meta3/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt @report @token=$tk0
+$cmdt0 @test=meta3/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt @report=main @token=$tk0
 
 $cmdt0 @init=meta4
 $cmdt0 @test=meta4/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt @test=sub4/ true
@@ -415,7 +415,8 @@ $cmdt0 @test=assertion/ @fail @-- $cmdt1 @report=main
 
 >&2 echo "## Test stdin"
 $cmdt0 @init=stdin
-echo foo | $cmdt0 @test=stdin/ @stdout="foo\n" cat
+echo foo | $cmdt @async=false @test=stdin/ @stdout="foo\n" cat
+# TODO test error raised if stdin used witch @async=true
 
 
 >&2 echo "## Test file ref content in assertions"
@@ -438,8 +439,8 @@ $cmdt0 @test=export/ @stdout~"/foo='bar'/m" sh -c "export"
 
 
 >&2 echo "## Interlaced tests"
-$cmdt0 @init="testA"
-$cmdt0 @init="testB"
+$cmdt0 @init="testA" @verbose=0
+$cmdt0 @init="testB" @verbose=0
 
 $cmdt0 echo ignored1 @ignore @test="testA/"
 $cmdt0 echo ignored2 @ignore @test="testA/"
@@ -648,7 +649,8 @@ $cmdt0 @test=container_wo_token/run_in_container @stderr:PASSED @-- $cmdt1 @cont
 $cmdt0 @test=container_wo_token/ @stderr:PASSED @-- $cmdt1 @container true
 $cmdt0 @test=container_wo_token/ @stderr:PASSED @-- $cmdt1 @container @fail false
 
-$cmdt0 @test=container_wo_token/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt1 @report=main
+#$cmdt0 @test=container_wo_token/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt1 @report=main
+$cmdt0 @test=container_wo_token/ @stderr:"3 success" @-- $cmdt1 @report=main
 
 export __CMDT_TOKEN="$token"
 

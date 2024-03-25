@@ -178,10 +178,10 @@ func ReadEnvPpid() (ppid int) {
 		if err != nil {
 			panic(err)
 		}
-		logger.Warn("found env ppid", "ppid", ppid)
+		logger.Debug("found env ppid", "ppid", ppid)
 	} else {
 		ppid = os.Getppid()
-		logger.Warn("env ppid not found", "ppid", ppid)
+		logger.Debug("env ppid not found", "ppid", ppid)
 	}
 	return
 }
@@ -210,7 +210,7 @@ func ForgeContextualToken() (string, error) {
 	if err != nil {
 		err = fmt.Errorf("cannot hash workspace dir: %w", err)
 	}
-	logger.Warn("token signature", "workDirPath", "token", token, workDirPath, "ppidStr", ppidStr)
+	logger.Debug("token signature", "workDirPath", "token", token, workDirPath, "ppidStr", ppidStr)
 	//log.Printf("contextual token: %s base on workDirPath: %s and ppid: %s\n", token, workDirPath, ppid)
 	return token, err
 }

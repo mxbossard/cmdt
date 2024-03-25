@@ -491,6 +491,8 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 
 		case "async":
 			c.Async, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
+		case "wait":
+			c.Wait, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
 		case "ignore":
 			c.Ignore, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
 		case "stopOnFailure":

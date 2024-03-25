@@ -17,7 +17,9 @@ const (
 	DefaultInitedVerboseLevel   = SHOW_FAILED_OUTS
 	DefaultInitlessVerboseLevel = DefaultVerboseLevel
 	DefaultInitedAsync          = true
+	DefaultInitedWait           = false
 	DefaultInitlessAsync        = false
+	DefaultInitlessWait         = true
 	StartDebugLevel             = WARN
 	DefaultDebugLevel           = INFO
 	DefaultTooMuchFailures      = 3
@@ -94,7 +96,8 @@ var (
 		ruleDef("container", "", "="), ruleDef("dirtyContainer", "=")}
 	// Config of test flow (init -> test -> report)
 	FlowConfigs = []RuleDefinition{ruleDef("token", "="), ruleDef("verbose", "", "="),
-		ruleDef("debug", "", "="), ruleDef("failuresLimit", "="), ruleDef("async", "", "="), ruleDef("keep", "", "=")}
+		ruleDef("debug", "", "="), ruleDef("failuresLimit", "="), ruleDef("async", "", "="), ruleDef("wait", "", "="),
+		ruleDef("keep", "", "=")}
 	Assertions = []RuleDefinition{ruleDef("success", ""), ruleDef("fail", ""), ruleDef("exit", "="),
 		ruleDef("cmd", "="), ruleDef("exists", "="),
 		ruleDef("stdout", "=", ":", "~", "!=", "!:", "!~", "@=", "@:"),
@@ -132,6 +135,7 @@ func NewGlobalDefaultConfig() Config {
 func NewSuiteDefaultConfig() Config {
 	return Config{
 		Async:           utilz.OptionalOf(DefaultInitedAsync),
+		Wait:            utilz.OptionalOf(DefaultInitedWait),
 		TooMuchFailures: utilz.OptionalOf(DefaultTooMuchFailures),
 		SuiteStartTime:  utilz.OptionalOf(time.Now()),
 		SuiteTimeout:    utilz.OptionalOf(120 * time.Second),
@@ -142,6 +146,7 @@ func NewSuiteDefaultConfig() Config {
 func NewInitlessSuiteDefaultConfig() Config {
 	return Config{
 		Async:           utilz.OptionalOf(DefaultInitlessAsync),
+		Wait:            utilz.OptionalOf(DefaultInitlessWait),
 		TooMuchFailures: utilz.OptionalOf(TooMuchFailuresNoLimit),
 		SuiteStartTime:  utilz.OptionalOf(time.Now()),
 		SuiteTimeout:    utilz.OptionalOf(3600 * time.Second),
@@ -210,6 +215,7 @@ type Config struct {
 	TestSuite utilz.Optional[string] `yaml:""`
 	TestName  utilz.Optional[string] `yaml:""`
 	Async     utilz.Optional[bool]   `yaml:""`
+	Wait      utilz.Optional[bool]   `yaml:""`
 
 	Prefix          utilz.Optional[string]        `yaml:""`
 	CmdAndArgs      []string                      `yaml:""`
@@ -276,6 +282,7 @@ func (c *Config) Merge(right Config) {
 	c.TestSuite.Merge(right.TestSuite)
 	c.TestName.Merge(right.TestName)
 	c.Async.Merge(right.Async)
+	c.Wait.Merge(right.Wait)
 
 	c.Prefix.Merge(right.Prefix)
 	c.TooMuchFailures.Merge(right.TooMuchFailures)

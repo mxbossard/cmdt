@@ -326,14 +326,14 @@ func (r FileRepo) ListTestSuites() (suites []string, err error) {
 	return
 }
 
-func (r FileRepo) QueueOperation(op *TestOperation) (err error) {
-	r.queuesRepo.Queue(*op)
+func (r FileRepo) QueueOperation(op Operater) (err error) {
+	r.queuesRepo.Queue(op)
 	err = r.queuesRepo.Persist()
 	//logger.Warn("QueueOperation()", "operation", *op, "err", err)
 	return
 }
 
-func (r FileRepo) UnqueueOperation() (op *TestOperation, err error) {
+func (r FileRepo) UnqueueOperation() (op Operater, err error) {
 	var ok bool
 	ok, op = r.queuesRepo.Unqueue()
 	if ok {
@@ -439,14 +439,13 @@ func persistSuiteConfig(token string, cfg model.Config) (err error) {
 	if err2 != nil {
 		return err2
 	}
-	logger.Warn("Persisting config", "suite", testSuite, "file", contextFilepath)
-	logger.Debug("Persisting config", "suite", testSuite, "file", contextFilepath, "cfg", cfg)
+	logger.Debug("Persisting config", "suite", testSuite, "file", contextFilepath, "content", content)
 	err2 = os.WriteFile(contextFilepath, content, 0600)
 	if err2 != nil {
 		err2 = fmt.Errorf("cannot persist context: %w", err2)
 		return err2
 	}
-	logger.Warn("Persisted config", "suite", testSuite, "file", contextFilepath, "content", content)
+	//logger.Warn("Persisted config", "suite", testSuite, "file", contextFilepath, "content", content)
 	return nil
 	//})
 	//return

@@ -58,16 +58,39 @@ type daemon struct {
 	repo  repo.FileRepo
 }
 
-func (d *daemon) run() {
+func (d daemon) unqueue() (ok bool) {
+	op, err := d.repo.UnqueueOperation()
+	if err != nil {
+		panic(err)
+	}
+	if op != nil {
+		logger.Debug("daemon: unqueued operation.")
+		switch o := op.(type) {
+		case *repo.TestOperation:
+			op.SetExitCode(d.performTest(o.Definition))
+		case *repo.ReportOperation:
+			op.SetExitCode(d.report(o.Definition))
+		case *repo.ReportAllOperation:
+			op.SetExitCode(d.reportAll(o.Definition))
+		default:
+			err = fmt.Errorf("unknown operation %T", op)
+			panic(err)
+		}
+		err = d.repo.State.ReportOperationDone(op)
+		if err != nil {
+			panic(err)
+		}
+		ok = true
+	}
+	return
+}
+
+func (d daemon) run() {
 	logger.Info("daemon: starting ...", "token", d.token)
 	lastUnqueue := time.Now()
 	for {
 		//logger.Warn("daemon: unqueueing ...")
-		testOp, err := d.repo.UnqueueOperation()
-		if err != nil {
-			panic(err)
-		}
-		if testOp == nil {
+		if ok := d.unqueue(); !ok {
 			// nothing to unqueue wait 1ms
 			duration := time.Since(lastUnqueue)
 			if duration > ExtraRunningSecs*time.Second {
@@ -78,13 +101,8 @@ func (d *daemon) run() {
 			time.Sleep(time.Millisecond)
 			continue
 		}
-		logger.Debug("daemon: unqueued operation.")
+
 		lastUnqueue = time.Now()
-		testOp.ExitCode = d.performTest(testOp.Def)
-		err = d.repo.State.ReportOperationDone(testOp)
-		if err != nil {
-			panic(err)
-		}
 	}
 	logger.Debug("daemon: stopping ...", "token", d.token)
 }
@@ -94,6 +112,20 @@ func (d daemon) performTest(testDef model.TestDefinition) (exitCode int) {
 	logger.Debug("daemon: processing test...")
 	exitCode = service.ProcessTestDef(testDef)
 	logger.Debug("daemon: test done.")
+	return
+}
+
+func (d daemon) report(def model.ReportDefinition) (exitCode int) {
+	logger.Debug("daemon: reporting test suite...")
+	exitCode = service.ProcessReportDef(def)
+	logger.Debug("daemon: reporting done.")
+	return
+}
+
+func (d daemon) reportAll(def model.ReportDefinition) (exitCode int) {
+	logger.Debug("daemon: reporting all test suites...")
+	exitCode = service.ProcessReportAllDef(def)
+	logger.Debug("daemon: reporting done.")
 	return
 }
 
@@ -182,13 +214,7 @@ func TakeOver() {
 	}
 
 	// Last unqueue
-	testOp, err := d.repo.UnqueueOperation()
-	if err != nil {
-		panic(err)
-	}
-	if testOp != nil {
-		d.performTest(testOp.Def)
-	}
+	_ = d.unqueue()
 
 	// Clear PID file
 	d.ClearPid()

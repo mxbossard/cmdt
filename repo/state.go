@@ -12,7 +12,7 @@ import (
 )
 
 type State struct {
-	OperationsDone []*TestOperation
+	Done []Operater
 }
 
 type FileState struct {
@@ -86,13 +86,13 @@ func (s *FileState) update() (err error) {
 	s.lastUpdate = time.Now()
 	return
 }
-func (s *FileState) ReportOperationDone(op *TestOperation) (err error) {
+func (s *FileState) ReportOperationDone(op Operater) (err error) {
 	logger.Debug("ReportOperationDone()", "operation", op)
 	err = s.lock()
 	if err != nil {
 		return
 	}
-	s.state.OperationsDone = append(s.state.OperationsDone, op)
+	s.state.Done = append(s.state.Done, op)
 	err = s.persist()
 	if err != nil {
 		return
@@ -104,14 +104,14 @@ func (s *FileState) ReportOperationDone(op *TestOperation) (err error) {
 	return
 }
 
-func (s *FileState) WaitOperationDone(op *TestOperation, timeout time.Duration) (exitCode int, err error) {
-	logger.Debug("waiting operation done...", "operation", *op, "timeout", timeout)
+func (s *FileState) WaitOperationDone(op Operater, timeout time.Duration) (exitCode int, err error) {
+	logger.Debug("waiting operation done...", "operation", op, "timeout", timeout)
 	start := time.Now()
 	for time.Since(start) < timeout {
 		s.update()
-		for _, done := range s.state.OperationsDone {
-			if done.TestSuite == op.TestSuite && done.Def.Seq == op.Def.Seq {
-				logger.Debug("operation finished.", "operation", *op)
+		for _, done := range s.state.Done {
+			if done.Suite() == op.Suite() && done.Seq() == op.Seq() {
+				logger.Debug("operation finished.", "operation", op)
 				return
 			}
 		}

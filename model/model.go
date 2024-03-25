@@ -28,6 +28,12 @@ type TestDefinition struct {
 	//Assertions []Assertion
 }
 
+type ReportDefinition struct {
+	Token     string
+	TestSuite string
+	Config    Config
+}
+
 type TestOutcome struct {
 	TestDefinition
 	//TestSuite string
