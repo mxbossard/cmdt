@@ -96,6 +96,7 @@ func (r *OperationQueueRepo) Unqueue() (ok bool, op *TestOperation) {
 	logger.Debug("Unqueue()", "QueuedSuites", r.QueuedSuites, "OpenedSuites", r.OpenedSuites)
 	var electedSuite string
 	for _, suite := range r.OpenedSuites {
+		// Elect first open not blocked queue
 		q := r.Queues[suite]
 		if q.Blocked {
 			// blocked queue => cannot elect it
@@ -116,7 +117,10 @@ func (r *OperationQueueRepo) Unqueue() (ok bool, op *TestOperation) {
 	}
 
 	if electedSuite != "" {
-		r.OpenedSuites = append(r.OpenedSuites, electedSuite)
+		// open the queue if not done already
+		if !collections.Contains(&r.OpenedSuites, electedSuite) {
+			r.OpenedSuites = append(r.OpenedSuites, electedSuite)
+		}
 	} else {
 		// no queue available to unqueue
 		return

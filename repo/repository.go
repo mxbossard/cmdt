@@ -431,7 +431,6 @@ func persistSuiteConfig(token string, cfg model.Config) (err error) {
 	if err != nil {
 		return
 	}
-	//err = cfg.TestSuite.IfPresent(func(testSuite string) error {
 	contextFilepath, err2 := testsuiteConfigFilepath(testSuite, token)
 	if err2 != nil {
 		return err2
@@ -440,12 +439,14 @@ func persistSuiteConfig(token string, cfg model.Config) (err error) {
 	if err2 != nil {
 		return err2
 	}
+	logger.Warn("Persisting config", "suite", testSuite, "file", contextFilepath)
 	logger.Debug("Persisting config", "suite", testSuite, "file", contextFilepath, "cfg", cfg)
 	err2 = os.WriteFile(contextFilepath, content, 0600)
 	if err2 != nil {
 		err2 = fmt.Errorf("cannot persist context: %w", err2)
 		return err2
 	}
+	logger.Warn("Persisted config", "suite", testSuite, "file", contextFilepath, "content", content)
 	return nil
 	//})
 	//return
