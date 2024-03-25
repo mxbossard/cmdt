@@ -24,6 +24,7 @@ const (
 	TooMuchFailuresNoLimit      = -1
 
 	ContextTokenEnvVarName    = "__CMDT_TOKEN"
+	ContextPpidEnvVarName     = "__CMDT_PPID"
 	GlobalConfigTestSuiteName = "__global"
 	DefaultTestSuiteName      = "main"
 

@@ -69,7 +69,7 @@ func NewSuiteContext(token, testSuite string, initless bool, action model.Action
 	return suiteCtx
 }
 
-func NewTestContext(token, testSuite string, inputCfg model.Config) TestContext {
+func NewTestContext(token, testSuite string, inputCfg model.Config, ppid int) TestContext {
 	suiteCtx := NewSuiteContext(token, testSuite, true, model.TestAction, model.Config{})
 	mergedCfg := suiteCtx.Config
 	mergedCfg.Merge(inputCfg)
@@ -80,7 +80,7 @@ func NewTestContext(token, testSuite string, inputCfg model.Config) TestContext 
 	testCtx.Config = mergedCfg
 	testCtx.Suite = suiteCtx
 	//logger.Warn("NewTestContext", "testCtx", testCtx)
-	err := testCtx.initExecuter()
+	err := testCtx.initExecuter(ppid)
 	if err != nil {
 		testCtx.NoErrorOrFatal(err)
 	}
@@ -95,7 +95,7 @@ func NewTestContext(token, testSuite string, inputCfg model.Config) TestContext 
 }
 
 func NewTestContext2(testDef model.TestDefinition) (ctx TestContext) {
-	return NewTestContext(testDef.Token, testDef.TestSuite, testDef.Config)
+	return NewTestContext(testDef.Token, testDef.TestSuite, testDef.Config, testDef.Ppid)
 }
 
 type GlobalContext struct {
@@ -300,7 +300,7 @@ func (c TestContext) AssertCmdExecBlocking(seq int, assertions []model.Assertion
 	return
 }
 
-func (c *TestContext) initExecuter() (err error) {
+func (c *TestContext) initExecuter(ppid int) (err error) {
 	cfg := c.Config
 	cmdAndArgs := cfg.CmdAndArgs
 	if len(cmdAndArgs) == 0 {
@@ -339,6 +339,8 @@ func (c *TestContext) initExecuter() (err error) {
 		}
 	}
 
+	ppidStr := fmt.Sprintf("%d", ppid)
+	cmd.AddEnv(model.ContextPpidEnvVarName, ppidStr)
 	c.CmdExec = cmd
 
 	// get test dir

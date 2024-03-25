@@ -31,6 +31,7 @@ type Operation[T TestOperation | ReportOperation] interface {
 */
 
 type TestOperation struct {
+	Token     string
 	TestSuite string
 	Def       model.TestDefinition
 	Blocking  bool

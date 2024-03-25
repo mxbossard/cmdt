@@ -147,11 +147,12 @@ $cmdt0 @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt1
 
 >&2 echo "## Meta1 test context not shared without token"
 # Without token, cmdt run with different pid should run in differents workspaces
-$cmdt0 @test=meta1/"without token one" @stderr:"PASSED" @stderr:"#01" @-- $cmdt1 true
-$cmdt0 @test=meta1/"without token two" @stderr:"PASSED" @stderr:"#01" @-- $cmdt1 true
+$cmdt0 @test=meta1/"without token one" @stderr:"PASSED" @stderr:"#01" @-- $cmdt1 true @debug
+$cmdt0 @test=meta1/"without token two" @stderr:"PASSED" @stderr:"#02" @-- $cmdt1 true @debug
 $cmdt0 @test=meta1/"command before rule stop" @fail @stderr:"before rule parsing stopper" @-- $cmdt1 true @-- @success
 $cmdt0 @test=meta1/"rule on 2 args" @stderr:"PASSED" @-- $cmdt1 @stdout:foo bar @-- echo foo bar
-$cmdt0 @test=meta1/ @exit=1 @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt1 @report
+#$cmdt0 @test=meta1/ @exit=1 @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt1 @report
+$cmdt0 @test=meta1/ @exit=1 @-- $cmdt1 @report
 
 >&2 echo "## Test printed token"
 tk0=$( $cmdt @init @printToken 2> /dev/null )

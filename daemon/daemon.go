@@ -200,7 +200,7 @@ func TakeOver() {
 }
 
 func LanchProcessIfNeeded(token string) error {
-	logger.Warn("daemon: should I launch daemon ?", "token", token)
+	logger.Info("daemon: should I launch daemon ?", "token", token)
 	if token == "" {
 		// No token => no daemon to launch
 		return nil

@@ -323,7 +323,8 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int, exitCod
 		}
 	case model.TestAction:
 		testSuite := inputConfig.TestSuite.Get()
-		testCtx := facade.NewTestContext(token, testSuite, inputConfig)
+		ppid := utils.ReadEnvPpid()
+		testCtx := facade.NewTestContext(token, testSuite, inputConfig, ppid)
 		logger.Debug("Forged context", "ctx", testCtx)
 		testCfg := testCtx.Config
 		token = testCtx.Token
@@ -334,15 +335,26 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int, exitCod
 
 		testCtx.NoErrorOrFatal(agg.Return())
 
-		testDef := model.TestDefinition{Token: token, TestSuite: testSuite, Seq: seq, Config: testCfg,
-			SuitePrefix: testCtx.Suite.Config.Prefix.Get(), CmdArgs: signifientArgs}
+		testDef := model.TestDefinition{
+			Ppid:        ppid,
+			Token:       token,
+			TestSuite:   testSuite,
+			Seq:         seq,
+			Config:      testCfg,
+			SuitePrefix: testCtx.Suite.Config.Prefix.Get(),
+			CmdArgs:     signifientArgs,
+		}
 
 		if testCfg.Async.Is(false) {
 			logger.Info("executing test blocking (not queueing test)", "suite", testSuite, "seq", seq)
 			exitCode = ProcessTestDef(testDef)
 		} else {
 			logger.Info("executing test async (queueing test)", "suite", testSuite, "seq", seq)
-			testOp := repo.TestOperation{TestSuite: testSuite, Def: testDef, Blocking: !testCfg.Async.Get()}
+			testOp := repo.TestOperation{
+				TestSuite: testSuite,
+				Def:       testDef,
+				Blocking:  !testCfg.Async.Get(),
+			}
 			testCtx.Repo.QueueOperation(&testOp)
 
 			wait = func() int {
