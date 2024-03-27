@@ -322,28 +322,34 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int, exitCod
 		dpl.Quiet(suiteCtx.Config.Quiet)
 		exitCode, err = InitTestSuite(suiteCtx)
 	case model.ReportAction:
+		// Report can be async (run by daemon) or not
+		// Report can wait (for termination) or not
+		// Report must always be delayed until all tests are done
+
+		//inputConfig.Async.Set(false) // For now enforce async false on report
 		if inputConfig.ReportAll.Is(true) {
+			// Reporting All test suite
 			if agg.GotError() {
 				log.Fatal(agg)
 			}
 			globalCtx := facade.NewGlobalContext(token, inputConfig)
 			if globalCtx.Config.Async.Is(false) {
+				// Process report all without daemon
 				logger.Debug("Forged context", "ctx", globalCtx)
-				logger.Info("executing report all blocking (not queueing test)")
+				logger.Warn("executing report all blocking (not queueing test)")
 				dpl.Quiet(globalCtx.Config.Quiet)
+				// TODO: wait all tests run
+				// Daemon must be off or No test remaining in suite queue
+				globalCtx.Repo.WaitAllEmpty(globalCtx.Config.SuiteTimeout.Get()) // FIXME: bad timeout
 				exitCode, err = ReportAllTestSuites(globalCtx)
 			} else {
-				logger.Info("executing report all async (queueing report)")
+				// Delegate report all processing to daemon
+				logger.Warn("executing report all async (queueing report)")
 				def := model.ReportDefinition{
 					Token:  token,
 					Config: globalCtx.Config,
 				}
-				op := repo.ReportAllOperation{
-					OperationBase: repo.OperationBase{
-						Blocking: true, // FIXME should not block if test can be run simultaneously
-					},
-					Definition: def,
-				}
+				op := repo.ReportAllOperation(true, def) // FIXME should not block if test can be run simultaneously
 				globalCtx.Repo.QueueOperation(&op)
 
 				if globalCtx.Config.Wait.Is(true) {
@@ -360,27 +366,25 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int, exitCod
 				}
 			}
 		} else {
+			// Reporting One test suite
 			testSuite := inputConfig.TestSuite.Get()
 			suiteCtx := facade.NewSuiteContext(token, testSuite, false, action, inputConfig)
 			suiteCtx.NoErrorOrFatal(agg.Return())
 			if suiteCtx.Config.Async.Is(false) {
+				// Process report without daemon
 				logger.Debug("Forged context", "ctx", suiteCtx)
-				logger.Info("executing report blocking (not queueing test)")
+				logger.Warn("executing report blocking (not queueing report)")
 				dpl.Quiet(suiteCtx.Config.Quiet)
+				suiteCtx.Repo.WaitEmptyQueue(testSuite, suiteCtx.Config.SuiteTimeout.Get())
 				exitCode, err = ReportTestSuite(suiteCtx)
 			} else {
-				logger.Info("executing report async (queueing report)")
+				// Delegate report processing to daemon
+				logger.Warn("executing report async (queueing report)")
 				def := model.ReportDefinition{
 					Token:  token,
 					Config: suiteCtx.Config,
 				}
-				op := repo.ReportOperation{
-					OperationBase: repo.OperationBase{
-						TestSuite: testSuite,
-						Blocking:  true, // FIXME should not block if test can be run simultaneously
-					},
-					Definition: def,
-				}
+				op := repo.ReportOperation(testSuite, true, def) // FIXME should not block if test can be run simultaneously
 				suiteCtx.Repo.QueueOperation(&op)
 
 				if suiteCtx.Config.Wait.Is(true) {
@@ -422,18 +426,14 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int, exitCod
 		}
 
 		if testCfg.Async.Is(false) {
+			// Process test without daemon
 			// enforce wait
 			logger.Info("executing test blocking (not queueing test)", "suite", testSuite, "seq", seq)
 			exitCode = ProcessTestDef(testDef)
 		} else {
+			// Delegate test processing to daemon
 			logger.Info("executing test async (queueing test)", "suite", testSuite, "seq", seq)
-			testOp := repo.TestOperation{
-				OperationBase: repo.OperationBase{
-					TestSuite: testSuite,
-					Blocking:  true, // FIXME should not block if test can be run simultaneously
-				},
-				Definition: testDef,
-			}
+			testOp := repo.TestOperation(testSuite, seq, true, testDef) // FIXME should not block if test can be run simultaneously
 			testCtx.Repo.QueueOperation(&testOp)
 
 			if testCfg.Wait.Is(true) {

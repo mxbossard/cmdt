@@ -11,17 +11,15 @@ import (
 	"mby.fr/utils/collections"
 )
 
-/*
 type OperationKind string
 
 const (
 	TestKind   = OperationKind("test")
 	ReportKind = OperationKind("report")
 )
-*/
 
 type Operater interface {
-	//Kind() OperationKind
+	Kind() string
 	Suite() string
 	Seq() int
 	Block() bool
@@ -31,18 +29,16 @@ type Operater interface {
 
 type OperationBase struct {
 	//Token     string
-	//Type      OperationKind
+	Type      string
 	TestSuite string
 	Sequence  int
 	Blocking  bool
 	Exit      int
 }
 
-/*
-func (o OperationBase) Kind() OperationKind {
+func (o OperationBase) Kind() string {
 	return o.Type
 }
-*/
 
 func (o OperationBase) Suite() string {
 	return o.TestSuite
@@ -64,25 +60,91 @@ func (o *OperationBase) SetExitCode(code int) {
 	o.Exit = code
 }
 
-type TestOperation struct {
-	OperationBase
-	Definition model.TestDefinition
+type TestOp struct {
+	OperationBase //`yaml:",inline"`
+	Definition    model.TestDefinition
 }
 
-type ReportOperation struct {
+func TestOperation(suite string, seq int, blocking bool, def model.TestDefinition) TestOp {
+	return TestOp{
+		OperationBase: OperationBase{
+			Type:      string(TestKind),
+			TestSuite: suite,
+			Sequence:  seq,
+			Blocking:  blocking,
+		},
+		Definition: def,
+	}
+}
+
+type ReportOp struct {
 	OperationBase
 	Definition model.ReportDefinition
 }
 
-type ReportAllOperation struct {
+func ReportOperation(suite string, blocking bool, def model.ReportDefinition) ReportOp {
+	return ReportOp{
+		OperationBase: OperationBase{
+			Type:      string(ReportKind),
+			TestSuite: suite,
+			Blocking:  blocking,
+		},
+		Definition: def,
+	}
+}
+
+type ReportAllOp struct {
 	OperationBase
 	Definition model.ReportDefinition
+}
+
+func ReportAllOperation(blocking bool, def model.ReportDefinition) ReportAllOp {
+	return ReportAllOp{
+		OperationBase: OperationBase{
+			Type:     string(ReportKind),
+			Blocking: blocking,
+		},
+		Definition: def,
+	}
+}
+
+type serializedOp struct {
+	Test      *TestOp      `yaml:",omitempty"`
+	Report    *ReportOp    `yaml:",omitempty"`
+	ReportAll *ReportAllOp `yaml:",omitempty"`
+}
+
+func buildSerializedOp(op Operater) (sop serializedOp) {
+	switch o := op.(type) {
+	case *TestOp:
+		sop.Test = o
+	case *ReportOp:
+		sop.Report = o
+	case *ReportAllOp:
+		sop.ReportAll = o
+	default:
+		err := fmt.Errorf("unable to serialize operation")
+		panic(err)
+	}
+	return
+}
+
+func deserializeOp(sop serializedOp) (op Operater) {
+	if sop.Test != nil {
+		return sop.Test
+	} else if sop.Report != nil {
+		return sop.Report
+	} else if sop.ReportAll != nil {
+		return sop.ReportAll
+	}
+	err := fmt.Errorf("unable to deserialize operation")
+	panic(err)
 }
 
 type OperationQueue struct {
 	//TestSuite  string
-	Operations []Operater
-	Blocked    bool
+	Operations []serializedOp
+	Blocking   *serializedOp
 }
 
 type OperationQueueRepo struct {
@@ -101,7 +163,9 @@ func (r *OperationQueueRepo) Queue(op Operater) {
 		q = OperationQueue{}
 	}
 	logger.Debug("Queue()", "testSuite", testSuite, "operation", op)
-	q.Operations = append(q.Operations, op)
+
+	sop := buildSerializedOp(op)
+	q.Operations = append(q.Operations, sop)
 	r.Queues[testSuite] = q
 }
 
@@ -118,7 +182,7 @@ func (r *OperationQueueRepo) Unqueue() (ok bool, op Operater) {
 	for _, suite := range r.OpenedSuites {
 		// Elect first open not blocked queue
 		q := r.Queues[suite]
-		if q.Blocked {
+		if q.Blocking != nil {
 			// blocked queue => cannot elect it
 			continue
 		}
@@ -147,15 +211,22 @@ func (r *OperationQueueRepo) Unqueue() (ok bool, op Operater) {
 	}
 
 	q := r.Queues[electedSuite]
+	if q.Blocking != nil {
+		err = fmt.Errorf("q %s was elected but is blocked", electedSuite)
+		panic(err)
+	}
 	size := len(q.Operations)
 	logger.Debug("Unqueue()", "electedSuite", electedSuite, "size", size)
 
 	if size > 0 {
 		// Unqueue operation
 		ok = true
-		op = q.Operations[0]
+		sop := q.Operations[0]
+		op = deserializeOp(sop)
 		q.Operations = q.Operations[1:]
-		q.Blocked = op.Block()
+		if op.Block() {
+			q.Blocking = &sop
+		}
 		r.Queues[electedSuite] = q
 	}
 
@@ -175,7 +246,24 @@ func (r *OperationQueueRepo) Unqueue() (ok bool, op Operater) {
 		delete(r.Queues, electedSuite)
 	}
 
+	logger.Warn("Unqueue()", "ok", ok, "ok2", op != nil, "opened", r.OpenedSuites, "electedSuite", electedSuite, "remaining", len(q.Operations), "blocked", q.Blocking != nil)
+
 	return
+}
+
+func (r *OperationQueueRepo) Unblock(op Operater) {
+	if op == nil {
+		return
+	}
+	suite := op.Suite()
+	q := r.Queues[suite]
+	if q.Blocking != nil {
+		blocking := deserializeOp(*q.Blocking)
+		if blocking.Kind() == op.Kind() && blocking.Seq() == op.Seq() {
+			q.Blocking = nil
+			logger.Warn("Unblock", "suite", suite)
+		}
+	}
 }
 
 func (r *OperationQueueRepo) WaitEmptyQueue(testSuite string, timeout time.Duration) {
@@ -186,20 +274,36 @@ func (r *OperationQueueRepo) WaitEmptyQueue(testSuite string, timeout time.Durat
 			panic(err)
 		}
 		if q, ok := r.Queues[testSuite]; ok {
+			logger.Warn("WaitEmptyQueue()", "q", q)
 			if len(q.Operations) == 0 {
 				// Queue is empty
 				return
 			}
+		} else {
+			// Queue does not exists
+			return
 		}
-		time.Sleep(1 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 	}
-	err := errors.New("WaitOperationDone() timed out")
+	err := errors.New("WaitEmptyQueue() timed out")
 	panic(err)
 }
 
-func (r *OperationQueueRepo) Unblock(op *TestOperation) {
-	q := r.Queues[op.TestSuite]
-	q.Blocked = false
+func (r *OperationQueueRepo) WaitAllEmpty(timeout time.Duration) {
+	start := time.Now()
+	for time.Since(start) < timeout {
+		err := r.Update()
+		if err != nil {
+			panic(err)
+		}
+		if len(r.Queues) == 0 {
+			// No Queue anymore
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	err := errors.New("WaitAllEmpty() timed out")
+	panic(err)
 }
 
 func (r OperationQueueRepo) Persist() (err error) {
@@ -239,6 +343,7 @@ func (r *OperationQueueRepo) Update() (err error) {
 
 func LoadOperationQueueRepo(backingFilepath string) (repo OperationQueueRepo, err error) {
 	repo.backingFilepath = backingFilepath
+	repo.Queues = map[string]OperationQueue{}
 	err = repo.Update()
 	return
 }

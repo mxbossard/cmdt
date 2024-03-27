@@ -122,8 +122,9 @@ $cmdt0 @init=should_error @failuresLimit=-1
 ! $cmdt0 @test=should_error/ true @stderr:"" || die "should error because empty contains"
 ! $cmdt0 @test=should_error/ true @stderr~"" || die "should error because empty regex"
 
-$cmdt @report=should_succeed @keep || die "reporting should_succeed should exit=0"
-$cmdt @report=should_succeed @keep 2>&1 | grep "28 success" > /dev/null || die "reporting should_succeed bad success count"
+>&2 echo reporting
+$cmdt @async=false @report=should_succeed @keep || die "reporting should_succeed should exit=0"
+$cmdt @async=false @report=should_succeed @keep 2>&1 | grep "28 success" > /dev/null || die "reporting should_succeed bad success count"
 
 ! $cmdt @report=should_fail @keep >/dev/null 2>&1 || die "reporting should_fail shoud exit=1"
 if $cmdt @report=should_fail @keep 2>&1 | grep "17 failures"; then

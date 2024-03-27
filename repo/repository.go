@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -43,6 +44,13 @@ func New(token string) (repo FileRepo) {
 
 	stateBackingFilepath := filepath.Join(path, "state.yaml")
 	repo.State = FileState{backingFilepath: stateBackingFilepath}
+
+	db, err := open(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	repo.db = db
+
 	return
 }
 
@@ -51,6 +59,7 @@ type FileRepo struct {
 	queuesRepo OperationQueueRepo
 
 	State FileState
+	db    *sql.DB
 }
 
 func (r FileRepo) BackingFilepath() string {
@@ -339,8 +348,24 @@ func (r FileRepo) UnqueueOperation() (op Operater, err error) {
 	if ok {
 		err = r.queuesRepo.Persist()
 		//logger.Warn("UnqueueOperation()", "operation", *op, "err", err)
+	} else {
+		op = nil
 	}
 	return
+}
+
+func (r FileRepo) Unblock(op Operater) (err error) {
+	r.queuesRepo.Unblock(op)
+	err = r.queuesRepo.Persist()
+	return
+}
+
+func (r FileRepo) WaitEmptyQueue(testSuite string, timeout time.Duration) {
+	r.queuesRepo.WaitEmptyQueue(testSuite, timeout)
+}
+
+func (r FileRepo) WaitAllEmpty(timeout time.Duration) {
+	r.queuesRepo.WaitAllEmpty(timeout)
 }
 
 func forgeWorkDirectoryPath(token string) (tempDirPath string, err error) {

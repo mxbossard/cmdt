@@ -12,7 +12,7 @@ import (
 )
 
 type State struct {
-	Done []Operater
+	Done []serializedOp
 }
 
 type FileState struct {
@@ -82,7 +82,7 @@ func (s *FileState) update() (err error) {
 		return
 	}
 	err = yaml.Unmarshal(content, &s.state)
-	//logger.Debug("updated state", "state", s.state)
+	logger.Warn("updated state", "state", s.state)
 	s.lastUpdate = time.Now()
 	return
 }
@@ -92,7 +92,8 @@ func (s *FileState) ReportOperationDone(op Operater) (err error) {
 	if err != nil {
 		return
 	}
-	s.state.Done = append(s.state.Done, op)
+	sop := buildSerializedOp(op)
+	s.state.Done = append(s.state.Done, sop)
 	err = s.persist()
 	if err != nil {
 		return
@@ -107,14 +108,18 @@ func (s *FileState) ReportOperationDone(op Operater) (err error) {
 func (s *FileState) WaitOperationDone(op Operater, timeout time.Duration) (exitCode int, err error) {
 	logger.Debug("waiting operation done...", "operation", op, "timeout", timeout)
 	start := time.Now()
+	var ptr int
 	for time.Since(start) < timeout {
 		s.update()
-		for _, done := range s.state.Done {
-			if done.Suite() == op.Suite() && done.Seq() == op.Seq() {
+		for _, done := range s.state.Done[ptr:] {
+			doneOp := deserializeOp(done)
+			if doneOp.Suite() == op.Suite() && doneOp.Seq() == op.Seq() {
 				logger.Debug("operation finished.", "operation", op)
 				return
 			}
+			ptr += 1
 		}
+
 		/*
 			if collections.ContainsAny(&s.state.OperationsDone, op) {
 				return

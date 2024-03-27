@@ -343,12 +343,6 @@ func (c *TestContext) initExecuter(ppid int) (err error) {
 	cmd.AddEnv(model.ContextPpidEnvVarName, ppidStr)
 	c.CmdExec = cmd
 
-	// get test dir
-	// create a mock dir
-	//c.MockDir, err = mockDirectoryPath(testWorkDir)
-	if err != nil {
-		return
-	}
 	return
 }
 

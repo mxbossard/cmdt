@@ -63,14 +63,15 @@ func (d daemon) unqueue() (ok bool) {
 	if err != nil {
 		panic(err)
 	}
+	defer d.repo.Unblock(op)
 	if op != nil {
 		logger.Debug("daemon: unqueued operation.")
 		switch o := op.(type) {
-		case *repo.TestOperation:
+		case *repo.TestOp:
 			op.SetExitCode(d.performTest(o.Definition))
-		case *repo.ReportOperation:
+		case *repo.ReportOp:
 			op.SetExitCode(d.report(o.Definition))
-		case *repo.ReportAllOperation:
+		case *repo.ReportAllOp:
 			op.SetExitCode(d.reportAll(o.Definition))
 		default:
 			err = fmt.Errorf("unknown operation %T", op)
