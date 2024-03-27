@@ -31,8 +31,24 @@ func DummyMapper(s, op string) (v string, err error) {
 	return s, nil
 }
 
-func IntMapper(s, op string) (v int, err error) {
-	v, err = strconv.Atoi(s)
+func Uint16Mapper(s, op string) (v uint16, err error) {
+	var i int
+	i, err = strconv.Atoi(s)
+	v = uint16(i)
+	return
+}
+
+func Int32Mapper(s, op string) (v int32, err error) {
+	var i int
+	i, err = strconv.Atoi(s)
+	v = int32(i)
+	return
+}
+
+func Uint32Mapper(s, op string) (v uint32, err error) {
+	var i int
+	i, err = strconv.Atoi(s)
+	v = uint32(i)
 	return
 }
 
@@ -176,7 +192,7 @@ func MockMapper(s, op string) (m model.CmdMock, err error) {
 			} else if strings.HasPrefix(rule, "exit=") {
 				value := rule[5:]
 				m.Delegate = false
-				m.ExitCode, err = IntMapper(value, "=")
+				m.ExitCode, err = Uint16Mapper(value, "=")
 				if err != nil {
 					// FIXME: aggregate errors
 					return
@@ -277,8 +293,26 @@ func RegexpPatternMapper(s, op string) (c *regexp.Regexp, err error) {
 	return
 }
 
-func IntValueValidater(min, max int) model.Validater[int] {
-	return func(rule model.Rule, n int) (err error) {
+func Uint16ValueValidater(min, max uint16) model.Validater[uint16] {
+	return func(rule model.Rule, n uint16) (err error) {
+		if n < min || n > max {
+			err = fmt.Errorf("rule %s%s value must be an integer >= %d and <= %d", rule.Prefix, rule.Name, min, max)
+		}
+		return
+	}
+}
+
+func Int32ValueValidater(min, max int32) model.Validater[int32] {
+	return func(rule model.Rule, n int32) (err error) {
+		if n < min || n > max {
+			err = fmt.Errorf("rule %s%s value must be an integer >= %d and <= %d", rule.Prefix, rule.Name, min, max)
+		}
+		return
+	}
+}
+
+func Uint32ValueValidater(min, max uint32) model.Validater[uint32] {
+	return func(rule model.Rule, n uint32) (err error) {
 		if n < min || n > max {
 			err = fmt.Errorf("rule %s%s value must be an integer >= %d and <= %d", rule.Prefix, rule.Name, min, max)
 		}
@@ -485,7 +519,7 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 			}
 
 		case "fork":
-			c.ForkCount, err = TranslateOptional(rule, IntMapper, OperatorValidater[int]("="), IntValueValidater(1, 5))
+			c.ForkCount, err = TranslateOptional(rule, Uint16Mapper, OperatorValidater[uint16]("="), Uint16ValueValidater(1, 5))
 		case "suiteTimeout":
 			c.SuiteTimeout, err = TranslateOptional(rule, DurationMapper)
 
@@ -509,7 +543,7 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 		case "timeout":
 			c.Timeout, err = TranslateOptional(rule, DurationMapper)
 		case "runCount":
-			c.RunCount, err = TranslateOptional(rule, IntMapper, OperatorValidater[int]("="), IntValueValidater(1, 1000))
+			c.RunCount, err = TranslateOptional(rule, Uint16Mapper, OperatorValidater[uint16]("="), Uint16ValueValidater(1, 1000))
 		case "prefix":
 			c.Prefix, err = TranslateOptional(rule, DummyMapper, OperatorValidater[string]("="))
 		case "token":
@@ -570,19 +604,19 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 				rule.Op = "="
 				rule.Expected = fmt.Sprintf("%d", model.SHOW_PASSED)
 			}
-			var level int
-			level, err = Translate(rule, IntMapper, OperatorValidater[int]("="), IntValueValidater(0, int(model.SHOW_ALL)))
+			var level uint16
+			level, err = Translate(rule, Uint16Mapper, OperatorValidater[uint16]("="), Uint16ValueValidater(0, uint16(model.SHOW_ALL)))
 			c.Verbose.Set(model.VerboseLevel(level))
 		case "debug":
 			if rule.Op == "" {
 				rule.Op = "="
 				rule.Expected = fmt.Sprintf("%d", model.DefaultDebugLevel)
 			}
-			var level int
-			level, err = Translate(rule, IntMapper, OperatorValidater[int]("="), IntValueValidater(0, int(model.TRACE)))
+			var level uint16
+			level, err = Translate(rule, Uint16Mapper, OperatorValidater[uint16]("="), Uint16ValueValidater(0, uint16(model.TRACE)))
 			c.Debug.Set(model.DebugLevel(level))
 		case "failuresLimit":
-			c.TooMuchFailures, err = TranslateOptional(rule, IntMapper, OperatorValidater[int]("="), IntValueValidater(-1, 1000))
+			c.TooMuchFailures, err = TranslateOptional(rule, Int32Mapper, OperatorValidater[int32]("="), Int32ValueValidater(-1, 1000))
 		default:
 			ok = false
 		}
@@ -626,14 +660,14 @@ func BuildAssertion(cfg model.Config, ruleExpr string) (ok bool, assertion model
 			return
 		}
 	case "exit":
-		var expectedExitCode int
-		expectedExitCode, err = Translate(assertion.Rule, IntMapper, IntValueValidater(0, 255), OperatorValidater[int]("="))
+		var expectedExitCode uint16
+		expectedExitCode, err = Translate(assertion.Rule, Uint16Mapper, Uint16ValueValidater(0, 255), OperatorValidater[uint16]("="))
 		if err != nil {
 			return
 		}
 		assertion.Asserter = func(cmd cmdz.Executer) (res model.AssertionResult, err error) {
 			res.Value = cmd.ExitCode()
-			res.Success = cmd.ExitCode() == expectedExitCode
+			res.Success = uint16(cmd.ExitCode()) == expectedExitCode
 			return
 		}
 	case "stdout":

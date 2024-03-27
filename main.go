@@ -254,7 +254,7 @@ func main() {
 
 	exitCode := wait()
 
-	os.Exit(exitCode)
+	os.Exit(int(exitCode))
 }
 
 /*

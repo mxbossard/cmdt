@@ -1,7 +1,6 @@
 package repo
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -35,31 +34,30 @@ func New(token string) (repo FileRepo) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	queuesBackingFilepath := filepath.Join(path, "operationQueues.yaml")
-	queuesRepo, err := LoadOperationQueueRepo(queuesBackingFilepath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	repo.queuesRepo = queuesRepo
+	//queuesBackingFilepath := filepath.Join(path, "operationQueues.yaml")
+	//queuesRepo, err := LoadOperationQueueRepo(queuesBackingFilepath)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//repo.queuesRepo = queuesRepo
 
 	stateBackingFilepath := filepath.Join(path, "state.yaml")
 	repo.State = FileState{backingFilepath: stateBackingFilepath}
 
-	db, err := open(path)
+	repo.dbRepo, err = newDbRepo(path)
 	if err != nil {
 		log.Fatal(err)
 	}
-	repo.db = db
 
 	return
 }
 
 type FileRepo struct {
-	token      string
-	queuesRepo OperationQueueRepo
+	token string
+	//queuesRepo OperationQueueRepo
 
-	State FileState
-	db    *sql.DB
+	State  FileState
+	dbRepo dbRepo
 }
 
 func (r FileRepo) BackingFilepath() string {
@@ -70,7 +68,7 @@ func (r FileRepo) BackingFilepath() string {
 	return path
 }
 
-func (r FileRepo) MockDirectoryPath(testSuite string, testId int) (mockDir string, err error) {
+func (r FileRepo) MockDirectoryPath(testSuite string, testId uint32) (mockDir string, err error) {
 	var path string
 	path, err = testSuiteDirectoryPath(testSuite, r.token)
 	if err != nil {
@@ -139,7 +137,7 @@ func (r FileRepo) LoadSuiteConfig(testSuite string, initless bool) (cfg model.Co
 	return
 }
 
-func (r FileRepo) readSuiteSeq(testSuite, name string) (n int) {
+func (r FileRepo) readSuiteSeq(testSuite, name string) (n uint32) {
 	//logger.Warn("readSuiteSeq()", "testSuite", testSuite, "name", name)
 	suiteDir, err := testSuiteDirectoryPath(testSuite, r.token)
 	if err != nil {
@@ -149,32 +147,32 @@ func (r FileRepo) readSuiteSeq(testSuite, name string) (n int) {
 	return
 }
 
-func (r FileRepo) TestCount(testSuite string) (n int) {
+func (r FileRepo) TestCount(testSuite string) (n uint32) {
 	return r.readSuiteSeq(testSuite, model.TestSequenceFilename)
 }
 
-func (r FileRepo) PassedCount(testSuite string) (n int) {
+func (r FileRepo) PassedCount(testSuite string) (n uint32) {
 	return r.readSuiteSeq(testSuite, model.PassedSequenceFilename)
 }
 
-func (r FileRepo) IgnoredCount(testSuite string) (n int) {
+func (r FileRepo) IgnoredCount(testSuite string) (n uint32) {
 	return r.readSuiteSeq(testSuite, model.IgnoredSequenceFilename)
 }
 
-func (r FileRepo) FailedCount(testSuite string) (n int) {
+func (r FileRepo) FailedCount(testSuite string) (n uint32) {
 	//logger.Warn("failedCount()", "testSuite", testSuite)
 	return r.readSuiteSeq(testSuite, model.FailedSequenceFilename)
 }
 
-func (r FileRepo) ErroredCount(testSuite string) (n int) {
+func (r FileRepo) ErroredCount(testSuite string) (n uint32) {
 	return r.readSuiteSeq(testSuite, model.ErroredSequenceFilename)
 }
 
-func (r FileRepo) TooMuchCount(testSuite string) (n int) {
+func (r FileRepo) TooMuchCount(testSuite string) (n uint32) {
 	return r.readSuiteSeq(testSuite, model.TooMuchSequenceFilename)
 }
 
-func (r FileRepo) IncrementSuiteSeq(testSuite, name string) (n int) {
+func (r FileRepo) IncrementSuiteSeq(testSuite, name string) (n uint32) {
 	suiteDir, err := testSuiteDirectoryPath(testSuite, r.token)
 	if err != nil {
 		log.Fatal(err)
@@ -336,36 +334,45 @@ func (r FileRepo) ListTestSuites() (suites []string, err error) {
 }
 
 func (r FileRepo) QueueOperation(op Operater) (err error) {
-	r.queuesRepo.Queue(op)
-	err = r.queuesRepo.Persist()
-	//logger.Warn("QueueOperation()", "operation", *op, "err", err)
+	// r.queuesRepo.Queue(op)
+	// err = r.queuesRepo.Persist()
+
+	err = r.dbRepo.Queue(op)
+
 	return
 }
 
 func (r FileRepo) UnqueueOperation() (op Operater, err error) {
-	var ok bool
-	ok, op = r.queuesRepo.Unqueue()
-	if ok {
-		err = r.queuesRepo.Persist()
-		//logger.Warn("UnqueueOperation()", "operation", *op, "err", err)
-	} else {
-		op = nil
-	}
+	// var ok bool
+	// ok, op = r.queuesRepo.Unqueue()
+	// if ok {
+	// 	err = r.queuesRepo.Persist()
+	// } else {
+	// 	op = nil
+	// }
+
+	_, op, err = r.dbRepo.Unqueue()
+
 	return
 }
 
 func (r FileRepo) Unblock(op Operater) (err error) {
-	r.queuesRepo.Unblock(op)
-	err = r.queuesRepo.Persist()
+	// r.queuesRepo.Unblock(op)
+	// err = r.queuesRepo.Persist()
+
+	err = r.dbRepo.Unblock(op)
+
 	return
 }
 
 func (r FileRepo) WaitEmptyQueue(testSuite string, timeout time.Duration) {
-	r.queuesRepo.WaitEmptyQueue(testSuite, timeout)
+	// r.queuesRepo.WaitEmptyQueue(testSuite, timeout)
+
+	r.dbRepo.WaitEmptyQueue(testSuite, timeout)
 }
 
 func (r FileRepo) WaitAllEmpty(timeout time.Duration) {
-	r.queuesRepo.WaitAllEmpty(timeout)
+	// r.queuesRepo.WaitAllEmpty(timeout)
 }
 
 func forgeWorkDirectoryPath(token string) (tempDirPath string, err error) {
@@ -395,7 +402,7 @@ func testSuiteDirectoryPath(testSuite, token string) (path string, err error) {
 	return
 }
 
-func testDirectoryPath(testSuite, token string, seq int) (testDir string, err error) {
+func testDirectoryPath(testSuite, token string, seq uint16) (testDir string, err error) {
 	var tmpDir string
 	tmpDir, err = testSuiteDirectoryPath(testSuite, token)
 	if err != nil {
@@ -526,7 +533,7 @@ func loadSuiteConfig(testSuite, token string) (config model.Config, err error) {
 	return
 }
 
-func cmdLogFiles(testSuite, token string, seq int) (stdoutFile, stderrFile, reportFile *os.File, err error) {
+func cmdLogFiles(testSuite, token string, seq uint16) (stdoutFile, stderrFile, reportFile *os.File, err error) {
 	var testDir string
 	testDir, err = testDirectoryPath(testSuite, token, seq)
 	if err != nil {

@@ -17,11 +17,11 @@ type Validater[T any] func(rule Rule, value T) error
 type Asserter func(cmdz.Executer) (AssertionResult, error)
 
 type TestDefinition struct {
-	Ppid        int
+	Ppid        uint16
 	Token       string
 	TestSuite   string
 	TestName    string
-	Seq         int
+	Seq         uint16
 	Config      Config
 	SuitePrefix string
 	CmdArgs     []string
@@ -41,7 +41,7 @@ type TestOutcome struct {
 	//Seq       int
 	//TestQualifiedName string
 	CmdTitle         string
-	ExitCode         int
+	ExitCode         int16
 	Err              error
 	Duration         time.Duration
 	Stdout           string
@@ -52,16 +52,16 @@ type TestOutcome struct {
 
 type SuiteOutcome struct {
 	TestSuite string
-	//ExitCode    int
+	//ExitCode    uint16
 	Duration time.Duration
 	//Err         error
 	FailureReports []string
-	TestCount      int
-	PassedCount    int
-	FailedCount    int
-	ErroredCount   int
-	IgnoredCount   int
-	TooMuchCount   int
+	TestCount      uint32
+	PassedCount    uint32
+	FailedCount    uint32
+	ErroredCount   uint32
+	IgnoredCount   uint32
+	TooMuchCount   uint32
 }
 
 type Rule struct {

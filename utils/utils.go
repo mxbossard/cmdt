@@ -55,7 +55,7 @@ func InitSeq(pathes ...string) (err error) {
 	return
 }
 
-func IncrementSeq(pathes ...string) (seq int) {
+func IncrementSeq(pathes ...string) (seq uint32) {
 	// return an increment for test indexing
 	//tmpDir := testsuiteDirectoryPath(testSuite, token)
 	seqFilepath := filepath.Join(pathes...)
@@ -73,10 +73,12 @@ func IncrementSeq(pathes ...string) (seq int) {
 	if strSeq == "" {
 		seq = 0
 	} else {
-		seq, err = strconv.Atoi(strSeq)
+		var i int
+		i, err = strconv.Atoi(strSeq)
 		if err != nil {
 			log.Fatalf("cannot convert seq file (%s) to an integer to increment: %s", seqFilepath, err)
 		}
+		seq = uint32(i)
 	}
 
 	newSec := seq + 1
@@ -89,7 +91,7 @@ func IncrementSeq(pathes ...string) (seq int) {
 	return newSec
 }
 
-func ReadSeq(pathes ...string) (c int) {
+func ReadSeq(pathes ...string) (c uint32) {
 	// return the count of run test
 	//tmpDir := testsuiteDirectoryPath(testSuite, token)
 	seqFilepath := filepath.Join(pathes...)
@@ -110,10 +112,12 @@ func ReadSeq(pathes ...string) (c int) {
 		}
 		log.Fatalf("cannot read seq file (%s) to read: %s", seqFilepath, err)
 	}
-	c, err = strconv.Atoi(strSeq)
+	var i int
+	i, err = strconv.Atoi(strSeq)
 	if err != nil {
 		log.Fatalf("cannot convert seq file (%s) as an integer to read: %s", seqFilepath, err)
 	}
+	c = uint32(i)
 	return
 }
 

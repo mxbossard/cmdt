@@ -117,14 +117,14 @@ func NewGlobalDefaultConfig() Config {
 		//Verbose: utilz.OptionalOf(DefaultInitlessVerboseLevel),
 		//Verbose:           utilz.OptionalOf(DefaultInitedVerboseLevel),
 		GlobalStartTime:   utilz.OptionalOf(time.Now()),
-		ForkCount:         utilz.OptionalOf(1),
+		ForkCount:         utilz.OptionalOf(uint16(1)),
 		Ignore:            utilz.OptionalOf(false),
 		StopOnFailure:     utilz.OptionalOf(false),
 		KeepStdout:        utilz.OptionalOf(false),
 		KeepStderr:        utilz.OptionalOf(false),
 		Timeout:           utilz.OptionalOf(10 * time.Second),
-		RunCount:          utilz.OptionalOf(1),
-		Parallel:          utilz.OptionalOf(1),
+		RunCount:          utilz.OptionalOf(uint16(1)),
+		Parallel:          utilz.OptionalOf(uint16(1)),
 		ContainerDisabled: utilz.OptionalOf(true),
 		ContainerImage:    utilz.OptionalOf(DefaultContainerImage),
 		ContainerDirties:  utilz.OptionalOf(DirtyBeforeSuite),
@@ -136,7 +136,7 @@ func NewSuiteDefaultConfig() Config {
 	return Config{
 		Async:           utilz.OptionalOf(DefaultInitedAsync),
 		Wait:            utilz.OptionalOf(DefaultInitedWait),
-		TooMuchFailures: utilz.OptionalOf(DefaultTooMuchFailures),
+		TooMuchFailures: utilz.OptionalOf(int32(DefaultTooMuchFailures)),
 		SuiteStartTime:  utilz.OptionalOf(time.Now()),
 		SuiteTimeout:    utilz.OptionalOf(120 * time.Second),
 		Verbose:         utilz.OptionalOf(DefaultInitedVerboseLevel),
@@ -147,14 +147,14 @@ func NewInitlessSuiteDefaultConfig() Config {
 	return Config{
 		Async:           utilz.OptionalOf(DefaultInitlessAsync),
 		Wait:            utilz.OptionalOf(DefaultInitlessWait),
-		TooMuchFailures: utilz.OptionalOf(TooMuchFailuresNoLimit),
+		TooMuchFailures: utilz.OptionalOf(int32(TooMuchFailuresNoLimit)),
 		SuiteStartTime:  utilz.OptionalOf(time.Now()),
 		SuiteTimeout:    utilz.OptionalOf(3600 * time.Second),
 		Verbose:         utilz.OptionalOf(DefaultInitlessVerboseLevel),
 	}
 }
 
-type ConfigScope int
+type ConfigScope int16
 
 const (
 	GLOBAL_SCOPE ConfigScope = iota // How to use this ?
@@ -174,7 +174,7 @@ const (
 	DirtyAfterRun    = DirtyScope("afterRun")
 )
 
-type VerboseLevel int
+type VerboseLevel int16
 
 const (
 	SHOW_REPORTS_ONLY VerboseLevel = iota
@@ -185,7 +185,7 @@ const (
 	SHOW_ALL
 )
 
-type DebugLevel int
+type DebugLevel int16
 
 const (
 	ERROR DebugLevel = iota
@@ -203,7 +203,7 @@ type CmdMock struct {
 	Stdin            *string
 	Stdout           string
 	Stderr           string
-	ExitCode         int
+	ExitCode         uint16
 	Delegate         bool
 	OnCallCmdAndArgs []string
 }
@@ -221,10 +221,10 @@ type Config struct {
 	CmdAndArgs      []string                      `yaml:""`
 	GlobalStartTime utilz.Optional[time.Time]     `yaml:""`
 	SuiteStartTime  utilz.Optional[time.Time]     `yaml:""`
-	TooMuchFailures utilz.Optional[int]           `yaml:""`
+	TooMuchFailures utilz.Optional[int32]         `yaml:""`
 	LastTestTime    utilz.Optional[time.Time]     `yaml:""`
 	SuiteTimeout    utilz.Optional[time.Duration] `yaml:""`
-	ForkCount       utilz.Optional[int]           `yaml:""`
+	ForkCount       utilz.Optional[uint16]        `yaml:""`
 	BeforeSuite     [][]string                    `yaml:""`
 	AfterSuite      [][]string                    `yaml:""`
 
@@ -241,8 +241,8 @@ type Config struct {
 	KeepStdout    utilz.Optional[bool]          `yaml:""`
 	KeepStderr    utilz.Optional[bool]          `yaml:""`
 	Timeout       utilz.Optional[time.Duration] `yaml:""`
-	RunCount      utilz.Optional[int]           `yaml:""`
-	Parallel      utilz.Optional[int]           `yaml:""`
+	RunCount      utilz.Optional[uint16]        `yaml:""`
+	Parallel      utilz.Optional[uint16]        `yaml:""`
 
 	Mocks     []CmdMock  `yaml:""`
 	RootMocks []CmdMock  `yaml:""`

@@ -64,7 +64,7 @@ func (d BasicDisplay) Suite(ctx facade.SuiteContext) {
 	}
 }
 
-func (d BasicDisplay) TestTitle(ctx facade.TestContext, seq int) {
+func (d BasicDisplay) TestTitle(ctx facade.TestContext, seq uint16) {
 	if ctx.Config.Verbose.Get() == model.SHOW_REPORTS_ONLY {
 		return
 	}

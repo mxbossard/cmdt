@@ -36,14 +36,14 @@ func usage() {
 	usagePrinter.Flush()
 }
 
-func GlobalConfig(ctx facade.GlobalContext) (exitCode int, err error) {
+func GlobalConfig(ctx facade.GlobalContext) (exitCode int16, err error) {
 	// Init or Update Global config
 	exitCode = 0
 	err = ctx.Save()
 	return
 }
 
-func InitTestSuite(ctx facade.SuiteContext) (exitCode int, err error) {
+func InitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	// Clear and Init new test suite
 	exitCode = 0
 	cfg := ctx.Config
@@ -74,7 +74,7 @@ func InitTestSuite(ctx facade.SuiteContext) (exitCode int, err error) {
 	return
 }
 
-func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int, err error) {
+func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int16, err error) {
 	exitCode = 1
 	token := ctx.Token
 
@@ -95,7 +95,7 @@ func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int, err error) {
 	for _, testSuite := range testSuites {
 		suiteCtx := facade.NewSuiteContext(token, testSuite, false, model.ReportAction, ctx.Config)
 		if suiteCtx.Repo.TestCount(testSuite) > 0 {
-			code := 0
+			var code int16
 			code, err = ReportTestSuite(suiteCtx)
 			if code != 0 {
 				exitCode = code
@@ -111,7 +111,7 @@ func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int, err error) {
 	return
 }
 
-func ProcessReportAllDef(def model.ReportDefinition) (exitCode int) {
+func ProcessReportAllDef(def model.ReportDefinition) (exitCode int16) {
 	var err error
 	ctx := facade.NewGlobalContext(def.Token, model.Config{})
 	exitCode, err = ReportAllTestSuites(ctx)
@@ -121,7 +121,7 @@ func ProcessReportAllDef(def model.ReportDefinition) (exitCode int) {
 	return
 }
 
-func ReportTestSuite(ctx facade.SuiteContext) (exitCode int, err error) {
+func ReportTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	exitCode = 1
 	cfg := ctx.Config
 	testSuite := cfg.TestSuite.Get()
@@ -151,7 +151,7 @@ func ReportTestSuite(ctx facade.SuiteContext) (exitCode int, err error) {
 	return
 }
 
-func ProcessReportDef(def model.ReportDefinition) (exitCode int) {
+func ProcessReportDef(def model.ReportDefinition) (exitCode int16) {
 	var err error
 	ctx := facade.NewSuiteContext(def.Token, def.TestSuite, false, model.ReportAction, model.Config{})
 	exitCode, err = ReportTestSuite(ctx)
@@ -159,7 +159,7 @@ func ProcessReportDef(def model.ReportDefinition) (exitCode int) {
 	return
 }
 
-func PerformTest(testDef model.TestDefinition) (exitCode int, err error) {
+func PerformTest(testDef model.TestDefinition) (exitCode int16, err error) {
 	exitCode = 1
 	cfg := testDef.Config
 	ctx := facade.NewTestContext2(testDef)
@@ -218,7 +218,7 @@ func PerformTest(testDef model.TestDefinition) (exitCode int, err error) {
 	return
 }
 
-func ProcessTestDef(testDef model.TestDefinition) (exitCode int) {
+func ProcessTestDef(testDef model.TestDefinition) (exitCode int16) {
 	token := testDef.Token
 	testSuite := testDef.TestSuite
 	testCfg := testDef.Config
@@ -271,9 +271,9 @@ func ProcessTestDef(testDef model.TestDefinition) (exitCode int) {
 	return
 }
 
-func ProcessArgs(allArgs []string) (daemonToken string, wait func() int, exitCode int) {
+func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16, exitCode int16) {
 	exitCode = 1
-	wait = func() int { return exitCode }
+	wait = func() int16 { return exitCode }
 
 	if len(allArgs) == 1 {
 		usage()
@@ -350,10 +350,13 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int, exitCod
 					Config: globalCtx.Config,
 				}
 				op := repo.ReportAllOperation(true, def) // FIXME should not block if test can be run simultaneously
-				globalCtx.Repo.QueueOperation(&op)
+				err = globalCtx.Repo.QueueOperation(&op)
+				if err != nil {
+					log.Fatal(err)
+				}
 
 				if globalCtx.Config.Wait.Is(true) {
-					wait = func() int {
+					wait = func() int16 {
 						// FIXME: bad timeout
 						exitCode, err := globalCtx.Repo.State.WaitOperationDone(&op, globalCtx.Config.SuiteTimeout.Get())
 						if err != nil {
@@ -385,10 +388,11 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int, exitCod
 					Config: suiteCtx.Config,
 				}
 				op := repo.ReportOperation(testSuite, true, def) // FIXME should not block if test can be run simultaneously
-				suiteCtx.Repo.QueueOperation(&op)
+				err = suiteCtx.Repo.QueueOperation(&op)
+				suiteCtx.NoErrorOrFatal(err)
 
 				if suiteCtx.Config.Wait.Is(true) {
-					wait = func() int {
+					wait = func() int16 {
 						// FIXME: bad timeout
 						exitCode, err := suiteCtx.Repo.State.WaitOperationDone(&op, suiteCtx.Config.SuiteTimeout.Get())
 						if err != nil {
@@ -403,12 +407,12 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int, exitCod
 		}
 	case model.TestAction:
 		testSuite := inputConfig.TestSuite.Get()
-		ppid := utils.ReadEnvPpid()
+		ppid := uint16(utils.ReadEnvPpid())
 		testCtx := facade.NewTestContext(token, testSuite, inputConfig, ppid)
 		logger.Debug("Forged context", "ctx", testCtx)
 		testCfg := testCtx.Config
 		token = testCtx.Token
-		var seq int
+		var seq uint16
 		//if testCfg.ContainerDisabled.Is(true) || testCfg.ContainerImage.IsEmpty() {
 		seq = testCtx.IncrementTestCount()
 		//}
@@ -434,10 +438,11 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int, exitCod
 			// Delegate test processing to daemon
 			logger.Info("executing test async (queueing test)", "suite", testSuite, "seq", seq)
 			testOp := repo.TestOperation(testSuite, seq, true, testDef) // FIXME should not block if test can be run simultaneously
-			testCtx.Repo.QueueOperation(&testOp)
+			err = testCtx.Repo.QueueOperation(&testOp)
+			testCtx.NoErrorOrFatal(err)
 
 			if testCfg.Wait.Is(true) {
-				wait = func() int {
+				wait = func() int16 {
 					exitCode, err := testCtx.Repo.State.WaitOperationDone(&testOp, testCfg.SuiteTimeout.Get())
 					if err != nil {
 						panic(err)

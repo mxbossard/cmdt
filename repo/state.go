@@ -92,7 +92,7 @@ func (s *FileState) ReportOperationDone(op Operater) (err error) {
 	if err != nil {
 		return
 	}
-	sop := buildSerializedOp(op)
+	sop := serializeOp0(op)
 	s.state.Done = append(s.state.Done, sop)
 	err = s.persist()
 	if err != nil {
@@ -105,14 +105,14 @@ func (s *FileState) ReportOperationDone(op Operater) (err error) {
 	return
 }
 
-func (s *FileState) WaitOperationDone(op Operater, timeout time.Duration) (exitCode int, err error) {
+func (s *FileState) WaitOperationDone(op Operater, timeout time.Duration) (exitCode int16, err error) {
 	logger.Debug("waiting operation done...", "operation", op, "timeout", timeout)
 	start := time.Now()
 	var ptr int
 	for time.Since(start) < timeout {
 		s.update()
 		for _, done := range s.state.Done[ptr:] {
-			doneOp := deserializeOp(done)
+			doneOp := deserializeOp0(done)
 			if doneOp.Suite() == op.Suite() && doneOp.Seq() == op.Seq() {
 				logger.Debug("operation finished.", "operation", op)
 				return

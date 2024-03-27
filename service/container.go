@@ -181,7 +181,7 @@ func PerformTestInEphemeralContainer(testCtx facade.TestContext) (exitCode int, 
 	return
 }
 
-func PerformTestInContainer(testCtx facade.TestContext) (ctId string, exitCode int, err error) {
+func PerformTestInContainer(testCtx facade.TestContext) (ctId string, exitCode int16, err error) {
 	if testCtx.Config.ContainerId.IsPresent() {
 		ctId = testCtx.Config.ContainerId.Get()
 	}
@@ -242,7 +242,7 @@ func PerformTestInContainer(testCtx facade.TestContext) (ctId string, exitCode i
 	if err != nil {
 		return
 	}
-	exitCode = exec.ExitCode()
+	exitCode = int16(exec.ExitCode())
 
 	return
 }

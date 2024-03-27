@@ -68,11 +68,11 @@ func (d daemon) unqueue() (ok bool) {
 		logger.Debug("daemon: unqueued operation.")
 		switch o := op.(type) {
 		case *repo.TestOp:
-			op.SetExitCode(d.performTest(o.Definition))
+			op.SetExitCode(uint16(d.performTest(o.Definition)))
 		case *repo.ReportOp:
-			op.SetExitCode(d.report(o.Definition))
+			op.SetExitCode(uint16(d.report(o.Definition)))
 		case *repo.ReportAllOp:
-			op.SetExitCode(d.reportAll(o.Definition))
+			op.SetExitCode(uint16(d.reportAll(o.Definition)))
 		default:
 			err = fmt.Errorf("unknown operation %T", op)
 			panic(err)
@@ -108,7 +108,7 @@ func (d daemon) run() {
 	logger.Debug("daemon: stopping ...", "token", d.token)
 }
 
-func (d daemon) performTest(testDef model.TestDefinition) (exitCode int) {
+func (d daemon) performTest(testDef model.TestDefinition) (exitCode int16) {
 	//logger.Warn("daemon performing test", "testDef", testDef)
 	logger.Debug("daemon: processing test...")
 	exitCode = service.ProcessTestDef(testDef)
@@ -116,14 +116,14 @@ func (d daemon) performTest(testDef model.TestDefinition) (exitCode int) {
 	return
 }
 
-func (d daemon) report(def model.ReportDefinition) (exitCode int) {
+func (d daemon) report(def model.ReportDefinition) (exitCode int16) {
 	logger.Debug("daemon: reporting test suite...")
 	exitCode = service.ProcessReportDef(def)
 	logger.Debug("daemon: reporting done.")
 	return
 }
 
-func (d daemon) reportAll(def model.ReportDefinition) (exitCode int) {
+func (d daemon) reportAll(def model.ReportDefinition) (exitCode int16) {
 	logger.Debug("daemon: reporting all test suites...")
 	exitCode = service.ProcessReportAllDef(def)
 	logger.Debug("daemon: reporting done.")

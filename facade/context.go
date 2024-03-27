@@ -69,7 +69,7 @@ func NewSuiteContext(token, testSuite string, initless bool, action model.Action
 	return suiteCtx
 }
 
-func NewTestContext(token, testSuite string, inputCfg model.Config, ppid int) TestContext {
+func NewTestContext(token, testSuite string, inputCfg model.Config, ppid uint16) TestContext {
 	suiteCtx := NewSuiteContext(token, testSuite, true, model.TestAction, model.Config{})
 	mergedCfg := suiteCtx.Config
 	mergedCfg.Merge(inputCfg)
@@ -129,27 +129,28 @@ func (c SuiteContext) InitSuite() error {
 	return c.Repo.InitSuite(c.Config)
 }
 
-func (c SuiteContext) IncrementTestCount() (n int) {
-	return c.Repo.IncrementSuiteSeq(c.Config.TestSuite.Get(), model.TestSequenceFilename)
+func (c SuiteContext) IncrementTestCount() (n uint16) {
+	s := c.Repo.IncrementSuiteSeq(c.Config.TestSuite.Get(), model.TestSequenceFilename)
+	return uint16(s)
 }
 
-func (c SuiteContext) IncrementPassedCount() (n int) {
+func (c SuiteContext) IncrementPassedCount() (n uint32) {
 	return c.Repo.IncrementSuiteSeq(c.Config.TestSuite.Get(), model.PassedSequenceFilename)
 }
 
-func (c SuiteContext) IncrementIgnoredCount() (n int) {
+func (c SuiteContext) IncrementIgnoredCount() (n uint32) {
 	return c.Repo.IncrementSuiteSeq(c.Config.TestSuite.Get(), model.IgnoredSequenceFilename)
 }
 
-func (c SuiteContext) IncrementFailedCount() (n int) {
+func (c SuiteContext) IncrementFailedCount() (n uint32) {
 	return c.Repo.IncrementSuiteSeq(c.Config.TestSuite.Get(), model.FailedSequenceFilename)
 }
 
-func (c SuiteContext) IncrementErroredCount() (n int) {
+func (c SuiteContext) IncrementErroredCount() (n uint32) {
 	return c.Repo.IncrementSuiteSeq(c.Config.TestSuite.Get(), model.ErroredSequenceFilename)
 }
 
-func (c SuiteContext) IncrementTooMuchCount() (n int) {
+func (c SuiteContext) IncrementTooMuchCount() (n uint32) {
 	return c.Repo.IncrementSuiteSeq(c.Config.TestSuite.Get(), model.TooMuchSequenceFilename)
 }
 
@@ -200,11 +201,11 @@ func (c TestContext) TestId() (id string) {
 	return
 }
 
-func (c TestContext) ProcessTooMuchFailures() (n int) {
+func (c TestContext) ProcessTooMuchFailures() (n uint32) {
 	cfg := c.Config
 	testSuite := cfg.TestSuite.Get()
 	failures := c.Repo.ErroredCount(testSuite) + c.Repo.FailedCount(testSuite)
-	if !c.Config.TooMuchFailures.Is(model.TooMuchFailuresNoLimit) && failures >= c.Config.TooMuchFailures.Get() {
+	if !c.Config.TooMuchFailures.Is(model.TooMuchFailuresNoLimit) && failures >= uint32(c.Config.TooMuchFailures.Get()) {
 		// Too much failures do not execute more tests
 		n = c.IncrementTooMuchCount()
 	}
@@ -229,7 +230,7 @@ func (c TestContext) TestQualifiedName0() (name string) {
 	return
 }
 
-func (c TestContext) initTestOutcome(seq int) (outcome model.TestOutcome) {
+func (c TestContext) initTestOutcome(seq uint16) (outcome model.TestOutcome) {
 	testSuite := c.Config.TestSuite.Get()
 	outcome.TestSuite = testSuite
 	outcome.Seq = seq
@@ -242,13 +243,13 @@ func (c TestContext) initTestOutcome(seq int) (outcome model.TestOutcome) {
 	return
 }
 
-func (c TestContext) IgnoredTestOutcome(seq int) (outcome model.TestOutcome) {
+func (c TestContext) IgnoredTestOutcome(seq uint16) (outcome model.TestOutcome) {
 	outcome = c.initTestOutcome(seq)
 	outcome.Outcome = model.IGNORED
 	return
 }
 
-func (c TestContext) AssertCmdExecBlocking(seq int, assertions []model.Assertion) (outcome model.TestOutcome) {
+func (c TestContext) AssertCmdExecBlocking(seq uint16, assertions []model.Assertion) (outcome model.TestOutcome) {
 	testSuite := c.Config.TestSuite.Get()
 	exitCode, err := c.CmdExec.BlockRun()
 
@@ -267,7 +268,7 @@ func (c TestContext) AssertCmdExecBlocking(seq int, assertions []model.Assertion
 		}
 		c.IncrementErroredCount()
 	} else {
-		outcome.ExitCode = exitCode
+		outcome.ExitCode = int16(exitCode)
 
 		var failedResults []model.AssertionResult
 		for _, assertion := range assertions {
@@ -300,7 +301,7 @@ func (c TestContext) AssertCmdExecBlocking(seq int, assertions []model.Assertion
 	return
 }
 
-func (c *TestContext) initExecuter(ppid int) (err error) {
+func (c *TestContext) initExecuter(ppid uint16) (err error) {
 	cfg := c.Config
 	cmdAndArgs := cfg.CmdAndArgs
 	if len(cmdAndArgs) == 0 {
@@ -377,7 +378,7 @@ func (c TestContext) ConfigMocking() (err error) {
 	return
 }
 
-func (c TestContext) MockDirectoryPath(testId int) (mockDir string, err error) {
+func (c TestContext) MockDirectoryPath(testId uint32) (mockDir string, err error) {
 	return c.Repo.MockDirectoryPath(c.Config.TestSuite.Get(), testId)
 }
 

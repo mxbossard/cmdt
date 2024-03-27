@@ -1,6 +1,8 @@
 package repo
 
 import (
+	"bytes"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"os"
@@ -21,19 +23,22 @@ const (
 type Operater interface {
 	Kind() string
 	Suite() string
-	Seq() int
+	Seq() uint16
 	Block() bool
-	ExitCode() int
-	SetExitCode(int)
+	ExitCode() uint16
+	SetExitCode(uint16)
+	Id() uint16
+	SetId(uint16)
 }
 
 type OperationBase struct {
 	//Token     string
 	Type      string
 	TestSuite string
-	Sequence  int
+	Sequence  uint16
 	Blocking  bool
-	Exit      int
+	exit      uint16
+	id        uint16
 }
 
 func (o OperationBase) Kind() string {
@@ -44,7 +49,7 @@ func (o OperationBase) Suite() string {
 	return o.TestSuite
 }
 
-func (o OperationBase) Seq() int {
+func (o OperationBase) Seq() uint16 {
 	return o.Sequence
 }
 
@@ -52,12 +57,20 @@ func (o OperationBase) Block() bool {
 	return o.Blocking
 }
 
-func (o OperationBase) ExitCode() int {
-	return o.Exit
+func (o OperationBase) ExitCode() uint16 {
+	return o.exit
 }
 
-func (o *OperationBase) SetExitCode(code int) {
-	o.Exit = code
+func (o *OperationBase) SetExitCode(code uint16) {
+	o.exit = code
+}
+
+func (o OperationBase) Id() uint16 {
+	return o.id
+}
+
+func (o *OperationBase) SetId(id uint16) {
+	o.id = id
 }
 
 type TestOp struct {
@@ -65,7 +78,7 @@ type TestOp struct {
 	Definition    model.TestDefinition
 }
 
-func TestOperation(suite string, seq int, blocking bool, def model.TestDefinition) TestOp {
+func TestOperation(suite string, seq uint16, blocking bool, def model.TestDefinition) TestOp {
 	return TestOp{
 		OperationBase: OperationBase{
 			Type:      string(TestKind),
@@ -114,7 +127,7 @@ type serializedOp struct {
 	ReportAll *ReportAllOp `yaml:",omitempty"`
 }
 
-func buildSerializedOp(op Operater) (sop serializedOp) {
+func serializeOp0(op Operater) (sop serializedOp) {
 	switch o := op.(type) {
 	case *TestOp:
 		sop.Test = o
@@ -129,7 +142,19 @@ func buildSerializedOp(op Operater) (sop serializedOp) {
 	return
 }
 
-func deserializeOp(sop serializedOp) (op Operater) {
+func serializeOp(op Operater) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	sop := serializeOp0(op)
+	err := enc.Encode(sop)
+	if err != nil {
+		return nil, err
+	}
+	b := buf.Bytes()
+	return b, nil
+}
+
+func deserializeOp0(sop serializedOp) (op Operater) {
 	if sop.Test != nil {
 		return sop.Test
 	} else if sop.Report != nil {
@@ -139,6 +164,15 @@ func deserializeOp(sop serializedOp) (op Operater) {
 	}
 	err := fmt.Errorf("unable to deserialize operation")
 	panic(err)
+}
+
+func deserializeOp(b []byte) (op Operater, err error) {
+	buf := bytes.NewReader(b)
+	dec := gob.NewDecoder(buf)
+	var sop serializedOp
+	err = dec.Decode(&sop)
+	op = deserializeOp0(sop)
+	return
 }
 
 type OperationQueue struct {
@@ -164,7 +198,7 @@ func (r *OperationQueueRepo) Queue(op Operater) {
 	}
 	logger.Debug("Queue()", "testSuite", testSuite, "operation", op)
 
-	sop := buildSerializedOp(op)
+	sop := serializeOp0(op)
 	q.Operations = append(q.Operations, sop)
 	r.Queues[testSuite] = q
 }
@@ -222,7 +256,7 @@ func (r *OperationQueueRepo) Unqueue() (ok bool, op Operater) {
 		// Unqueue operation
 		ok = true
 		sop := q.Operations[0]
-		op = deserializeOp(sop)
+		op = deserializeOp0(sop)
 		q.Operations = q.Operations[1:]
 		if op.Block() {
 			q.Blocking = &sop
@@ -258,7 +292,7 @@ func (r *OperationQueueRepo) Unblock(op Operater) {
 	suite := op.Suite()
 	q := r.Queues[suite]
 	if q.Blocking != nil {
-		blocking := deserializeOp(*q.Blocking)
+		blocking := deserializeOp0(*q.Blocking)
 		if blocking.Kind() == op.Kind() && blocking.Seq() == op.Seq() {
 			q.Blocking = nil
 			logger.Warn("Unblock", "suite", suite)
