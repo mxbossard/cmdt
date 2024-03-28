@@ -201,7 +201,7 @@ func (r FileRepo) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 		return
 	}
 
-	qualifiedName := fmt.Sprintf("[%s]>%s", outcome.TestSuite, outcome.TestName)
+	qualifiedName := fmt.Sprintf("[%s]> %s", outcome.TestSuite, outcome.TestName)
 	testTitle := format.PadRight(qualifiedName, 70)
 	switch outcome.Outcome {
 	case model.PASSED:
@@ -356,13 +356,17 @@ func (r FileRepo) UnqueueOperation() (op Operater, err error) {
 	return
 }
 
-func (r FileRepo) Unblock(op Operater) (err error) {
+func (r FileRepo) Done(op Operater) (err error) {
 	// r.queuesRepo.Unblock(op)
 	// err = r.queuesRepo.Persist()
 
-	err = r.dbRepo.Unblock(op)
+	err = r.dbRepo.Done(op)
 
 	return
+}
+
+func (r FileRepo) WaitOperationDone(op Operater, timeout time.Duration) (exitCode int16, err error) {
+	return r.dbRepo.WaitOperaterDone(op, timeout)
 }
 
 func (r FileRepo) WaitEmptyQueue(testSuite string, timeout time.Duration) {

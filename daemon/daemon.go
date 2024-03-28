@@ -63,9 +63,9 @@ func (d daemon) unqueue() (ok bool) {
 	if err != nil {
 		panic(err)
 	}
-	defer d.repo.Unblock(op)
+	defer d.repo.Done(op)
 	if op != nil {
-		logger.Debug("daemon: unqueued operation.")
+		logger.Info("daemon: unqueued operation.", "kind", op.Kind(), "id", op.Id())
 		switch o := op.(type) {
 		case *repo.TestOp:
 			op.SetExitCode(uint16(d.performTest(o.Definition)))

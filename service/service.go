@@ -87,7 +87,7 @@ func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int16, err error) {
 	logger.Info("Reporting all suites", "token", token, "suites", testSuites)
 
 	if len(testSuites) == 0 {
-		err = fmt.Errorf("you must perform some test prior to report")
+		err = fmt.Errorf("you must perform some test prior to report all suites")
 		return
 	}
 
@@ -126,11 +126,11 @@ func ReportTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	cfg := ctx.Config
 	testSuite := cfg.TestSuite.Get()
 	if ctx.Repo.TestCount(testSuite) == 0 {
-		err = fmt.Errorf("you must perform some test prior to report")
+		err = fmt.Errorf("you must perform some test prior to report: [%s] suite", testSuite)
 		return
 	}
 
-	logger.Info("Reporting suite", "ctx", ctx)
+	//logger.Info("Reporting suite", "ctx", ctx)
 
 	var suiteOutcome model.SuiteOutcome
 	suiteOutcome, err = ctx.Repo.LoadSuiteOutcome(testSuite)
@@ -152,8 +152,9 @@ func ReportTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 }
 
 func ProcessReportDef(def model.ReportDefinition) (exitCode int16) {
+	//logger.Warn("ProcessReportDef()", "def", def)
 	var err error
-	ctx := facade.NewSuiteContext(def.Token, def.TestSuite, false, model.ReportAction, model.Config{})
+	ctx := facade.NewSuiteContext(def.Token, def.TestSuite, false, model.ReportAction, def.Config)
 	exitCode, err = ReportTestSuite(ctx)
 	ctx.NoErrorOrFatal(err)
 	return
@@ -346,7 +347,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16, exitC
 				// Delegate report all processing to daemon
 				logger.Warn("executing report all async (queueing report)")
 				def := model.ReportDefinition{
-					Token:  token,
+					Token:  globalCtx.Token,
 					Config: globalCtx.Config,
 				}
 				op := repo.ReportAllOperation(true, def) // FIXME should not block if test can be run simultaneously
@@ -358,7 +359,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16, exitC
 				if globalCtx.Config.Wait.Is(true) {
 					wait = func() int16 {
 						// FIXME: bad timeout
-						exitCode, err := globalCtx.Repo.State.WaitOperationDone(&op, globalCtx.Config.SuiteTimeout.Get())
+						exitCode, err := globalCtx.Repo.WaitOperationDone(&op, globalCtx.Config.SuiteTimeout.Get())
 						if err != nil {
 							panic(err)
 						}
@@ -384,8 +385,9 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16, exitC
 				// Delegate report processing to daemon
 				logger.Warn("executing report async (queueing report)")
 				def := model.ReportDefinition{
-					Token:  token,
-					Config: suiteCtx.Config,
+					Token:     suiteCtx.Token,
+					TestSuite: testSuite,
+					Config:    suiteCtx.Config,
 				}
 				op := repo.ReportOperation(testSuite, true, def) // FIXME should not block if test can be run simultaneously
 				err = suiteCtx.Repo.QueueOperation(&op)
@@ -394,7 +396,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16, exitC
 				if suiteCtx.Config.Wait.Is(true) {
 					wait = func() int16 {
 						// FIXME: bad timeout
-						exitCode, err := suiteCtx.Repo.State.WaitOperationDone(&op, suiteCtx.Config.SuiteTimeout.Get())
+						exitCode, err := suiteCtx.Repo.WaitOperationDone(&op, suiteCtx.Config.SuiteTimeout.Get())
 						if err != nil {
 							panic(err)
 						}
@@ -443,7 +445,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16, exitC
 
 			if testCfg.Wait.Is(true) {
 				wait = func() int16 {
-					exitCode, err := testCtx.Repo.State.WaitOperationDone(&testOp, testCfg.SuiteTimeout.Get())
+					exitCode, err := testCtx.Repo.WaitOperationDone(&testOp, testCfg.SuiteTimeout.Get())
 					if err != nil {
 						panic(err)
 					}

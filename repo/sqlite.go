@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gofrs/flock"
 	_ "modernc.org/sqlite"
 )
 
@@ -16,7 +18,7 @@ const (
 	BusyTimeout = 5 * time.Second
 )
 
-func dbOpen(dirpath string) (db *sql.DB, err error) {
+func dbOpen(dirpath string) (db *OneWriterDB, err error) {
 	file := filepath.Join(dirpath, DbFileName)
 
 	//var initNeeded bool
@@ -30,7 +32,8 @@ func dbOpen(dirpath string) (db *sql.DB, err error) {
 		return
 	}
 
-	db, err = sql.Open("sqlite", file+"?_busy_timeout=5000")
+	//db, err = sql.Open("sqlite", file+"?_busy_timeout=5000")
+	db, err = OpenSqliteOneWriterDB(file, "")
 	if err != nil {
 		return
 	}
@@ -40,16 +43,12 @@ func dbOpen(dirpath string) (db *sql.DB, err error) {
 	return
 }
 
-func dbInit(db *sql.DB) (err error) {
-	tx, err := db.Begin()
-	if err != nil {
-		return
-	}
-	_, err = tx.Exec(`
+func dbInit(db *OneWriterDB) (err error) {
+	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS suite_queue (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			name TEXT UNIQUE,
-			open INTEGER,
+			name TEXT UNIQUE NOT NULL,
+			open INTEGER NOT NULL,
 			blocking INTEGER
 		);
 
@@ -57,8 +56,9 @@ func dbInit(db *sql.DB) (err error) {
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			suite TEXT NOT NULL,
 			op BLOB NOT NULL,
+			unqueued INTEGER NOT NULL,
+			exitCode INTEGER,
 			block INTEGER,
-			unqueued INTEGER,
 			FOREIGN KEY(suite) REFERENCES suite_queue(name)
 		);
 
@@ -67,16 +67,134 @@ func dbInit(db *sql.DB) (err error) {
 			blocking INTEGER,
 			FOREIGN KEY(name) REFERENCES suite_queue(name)
 		);
-	`) // FOREIGN KEY(blocking) REFERENCES operation_queue(id)
-	if err != nil {
-		return
-	}
-	err = tx.Commit()
+	`)
 	return
 }
 
+type SqlQuerier interface {
+	Exec(query string, args ...any) (sql.Result, error)
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	Query(query string, args ...any) (*sql.Rows, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRow(query string, args ...any) *sql.Row
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+type OneWriterDB struct {
+	*sql.DB
+	fileLock    *flock.Flock
+	busyTimeout time.Duration
+}
+
+func (d OneWriterDB) lock() (err error) {
+	lockCtx, cancel := context.WithTimeout(context.Background(), d.busyTimeout)
+	defer cancel()
+	locked, err := d.fileLock.TryLockContext(lockCtx, time.Millisecond)
+	if err != nil {
+		return
+	}
+	if !locked {
+		err = errors.New("unable to acquire DB lock")
+	}
+	return
+}
+
+func (d OneWriterDB) unlock() (err error) {
+	if d.fileLock != nil {
+		err = d.fileLock.Unlock()
+	}
+	return
+}
+
+func (d OneWriterDB) Exec(query string, args ...any) (sql.Result, error) {
+	d.lock()
+	defer d.unlock()
+	return d.DB.Exec(query, args...)
+}
+
+func (d OneWriterDB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	d.lock()
+	defer d.unlock()
+	return d.DB.ExecContext(ctx, query, args...)
+}
+
+func (d OneWriterDB) Query(query string, args ...any) (*sql.Rows, error) {
+	d.lock()
+	defer d.unlock()
+	return d.DB.Query(query, args...)
+}
+
+func (d OneWriterDB) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	d.lock()
+	defer d.unlock()
+	return d.DB.QueryContext(ctx, query, args...)
+}
+
+func (d OneWriterDB) QueryRow(query string, args ...any) *sql.Row {
+	d.lock()
+	defer d.unlock()
+	return d.DB.QueryRow(query, args...)
+}
+
+func (d OneWriterDB) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+	d.lock()
+	defer d.unlock()
+	return d.DB.QueryRowContext(ctx, query, args...)
+}
+
+func (d OneWriterDB) Begin() (*OneWriterTx, error) {
+	d.lock()
+	tx, err := d.DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+	return &OneWriterTx{Tx: tx, db: &d}, nil
+}
+
+func (d OneWriterDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*OneWriterTx, error) {
+	d.lock()
+	tx, err := d.DB.BeginTx(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	return &OneWriterTx{Tx: tx, db: &d}, nil
+}
+
+type OneWriterTx struct {
+	*sql.Tx
+	db *OneWriterDB
+}
+
+func (t OneWriterTx) Commit() error {
+	defer t.db.unlock()
+	return t.Tx.Commit()
+}
+
+func (t OneWriterTx) Rollback() error {
+	defer t.db.unlock()
+	return t.Tx.Rollback()
+}
+
+func OpenSqliteOneWriterDB(backingFile, opts string) (*OneWriterDB, error) {
+	dataSourceName := backingFile
+	if opts != "" {
+		dataSourceName += "?" + opts
+	}
+	db, err := sql.Open("sqlite", dataSourceName)
+	if err != nil {
+		return nil, err
+	}
+	fileLock := flock.New(backingFile)
+	wrapper := OneWriterDB{
+		DB:          db,
+		fileLock:    fileLock,
+		busyTimeout: BusyTimeout,
+	}
+	return &wrapper, err
+}
+
 type queueDao struct {
-	db *sql.DB
+	db *OneWriterDB
 }
 
 func (d queueDao) queueOperater(op Operater) (err error) {
@@ -89,22 +207,32 @@ func (d queueDao) queueOperater(op Operater) (err error) {
 	if err != nil {
 		return
 	}
+	defer tx.Rollback()
+
 	_, err = tx.Exec(`
-		INSERT OR IGNORE INTO suite_queue(name) VALUES (@suite);
-		INSERT INTO operation_queue(suite, op, block, unqueued) VALUES (@suite, @opBlob, @block, 0);
+		INSERT OR IGNORE INTO suite_queue(name, open) VALUES (@suite, 0);
+		INSERT INTO operation_queue(suite, op, unqueued, block) 
+			VALUES (@suite, @opBlob, 0, @block);
 		`, sql.Named("suite", op.Suite()), sql.Named("opBlob", b), sql.Named("block", op.Block()))
 	if err != nil {
-		if err2 := tx.Rollback(); err2 != nil {
-			err = err2
-		}
 		return
 	}
 	err = tx.Commit()
+	if err != nil {
+		return
+	}
+
+	// queuedSuites, err := d.queuedSuites()
+	// if err != nil {
+	// 	return
+	// }
+	// logger.Warn("queueOperater()", "queuedSuites", queuedSuites)
+
 	return
 }
 
 func (d queueDao) queuedSuites() (queued []string, err error) {
-	rows, err := d.db.Query("SELECT * FROM suite_queue WHERE open = 1 ORDER BY id;")
+	rows, err := d.db.Query("SELECT name FROM suite_queue WHERE open = 0 ORDER BY id;")
 	if err != nil {
 		return
 	}
@@ -137,17 +265,45 @@ func (d queueDao) openedNotBlockingSuites() (opened []string, err error) {
 	return
 }
 
-func (d queueDao) unblockSuite(op Operater) (err error) {
+func (d queueDao) done(op Operater) (err error) {
+	// 1- Flag operation done
+	// 2- Flag suite done or Remove suite if no operation remaining
+
 	suite := op.Suite()
-	_, err = d.db.Exec(`
-		UPDATE suite_queue SET blocking = NULL 
-		WHERE name = '@suite' and blocking = @id;
-	`, sql.Named("suite", suite), sql.Named("id", op.Id()))
+
+	tx, err := d.db.Begin()
+	if err != nil {
+		return
+	}
+	defer tx.Rollback()
+
+	count, err := d.queuedOperationsCountBySuite(suite, tx)
+	if err != nil {
+		return
+	}
+
+	_, err = tx.Exec(`UPDATE operation_queue SET exitCode = ? WHERE id = ?;`, op.ExitCode(), op.Id())
+	if err != nil {
+		return
+	}
+
+	if count == 0 {
+		// Remove suite
+		_, err = tx.Exec(`DELETE FROM suite_queue WHERE name = ?;`, suite)
+	} else {
+		// Unblock suite
+		_, err = tx.Exec(`UPDATE suite_queue SET blocking = NULL WHERE name = ?;`, suite)
+	}
+	if err != nil {
+		return
+	}
+
+	err = tx.Commit()
 	return
 }
 
 func (d queueDao) closeSuite(suite string) (err error) {
-	_, err = d.db.Exec(`UPDATE suite_queue SET open = 0 WHERE name = '@suite';`, sql.Named("suite", suite))
+	_, err = d.db.Exec(`UPDATE suite_queue SET open = 0 WHERE name = @suite;`, sql.Named("suite", suite))
 	return
 }
 
@@ -157,26 +313,53 @@ func (d queueDao) queuedOperationsCount() (count int, err error) {
 	return
 }
 
-func (d queueDao) queuedOperationsCountBySuite(suite string) (count int, err error) {
-	row := d.db.QueryRow("SELECT count(*) FROM operation_queue WHERE suite = '?' and unqueued = 0;", suite)
+func (d queueDao) queuedOperationsCountBySuite(suite string, tx *OneWriterTx) (count int, err error) {
+	var qr SqlQuerier
+	qr = d.db
+	if tx != nil {
+		qr = tx
+	}
+	row := qr.QueryRow("SELECT count(*) FROM operation_queue WHERE suite = ? and unqueued = 0;", suite)
 	err = row.Scan(&count)
 	return
 }
 
-func (d queueDao) nextQueuedOperation(suite string) (op Operater, err error) {
+func (d queueDao) globalOperationsCount() (count int, err error) {
+	row := d.db.QueryRow("SELECT count(*) FROM operation_queue;")
+	err = row.Scan(&count)
+	return
+}
+
+func (d queueDao) isOperationsDone(op Operater) (done bool, exitCode int16, err error) {
 	row := d.db.QueryRow(`
+		SELECT count(*) = 1, exitCode 
+		FROM operation_queue 
+		WHERE id = @opId AND exitCode IS NOT NULL;
+	`, sql.Named("opId", op.Id()))
+	err = row.Scan(&done, &exitCode)
+	return
+}
+
+func (d queueDao) nextQueuedOperation(suite string, tx *OneWriterTx) (op Operater, err error) {
+	var qr SqlQuerier
+	qr = d.db
+	if tx != nil {
+		qr = tx
+	}
+	row := qr.QueryRow(`
 		SELECT id, op 
 		FROM operation_queue 
-		WHERE suite = '?' and unqueued = 0 
+		WHERE suite = @suite and unqueued = 0 
 		ORDER BY id 
 		LIMIT 1;
-	`, suite)
+	`, sql.Named("suite", suite))
 	var b []byte
 	var opId uint16
 	err = row.Scan(&opId, &b)
 	if err == sql.ErrNoRows {
 		// No operation queued
 		err = nil
+		//logger.Warn("no operation found")
 		return
 	} else if err != nil {
 		return
@@ -202,33 +385,29 @@ func (d queueDao) unqueueOperater() (op Operater, err error) {
 	}
 	if len(openedNotBlockingSuites) > 0 {
 		electedSuite = openedNotBlockingSuites[0]
+		//logger.Warn("unqueueOperater()", "openedNotBlockingSuites", openedNotBlockingSuites)
 	}
 
-	rollback := true
+	//rollback := true
 	tx, err := d.db.Begin()
 	if err != nil {
 		return
 	}
-	defer func() {
-		var err2 error
-		if rollback {
-			err2 = tx.Rollback()
+	defer tx.Rollback()
+
+	/*
+		defer func() {
+			var err2 error
+			if rollback {
+				err2 = tx.Rollback()
+			} else {
+				err2 = tx.Commit()
+			}
 			if err2 != nil {
 				err = err2
 			}
-		} else {
-			start := time.Now()
-			for time.Since(start) < BusyTimeout {
-				err2 = tx.Commit()
-				if err2 == nil || !IsBusyError(err2) {
-					break
-				}
-			}
-		}
-		if err2 != nil {
-			err = err2
-		}
-	}()
+		}()
+	*/
 
 	if electedSuite == "" {
 		// Select first closed suite
@@ -250,52 +429,49 @@ func (d queueDao) unqueueOperater() (op Operater, err error) {
 			// No suite found
 			return
 		}
-
-		// Open this suite
-		_, err = tx.Exec(`
-			UPDATE suite_queue SET open = 1
-			WHERE name = @suite;
-		`, sql.Named("suite", electedSuite))
-		if err != nil {
-			return
-		}
 	}
 
+	//logger.Warn("unqueueOperater()", "electedSuite", electedSuite)
+
 	// Get next operation
-	op, err = d.nextQueuedOperation(electedSuite)
+	op, err = d.nextQueuedOperation(electedSuite, tx)
 	if err != nil {
+		return
+	}
+	if op == nil {
+		//logger.Warn("unqueueOperater() no operation found")
 		return
 	}
 	opId := op.Id()
 
 	logger.Info("unqueueOperater()", "electedSuite", electedSuite, "opId", opId)
 
-	// Record blocking state
+	// Open this suite & Record blocking state
 	if op.Block() {
-		_, err = tx.Exec(`UPDATE suite_queue SET blocking = @opId WHERE name = '@suite';`,
-			sql.Named("suite", electedSuite), sql.Named("opId", opId))
-		if err != nil {
-			return
-		}
+		_, err = tx.Exec(`
+			UPDATE suite_queue SET open = 1, blocking = @opId
+			WHERE name = @suite;
+	`, sql.Named("suite", electedSuite), sql.Named("opId", op.Id()))
+	} else {
+		_, err = tx.Exec(`
+			UPDATE suite_queue SET open = 1, blocking = NULL
+			WHERE name = @suite;
+	`, sql.Named("suite", electedSuite))
+	}
+
+	if err != nil {
+		return
 	}
 
 	// Remove operation
-	_, err = tx.Exec(`DELETE FROM operation_queue WHERE id = @id;`,
+	_, err = tx.Exec(`UPDATE operation_queue SET unqueued = 1 WHERE id = @id;`,
 		sql.Named("id", opId))
 	if err != nil {
 		return
 	}
 
-	// Remove suite if queue empty
-	_, err = tx.Exec(`DELETE FROM suite_queue WHERE name NOT IN (
-		SELECT distinct(suite)
-		FROM operation_queue
-	);`)
-	if err != nil {
-		return
-	}
-
-	rollback = false
+	//rollback = false
+	err = tx.Commit()
 	return
 }
 
@@ -309,25 +485,37 @@ type dbRepo struct {
 }
 
 func (r dbRepo) Queue(op Operater) (err error) {
-	testSuite := op.Suite()
-	logger.Warn("Queue()", "testSuite", testSuite, "kind", op.Kind(), "seq", op.Seq())
+	//testSuite := op.Suite()
+	//logger.Warn("Queue() adding", "testSuite", testSuite, "kind", op.Kind(), "seq", op.Seq())
 
-	start := time.Now()
-	for time.Since(start) < BusyTimeout {
-		// BUSY retries
-		err = r.dao.queueOperater(op)
-		if err == nil || !IsBusyError(err) {
-			break
-		}
-	}
+	// start := time.Now()
+	// for time.Since(start) < BusyTimeout {
+	// BUSY retries
+	err = r.dao.queueOperater(op)
+	// 	if err == nil || !IsBusyError(err) {
+	// 		break
+	// 	}
+	// }
+
+	//logger.Warn("Queue() added", "testSuite", testSuite, "kind", op.Kind(), "seq", op.Seq())
 
 	return
 }
 
 func (r dbRepo) unqueue() (ok bool, op Operater, err error) {
-	var queuedOperationsCount int
-	queuedOperationsCount, err = r.dao.queuedOperationsCount()
-	if err != nil || queuedOperationsCount == 0 {
+	queuedOperationsCount, err := r.dao.queuedOperationsCount()
+	if err != nil {
+		return
+	}
+
+	//globalOperationsCount, err := r.dao.globalOperationsCount()
+	//if err != nil {
+	//	return
+	//}
+
+	//logger.Warn("unqueue()", "globalOperationsCount", globalOperationsCount)
+
+	if queuedOperationsCount == 0 {
 		return
 	}
 
@@ -341,30 +529,46 @@ func (r dbRepo) unqueue() (ok bool, op Operater, err error) {
 }
 
 func (r dbRepo) Unqueue() (ok bool, op Operater, err error) {
-	start := time.Now()
-	for time.Since(start) < BusyTimeout {
-		// BUSY retries
-		ok, op, err = r.unqueue()
-		if err == nil || !IsBusyError(err) {
-			break
-		}
-		logger.Warn("Retrying BUSY ...")
-		time.Sleep(time.Millisecond)
-	}
+	// start := time.Now()
+	// for time.Since(start) < BusyTimeout {
+	// BUSY retries
+	ok, op, err = r.unqueue()
+	// if err == nil || !IsBusyError(err) {
+	// 	   break
+	// }
+	// 	logger.Warn("Retrying BUSY ...")
+	// 	time.Sleep(time.Millisecond)
+	// }
 
-	if ok {
-		logger.Warn("Unqueue()", "kind", op.Kind(), "seq", op.Seq())
-	}
+	//if ok {
+	//	logger.Warn("Unqueue()", "kind", op.Kind(), "opId", op.Id())
+	//}
 
 	return
 }
 
-func (r dbRepo) Unblock(op Operater) (err error) {
+func (r dbRepo) Done(op Operater) (err error) {
 	if op == nil {
 		return
 	}
 
-	err = r.dao.unblockSuite(op)
+	err = r.dao.done(op)
+	//logger.Warn("Unblock() unblocked", "opId", op.Id())
+	return
+}
+
+func (r dbRepo) WaitOperaterDone(op Operater, timeout time.Duration) (exitCode int16, err error) {
+	start := time.Now()
+	for time.Since(start) < timeout {
+		var done bool
+		done, exitCode, err = r.dao.isOperationsDone(op)
+		if done || err != nil {
+			// Operater not done
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	err = errors.New("WaitOperaterDone() timed out")
 	return
 }
 
@@ -372,15 +576,16 @@ func (r dbRepo) WaitEmptyQueue(testSuite string, timeout time.Duration) (err err
 	start := time.Now()
 	for time.Since(start) < timeout {
 		var count int
-		count, err = r.dao.queuedOperationsCountBySuite(testSuite)
+		count, err = r.dao.queuedOperationsCountBySuite(testSuite, nil)
 		if err != nil {
 			return
 		}
+		//logger.Warn("WaitEmptyQueue()", "testSuite", testSuite, "count", count)
 		if count == 0 {
 			// Queue is empty
 			return
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 	}
 	err = errors.New("WaitEmptyQueue() timed out")
 	return
@@ -398,7 +603,7 @@ func (r dbRepo) WaitAllEmpty(timeout time.Duration) (err error) {
 			// No operation queued
 			return
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 	}
 	err = errors.New("WaitAllEmpty() timed out")
 	return

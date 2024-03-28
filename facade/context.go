@@ -234,12 +234,17 @@ func (c TestContext) initTestOutcome(seq uint16) (outcome model.TestOutcome) {
 	testSuite := c.Config.TestSuite.Get()
 	outcome.TestSuite = testSuite
 	outcome.Seq = seq
-	//outcome.TestQualifiedName = c.TestQualifiedName()
 	outcome.ExitCode = -1
-	//outcome.CmdTitle = cmdTitle(c.CmdExec)
 	outcome.Duration = c.CmdExec.Duration()
 	outcome.Stdout = c.CmdExec.StdoutRecord()
 	outcome.Stderr = c.CmdExec.StderrRecord()
+
+	if c.Config.TestName.IsPresent() && !c.Config.TestName.Is("") {
+		outcome.TestName = c.Config.TestName.Get()
+	} else {
+		outcome.TestName = cmdTitle(c.CmdExec)
+	}
+
 	return
 }
 
