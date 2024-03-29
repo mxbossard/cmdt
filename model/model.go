@@ -17,7 +17,7 @@ type Validater[T any] func(rule Rule, value T) error
 type Asserter func(cmdz.Executer) (AssertionResult, error)
 
 type TestDefinition struct {
-	Ppid        uint16
+	Ppid        uint32
 	Token       string
 	TestSuite   string
 	TestName    string

@@ -202,32 +202,62 @@ func (d queueDao) queueOperater(op Operater) (err error) {
 	if err != nil {
 		return
 	}
-
+	logger.Error("queueing operater", "kind", op.Kind())
 	tx, err := d.db.Begin()
 	if err != nil {
 		return
 	}
 	defer tx.Rollback()
 
-	_, err = tx.Exec(`
+	res, err := tx.Exec(`
 		INSERT OR IGNORE INTO suite_queue(name, open) VALUES (@suite, 0);
-		INSERT INTO operation_queue(suite, op, unqueued, block) 
-			VALUES (@suite, @opBlob, 0, @block);
+		INSERT INTO operation_queue(suite, op, unqueued, block, exitCode) 
+			VALUES (@suite, @opBlob, 0, @block, NULL);
 		`, sql.Named("suite", op.Suite()), sql.Named("opBlob", b), sql.Named("block", op.Block()))
 	if err != nil {
 		return
 	}
+
+	id, err := res.LastInsertId()
+	if err != nil {
+		return
+	}
+
 	err = tx.Commit()
 	if err != nil {
 		return
 	}
 
-	// queuedSuites, err := d.queuedSuites()
-	// if err != nil {
-	// 	return
-	// }
-	// logger.Warn("queueOperater()", "queuedSuites", queuedSuites)
+	op.SetId(uint16(id))
+	logger.Error("queued operater", "id", id)
 
+	return
+}
+
+func (d queueDao) isOperationsDone(op Operater) (done bool, exitCode int16, err error) {
+	row := d.db.QueryRow(`
+		SELECT exitCode 
+		FROM operation_queue 
+		WHERE id = @opId AND exitCode IS NOT NULL;
+	`, sql.Named("opId", op.Id()))
+	err = row.Scan(&exitCode)
+	if err == sql.ErrNoRows {
+		err = nil
+		return
+	} else if err != nil {
+		return
+	}
+	done = true
+	return
+}
+
+func (d queueDao) isOperationsDone0(op Operater) (done bool, exitCode int16, err error) {
+	row := d.db.QueryRow(`
+		SELECT count(*) = 1, exitCode 
+		FROM operation_queue 
+		WHERE id = @opId AND exitCode IS NOT NULL;
+	`, sql.Named("opId", op.Id()))
+	err = row.Scan(&done, &exitCode)
 	return
 }
 
@@ -327,16 +357,6 @@ func (d queueDao) queuedOperationsCountBySuite(suite string, tx *OneWriterTx) (c
 func (d queueDao) globalOperationsCount() (count int, err error) {
 	row := d.db.QueryRow("SELECT count(*) FROM operation_queue;")
 	err = row.Scan(&count)
-	return
-}
-
-func (d queueDao) isOperationsDone(op Operater) (done bool, exitCode int16, err error) {
-	row := d.db.QueryRow(`
-		SELECT count(*) = 1, exitCode 
-		FROM operation_queue 
-		WHERE id = @opId AND exitCode IS NOT NULL;
-	`, sql.Named("opId", op.Id()))
-	err = row.Scan(&done, &exitCode)
 	return
 }
 
@@ -444,7 +464,7 @@ func (d queueDao) unqueueOperater() (op Operater, err error) {
 	}
 	opId := op.Id()
 
-	logger.Info("unqueueOperater()", "electedSuite", electedSuite, "opId", opId)
+	logger.Debug("unqueueOperater()", "electedSuite", electedSuite, "opId", opId)
 
 	// Open this suite & Record blocking state
 	if op.Block() {
@@ -558,15 +578,16 @@ func (r dbRepo) Done(op Operater) (err error) {
 }
 
 func (r dbRepo) WaitOperaterDone(op Operater, timeout time.Duration) (exitCode int16, err error) {
+	exitCode = -1
 	start := time.Now()
 	for time.Since(start) < timeout {
 		var done bool
 		done, exitCode, err = r.dao.isOperationsDone(op)
 		if done || err != nil {
-			// Operater not done
+			// Operater done
 			return
 		}
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(1 * time.Millisecond)
 	}
 	err = errors.New("WaitOperaterDone() timed out")
 	return
@@ -585,7 +606,7 @@ func (r dbRepo) WaitEmptyQueue(testSuite string, timeout time.Duration) (err err
 			// Queue is empty
 			return
 		}
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(1 * time.Millisecond)
 	}
 	err = errors.New("WaitEmptyQueue() timed out")
 	return
@@ -603,7 +624,7 @@ func (r dbRepo) WaitAllEmpty(timeout time.Duration) (err error) {
 			// No operation queued
 			return
 		}
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(1 * time.Millisecond)
 	}
 	err = errors.New("WaitAllEmpty() timed out")
 	return

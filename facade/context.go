@@ -69,7 +69,7 @@ func NewSuiteContext(token, testSuite string, initless bool, action model.Action
 	return suiteCtx
 }
 
-func NewTestContext(token, testSuite string, inputCfg model.Config, ppid uint16) TestContext {
+func NewTestContext(token, testSuite string, inputCfg model.Config, ppid uint32) TestContext {
 	suiteCtx := NewSuiteContext(token, testSuite, true, model.TestAction, model.Config{})
 	mergedCfg := suiteCtx.Config
 	mergedCfg.Merge(inputCfg)
@@ -306,7 +306,7 @@ func (c TestContext) AssertCmdExecBlocking(seq uint16, assertions []model.Assert
 	return
 }
 
-func (c *TestContext) initExecuter(ppid uint16) (err error) {
+func (c *TestContext) initExecuter(ppid uint32) (err error) {
 	cfg := c.Config
 	cmdAndArgs := cfg.CmdAndArgs
 	if len(cmdAndArgs) == 0 {

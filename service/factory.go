@@ -946,6 +946,11 @@ func ParseArgs(rulePrefix string, args []string) (cfg model.Config, assertions [
 		agg.Add(err)
 	}
 
+	if cfg.Action.Is(model.ReportAction) {
+		cfg.Async.Default(true)
+		cfg.Wait.Default(true)
+	}
+
 	err = ValidateMutualyExclusiveRules(rules...)
 	if err != nil {
 		agg.Add(err)

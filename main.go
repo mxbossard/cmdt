@@ -94,6 +94,7 @@ import (
 ## TODO:
 
 Bugs:
+- @verbose @debug=0 log some INFO level (maybe daemon only)
 - @async test not compatible with stdin usage (because it's the daemon who shoud read from stdin
 - Environ not passed to test run by daemon => should embed cmdt environ into operation
 - cmdt cannot call cmdt with same token if 2 are blockings and fork=1

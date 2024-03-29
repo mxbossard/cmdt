@@ -127,19 +127,20 @@ $cmdt @async=false @report=should_succeed @keep || die "reporting should_succeed
 $cmdt @async=false @report=should_succeed @keep 2>&1 | grep "28 success" > /dev/null || die "reporting should_succeed bad success count"
 
 >&2 echo "## reporting should_fail"
-! $cmdt @async=false @report=should_fail @keep >/dev/null 2>&1 || die "reporting should_fail shoud exit=1"
+! $cmdt @report=should_fail @keep >/dev/null 2>&1 || die "reporting should_fail shoud exit=1"
 if $cmdt @wait @report=should_fail @keep 2>&1 | grep "17 failures"; then
 	$cmdt @async=false @report=should_fail @keep || true
 	die "reporting should_fail bad failures count"
 fi
 
 >&2 echo "## reporting should_error"
-! $cmdt @async=true @report=should_error @keep >/dev/null 2>&1 || die "reporting should_error should exit=1" || true
+! $cmdt @wait @report=should_error @keep >/dev/null 2>&1 || die "reporting should_error should exit=1" || true
 if $cmdt @wait @report=should_error @keep 2>&1 | grep "4 errors"; then
 	$cmdt @wait @report=should_error @keep || true
 	die "reporting should_error bad errors count"
 fi
 
+>&2 echo "## reporting all"
 ! $cmdt @async=false @report >/dev/null 2>&1 || die "reporting all should exit=1"
 
 nothingToReportExpectedStderrMsg="you must perform some test prior to report"
@@ -714,6 +715,7 @@ $cmdt0 @test=testContainer/ @stderr:PASSED @-- $cmdt1 @test=sub/ ls "$testFile" 
 $cmdt0 @test=testContainer/ @stderr:PASSED @-- $cmdt1 @test=sub/ ls "$hostFile" @fail @stderr:"$hostFile" # file should not exist in container
 $cmdt0 @test=testContainer/ @-- $cmdt1 @report=sub
 
-$cmdt @report= ; >&2 echo SUCCESS ; exit 0
+>&2 echo "## Reporting all"
+$cmdt @wait @report= ; >&2 echo SUCCESS ; exit 0
 
 

@@ -63,9 +63,14 @@ func (d daemon) unqueue() (ok bool) {
 	if err != nil {
 		panic(err)
 	}
-	defer d.repo.Done(op)
+	defer func() {
+		err = d.repo.Done(op)
+		if err != nil {
+			panic(err)
+		}
+	}()
 	if op != nil {
-		logger.Info("daemon: unqueued operation.", "kind", op.Kind(), "id", op.Id())
+		logger.Debug("daemon: unqueued operation.", "kind", op.Kind(), "id", op.Id())
 		switch o := op.(type) {
 		case *repo.TestOp:
 			op.SetExitCode(uint16(d.performTest(o.Definition)))
@@ -75,10 +80,6 @@ func (d daemon) unqueue() (ok bool) {
 			op.SetExitCode(uint16(d.reportAll(o.Definition)))
 		default:
 			err = fmt.Errorf("unknown operation %T", op)
-			panic(err)
-		}
-		err = d.repo.State.ReportOperationDone(op)
-		if err != nil {
 			panic(err)
 		}
 		ok = true

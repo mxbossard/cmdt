@@ -41,8 +41,8 @@ func New(token string) (repo FileRepo) {
 	//}
 	//repo.queuesRepo = queuesRepo
 
-	stateBackingFilepath := filepath.Join(path, "state.yaml")
-	repo.State = FileState{backingFilepath: stateBackingFilepath}
+	//stateBackingFilepath := filepath.Join(path, "state.yaml")
+	//repo.State = FileState{backingFilepath: stateBackingFilepath}
 
 	repo.dbRepo, err = newDbRepo(path)
 	if err != nil {
@@ -56,7 +56,7 @@ type FileRepo struct {
 	token string
 	//queuesRepo OperationQueueRepo
 
-	State  FileState
+	//State  FileState
 	dbRepo dbRepo
 }
 
