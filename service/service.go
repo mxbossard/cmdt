@@ -273,7 +273,8 @@ func ProcessTestDef(testDef model.TestDefinition) (exitCode int16) {
 	return
 }
 
-func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16, exitCode int16) {
+func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
+	var exitCode int16
 	exitCode = 1
 	wait = func() int16 { return exitCode }
 
@@ -371,6 +372,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16, exitC
 				} else {
 					exitCode = 0
 				}
+				daemonToken = globalCtx.Token
 			}
 		} else {
 			// Reporting One test suite
@@ -408,21 +410,19 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16, exitC
 				} else {
 					exitCode = 0
 				}
+				daemonToken = suiteCtx.Token
 			}
 		}
 	case model.TestAction:
 		testSuite := inputConfig.TestSuite.Get()
 		ppid := uint32(utils.ReadEnvPpid())
 		testCtx := facade.NewTestContext(token, testSuite, inputConfig, ppid)
+		var seq uint16
+		seq = testCtx.IncrementTestCount()
+		testCtx.NoErrorOrFatal(agg.Return())
 		logger.Debug("Forged context", "ctx", testCtx)
 		testCfg := testCtx.Config
 		token = testCtx.Token
-		var seq uint16
-		//if testCfg.ContainerDisabled.Is(true) || testCfg.ContainerImage.IsEmpty() {
-		seq = testCtx.IncrementTestCount()
-		//}
-
-		testCtx.NoErrorOrFatal(agg.Return())
 
 		testDef := model.TestDefinition{
 			Ppid:        ppid,

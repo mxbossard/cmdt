@@ -247,7 +247,7 @@ func main() {
 	daemon.TakeOver()
 
 	model.LoggerLevel.Set(slog.Level(8 - model.StartDebugLevel*4))
-	daemonToken, wait, _ := service.ProcessArgs(os.Args)
+	daemonToken, wait := service.ProcessArgs(os.Args)
 
 	if daemonToken != "" {
 		daemon.LanchProcessIfNeeded(daemonToken)

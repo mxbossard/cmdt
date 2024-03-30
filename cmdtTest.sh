@@ -122,26 +122,31 @@ $cmdt0 @init=should_error @failuresLimit=-1
 ! $cmdt0 @test=should_error/ true @stderr:"" || die "should error because empty contains"
 ! $cmdt0 @test=should_error/ true @stderr~"" || die "should error because empty regex"
 
+set +o pipefail
 >&2 echo "## reporting should_succeed"
 $cmdt @async=false @report=should_succeed @keep || die "reporting should_succeed should exit=0"
 $cmdt @async=false @report=should_succeed @keep 2>&1 | grep "28 success" > /dev/null || die "reporting should_succeed bad success count"
 
 >&2 echo "## reporting should_fail"
+#! $cmdt @report=should_fail @keep || false
 ! $cmdt @report=should_fail @keep >/dev/null 2>&1 || die "reporting should_fail shoud exit=1"
-if $cmdt @wait @report=should_fail @keep 2>&1 | grep "17 failures"; then
-	$cmdt @async=false @report=should_fail @keep || true
+if ! $cmdt @report=should_fail @async=false @keep 2>&1 | grep "17 failures"; then
+	$cmdt @report=should_fail @async=false @keep || true
 	die "reporting should_fail bad failures count"
 fi
 
 >&2 echo "## reporting should_error"
-! $cmdt @wait @report=should_error @keep >/dev/null 2>&1 || die "reporting should_error should exit=1" || true
-if $cmdt @wait @report=should_error @keep 2>&1 | grep "4 errors"; then
-	$cmdt @wait @report=should_error @keep || true
+#! $cmdt @report=should_error @keep || false
+! $cmdt @report=should_error @keep >/dev/null 2>&1 || die "reporting should_error should exit=1"
+if ! $cmdt @report=should_error @async=false @keep 2>&1 | grep "4 errors"; then
+	$cmdt @report=should_error @async=false @keep || true
 	die "reporting should_error bad errors count"
 fi
 
 >&2 echo "## reporting all"
 ! $cmdt @async=false @report >/dev/null 2>&1 || die "reporting all should exit=1"
+
+set -o pipefail
 
 nothingToReportExpectedStderrMsg="you must perform some test prior to report"
 >&2 echo "## Test @report without test"

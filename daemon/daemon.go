@@ -88,7 +88,7 @@ func (d daemon) unqueue() (ok bool) {
 }
 
 func (d daemon) run() {
-	logger.Info("daemon: starting ...", "token", d.token)
+	logger.Warn("daemon: starting ...", "token", d.token)
 	lastUnqueue := time.Now()
 	for {
 		//logger.Warn("daemon: unqueueing ...")
@@ -228,7 +228,7 @@ func TakeOver() {
 }
 
 func LanchProcessIfNeeded(token string) error {
-	logger.Info("daemon: should I launch daemon ?", "token", token)
+	logger.Warn("daemon: should I launch daemon ?", "token", token)
 	if token == "" {
 		// No token => no daemon to launch
 		return nil

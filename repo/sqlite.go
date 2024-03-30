@@ -229,7 +229,7 @@ func (d queueDao) queueOperater(op Operater) (err error) {
 	}
 
 	op.SetId(uint16(id))
-	logger.Error("queued operater", "id", id)
+	logger.Error("queued operater", "id", id, "suite", op.Suite())
 
 	return
 }
