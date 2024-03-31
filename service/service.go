@@ -146,7 +146,7 @@ func ReportTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 
 	if !cfg.Keep.Is(true) {
 		err = ctx.Repo.ClearTestSuite(suiteOutcome.TestSuite)
-		logger.Info("Cleared suite", "suite", suiteOutcome.TestSuite)
+		logger.Debug("Cleared suite", "suite", suiteOutcome.TestSuite)
 	}
 
 	return
@@ -351,7 +351,8 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 				// Delegate report all processing to daemon
 				logger.Warn("executing report all async (queueing report)")
 				def := model.ReportDefinition{
-					Token:  globalCtx.Token,
+					Token: globalCtx.Token,
+					//TestSuite: "__global",
 					Config: globalCtx.Config,
 				}
 				op := repo.ReportAllOperation(true, def) // FIXME should not block if test can be run simultaneously

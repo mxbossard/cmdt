@@ -114,8 +114,9 @@ type ReportAllOp struct {
 func ReportAllOperation(blocking bool, def model.ReportDefinition) ReportAllOp {
 	return ReportAllOp{
 		OperationBase: OperationBase{
-			Type:     string(ReportKind),
-			Blocking: blocking,
+			Type:      string(ReportKind),
+			TestSuite: "__global",
+			Blocking:  blocking,
 		},
 		Definition: def,
 	}

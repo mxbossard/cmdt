@@ -169,9 +169,9 @@ tk0=$( $cmdt @init @printToken 2> /dev/null )
 $cmdt0 @init=meta2
 $cmdt0 @test=meta2/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt true @token=$tk0
 $cmdt0 @test=meta2/ @stderr:"PASSED" @stderr:"#02" @-- $cmdt true @token=$tk0
-$cmdt0 @test=meta2/ @fail @-- $cmdt @report=main
-$cmdt0 @test=meta2/ @stderr:"Successfuly ran" @-- $cmdt @report @token=$tk0
-$cmdt @report 2>&1 | grep -v "Failures"
+$cmdt0 @test=meta2/ @fail @-- $cmdt @report=main @async=false
+$cmdt0 @test=meta2/ @stderr:"Successfuly ran" @-- $cmdt @report @async=false @token=$tk0
+$cmdt @report @async=false 2>&1 | grep -v "Failures"
 
 >&2 echo "## Test exported token"
 eval $( $cmdt @init @exportToken 2> /dev/null )
@@ -179,15 +179,15 @@ eval $( $cmdt @init @exportToken 2> /dev/null )
 $cmdt0 @init=meta3
 $cmdt0 @test=meta3/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt true
 $cmdt0 @test=meta3/ @stderr:"PASSED" @stderr:"#02" @-- $cmdt true
-$cmdt0 @test=meta3/ @stderr:"Successfuly ran" @-- $cmdt @report=main
-$cmdt0 @test=meta3/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt @report=main @token=$tk0
+$cmdt0 @test=meta3/ @stderr:"Successfuly ran" @-- $cmdt @report=main @async=false
+$cmdt0 @test=meta3/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt @report=main @async=false @token=$tk0
 
 $cmdt0 @init=meta4
 $cmdt0 @test=meta4/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt @test=sub4/ true
 $cmdt0 @test=meta4/ @stderr:"PASSED" @stderr:"#02" @-- $cmdt @test=sub4/ true
-$cmdt0 @test=meta4/ @stderr:"Successfuly ran" @-- $cmdt @report=sub4
-$cmdt0 @test=meta4/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt @report=sub4 @token=$tk0
-$cmdt @report 2>&1 | grep -v "Failures"
+$cmdt0 @test=meta4/ @stderr:"Successfuly ran" @-- $cmdt @report=sub4 @async=false
+$cmdt0 @test=meta4/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt @report=sub4 @async=false @token=$tk0
+$cmdt @report @async=false 2>&1 | grep -v "Failures"
 
 export -n __CMDT_TOKEN
 
@@ -264,7 +264,7 @@ $cmdt0 @test=outputs_assertions/ @stderr:"#01..." @stderr:"PASSED" @-- $cmdt tru
 $cmdt0 @test=outputs_assertions/ @stderr:"#02..." @stderr:"PASSED" @-- $cmdt true @test=t1/
 $cmdt0 @test=outputs_assertions/ @stderr:"#03..." @stderr:"FAILED" @-- $cmdt false @test=t1/
 $cmdt0 @test=outputs_assertions/ @stderr:"#04..." @stderr:"PASSED" @-- $cmdt false @fail @test=t1/
-$cmdt0 @test=outputs_assertions/ @fail @stderr~"/Failures in \[.*t1.*\] test suite \(3 success, 1 failures, 0 errors on 4 tests in/" @-- $cmdt @report=t1
+$cmdt0 @test=outputs_assertions/ @fail @stderr~"/Failures in \[.*t1.*\] test suite \(3 success, 1 failures, 0 errors on 4 tests in/" @-- $cmdt @report=t1 @async=false
 
 
 >&2 echo "## Test namings"
@@ -358,7 +358,7 @@ $cmdt0 @test=test_config/ @stderr= @-- $cmdt1 @quiet false
 $cmdt0 @test=test_config/ @stdout="foo\n" @stderr= @-- $cmdt1 @quiet @keepOutputs echo foo
 $cmdt0 @test=test_config/ @stdout= @stderr="foo\n" @-- $cmdt1 @quiet @keepOutputs sh -c ">&2 echo foo"
 
-$cmdt0 @test=test_config/ @fail @-- $cmdt1 @report=main 
+$cmdt0 @test=test_config/ @fail @-- $cmdt1 @report=main
 
 
 >&2 echo "## Test suite config"
@@ -419,7 +419,7 @@ $cmdt0 @test=assertion/ @stderr:FAILED @-- $cmdt1 true @cmd=false
 touch /tmp/doexists
 $cmdt0 @test=assertion/ @stderr:PASSED @-- $cmdt1 false @fail @cmd="ls /tmp/doexists"
 
-$cmdt0 @test=assertion/ @fail @-- $cmdt1 @report=main 
+$cmdt0 @test=assertion/ @fail @-- $cmdt1 @report=main
 
 
 >&2 echo "## Test stdin"
@@ -439,7 +439,7 @@ $cmdt0 @test=file_ref_content/ @stderr:FAILED @-- $cmdt1 @stdout@=/tmp/fileRefCo
 $cmdt0 @test=file_ref_content/ @stderr:PASSED @-- $cmdt1 @stdout@:/tmp/fileRefContent echo foo
 $cmdt0 @test=file_ref_content/ @stderr:FAILED @-- $cmdt1 @stdout@:/tmp/fileRefContent echo bar
 
-$cmdt0 @test=file_ref_content/ @fail @-- $cmdt1 @report=main 
+$cmdt0 @test=file_ref_content/ @fail @-- $cmdt1 @report=main
 
 >&2 echo "## Test export"
 export foo=bar
@@ -721,6 +721,6 @@ $cmdt0 @test=testContainer/ @stderr:PASSED @-- $cmdt1 @test=sub/ ls "$hostFile" 
 $cmdt0 @test=testContainer/ @-- $cmdt1 @report=sub
 
 >&2 echo "## Reporting all"
-$cmdt @wait @report= ; >&2 echo SUCCESS ; exit 0
+$cmdt @async=true @report= ; >&2 echo SUCCESS ; exit 0
 
 
