@@ -20,13 +20,15 @@ cd - > /dev/null
 rm -rf -- "$workspaceDir"
 
 cmd="TO_REPLACE"
-cmdt="$GOBIN/cmdtest"
-ls -lh "$cmdt"
+newCmdt="$GOBIN/cmdtest"
+ls -lh "$newCmdt"
 
-cmdt="$cmdt"
+cmdt="cmdt"
+cmdt="$newCmdt"
+
 cmdt0="$cmdt $@"
-#cmdt0="$cmdt"
-cmdt1="$cmdt @async=false @verbose @failuresLimit=-1" # Default verbose show passed test + perform all test beyond failures limit
+#cmdt0="cmdt"
+cmdt1="$newCmdt @verbose @failuresLimit=-1" # Default verbose show passed test + perform all test beyond failures limit
 
 mkdir -p "$scriptDir/.tmp"
 reportFile="$( mktemp "$scriptDir/.tmp/XXXXXX.log" )"
