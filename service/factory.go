@@ -947,7 +947,7 @@ func ParseArgs(rulePrefix string, args []string) (cfg model.Config, assertions [
 	}
 
 	if cfg.Action.Is(model.ReportAction) {
-		cfg.Async.Default(true)
+		//cfg.Async.Default(false)
 		cfg.Wait.Default(true)
 	}
 

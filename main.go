@@ -17,6 +17,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"log/slog"
 	"os"
 
@@ -122,6 +123,7 @@ Optims:
 
 Features:
 - use rule definitions in usage
+- shorten too long outputs on failure. Remove colors from output ?
 - @beforeSuite=CMD_ANG_ARGS & @afterSuite=CMD_ANG_ARGS
 - @called[=:]CMD ARG_S,stdin=IN,count=N assertion => verify a mock was called
 - probably too slow podman/docker abstraction (check for podman & docker in path everytime)
@@ -250,11 +252,16 @@ func main() {
 	daemonToken, wait := service.ProcessArgs(os.Args)
 
 	if daemonToken != "" {
-		daemon.LanchProcessIfNeeded(daemonToken)
+		err := daemon.LanchProcessIfNeeded(daemonToken)
+		if err != nil {
+			panic(err)
+		}
 	}
 
+	log.Printf("waiting\n")
 	exitCode := wait()
 
+	log.Printf("exiting with code: %d\n", exitCode)
 	os.Exit(int(exitCode))
 }
 

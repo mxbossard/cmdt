@@ -16,7 +16,7 @@ const (
 	DefaultVerboseLevel         = SHOW_PASSED
 	DefaultInitedVerboseLevel   = SHOW_FAILED_OUTS
 	DefaultInitlessVerboseLevel = DefaultVerboseLevel
-	DefaultInitedAsync          = true
+	DefaultInitedAsync          = false
 	DefaultInitedWait           = false
 	DefaultInitlessAsync        = false
 	DefaultInitlessWait         = true

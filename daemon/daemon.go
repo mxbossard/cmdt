@@ -21,7 +21,7 @@ const (
 	DaemonLockFilename = "daemon.lock"
 	DaemonPidFilename  = "daemon.pid"
 	LockWatingSecs     = 5
-	ExtraRunningSecs   = 10
+	ExtraRunningSecs   = 5
 )
 
 var logger = slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
@@ -58,15 +58,18 @@ type daemon struct {
 	repo  repo.FileRepo
 }
 
-func (d daemon) unqueue() (ok bool) {
+func (d daemon) unqueue() (ok bool, err error) {
 	op, err := d.repo.UnqueueOperation()
 	if err != nil {
-		panic(err)
+		return
 	}
 	defer func() {
-		err = d.repo.Done(op)
-		if err != nil {
-			panic(err)
+		if op != nil {
+			//logger.Warn("doning op ...", "op", op)
+			err = d.repo.Done(op)
+			if err != nil {
+				panic(err)
+			}
 		}
 	}()
 	if op != nil {
@@ -75,12 +78,16 @@ func (d daemon) unqueue() (ok bool) {
 		case *repo.TestOp:
 			op.SetExitCode(uint16(d.performTest(o.Definition)))
 		case *repo.ReportOp:
-			op.SetExitCode(uint16(d.report(o.Definition)))
+			exitCode, err := d.report(o.Definition)
+			if err != nil {
+				return false, err
+			}
+			op.SetExitCode(uint16(exitCode))
 		case *repo.ReportAllOp:
 			op.SetExitCode(uint16(d.reportAll(o.Definition)))
 		default:
 			err = fmt.Errorf("unknown operation %T", op)
-			panic(err)
+			return
 		}
 		ok = true
 	}
@@ -92,7 +99,9 @@ func (d daemon) run() {
 	lastUnqueue := time.Now()
 	for {
 		//logger.Warn("daemon: unqueueing ...")
-		if ok := d.unqueue(); !ok {
+		if ok, err := d.unqueue(); err != nil {
+			panic(err)
+		} else if !ok {
 			// nothing to unqueue wait 1ms
 			duration := time.Since(lastUnqueue)
 			if duration > ExtraRunningSecs*time.Second {
@@ -117,9 +126,9 @@ func (d daemon) performTest(testDef model.TestDefinition) (exitCode int16) {
 	return
 }
 
-func (d daemon) report(def model.ReportDefinition) (exitCode int16) {
+func (d daemon) report(def model.ReportDefinition) (exitCode int16, err error) {
 	logger.Debug("daemon: reporting test suite...")
-	exitCode = service.ProcessReportDef(def)
+	exitCode, err = service.ProcessReportDef(def)
 	logger.Debug("daemon: reporting done.")
 	return
 }
@@ -216,7 +225,10 @@ func TakeOver() {
 	}
 
 	// Last unqueue
-	_ = d.unqueue()
+	_, err = d.unqueue()
+	if err != nil {
+		panic(err)
+	}
 
 	// Clear PID file
 	d.ClearPid()
@@ -238,11 +250,12 @@ func LanchProcessIfNeeded(token string) error {
 	if err != nil {
 		return err
 	}
+
 	cmd := exec.Command(os.Args[0], "@_daemon", token)
 	cmd.Dir = cwd
 	cmd.Env = os.Environ()
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	//cmd.Stdout = os.Stdout
+	//cmd.Stderr = os.Stderr
 	err = cmd.Start()
 	if err != nil {
 		return err
@@ -251,6 +264,16 @@ func LanchProcessIfNeeded(token string) error {
 	if err != nil {
 		return err
 	}
-	logger.Debug("daemon process released")
-	return nil
+
+	// argv := []string{os.Args[0], "@_daemon", token}
+	// //procattr := os.ProcAttr{Dir: cwd, Env: os.Environ(), Files: []*os.File{nil, os.Stdout, os.Stderr}}
+	// procattr := os.ProcAttr{Dir: cwd, Env: os.Environ(), Files: []*os.File{nil, nil, nil}}
+	// proc, err := os.StartProcess(os.Args[0], argv, &procattr)
+	// if err != nil {
+	// 	return err
+	// }
+	// err = proc.Release()
+
+	logger.Warn("daemon process released")
+	return err
 }

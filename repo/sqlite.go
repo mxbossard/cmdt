@@ -202,7 +202,7 @@ func (d queueDao) queueOperater(op Operater) (err error) {
 	if err != nil {
 		return
 	}
-	logger.Error("queueing operater", "kind", op.Kind())
+	logger.Debug("queueing operater", "kind", op.Kind())
 	tx, err := d.db.Begin()
 	if err != nil {
 		return
@@ -229,7 +229,7 @@ func (d queueDao) queueOperater(op Operater) (err error) {
 	}
 
 	op.SetId(uint16(id))
-	logger.Error("queued operater", "id", id, "suite", op.Suite())
+	logger.Debug("queued operater", "id", id, "suite", op.Suite())
 
 	return
 }
@@ -300,7 +300,7 @@ func (d queueDao) done(op Operater) (err error) {
 	// 2- Flag suite done or Remove suite if no operation remaining
 
 	suite := op.Suite()
-
+	//logger.Warn("doning op ...", "suite", suite, "op", op)
 	tx, err := d.db.Begin()
 	if err != nil {
 		return
@@ -329,6 +329,7 @@ func (d queueDao) done(op Operater) (err error) {
 	}
 
 	err = tx.Commit()
+	//logger.Warn("op done", "suite", suite, "op", op)
 	return
 }
 
@@ -588,6 +589,7 @@ func (r dbRepo) WaitOperaterDone(op Operater, timeout time.Duration) (exitCode i
 			return
 		}
 		time.Sleep(1 * time.Millisecond)
+		//logger.Debug("waiting ...", "op", op)
 	}
 	err = errors.New("WaitOperaterDone() timed out")
 	return

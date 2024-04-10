@@ -152,12 +152,12 @@ func ReportTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	return
 }
 
-func ProcessReportDef(def model.ReportDefinition) (exitCode int16) {
+func ProcessReportDef(def model.ReportDefinition) (exitCode int16, err error) {
 	//logger.Warn("ProcessReportDef()", "def", def)
-	var err error
+	//var err error
 	ctx := facade.NewSuiteContext(def.Token, def.TestSuite, false, model.ReportAction, def.Config)
 	exitCode, err = ReportTestSuite(ctx)
-	ctx.NoErrorOrFatal(err)
+	//ctx.NoErrorOrFatal(err)
 	return
 }
 
@@ -402,10 +402,12 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 				if suiteCtx.Config.Wait.Is(true) {
 					wait = func() int16 {
 						// FIXME: bad timeout
+						logger.Warn("waiting report done ...", "suite", testSuite)
 						exitCode, err := suiteCtx.Repo.WaitOperationDone(&op, suiteCtx.Config.SuiteTimeout.Get())
 						if err != nil {
 							panic(err)
 						}
+						logger.Warn("report done", "suite", testSuite)
 						return exitCode
 					}
 				} else {

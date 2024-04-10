@@ -33,7 +33,8 @@ cmdtIn="$cmdt $@"
 
 # Tested cmdt
 cmdt0="$newCmdt"
-cmdt1="$newCmdt @verbose @failuresLimit=-1" # Default verbose show passed test + perform all test beyond failures limit
+cmdt1="$newCmdt @verbose @failuresLimit=-1 @async" # Default verbose show passed test + perform all test beyond failures limit
+#cmdt2="$newCmdt @verbose @failuresLimit=-1 @async @wait"
 
 mkdir -p "$scriptDir/.tmp"
 reportFile="$( mktemp "$scriptDir/.tmp/XXXXXX.log" )"
@@ -158,8 +159,11 @@ grep "4 errors" "$of" || die "reporting should_error bad errors count"
 nothingToReportExpectedStderrMsg="you must perform some test prior to report"
 >&2 echo "## Test @report without test"
 $cmdtIn @init=meta1
+>&2 echo meta1 A
 $cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt1 @report=foo
+>&2 echo meta1 B
 $cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt1 @report=foo
+>&2 echo meta1 C
 
 >&2 echo "## Meta1 test context not shared without token"
 # Without token, cmdt run with different pid should run in differents workspaces
@@ -175,26 +179,26 @@ $cmdtIn @test=meta1/ @exit=1 @-- $cmdt1 @report=main
 tk0=$( $cmdt @init @printToken 2> /dev/null )
 >&2 echo "token: $tk0"
 $cmdtIn @init=meta2
-$cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt0 true @token=$tk0
-$cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#02" @-- $cmdt0 true @token=$tk0
-$cmdtIn @test=meta2/ @fail @-- $cmdt0 @report=main
-$cmdtIn @test=meta2/ @stderr:"Successfuly ran" @-- $cmdt0 @report @token=$tk0
+$cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt1 true @token=$tk0
+$cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#02" @-- $cmdt1 true @token=$tk0
+$cmdtIn @test=meta2/ @fail @-- $cmdt1 @report=main
+$cmdtIn @test=meta2/ @stderr:"Successfuly ran" @-- $cmdt1 @report @token=$tk0
 $cmdt @report 2>&1 | grep -v "Failures"
 
 >&2 echo "## Test exported token"
 eval $( $cmdt @init @exportToken 2> /dev/null )
 >&2 echo "token: $__CMDT_TOKEN"
 $cmdtIn @init=meta3
-$cmdtIn @test=meta3/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt0 true
-$cmdtIn @test=meta3/ @stderr:"PASSED" @stderr:"#02" @-- $cmdt0 true
-$cmdtIn @test=meta3/ @stderr:"Successfuly ran" @-- $cmdt0 @report=main
+$cmdtIn @test=meta3/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt1 true
+$cmdtIn @test=meta3/ @stderr:"PASSED" @stderr:"#02" @-- $cmdt1 true
+$cmdtIn @test=meta3/ @stderr:"Successfuly ran" @-- $cmdt1 @report=main
 $cmdtIn @test=meta3/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=main @token=$tk0
 
 $cmdtIn @init=meta4
-$cmdtIn @test=meta4/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt0 @test=sub4/ true
-$cmdtIn @test=meta4/ @stderr:"PASSED" @stderr:"#02" @-- $cmdt0 @test=sub4/ true
-$cmdtIn @test=meta4/ @stderr:"Successfuly ran" @-- $cmdt0 @report=sub4
-$cmdtIn @test=meta4/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=sub4 @token=$tk0
+$cmdtIn @test=meta4/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt1 @test=sub4/ true
+$cmdtIn @test=meta4/ @stderr:"PASSED" @stderr:"#02" @-- $cmdt1 @test=sub4/ true
+$cmdtIn @test=meta4/ @stderr:"Successfuly ran" @-- $cmdt1 @report=sub4
+$cmdtIn @test=meta4/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt1 @report=sub4 @token=$tk0
 $cmdt @report 2>&1 | grep -v "Failures"
 
 export -n __CMDT_TOKEN
