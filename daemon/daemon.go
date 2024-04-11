@@ -256,6 +256,7 @@ func LanchProcessIfNeeded(token string) error {
 	cmd.Env = os.Environ()
 	//cmd.Stdout = os.Stdout
 	//cmd.Stderr = os.Stderr
+	// FIXME: daemon should produce outputs in buffers and post it witin done op if waiting.
 	err = cmd.Start()
 	if err != nil {
 		return err

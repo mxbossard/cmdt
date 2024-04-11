@@ -158,8 +158,8 @@ grep "4 errors" "$of" || die "reporting should_error bad errors count"
 nothingToReportExpectedStderrMsg="you must perform some test prior to report"
 >&2 echo "## Test @report without test"
 $cmdtIn @init=meta1
-$cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt1 @report=foo
-$cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt1 @report=foo
+$cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=foo
+$cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=foo
 
 >&2 echo "## Meta1 test context not shared without token"
 # Without token, cmdt run with different pid should run in differents workspaces
@@ -169,7 +169,7 @@ $cmdtIn @test=meta1/"without token two" @stderr:"PASSED" @stderr:"#02" @-- $cmdt
 $cmdtIn @test=meta1/"command before rule stop" @fail @stderr:"before rule parsing stopper" @-- $cmdt1 true @-- @success
 $cmdtIn @test=meta1/"rule on 2 args" @stderr:"PASSED" @-- $cmdt1 @stdout:foo bar @-- echo foo bar
 #$cmdtIn @test=meta1/ @exit=1 @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt1 @report
-$cmdtIn @test=meta1/ @exit=1 @-- $cmdt1 @report=main
+$cmdtIn @test=meta1/ @exit=1 @stderr:"Failures in" @-- $cmdt0 @report=main
 
 >&2 echo "## Test printed token"
 tk0=$( $cmdt @init @printToken 2> /dev/null )
