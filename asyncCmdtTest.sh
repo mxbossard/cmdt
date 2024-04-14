@@ -159,45 +159,39 @@ grep "4 errors" "$of" || die "reporting should_error bad errors count"
 nothingToReportExpectedStderrMsg="you must perform some test prior to report"
 >&2 echo "## Test @report without test"
 $cmdtIn @init=meta1
->&2 echo meta1 A
 $cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt1 @report=foo
->&2 echo meta1 B
 $cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt1 @report=foo
->&2 echo meta1 C
 
 >&2 echo "## Meta1 test context not shared without token"
-# Without token, cmdt run with different pid should run in differents workspaces
-$cmdtIn @test=meta1/"without token one" @stderr:"PASSED" @stderr:"#01" @-- $cmdt1 true @debug
-# FIXME: without token, should be first or second test ?
-$cmdtIn @test=meta1/"without token two" @stderr:"PASSED" @stderr:"#02" @-- $cmdt1 true @debug
+$cmdtIn @test=meta1/"without token one" @stderr= @-- $cmdt1 true @debug=0
+$cmdtIn @test=meta1/"without token two" @stderr= @-- $cmdt1 true @debug=0
 $cmdtIn @test=meta1/"command before rule stop" @fail @stderr:"before rule parsing stopper" @-- $cmdt1 true @-- @success
-$cmdtIn @test=meta1/"rule on 2 args" @stderr:"PASSED" @-- $cmdt1 @stdout:foo bar @-- echo foo bar
-#$cmdtIn @test=meta1/ @exit=1 @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt1 @report
-$cmdtIn @test=meta1/ @exit=1 @-- $cmdt1 @report=main
+$cmdtIn @test=meta1/"rule on 2 args" @stderr= @-- $cmdt1 @stdout:foo bar @debug=0 @-- echo foo bar
+$cmdtIn @test=meta1/ @exit=1 @stderr:"3 success" @stderr:"0 failure" @stderr:"1 error" @-- $cmdt1 @report=main
 
 >&2 echo "## Test printed token"
 tk0=$( $cmdt @init @printToken 2> /dev/null )
 >&2 echo "token: $tk0"
 $cmdtIn @init=meta2
-$cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt1 true @token=$tk0
-$cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#02" @-- $cmdt1 true @token=$tk0
+$cmdtIn @test=meta2/ @stderr= @-- $cmdt1 true @token=$tk0 @debug=0
+$cmdtIn @test=meta2/ @stderr= @-- $cmdt1 true @token=$tk0 @debug=0
 $cmdtIn @test=meta2/ @fail @-- $cmdt1 @report=main
-$cmdtIn @test=meta2/ @stderr:"Successfuly ran" @-- $cmdt1 @report @token=$tk0
+$cmdtIn @test=meta2/ @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @-- $cmdt1 @report @token=$tk0
 $cmdt @report 2>&1 | grep -v "Failures"
 
 >&2 echo "## Test exported token"
 eval $( $cmdt @init @exportToken 2> /dev/null )
 >&2 echo "token: $__CMDT_TOKEN"
 $cmdtIn @init=meta3
-$cmdtIn @test=meta3/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt1 true
-$cmdtIn @test=meta3/ @stderr:"PASSED" @stderr:"#02" @-- $cmdt1 true
-$cmdtIn @test=meta3/ @stderr:"Successfuly ran" @-- $cmdt1 @report=main
+$cmdtIn @test=meta3/ @stderr= @-- $cmdt1 true @debug=0
+$cmdtIn @test=meta3/ @stderr= @-- $cmdt1 true @debug=0
+$cmdtIn @test=meta3/ @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @-- $cmdt1 @report=main
 $cmdtIn @test=meta3/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=main @token=$tk0
 
 $cmdtIn @init=meta4
-$cmdtIn @test=meta4/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt1 @test=sub4/ true
-$cmdtIn @test=meta4/ @stderr:"PASSED" @stderr:"#02" @-- $cmdt1 @test=sub4/ true
-$cmdtIn @test=meta4/ @stderr:"Successfuly ran" @-- $cmdt1 @report=sub4
+$cmdtIn @test=meta4/ @stderr= @-- $cmdt1 @test=sub4/ true @debug=0
+$cmdtIn @test=meta4/ @stderr= @-- $cmdt1 @test=sub4/ true @debug=0
+$cmdtIn @test=meta4/ @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @-- $cmdt1 @report=sub4
 $cmdtIn @test=meta4/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt1 @report=sub4 @token=$tk0
 $cmdt @report 2>&1 | grep -v "Failures"
 
@@ -221,16 +215,17 @@ $cmdtIn @test=reinit/ @-- $cmdt1 @keepOutputs @test=sub2/ true
 $cmdtIn @test=reinit/ @-- $cmdt1 @keepOutputs @init=sub2
 $cmdtIn @test=reinit/ @-- $cmdt1 @keepOutputs @test=sub2/ true
 $cmdtIn @test=reinit/ @-- $cmdt1 @keepOutputs @test=sub2/ true
-$cmdtIn @test=reinit/ @stderr:"2 success" @-- $cmdt1 @report=sub2
+$cmdtIn @test=reinit/ @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @-- $cmdt1 @report=sub2
 
 $cmdtIn @test=reinit/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt1 @report=sub3
 $cmdtIn @test=reinit/ @-- $cmdt1 @test=sub3/ true
 $cmdtIn @test=reinit/ @-- $cmdt1 @init=sub3
 $cmdtIn @test=reinit/ @-- $cmdt1 @test=sub3/ true
-$cmdtIn @test=reinit/ @-- $cmdt1 @report=sub3
+$cmdtIn @test=reinit/ @-- $cmdt1 @test=sub3/ true
+$cmdtIn @test=reinit/ @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @-- $cmdt1 @report=sub3
 $cmdtIn @test=reinit/ @-- $cmdt1 @init=sub3
 $cmdtIn @test=reinit/ @-- $cmdt1 @test=sub3/ true
-$cmdtIn @test=reinit/ @stderr:"1 success" @-- $cmdt1 @report=sub3
+$cmdtIn @timeout=30s @test=reinit/ @stderr:"1 success" @stderr!:"failure" @stderr!:"error" @-- $cmdt1 @report=sub3
 
 
 >&2 echo "## Test usage"
@@ -238,32 +233,32 @@ $cmdtIn @init=meta
 $cmdtIn @test=meta/ @fail @stderr:"usage:" @-- $cmdt0
 
 >&2 echo "## Test cmdt basic assertions"
-$cmdtIn @test=meta/ @stderr:"PASSED" @-- $cmdt0 true
-$cmdtIn @test=meta/ @stderr:"FAILED" @-- $cmdt0 false
-$cmdtIn @test=meta/ @stderr:"PASSED" @-- $cmdt0 true @success
-$cmdtIn @test=meta/ @stderr:"FAILED" @-- $cmdt0 false @success
-$cmdtIn @test=meta/ @stderr:"FAILED" @-- $cmdt0 true @fail
-$cmdtIn @test=meta/ @stderr:"PASSED" @-- $cmdt0 false @fail
-$cmdtIn @test=meta/ @stderr:"PASSED" @-- $cmdt0 true @exit=0
-$cmdtIn @test=meta/ @stderr:"FAILED" @-- $cmdt0 false @exit=0
-$cmdtIn @test=meta/ @stderr:"FAILED" @-- $cmdt0 true @exit=1
-$cmdtIn @test=meta/ @stderr:"PASSED" @-- $cmdt0 false @exit=1
+$cmdtIn @test=meta/ @stderr= @-- $cmdt1 @debug=0 true
+$cmdtIn @test=meta/ @stderr= @-- $cmdt1 @debug=0 false
+$cmdtIn @test=meta/ @stderr= @-- $cmdt1 @debug=0 true @success
+$cmdtIn @test=meta/ @stderr= @-- $cmdt1 @debug=0 false @success
+$cmdtIn @test=meta/ @stderr= @-- $cmdt1 @debug=0 true @fail
+$cmdtIn @test=meta/ @stderr= @-- $cmdt1 @debug=0 false @fail
+$cmdtIn @test=meta/ @stderr= @-- $cmdt1 @debug=0 true @exit=0
+$cmdtIn @test=meta/ @stderr= @-- $cmdt1 @debug=0 false @exit=0
+$cmdtIn @test=meta/ @stderr= @-- $cmdt1 @debug=0 true @exit=1
+$cmdtIn @test=meta/ @stderr= @-- $cmdt1 @debug=0 false @exit=1
 
-$cmdtIn @test=meta/ @stderr:"PASSED" @-- $cmdt0 echo foo bar @stdout:foo @stderr=
-$cmdtIn @test=meta/ @stderr:"FAILED" @-- $cmdt0 echo foo bar @stdout:baz @stderr=
-$cmdtIn @test=meta/ @stderr:"PASSED" @-- $cmdt0 echo foo bar @stdout:foo @stdout:bar @stderr=
-$cmdtIn @test=meta/ @stderr:"FAILED" @-- $cmdt0 echo foo bar @stdout:baz @stdout:bar @stderr=
-$cmdtIn @test=meta/ @stderr:"FAILED" @-- $cmdt0 echo foo bar @stdout:foo @stdout:baz @stderr=
-$cmdtIn @test=meta/ @stderr:"FAILED" @-- $cmdt0 echo foo bar @stdout!:foo
-$cmdtIn @test=meta/ @stderr:"PASSED" @-- $cmdt0 echo foo bar @stdout!=foo @stdout:bar @stdout!:baz
+$cmdtIn @test=meta/ @stderr= @-- $cmdt1 @debug=0 echo foo bar @stdout:foo @stderr=
+$cmdtIn @test=meta/ @stderr= @-- $cmdt1 @debug=0 echo foo bar @stdout:baz @stderr=
+$cmdtIn @test=meta/ @stderr= @-- $cmdt1 @debug=0 echo foo bar @stdout:foo @stdout:bar @stderr=
+$cmdtIn @test=meta/ @stderr= @-- $cmdt1 @debug=0 echo foo bar @stdout:baz @stdout:bar @stderr=
+$cmdtIn @test=meta/ @stderr= @-- $cmdt1 @debug=0 echo foo bar @stdout:foo @stdout:baz @stderr=
+$cmdtIn @test=meta/ @stderr= @-- $cmdt1 @debug=0 echo foo bar @stdout!:foo
+$cmdtIn @test=meta/ @stderr= @-- $cmdt1 @debug=0 echo foo bar @stdout!=foo @stdout:bar @stdout!:baz
 
-$cmdtIn @test=meta/ @stderr:"PASSED" @-- $cmdt0 sh -c ">&2 echo foo bar" @stderr:foo @stdout=
-$cmdtIn @test=meta/ @stderr:"FAILED" @-- $cmdt0 sh -c ">&2 echo foo bar" @stderr:baz @stdout=
-$cmdtIn @test=meta/ @stderr:"PASSED" @-- $cmdt0 sh -c ">&2 echo foo bar" @stderr:foo @stderr:bar @stdout=
-$cmdtIn @test=meta/ @stderr:"FAILED" @-- $cmdt0 sh -c ">&2 echo foo bar" @stderr:baz @stderr:bar @stdout=
-$cmdtIn @test=meta/ @stderr:"FAILED" @-- $cmdt0 sh -c ">&2 echo foo bar" @stderr:foo @stderr:baz @stdout=
-$cmdtIn @test=meta/ @stderr:"FAILED" @-- $cmdt0 sh -c ">&2 echo foo bar" @stderr!:foo
-$cmdtIn @test=meta/ @stderr:"PASSED" @-- $cmdt0 sh -c ">&2 echo foo bar" @stderr!=foo @stderr:bar @stderr!:baz
+$cmdtIn @test=meta/ @stderr= @-- $cmdt1 @debug=0 sh -c ">&2 echo foo bar" @stderr:foo @stdout=
+$cmdtIn @test=meta/ @stderr= @-- $cmdt1 @debug=0 sh -c ">&2 echo foo bar" @stderr:baz @stdout=
+$cmdtIn @test=meta/ @stderr= @-- $cmdt1 @debug=0 sh -c ">&2 echo foo bar" @stderr:foo @stderr:bar @stdout=
+$cmdtIn @test=meta/ @stderr= @-- $cmdt1 @debug=0 sh -c ">&2 echo foo bar" @stderr:baz @stderr:bar @stdout=
+$cmdtIn @test=meta/ @stderr= @-- $cmdt1 @debug=0 sh -c ">&2 echo foo bar" @stderr:foo @stderr:baz @stdout=
+$cmdtIn @test=meta/ @stderr= @-- $cmdt1 @debug=0 sh -c ">&2 echo foo bar" @stderr!:foo
+$cmdtIn @test=meta/ @stderr= @-- $cmdt1 @debug=0 sh -c ">&2 echo foo bar" @stderr!=foo @stderr:bar @stderr!:baz
 
 
 ## Forge a token for remaining tests

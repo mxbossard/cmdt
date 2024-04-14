@@ -947,8 +947,13 @@ func ParseArgs(rulePrefix string, args []string) (cfg model.Config, assertions [
 	}
 
 	if cfg.Action.Is(model.ReportAction) {
-		//cfg.Async.Default(false)
-		cfg.Wait.Default(true)
+		// Force Wait for report
+		cfg.Wait.Set(true)
+	}
+
+	if cfg.Wait.Is(true) {
+		// Force Async false if Wait is true
+		cfg.Async.Set(false)
 	}
 
 	err = ValidateMutualyExclusiveRules(rules...)

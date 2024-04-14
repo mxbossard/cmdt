@@ -17,7 +17,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"log/slog"
 	"os"
 
@@ -258,10 +257,10 @@ func main() {
 		}
 	}
 
-	log.Printf("waiting\n")
+	//log.Printf("waiting\n")
 	exitCode := wait()
 
-	log.Printf("exiting with code: %d\n", exitCode)
+	//log.Printf("exiting with code: %d\n", exitCode)
 	os.Exit(int(exitCode))
 }
 

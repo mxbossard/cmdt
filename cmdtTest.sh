@@ -162,23 +162,20 @@ $cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt
 $cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=foo
 
 >&2 echo "## Meta1 test context not shared without token"
-# Without token, cmdt run with different pid should run in differents workspaces
 $cmdtIn @test=meta1/"without token one" @stderr:"PASSED" @stderr:"#01" @-- $cmdt1 true @debug
-# FIXME: without token, should be first or second test ?
 $cmdtIn @test=meta1/"without token two" @stderr:"PASSED" @stderr:"#02" @-- $cmdt1 true @debug
 $cmdtIn @test=meta1/"command before rule stop" @fail @stderr:"before rule parsing stopper" @-- $cmdt1 true @-- @success
 $cmdtIn @test=meta1/"rule on 2 args" @stderr:"PASSED" @-- $cmdt1 @stdout:foo bar @-- echo foo bar
-#$cmdtIn @test=meta1/ @exit=1 @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt1 @report
-$cmdtIn @test=meta1/ @exit=1 @stderr:"Failures in" @-- $cmdt0 @report=main
+$cmdtIn @test=meta1/ @exit=1 @stderr:"3 success" @stderr:"0 failure" @stderr:"1 error" @-- $cmdt0 @report=main
 
 >&2 echo "## Test printed token"
 tk0=$( $cmdt @init @printToken 2> /dev/null )
 >&2 echo "token: $tk0"
 $cmdtIn @init=meta2
-$cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt0 true @token=$tk0
-$cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#02" @-- $cmdt0 true @token=$tk0
+$cmdtIn @test=meta2/ @-- $cmdt0 true @token=$tk0
+$cmdtIn @test=meta2/ @-- $cmdt0 true @token=$tk0
 $cmdtIn @test=meta2/ @fail @-- $cmdt0 @report=main
-$cmdtIn @test=meta2/ @stderr:"Successfuly ran" @-- $cmdt0 @report @token=$tk0
+$cmdtIn @test=meta2/ @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @-- $cmdt0 @report @token=$tk0
 $cmdt @report 2>&1 | grep -v "Failures"
 
 >&2 echo "## Test exported token"

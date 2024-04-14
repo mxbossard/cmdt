@@ -16,6 +16,8 @@ const (
 	DefaultVerboseLevel         = SHOW_PASSED
 	DefaultInitedVerboseLevel   = SHOW_FAILED_OUTS
 	DefaultInitlessVerboseLevel = DefaultVerboseLevel
+	DefaultAsync                = false
+	DefaultWait                 = true
 	DefaultInitedAsync          = false
 	DefaultInitedWait           = false
 	DefaultInitlessAsync        = false
@@ -116,6 +118,8 @@ func NewGlobalDefaultConfig() Config {
 		Prefix: utilz.OptionalOf(DefaultRulePrefix),
 		//Verbose: utilz.OptionalOf(DefaultInitlessVerboseLevel),
 		//Verbose:           utilz.OptionalOf(DefaultInitedVerboseLevel),
+		Async:             utilz.OptionalOf(DefaultAsync),
+		Wait:              utilz.OptionalOf(DefaultWait),
 		GlobalStartTime:   utilz.OptionalOf(time.Now()),
 		ForkCount:         utilz.OptionalOf(uint16(1)),
 		Ignore:            utilz.OptionalOf(false),
