@@ -380,13 +380,23 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 			testSuite := inputConfig.TestSuite.Get()
 			suiteCtx := facade.NewSuiteContext(token, testSuite, false, action, inputConfig)
 			suiteCtx.NoErrorOrFatal(agg.Return())
+
+			def := model.ReportDefinition{
+				Token:     suiteCtx.Token,
+				TestSuite: testSuite,
+				Config:    suiteCtx.Config,
+			}
+			op := repo.ReportOperation(testSuite, true, def) // FIXME should not block if test can be run simultaneously
+
 			if suiteCtx.Config.Async.Is(false) {
 				// Process report without daemon
 				logger.Debug("Forged context", "ctx", suiteCtx)
 				logger.Warn("executing report in sync (not queueing report)", "suite", testSuite)
 				dpl.Quiet(suiteCtx.Config.Quiet)
 				suiteCtx.Repo.WaitEmptyQueue(testSuite, suiteCtx.Config.SuiteTimeout.Get())
-				exitCode, err = ReportTestSuite(suiteCtx)
+				//exitCode, err = ReportTestSuite(suiteCtx)
+				exitCode, err = ProcessReportDef(def)
+				suiteCtx.Repo.Done(&op)
 			} else {
 				// Delegate report processing to daemon
 				logger.Warn("executing report async (queueing report)", "suite", testSuite)

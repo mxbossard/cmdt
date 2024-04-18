@@ -238,6 +238,20 @@ func IsShellBuiltin(cmd string) (ok bool, err error) {
 	return
 }
 
+func WhichCmd(cmd string) (absolute string, err error) {
+	exec := cmdz.Sh("which", cmd).CombinedOutputs().AddEnviron(os.Environ()...)
+	rc, err := exec.BlockRun()
+	if err != nil {
+		err = fmt.Errorf("cannot which command %s: %w", cmd, err)
+		return
+	} else if rc > 0 {
+		err = fmt.Errorf("cannot which command %s: %s", cmd, exec.StdoutRecord())
+		return
+	}
+	absolute = strings.TrimSpace(exec.StdoutRecord())
+	return
+}
+
 func IsWithinContainer() (ok bool) {
 	ok, _ = ReadEnvValue(model.EnvContainerIdKey)
 	return

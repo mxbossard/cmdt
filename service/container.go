@@ -27,7 +27,12 @@ func StartContainer(testCtx facade.TestContext) (id string, err error) {
 	}
 	repoDir := testCtx.Repo.BackingFilepath()
 
-	cmdtestVol := os.Args[0] + ":/opt/cmdtest:ro"
+	absCmd, err := utils.WhichCmd(os.Args[0])
+	if err != nil {
+		return
+	}
+
+	cmdtestVol := absCmd + ":/opt/cmdtest:ro"
 	ctxDirVol := repoDir + ":" + repoDir + ":rw,z"
 
 	// FIXME: sleep test or suite timeout

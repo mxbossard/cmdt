@@ -89,12 +89,19 @@ func (r FileRepo) InitSuite(cfg model.Config) (err error) {
 		return
 	}
 	err = persistSuiteConfig(r.token, cfg)
+	if err != nil {
+		err = fmt.Errorf("unable to init suite: %w", err)
+	}
 	return
 }
 
 func (r FileRepo) SaveGlobalConfig(cfg model.Config) (err error) {
 	cfg.TestSuite.Set(model.GlobalConfigTestSuiteName)
-	return persistSuiteConfig(r.token, cfg)
+	err = persistSuiteConfig(r.token, cfg)
+	if err != nil {
+		err = fmt.Errorf("unable to save global config: %w", err)
+	}
+	return
 }
 
 func (r FileRepo) LoadGlobalConfig() (cfg model.Config, err error) {
@@ -113,10 +120,20 @@ func (r FileRepo) LoadGlobalConfig() (cfg model.Config, err error) {
 }
 
 func (r FileRepo) SaveSuiteConfig(cfg model.Config) (err error) {
-	return persistSuiteConfig(r.token, cfg)
+	err = persistSuiteConfig(r.token, cfg)
+	if err != nil {
+		err = fmt.Errorf("unable to save suite config: %w", err)
+	}
+	return
 }
 
 func (r FileRepo) LoadSuiteConfig(testSuite string, initless bool) (cfg model.Config, err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("cannot load suite config: %w", err)
+		}
+	}()
+
 	cfg, err = loadSuiteConfig(testSuite, r.token)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -262,6 +279,7 @@ func (r FileRepo) UpdateLastTestTime(testSuite string) {
 	cfg.LastTestTime = utilz.OptionalOf(time.Now())
 	err = persistSuiteConfig(r.token, cfg)
 	if err != nil {
+		err = fmt.Errorf("unable to update last test time: %w", err)
 		log.Fatal(err)
 	}
 }
@@ -427,6 +445,12 @@ func testsuiteConfigFilepath(testSuite, token string) (path string, err error) {
 }
 
 func initWorkspaceIfNot(token, testSuite string) (err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("cannot init workspace: %w", err)
+		}
+	}()
+
 	// init the tmp directory
 	var tmpDir string
 	tmpDir, err = testSuiteDirectoryPath(testSuite, token)
@@ -451,17 +475,29 @@ func initWorkspaceIfNot(token, testSuite string) (err error) {
 }
 
 func clearSuiteWorkspace(token, testSuite string) (err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("cannot clear suite workspace: %w", err)
+		}
+	}()
+
 	var workDir string
 	workDir, err = testSuiteDirectoryPath(testSuite, token)
 	if err != nil {
 		return
 	}
-	logger.Debug("Clearing suite workspace", "suite", testSuite, "workDir", workDir)
+	logger.Info("Clearing suite workspace", "suite", testSuite, "workDir", workDir)
 	err = os.RemoveAll(workDir)
 	return
 }
 
 func persistSuiteConfig(token string, cfg model.Config) (err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("cannot persist config: %w", err)
+		}
+	}()
+
 	testSuite := cfg.TestSuite.Get()
 	err = initWorkspaceIfNot(token, testSuite)
 	if err != nil {
@@ -478,7 +514,6 @@ func persistSuiteConfig(token string, cfg model.Config) (err error) {
 	logger.Debug("Persisting config", "suite", testSuite, "file", contextFilepath, "content", content)
 	err2 = os.WriteFile(contextFilepath, content, 0600)
 	if err2 != nil {
-		err2 = fmt.Errorf("cannot persist context: %w", err2)
 		return err2
 	}
 	//logger.Warn("Persisted config", "suite", testSuite, "file", contextFilepath, "content", content)
@@ -488,6 +523,12 @@ func persistSuiteConfig(token string, cfg model.Config) (err error) {
 }
 
 func readConfig(name, token string) (config model.Config, err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("cannot read config: %w", err)
+		}
+	}()
+
 	err = initWorkspaceIfNot(token, name)
 	if err != nil {
 		return
@@ -508,6 +549,12 @@ func readConfig(name, token string) (config model.Config, err error) {
 }
 
 func loadGlobalConfig(token string) (config model.Config, err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("cannot load global config: %w", err)
+		}
+	}()
+
 	config = model.NewGlobalDefaultConfig()
 	var loaded model.Config
 	loaded, err = readConfig(model.GlobalConfigTestSuiteName, token)
@@ -520,6 +567,12 @@ func loadGlobalConfig(token string) (config model.Config, err error) {
 }
 
 func loadSuiteConfig(testSuite, token string) (config model.Config, err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("cannot load suite config: %w", err)
+		}
+	}()
+
 	var globalCfg, suiteCfg model.Config
 	globalCfg, err = loadGlobalConfig(token)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {

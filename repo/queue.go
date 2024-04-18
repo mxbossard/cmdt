@@ -29,6 +29,7 @@ type Operater interface {
 	SetExitCode(uint16)
 	Id() uint16
 	SetId(uint16)
+	String() string
 }
 
 type OperationBase struct {
@@ -71,6 +72,10 @@ func (o OperationBase) Id() uint16 {
 
 func (o *OperationBase) SetId(id uint16) {
 	o.id = id
+}
+
+func (o *OperationBase) String() string {
+	return fmt.Sprintf("Op[type: %s ; id: %d]", o.Type, o.id)
 }
 
 type TestOp struct {

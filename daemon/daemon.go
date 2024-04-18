@@ -68,6 +68,7 @@ func (d daemon) unqueue() (ok bool, err error) {
 			//logger.Warn("doning op ...", "op", op)
 			err = d.repo.Done(op)
 			if err != nil {
+				err = fmt.Errorf("unable to done op: [%s] : %w", op, err)
 				panic(err)
 			}
 		}
@@ -96,9 +97,15 @@ func (d daemon) unqueue() (ok bool, err error) {
 
 func (d daemon) run() {
 	logger.Warn("daemon: starting ...", "token", d.token)
+	startTime := time.Now()
+	debugTime := time.Now()
 	lastUnqueue := time.Now()
 	for {
-		//logger.Warn("daemon: unqueueing ...")
+		if time.Since(debugTime) > time.Second {
+			debugTime = time.Now()
+			logger.Warn("daemon running", "token", d.token, "for", time.Since(startTime))
+		}
+
 		if ok, err := d.unqueue(); err != nil {
 			panic(err)
 		} else if !ok {
@@ -115,7 +122,7 @@ func (d daemon) run() {
 
 		lastUnqueue = time.Now()
 	}
-	logger.Debug("daemon: stopping ...", "token", d.token)
+	logger.Warn("daemon: stopping ...", "token", d.token, "after", time.Since(startTime))
 }
 
 func (d daemon) performTest(testDef model.TestDefinition) (exitCode int16) {
@@ -168,6 +175,9 @@ func (d daemon) ClearPid() {
 }
 
 func TakeOver() {
+	//model.LoggerLevel.Set(slog.LevelDebug)
+	model.LoggerLevel.Set(slog.LevelInfo)
+
 	//logger.Warn("daemon: should I take over ?", "args", os.Args)
 	if len(os.Args) > 1 && os.Args[1] == "@_daemon" {
 		//fmt.Printf("@_daemon args: %s", os.Args)
@@ -177,8 +187,6 @@ func TakeOver() {
 	} else {
 		return
 	}
-
-	logger.Debug("daemon: taking over ...")
 
 	token := os.Args[2]
 	repo := repo.New(token)
@@ -211,6 +219,31 @@ func TakeOver() {
 	if err != nil {
 		panic(err)
 	}
+
+	/*
+		stdout, err := os.OpenFile("/dev/stdout", os.O_WRONLY+os.O_CREATE+os.O_APPEND, 0644)
+		if err != nil {
+			panic(err)
+		}
+		stderr, err := os.OpenFile("/dev/stderr", os.O_WRONLY+os.O_CREATE+os.O_APPEND, 0644)
+		if err != nil {
+			panic(err)
+		}
+	*/
+
+	/*
+		stdout := os.NewFile(uintptr(syscall.Stdout), "/dev/stdout")
+		stderr := os.NewFile(uintptr(syscall.Stderr), "/dev/stderr")
+
+		os.Stdout = stdout
+		os.Stderr = stderr
+		defer stdout.Close()
+		defer stderr.Close()
+		logger = slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
+	*/
+
+	fmt.Printf("daemon: TakeOver() args: %s\n", os.Args)
+	logger.Debug("daemon: taking over ...")
 
 	// Run daemon
 	d.run()
@@ -251,11 +284,28 @@ func LanchProcessIfNeeded(token string) error {
 		return err
 	}
 
+	/*
+		stdout := os.NewFile(uintptr(syscall.Stdout), "/dev/stdout")
+		stderr := os.NewFile(uintptr(syscall.Stderr), "/dev/stderr")
+	*/
+
+	ppid := os.Getppid()
+	stdout, err := os.OpenFile(fmt.Sprintf("/proc/%d/fd/1", ppid), os.O_WRONLY, 0644)
+	if err != nil {
+		panic(err)
+	}
+	stderr, err := os.OpenFile(fmt.Sprintf("/proc/%d/fd/2", ppid), os.O_WRONLY, 0644)
+	if err != nil {
+		panic(err)
+	}
+
 	cmd := exec.Command(os.Args[0], "@_daemon", token)
 	cmd.Dir = cwd
 	cmd.Env = os.Environ()
 	//cmd.Stdout = os.Stdout
 	//cmd.Stderr = os.Stderr
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
 	// FIXME: daemon should produce outputs in buffers and post it witin done op if waiting.
 	err = cmd.Start()
 	if err != nil {
@@ -266,14 +316,16 @@ func LanchProcessIfNeeded(token string) error {
 		return err
 	}
 
-	// argv := []string{os.Args[0], "@_daemon", token}
-	// //procattr := os.ProcAttr{Dir: cwd, Env: os.Environ(), Files: []*os.File{nil, os.Stdout, os.Stderr}}
-	// procattr := os.ProcAttr{Dir: cwd, Env: os.Environ(), Files: []*os.File{nil, nil, nil}}
-	// proc, err := os.StartProcess(os.Args[0], argv, &procattr)
-	// if err != nil {
-	// 	return err
-	// }
-	// err = proc.Release()
+	/*
+		argv := []string{os.Args[0], "@_daemon", token}
+		//procattr := os.ProcAttr{Dir: cwd, Env: os.Environ(), Files: []*os.File{nil, os.Stdout, os.Stderr}}
+		procattr := os.ProcAttr{Dir: cwd, Env: os.Environ(), Files: []*os.File{nil, nil, nil}}
+		proc, err := os.StartProcess(os.Args[0], argv, &procattr)
+		if err != nil {
+			return err
+		}
+		err = proc.Release()
+	*/
 
 	logger.Warn("daemon process released")
 	return err

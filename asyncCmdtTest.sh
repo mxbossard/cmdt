@@ -189,16 +189,17 @@ $cmdtIn @test=meta3/ @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @--
 $cmdtIn @test=meta3/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=main @token=$tk0
 
 $cmdtIn @init=meta4
-$cmdtIn @test=meta4/ @stderr= @-- $cmdt1 @test=sub4/ true @debug=0
-$cmdtIn @test=meta4/ @stderr= @-- $cmdt1 @test=sub4/ true @debug=0
-$cmdtIn @test=meta4/ @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @-- $cmdt1 @report=sub4
-$cmdtIn @test=meta4/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt1 @report=sub4 @token=$tk0
+$cmdtIn @test=meta4/ @stderr= @-- $cmdt1 @test=sub0/ true @debug=0
+$cmdtIn @test=meta4/ @stderr= @-- $cmdt1 @test=sub0/ true @debug=0
+$cmdtIn @test=meta4/ @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @-- $cmdt1 @report=sub0
+$cmdtIn @test=meta4/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt1 @report=sub0 @token=$tk0
 $cmdt @report 2>&1 | grep -v "Failures"
 
 export -n __CMDT_TOKEN
 
 
 eval $( $cmdt @init @exportToken 2> /dev/null )
+>&2 echo "exported token: $__CMDT_TOKEN"
 
 >&2 echo "## Rules parsing stopper @--"
 $cmdtIn @init=parsing_stopper
@@ -222,10 +223,16 @@ $cmdtIn @test=reinit/ @-- $cmdt1 @test=sub3/ true
 $cmdtIn @test=reinit/ @-- $cmdt1 @init=sub3
 $cmdtIn @test=reinit/ @-- $cmdt1 @test=sub3/ true
 $cmdtIn @test=reinit/ @-- $cmdt1 @test=sub3/ true
-$cmdtIn @test=reinit/ @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @-- $cmdt1 @report=sub3
-$cmdtIn @test=reinit/ @-- $cmdt1 @init=sub3
-$cmdtIn @test=reinit/ @-- $cmdt1 @test=sub3/ true
-$cmdtIn @timeout=30s @test=reinit/ @stderr:"1 success" @stderr!:"failure" @stderr!:"error" @-- $cmdt1 @report=sub3
+#sleep 5
+$cmdtIn @timeout=2s @test=reinit/report3a @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @-- $cmdt1 @report=sub3
+$cmdtIn @timeout=2s @test=reinit/post_report3a @-- $cmdt1 @test=sub3/ true @debug
+$cmdtIn @timeout=2s @test=reinit/ @-- $cmdt1 @init=sub4
+$cmdtIn @timeout=2s @test=reinit/ @-- $cmdt1 @test=sub4/ true
+$cmdtIn @timeout=2s @test=reinit/ @-- $cmdt1 @test=sub4/ true
+$cmdtIn @timeout=2s @test=reinit/report4a @stderr:"1 success" @stderr!:"failure" @stderr!:"error" @-- $cmdt1 @report=sub4
+$cmdtIn @timeout=2s @test=reinit/ @-- $cmdt1 @init=sub3
+$cmdtIn @timeout=2s @test=reinit/retest3 @-- $cmdt1 @test=sub3/ true
+$cmdtIn @timeout=2s @test=reinit/report3b @stderr:"1 success" @stderr!:"failure" @stderr!:"error" @-- $cmdt1 @report=sub3
 
 
 >&2 echo "## Test usage"
