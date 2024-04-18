@@ -51,6 +51,9 @@ import (
   - if suite waiting how repo know it
   - SaveTestOutcome could release wait
   - Unqueue should not block if possible but block if nothing to unqueue ???
+- Daemon wait for finished test with sql repo
+- Do not queue async report for simplicity sake => report always in sync
+
 
 ### Possible behaviors:
 - for async test log when possible like async=false
@@ -59,19 +62,9 @@ import (
 - for async report log nothing until next waiting report
 
 ### Open questions:
-- how to wait a finished test by daemon ? (do we need queue wait vs queue block ?)
-- how to queue @report @async ? => "close" suite ? queue an operation (more extensible) ?
 - when outputs async test ? on waiting report ?
 - could wait @report before launching tests if necessary ?
 - @wait = !@async ? => NO: @async=true ran by daemon ; @wait=true => block until operation done properly
-
-### Planning:
-- Implement Queue / Unqueue by suite OK
-- Delegate all test to daemon waiting => should be isofunctionnal with nodaemon OK
-- Run without daemon in option and use it in container OK
-- Run by daemon only if @async=true OK
-- Wait only if @wait=true
-- Report async in option
 
 
 
@@ -111,6 +104,7 @@ Bugs:
 Cleaning:
 - move seq into utils module
 - move contianer use into utils module
+- move OneWriterDB into utils module / Rename to something like NotConcurrentDb
 
 
 Optims:
@@ -121,6 +115,7 @@ Optims:
 
 
 Features:
+- add cmdt @version  or cmdt -v or cmdt --version => how to embed version ? git hash ? git tag ?
 - use rule definitions in usage
 - shorten too long outputs on failure. Remove colors from output ?
 - @init=suite should set suite as default for following test (instead of default main)
