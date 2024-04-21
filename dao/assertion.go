@@ -14,13 +14,7 @@ type Assertion struct {
 
 func (d Assertion) init() (err error) {
 	_, err = d.db.Exec(`
-		CREATE TABLE IF NOT EXISTS assertion (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			test INTEGER NOT NULL,
-			seq INTEGER NOT NULL,
-
-			FOREIGN KEY(test) REFERENCES test(name)
-		);
+		FOO
 	`)
 	return
 }

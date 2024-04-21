@@ -64,6 +64,7 @@ type SuiteOutcome struct {
 	ErroredCount   uint32
 	IgnoredCount   uint32
 	TooMuchCount   uint32
+	Outcome        Outcome
 }
 
 type Rule struct {

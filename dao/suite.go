@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/gob"
+	"time"
 
 	"mby.fr/cmdtest/model"
 	"mby.fr/utils/zql"
@@ -23,8 +24,67 @@ func (d Suite) init() (err error) {
 	_, err = d.db.Exec(`
 		CREATE TABLE IF NOT EXISTS suite (
 			name TEXT UNIQUE NOT NULL,
-			config BLOB NOT NULL
+			config BLOB NOT NULL,
+			startTime INTEGER NULL,
+			seq INTEGER NOT NULL,
+			endTime INTEGER NULL,
+			outcome TEXT NULL
 		);
+	`)
+	return
+}
+
+func (d Test) NextSeq(suite string) (seq int, err error) {
+	tx, err := d.db.Begin()
+	if err != nil {
+		return
+	}
+	defer tx.Rollback()
+	row := tx.QueryRow(`
+		SELECT seq
+		FROM suite
+		WHERE name = ?
+	`, suite)
+	row.Scan(&seq)
+	_, err = tx.Exec(`
+		UPDATE suite SET seq = ? 
+		WHERE name = ?
+	`, seq+1, suite)
+	err = tx.Commit()
+	return
+}
+
+func (d Suite) UpdateEndTime(suite string, end time.Time) (err error) {
+	micros := end.UnixMicro()
+	_, err = d.db.Exec(`
+		UPDATE suite SET endTime = ?
+		WHERE name = ?
+	`, micros, suite)
+	return
+}
+
+func (d Suite) UpdateOutcome(suite string, outcome model.Outcome) (err error) {
+	_, err = d.db.Exec(`
+		UPDATE suite SET outcome = ?
+		WHERE name = ?
+	`, outcome, suite)
+	return
+}
+
+func (d Suite) Delete(suite string) (err error) {
+	_, err = d.db.Exec(`
+		DELETE FROM suite
+		WHERE name = ?
+	`, suite)
+	return
+}
+
+func (d Suite) ListPassedFailedErrored() (suites []string, err error) {
+	_, err = d.db.Exec(`
+		SELECT name
+		FROM suite
+		WHERE outcome IN ('PASSED', 'FAILED', 'ERRORED') AND startTime IS NOT NULL
+		ORDER BY outcome DESC, startTime ASC
 	`)
 	return
 }
@@ -87,9 +147,17 @@ func (d Suite) SaveSuiteConfig(testSuite string, cfg model.Config) (err error) {
 	if err != nil {
 		return
 	}
-	_, err = d.db.Exec("INSERT OR REPLACE INTO suite(name, config) VALUES (@suite, @serCfg);",
-		sql.Named("suite", testSuite), sql.Named("serCfg", serializedConfig),
-	)
+	if cfg.SuiteStartTime.IsPresent() {
+		micros := cfg.SuiteStartTime.Get().UnixMicro()
+		_, err = d.db.Exec("INSERT OR REPLACE INTO suite(name, config, startTime) VALUES (@suite, @serCfg, @startTime);",
+			sql.Named("suite", testSuite), sql.Named("serCfg", serializedConfig),
+			sql.Named("startTime", micros),
+		)
+	} else {
+		_, err = d.db.Exec("INSERT OR REPLACE INTO suite(name, config) VALUES (@suite, @serCfg);",
+			sql.Named("suite", testSuite), sql.Named("serCfg", serializedConfig),
+		)
+	}
 	return
 }
 
