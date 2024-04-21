@@ -19,6 +19,7 @@ type Asserter func(cmdz.Executer) (AssertionResult, error)
 type TestDefinition struct {
 	Ppid        uint32
 	Token       string
+	Isolation   string
 	TestSuite   string
 	TestName    string
 	Seq         uint16
@@ -30,6 +31,7 @@ type TestDefinition struct {
 
 type ReportDefinition struct {
 	Token     string
+	Isolation string
 	TestSuite string
 	Config    Config
 }

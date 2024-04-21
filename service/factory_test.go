@@ -35,14 +35,14 @@ func TestApplyConfig(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, ok)
 
-	expectedFork := 3
+	expectedFork := uint16(3)
 	ok, _, err = ApplyConfig(&cfg, fmt.Sprintf("@fork=%d", expectedFork))
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	require.True(t, cfg.ForkCount.IsPresent())
 	assert.Equal(t, expectedFork, cfg.ForkCount.Get())
 
-	expectedFork = 7
+	expectedFork = uint16(7)
 	ok, _, err = ApplyConfig(&cfg, fmt.Sprintf("@fork=%d", expectedFork))
 	assert.Error(t, err)
 	assert.True(t, ok)
@@ -249,7 +249,7 @@ func TestMockMapper(t *testing.T) {
 	assert.Nil(t, m.Stdin)
 	assert.Equal(t, "", m.Stdout)
 	assert.Equal(t, "", m.Stderr)
-	assert.Equal(t, 0, m.ExitCode)
+	assert.Equal(t, uint16(0), m.ExitCode)
 	assert.True(t, m.Delegate)
 
 	m, err = MockMapper("true arg1 arg2", "=")
@@ -259,7 +259,7 @@ func TestMockMapper(t *testing.T) {
 	assert.Nil(t, m.Stdin)
 	assert.Equal(t, "", m.Stdout)
 	assert.Equal(t, "", m.Stderr)
-	assert.Equal(t, 0, m.ExitCode)
+	assert.Equal(t, uint16(0), m.ExitCode)
 	assert.True(t, m.Delegate)
 
 	expectedStdin := "foo"
@@ -270,7 +270,7 @@ func TestMockMapper(t *testing.T) {
 	assert.Equal(t, &expectedStdin, m.Stdin)
 	assert.Equal(t, "", m.Stdout)
 	assert.Equal(t, "", m.Stderr)
-	assert.Equal(t, 0, m.ExitCode)
+	assert.Equal(t, uint16(0), m.ExitCode)
 	assert.True(t, m.Delegate)
 
 	m, err = MockMapper("true arg1 arg2,stdin=foo,stdout=bar=,stderr=pif paf,exit=12", "=")
@@ -280,7 +280,7 @@ func TestMockMapper(t *testing.T) {
 	assert.Equal(t, &expectedStdin, m.Stdin)
 	assert.Equal(t, "bar=", m.Stdout)
 	assert.Equal(t, "pif paf", m.Stderr)
-	assert.Equal(t, 12, m.ExitCode)
+	assert.Equal(t, uint16(12), m.ExitCode)
 	assert.False(t, m.Delegate)
 
 	m, err = MockMapper(";true;arg 1;arg 2", "=")
@@ -290,7 +290,7 @@ func TestMockMapper(t *testing.T) {
 	assert.Nil(t, m.Stdin)
 	assert.Equal(t, "", m.Stdout)
 	assert.Equal(t, "", m.Stderr)
-	assert.Equal(t, 0, m.ExitCode)
+	assert.Equal(t, uint16(0), m.ExitCode)
 	assert.True(t, m.Delegate)
 
 	m, err = MockMapper(":true:arg 1:arg 2", "=")
@@ -300,7 +300,7 @@ func TestMockMapper(t *testing.T) {
 	assert.Nil(t, m.Stdin)
 	assert.Equal(t, "", m.Stdout)
 	assert.Equal(t, "", m.Stderr)
-	assert.Equal(t, 0, m.ExitCode)
+	assert.Equal(t, uint16(0), m.ExitCode)
 	assert.True(t, m.Delegate)
 
 	m, err = MockMapper("|true|arg 1|arg 2,stdin=foo,stdout=bar=,stderr=pif paf,exit=12", "=")
@@ -310,7 +310,7 @@ func TestMockMapper(t *testing.T) {
 	assert.Equal(t, &expectedStdin, m.Stdin)
 	assert.Equal(t, "bar=", m.Stdout)
 	assert.Equal(t, "pif paf", m.Stderr)
-	assert.Equal(t, 12, m.ExitCode)
+	assert.Equal(t, uint16(12), m.ExitCode)
 	assert.False(t, m.Delegate)
 
 }

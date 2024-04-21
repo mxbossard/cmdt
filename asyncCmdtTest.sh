@@ -32,8 +32,8 @@ cmdt="cmdt"
 cmdtIn="$cmdt $@"
 
 # Tested cmdt
-cmdt0="$newCmdt"
-cmdt1="$newCmdt @verbose @failuresLimit=-1 @async" # Default verbose show passed test + perform all test beyond failures limit
+cmdt0="$newCmdt @isol=tested"
+cmdt1="$newCmdt @isol=tested @verbose @failuresLimit=-1 @async" # Default verbose show passed test + perform all test beyond failures limit
 #cmdt2="$newCmdt @verbose @failuresLimit=-1 @async @wait"
 
 mkdir -p "$scriptDir/.tmp"

@@ -552,6 +552,8 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 			c.PrintToken, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
 		case "exportToken":
 			c.ExportToken, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
+		case "isol":
+			c.Isol, err = TranslateOptional(rule, DummyMapper, OperatorValidater[string]("="), NotEmptyValidater[string])
 		case "keep":
 			c.Keep, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
 		case "parallel":
@@ -1031,7 +1033,6 @@ func ValidateOnceOnlyDefinedRule(rules ...model.Rule) (err error) {
 }
 
 func ValidateMutualyExclusiveRules(rules ...model.Rule) (err error) {
-	// FIXME: stdout= and stdout~ are ME ; stdout= and stdout= are ME but stdout~ and stdout~ are not ME
 	MutualyExclusiveRules := [][]model.RuleKey{
 		ruleKeys(model.Actions),
 		{{"fail", "all"}, {"success", "all"}, {"exit", "all"}},

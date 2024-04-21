@@ -76,15 +76,15 @@ func (d daemon) unqueue() (ok bool, err error) {
 	if op != nil {
 		logger.Debug("daemon: unqueued operation.", "kind", op.Kind(), "id", op.Id())
 		switch o := op.(type) {
-		case *repo.TestOp:
+		case *model.TestOp:
 			op.SetExitCode(uint16(d.performTest(o.Definition)))
-		case *repo.ReportOp:
+		case *model.ReportOp:
 			exitCode, err := d.report(o.Definition)
 			if err != nil {
 				return false, err
 			}
 			op.SetExitCode(uint16(exitCode))
-		case *repo.ReportAllOp:
+		case *model.ReportAllOp:
 			op.SetExitCode(uint16(d.reportAll(o.Definition)))
 		default:
 			err = fmt.Errorf("unknown operation %T", op)
@@ -189,7 +189,7 @@ func TakeOver() {
 	}
 
 	token := os.Args[2]
-	repo := repo.New(token)
+	repo := repo.New(token, "")
 	d := daemon{token: token, repo: repo}
 	lockFilepath := filepath.Join(repo.BackingFilepath(), DaemonLockFilename)
 	fileLock := flock.New(lockFilepath)

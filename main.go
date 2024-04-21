@@ -115,6 +115,7 @@ Optims:
 
 
 Features:
+- multiple @stderr or @stdout rules should be aggregated in assertion report
 - add cmdt @version  or cmdt -v or cmdt --version => how to embed version ? git hash ? git tag ?
 - use rule definitions in usage
 - shorten too long outputs on failure. Remove colors from output ?

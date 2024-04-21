@@ -12,6 +12,7 @@ import (
 )
 
 const (
+	DefaultIsolation            = ""
 	DefaultRulePrefix           = "@"
 	DefaultVerboseLevel         = SHOW_PASSED
 	DefaultInitedVerboseLevel   = SHOW_FAILED_OUTS
@@ -97,7 +98,7 @@ var (
 		ruleDef("parallel", "="), ruleDef("runCount", "="), ruleDef("mock", "=", ":"),
 		ruleDef("container", "", "="), ruleDef("dirtyContainer", "=")}
 	// Config of test flow (init -> test -> report)
-	FlowConfigs = []RuleDefinition{ruleDef("token", "="), ruleDef("verbose", "", "="),
+	FlowConfigs = []RuleDefinition{ruleDef("token", "="), ruleDef("isol", "="), ruleDef("verbose", "", "="),
 		ruleDef("debug", "", "="), ruleDef("failuresLimit", "="), ruleDef("async", "", "="), ruleDef("wait", "", "="),
 		ruleDef("keep", "", "=")}
 	Assertions = []RuleDefinition{ruleDef("success", ""), ruleDef("fail", ""), ruleDef("exit", "="),
@@ -115,9 +116,8 @@ var (
 
 func NewGlobalDefaultConfig() Config {
 	return Config{
-		Prefix: utilz.OptionalOf(DefaultRulePrefix),
-		//Verbose: utilz.OptionalOf(DefaultInitlessVerboseLevel),
-		//Verbose:           utilz.OptionalOf(DefaultInitedVerboseLevel),
+		Isol:              utilz.OptionalOf(DefaultIsolation),
+		Prefix:            utilz.OptionalOf(DefaultRulePrefix),
 		Async:             utilz.OptionalOf(DefaultAsync),
 		Wait:              utilz.OptionalOf(DefaultWait),
 		GlobalStartTime:   utilz.OptionalOf(time.Now()),
@@ -215,6 +215,7 @@ type CmdMock struct {
 type Config struct {
 	// TestSuite only
 	Token     utilz.Optional[string]
+	Isol      utilz.Optional[string]
 	Action    utilz.Optional[Action] `yaml:""`
 	TestSuite utilz.Optional[string] `yaml:""`
 	TestName  utilz.Optional[string] `yaml:""`
@@ -281,6 +282,7 @@ func (c Config) SplitRuleExpr(ruleExpr string) (ok bool, r Rule) {
 }
 
 func (c *Config) Merge(right Config) {
+	c.Isol.Merge(right.Isol)
 	c.Action.Merge(right.Action)
 	c.TestSuite.Merge(right.TestSuite)
 	c.TestSuite.Merge(right.TestSuite)

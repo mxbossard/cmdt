@@ -20,32 +20,6 @@ import (
 
 var logger = slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 
-/*
-func Fatal(testSuite, token string, v ...any) {
-	tmpDir, err := TestsuiteDirectoryPath(testSuite, token)
-	if err != nil {
-		log.Fatal(err)
-	}
-	IncrementSeq(tmpDir, model.ErrorSequenceFilename)
-	log.Fatal(v...)
-}
-
-func Fatalf(testSuite, token, format string, v ...any) {
-	log.Fatal(testSuite, token, fmt.Sprintf(format, v...))
-}
-*/
-
-/*
-func SuiteError(testSuite, token string, v ...any) error {
-	return SuiteErrorf(testSuite, token, "%s", fmt.Sprint(v...))
-}
-
-func SuiteErrorf(testSuite, token, format string, v ...any) error {
-	IncrementSeq(testSuite, token, model.ErrorSequenceFilename)
-	return fmt.Errorf(format, v...)
-}
-*/
-
 func InitSeq(pathes ...string) (err error) {
 	seqFilepath := filepath.Join(pathes...)
 	err = os.WriteFile(seqFilepath, []byte("0"), 0600)
@@ -57,7 +31,6 @@ func InitSeq(pathes ...string) (err error) {
 
 func IncrementSeq(pathes ...string) (seq uint32) {
 	// return an increment for test indexing
-	//tmpDir := testsuiteDirectoryPath(testSuite, token)
 	seqFilepath := filepath.Join(pathes...)
 
 	file, err := os.OpenFile(seqFilepath, os.O_RDWR|os.O_CREATE, 0600)
@@ -93,7 +66,6 @@ func IncrementSeq(pathes ...string) (seq uint32) {
 
 func ReadSeq(pathes ...string) (c uint32) {
 	// return the count of run test
-	//tmpDir := testsuiteDirectoryPath(testSuite, token)
 	seqFilepath := filepath.Join(pathes...)
 
 	file, err := os.OpenFile(seqFilepath, os.O_RDONLY, 0600)
@@ -190,33 +162,43 @@ func ReadEnvPpid() (ppid int) {
 	return
 }
 
-func ForgeContextualToken() (string, error) {
-	token := ReadEnvToken()
-	if token != "" {
-		return token, nil
+func ForgeContextualToken(token string) (string, error) {
+	if token == "" {
+		token = ReadEnvToken()
 	}
-	// If no token supplied use Workspace dir + ppid to forge tmp directory path
-	workDirPath, err := os.Getwd()
-	if err != nil {
-		//log.Fatalf("cannot find workspace dir: %s", err)
-		return "", fmt.Errorf("cannot find workspace dir: %w", err)
+	if token == "" {
+		// If no token supplied use Workspace dir + ppid to forge tmp directory path
+		workDirPath, err := os.Getwd()
+		if err != nil {
+			//log.Fatalf("cannot find workspace dir: %s", err)
+			return "", fmt.Errorf("cannot find workspace dir: %w", err)
+		}
+
+		ppid := ReadEnvPpid()
+		ppidStr := fmt.Sprintf("%d", ppid)
+		ppidStartTime, err := GetProcessStartTime(ppid)
+		if err != nil {
+			//log.Fatalf("cannot find parent process start time: %s", err)
+			return "", fmt.Errorf("cannot find parent process start time: %w", err)
+		}
+		ppidStartTimeStr := fmt.Sprintf("%d", ppidStartTime)
+		token, err = trust.SignStrings(workDirPath, "--", ppidStr, "--", ppidStartTimeStr)
+		if err != nil {
+			err = fmt.Errorf("cannot hash workspace dir: %w", err)
+			return "", err
+		}
+		logger.Debug("token signature", "workDirPath", "token", token, workDirPath, "ppidStr", ppidStr)
+		//log.Printf("contextual token: %s base on workDirPath: %s and ppid: %s\n", token, workDirPath, ppid)
 	}
 
-	ppid := ReadEnvPpid()
-	ppidStr := fmt.Sprintf("%d", ppid)
-	ppidStartTime, err := GetProcessStartTime(ppid)
-	if err != nil {
-		//log.Fatalf("cannot find parent process start time: %s", err)
-		return "", fmt.Errorf("cannot find parent process start time: %w", err)
+	return token, nil
+}
+
+func IsolatedToken(token, isolation string) string {
+	if isolation != "" {
+		return fmt.Sprintf("%s_%s", token, isolation)
 	}
-	ppidStartTimeStr := fmt.Sprintf("%d", ppidStartTime)
-	token, err = trust.SignStrings(workDirPath, "--", ppidStr, "--", ppidStartTimeStr)
-	if err != nil {
-		err = fmt.Errorf("cannot hash workspace dir: %w", err)
-	}
-	logger.Debug("token signature", "workDirPath", "token", token, workDirPath, "ppidStr", ppidStr)
-	//log.Printf("contextual token: %s base on workDirPath: %s and ppid: %s\n", token, workDirPath, ppid)
-	return token, err
+	return token
 }
 
 func IsShellBuiltin(cmd string) (ok bool, err error) {

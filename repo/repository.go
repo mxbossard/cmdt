@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"gopkg.in/yaml.v2"
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/utils"
 	"mby.fr/utils/format"
@@ -28,21 +27,14 @@ var (
 	testSuiteNameSanitizerPattern = regexp.MustCompile("[^a-zA-Z0-9]")
 )
 
-func New(token string) (repo FileRepo) {
+func New(token, isolation string) (repo FileRepo) {
 	repo.token = token
-	path, err := forgeWorkDirectoryPath(token)
+	repo.isolation = isolation
+	logger.Warn("new repo", "token", token, "isolation", isolation)
+	path, err := forgeWorkDirectoryPath(token, isolation)
 	if err != nil {
 		log.Fatal(err)
 	}
-	//queuesBackingFilepath := filepath.Join(path, "operationQueues.yaml")
-	//queuesRepo, err := LoadOperationQueueRepo(queuesBackingFilepath)
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//repo.queuesRepo = queuesRepo
-
-	//stateBackingFilepath := filepath.Join(path, "state.yaml")
-	//repo.State = FileState{backingFilepath: stateBackingFilepath}
 
 	repo.dbRepo, err = newDbRepo(path)
 	if err != nil {
@@ -53,15 +45,14 @@ func New(token string) (repo FileRepo) {
 }
 
 type FileRepo struct {
-	token string
-	//queuesRepo OperationQueueRepo
+	token     string
+	isolation string
 
-	//State  FileState
 	dbRepo dbRepo
 }
 
 func (r FileRepo) BackingFilepath() string {
-	path, err := forgeWorkDirectoryPath(r.token)
+	path, err := forgeWorkDirectoryPath(r.token, "")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -70,7 +61,7 @@ func (r FileRepo) BackingFilepath() string {
 
 func (r FileRepo) MockDirectoryPath(testSuite string, testId uint32) (mockDir string, err error) {
 	var path string
-	path, err = testSuiteDirectoryPath(testSuite, r.token)
+	path, err = testSuiteDirectoryPath(testSuite, r.token, r.isolation)
 	if err != nil {
 		return
 	}
@@ -88,7 +79,8 @@ func (r FileRepo) InitSuite(cfg model.Config) (err error) {
 	if err != nil {
 		return
 	}
-	err = persistSuiteConfig(r.token, cfg)
+	//err = persistSuiteConfig(r.token, cfg)
+	err = r.persistSuiteConfig(cfg)
 	if err != nil {
 		err = fmt.Errorf("unable to init suite: %w", err)
 	}
@@ -97,66 +89,82 @@ func (r FileRepo) InitSuite(cfg model.Config) (err error) {
 
 func (r FileRepo) SaveGlobalConfig(cfg model.Config) (err error) {
 	cfg.TestSuite.Set(model.GlobalConfigTestSuiteName)
-	err = persistSuiteConfig(r.token, cfg)
+	//err = persistSuiteConfig(r.token, cfg)
+	err = r.persistGlobalConfig(cfg)
 	if err != nil {
 		err = fmt.Errorf("unable to save global config: %w", err)
 	}
 	return
 }
 
-func (r FileRepo) LoadGlobalConfig() (cfg model.Config, err error) {
-	cfg, err = loadGlobalConfig(r.token)
+func (r FileRepo) GetGlobalConfig() (cfg model.Config, err error) {
+	//cfg, err = loadGlobalConfig(r.token)
+	loaded, err := r.loadGlobalConfig()
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			// global config does not exists yet
-			// create a new default one
-			cfg = model.NewGlobalDefaultConfig()
-			cfg.Token.Set(r.token)
-			cfg.GlobalStartTime.Set(time.Now())
-			err = r.SaveGlobalConfig(cfg)
-		}
+		return
+	}
+	if loaded != nil {
+		cfg = *loaded
+	} else {
+		// global config does not exists yet
+		// create a new default one
+		cfg = model.NewGlobalDefaultConfig()
+		cfg.Token.Set(r.token)
+		cfg.GlobalStartTime.Set(time.Now())
+		err = r.SaveGlobalConfig(cfg)
 	}
 	return
 }
 
 func (r FileRepo) SaveSuiteConfig(cfg model.Config) (err error) {
-	err = persistSuiteConfig(r.token, cfg)
+	//err = persistSuiteConfig(r.token, cfg)
+	err = r.persistSuiteConfig(cfg)
 	if err != nil {
 		err = fmt.Errorf("unable to save suite config: %w", err)
 	}
 	return
 }
 
-func (r FileRepo) LoadSuiteConfig(testSuite string, initless bool) (cfg model.Config, err error) {
+func (r FileRepo) GetSuiteConfig(testSuite string, initless bool) (cfg model.Config, err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("cannot load suite config: %w", err)
 		}
 	}()
 
-	cfg, err = loadSuiteConfig(testSuite, r.token)
+	//cfg, err = loadSuiteConfig(testSuite, r.token)
+	loaded, err := r.loadSuiteConfig(testSuite)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			// suite config does not exists yet
-			// create a new default one
-			if initless {
-				//logger.Warn("Saving new initless config", "testSuite", testSuite)
-				cfg = model.NewInitlessSuiteDefaultConfig()
-			} else {
-				//logger.Warn("Saving new inited config", "testSuite", testSuite)
-				cfg = model.NewSuiteDefaultConfig()
-			}
-			cfg.TestSuite.Set(testSuite)
-			cfg.SuiteStartTime.Set(time.Now())
-			err = r.SaveSuiteConfig(cfg)
+		return
+	}
+	if loaded != nil {
+		cfg = *loaded
+	} else {
+		// suite config does not exists yet
+		// create a new default one
+		cfg, err = r.GetGlobalConfig()
+		if err != nil {
+			return
 		}
+		var suiteCfg model.Config
+		if initless {
+			//logger.Warn("Saving new initless config", "testSuite", testSuite)
+			suiteCfg = model.NewInitlessSuiteDefaultConfig()
+		} else {
+			//logger.Warn("Saving new inited config", "testSuite", testSuite)
+			suiteCfg = model.NewSuiteDefaultConfig()
+		}
+		suiteCfg.TestSuite.Set(testSuite)
+		suiteCfg.SuiteStartTime.Set(time.Now())
+		cfg.Merge(suiteCfg)
+		err = r.SaveSuiteConfig(cfg)
 	}
 	return
 }
 
 func (r FileRepo) readSuiteSeq(testSuite, name string) (n uint32) {
 	//logger.Warn("readSuiteSeq()", "testSuite", testSuite, "name", name)
-	suiteDir, err := testSuiteDirectoryPath(testSuite, r.token)
+	suiteDir, err := testSuiteDirectoryPath(testSuite, r.token, r.isolation)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -190,7 +198,7 @@ func (r FileRepo) TooMuchCount(testSuite string) (n uint32) {
 }
 
 func (r FileRepo) IncrementSuiteSeq(testSuite, name string) (n uint32) {
-	suiteDir, err := testSuiteDirectoryPath(testSuite, r.token)
+	suiteDir, err := testSuiteDirectoryPath(testSuite, r.token, r.isolation)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -201,7 +209,7 @@ func (r FileRepo) IncrementSuiteSeq(testSuite, name string) (n uint32) {
 
 func (r FileRepo) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 	var stdoutLog, stderrLog, reportLog *os.File
-	stdoutLog, stderrLog, reportLog, err = cmdLogFiles(outcome.TestSuite, r.token, outcome.Seq)
+	stdoutLog, stderrLog, reportLog, err = cmdLogFiles(outcome.TestSuite, r.token, r.isolation, outcome.Seq)
 	if err != nil {
 		return
 	}
@@ -247,7 +255,7 @@ func (r FileRepo) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 
 func (r FileRepo) LoadSuiteOutcome(testSuite string) (outcome model.SuiteOutcome, err error) {
 	var suiteCfg model.Config
-	suiteCfg, err = r.LoadSuiteConfig(testSuite, false)
+	suiteCfg, err = r.GetSuiteConfig(testSuite, false)
 	if err != nil {
 		return
 	}
@@ -262,7 +270,7 @@ func (r FileRepo) LoadSuiteOutcome(testSuite string) (outcome model.SuiteOutcome
 	startTime := suiteCfg.SuiteStartTime.Get()
 	endTime := suiteCfg.LastTestTime.GetOr(time.Now())
 	outcome.Duration = endTime.Sub(startTime)
-	failureReports, err := failureReports(testSuite, r.token)
+	failureReports, err := failureReports(testSuite, r.token, r.isolation)
 	if err != nil {
 		return
 	}
@@ -272,12 +280,13 @@ func (r FileRepo) LoadSuiteOutcome(testSuite string) (outcome model.SuiteOutcome
 }
 
 func (r FileRepo) UpdateLastTestTime(testSuite string) {
-	cfg, err := loadSuiteConfig(testSuite, r.token)
+	//cfg, err := loadSuiteConfig(testSuite, r.token)
+	cfg, err := r.loadSuiteConfig(testSuite)
 	if err != nil {
 		log.Fatal(err)
 	}
 	cfg.LastTestTime = utilz.OptionalOf(time.Now())
-	err = persistSuiteConfig(r.token, cfg)
+	err = r.persistSuiteConfig(*cfg)
 	if err != nil {
 		err = fmt.Errorf("unable to update last test time: %w", err)
 		log.Fatal(err)
@@ -285,13 +294,13 @@ func (r FileRepo) UpdateLastTestTime(testSuite string) {
 }
 
 func (r FileRepo) ClearTestSuite(testSuite string) (err error) {
-	err = clearSuiteWorkspace(r.token, testSuite)
+	err = clearSuiteWorkspace(testSuite, r.token, r.isolation)
 	return
 }
 
 func (r FileRepo) ListTestSuites() (suites []string, err error) {
 	var tmpDir string
-	tmpDir, err = forgeWorkDirectoryPath(r.token)
+	tmpDir, err = forgeWorkDirectoryPath(r.token, "")
 	if err != nil {
 		return
 	}
@@ -351,69 +360,97 @@ func (r FileRepo) ListTestSuites() (suites []string, err error) {
 	return
 }
 
-func (r FileRepo) QueueOperation(op Operater) (err error) {
-	// r.queuesRepo.Queue(op)
-	// err = r.queuesRepo.Persist()
-
+func (r FileRepo) QueueOperation(op model.Operater) (err error) {
 	err = r.dbRepo.Queue(op)
 
 	return
 }
 
-func (r FileRepo) UnqueueOperation() (op Operater, err error) {
-	// var ok bool
-	// ok, op = r.queuesRepo.Unqueue()
-	// if ok {
-	// 	err = r.queuesRepo.Persist()
-	// } else {
-	// 	op = nil
-	// }
-
+func (r FileRepo) UnqueueOperation() (op model.Operater, err error) {
 	_, op, err = r.dbRepo.Unqueue()
 
 	return
 }
 
-func (r FileRepo) Done(op Operater) (err error) {
-	// r.queuesRepo.Unblock(op)
-	// err = r.queuesRepo.Persist()
-
+func (r FileRepo) Done(op model.Operater) (err error) {
 	err = r.dbRepo.Done(op)
 
 	return
 }
 
-func (r FileRepo) WaitOperationDone(op Operater, timeout time.Duration) (exitCode int16, err error) {
+func (r FileRepo) WaitOperationDone(op model.Operater, timeout time.Duration) (exitCode int16, err error) {
 	return r.dbRepo.WaitOperaterDone(op, timeout)
 }
 
 func (r FileRepo) WaitEmptyQueue(testSuite string, timeout time.Duration) {
-	// r.queuesRepo.WaitEmptyQueue(testSuite, timeout)
-
 	r.dbRepo.WaitEmptyQueue(testSuite, timeout)
 }
 
 func (r FileRepo) WaitAllEmpty(timeout time.Duration) {
-	// r.queuesRepo.WaitAllEmpty(timeout)
+	r.dbRepo.WaitAllEmpty(timeout)
 }
 
-func forgeWorkDirectoryPath(token string) (tempDirPath string, err error) {
-	if token == "" {
-		token, err = utils.ForgeContextualToken()
-	}
+func (r FileRepo) loadGlobalConfig() (cfg *model.Config, err error) {
+	err = initWorkspaceIfNot(model.GlobalConfigTestSuiteName, r.token, r.isolation)
 	if err != nil {
 		return
 	}
-	tempDirName := fmt.Sprintf("%s-%s", TEMP_DIR_PREFIX, token)
+
+	cfg, err = r.dbRepo.SuiteDao.FindGlobalConfig()
+	if err != nil {
+		return
+	}
+	if cfg != nil {
+		cfg.TestSuite.Clear()
+	}
+	return
+}
+
+func (r FileRepo) loadSuiteConfig(testSuite string) (cfg *model.Config, err error) {
+	err = initWorkspaceIfNot(testSuite, r.token, r.isolation)
+	if err != nil {
+		return
+	}
+
+	cfg, err = r.dbRepo.SuiteDao.FindSuiteConfig(testSuite)
+	return
+}
+
+func (r FileRepo) persistGlobalConfig(cfg model.Config) (err error) {
+	err = initWorkspaceIfNot(model.GlobalConfigTestSuiteName, r.token, r.isolation)
+	if err != nil {
+		return
+	}
+	err = r.dbRepo.SuiteDao.SaveGlobalConfig(cfg)
+	return
+}
+
+func (r FileRepo) persistSuiteConfig(cfg model.Config) (err error) {
+	testSuite := cfg.TestSuite.GetOr(model.DefaultTestSuiteName)
+	err = initWorkspaceIfNot(testSuite, r.token, r.isolation)
+	if err != nil {
+		return
+	}
+	err = r.dbRepo.SuiteDao.SaveSuiteConfig(testSuite, cfg)
+	return
+}
+
+func forgeWorkDirectoryPath(token, isol string) (tempDirPath string, err error) {
+	token, err = utils.ForgeContextualToken(token)
+	if err != nil {
+		return
+	}
+	isolatedToken := utils.IsolatedToken(token, isol)
+	tempDirName := fmt.Sprintf("%s-%s", TEMP_DIR_PREFIX, isolatedToken)
 	tempDirPath = filepath.Join(os.TempDir(), tempDirName)
 	err = os.MkdirAll(tempDirPath, 0700)
 	//logger.Warn("forgeWorkDirectoryPath", "workDir", tempDirPath)
 	return
 }
 
-func testSuiteDirectoryPath(testSuite, token string) (path string, err error) {
+func testSuiteDirectoryPath(testSuite, token, isol string) (path string, err error) {
 	var tmpDir string
-	tmpDir, err = forgeWorkDirectoryPath(token)
+	tmpDir, err = forgeWorkDirectoryPath(token, isol)
 	if err != nil {
 		return
 	}
@@ -424,9 +461,9 @@ func testSuiteDirectoryPath(testSuite, token string) (path string, err error) {
 	return
 }
 
-func testDirectoryPath(testSuite, token string, seq uint16) (testDir string, err error) {
+func testDirectoryPath(testSuite, token, isol string, seq uint16) (testDir string, err error) {
 	var tmpDir string
-	tmpDir, err = testSuiteDirectoryPath(testSuite, token)
+	tmpDir, err = testSuiteDirectoryPath(testSuite, token, isol)
 	if err != nil {
 		return
 	}
@@ -434,9 +471,9 @@ func testDirectoryPath(testSuite, token string, seq uint16) (testDir string, err
 	return
 }
 
-func testsuiteConfigFilepath(testSuite, token string) (path string, err error) {
+func testsuiteConfigFilepath(testSuite, token, isol string) (path string, err error) {
 	var testDir string
-	testDir, err = testSuiteDirectoryPath(testSuite, token)
+	testDir, err = testSuiteDirectoryPath(testSuite, token, isol)
 	if err != nil {
 		return
 	}
@@ -444,7 +481,7 @@ func testsuiteConfigFilepath(testSuite, token string) (path string, err error) {
 	return
 }
 
-func initWorkspaceIfNot(token, testSuite string) (err error) {
+func initWorkspaceIfNot(testSuite, token, isol string) (err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("cannot init workspace: %w", err)
@@ -453,7 +490,7 @@ func initWorkspaceIfNot(token, testSuite string) (err error) {
 
 	// init the tmp directory
 	var tmpDir string
-	tmpDir, err = testSuiteDirectoryPath(testSuite, token)
+	tmpDir, err = testSuiteDirectoryPath(testSuite, token, isol)
 	if err != nil {
 		return
 	}
@@ -474,7 +511,7 @@ func initWorkspaceIfNot(token, testSuite string) (err error) {
 	return
 }
 
-func clearSuiteWorkspace(token, testSuite string) (err error) {
+func clearSuiteWorkspace(testSuite, token, isol string) (err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("cannot clear suite workspace: %w", err)
@@ -482,7 +519,7 @@ func clearSuiteWorkspace(token, testSuite string) (err error) {
 	}()
 
 	var workDir string
-	workDir, err = testSuiteDirectoryPath(testSuite, token)
+	workDir, err = testSuiteDirectoryPath(testSuite, token, isol)
 	if err != nil {
 		return
 	}
@@ -491,108 +528,109 @@ func clearSuiteWorkspace(token, testSuite string) (err error) {
 	return
 }
 
-func persistSuiteConfig(token string, cfg model.Config) (err error) {
-	defer func() {
+/*
+	func persistSuiteConfig(token string, cfg model.Config) (err error) {
+		defer func() {
+			if err != nil {
+				err = fmt.Errorf("cannot persist config: %w", err)
+			}
+		}()
+
+		testSuite := cfg.TestSuite.Get()
+		err = initWorkspaceIfNot(token, testSuite)
 		if err != nil {
-			err = fmt.Errorf("cannot persist config: %w", err)
+			return
 		}
-	}()
+		contextFilepath, err2 := testsuiteConfigFilepath(testSuite, token)
+		if err2 != nil {
+			return err2
+		}
+		content, err2 := yaml.Marshal(&cfg)
+		if err2 != nil {
+			return err2
+		}
+		logger.Debug("Persisting config", "suite", testSuite, "file", contextFilepath, "content", content)
+		err2 = os.WriteFile(contextFilepath, content, 0600)
+		if err2 != nil {
+			return err2
+		}
+		//logger.Warn("Persisted config", "suite", testSuite, "file", contextFilepath, "content", content)
+		return nil
+		//})
+		//return
+	}
 
-	testSuite := cfg.TestSuite.Get()
-	err = initWorkspaceIfNot(token, testSuite)
-	if err != nil {
-		return
-	}
-	contextFilepath, err2 := testsuiteConfigFilepath(testSuite, token)
-	if err2 != nil {
-		return err2
-	}
-	content, err2 := yaml.Marshal(&cfg)
-	if err2 != nil {
-		return err2
-	}
-	logger.Debug("Persisting config", "suite", testSuite, "file", contextFilepath, "content", content)
-	err2 = os.WriteFile(contextFilepath, content, 0600)
-	if err2 != nil {
-		return err2
-	}
-	//logger.Warn("Persisted config", "suite", testSuite, "file", contextFilepath, "content", content)
-	return nil
-	//})
-	//return
-}
+	func readConfig(name, token string) (config model.Config, err error) {
+		defer func() {
+			if err != nil {
+				err = fmt.Errorf("cannot read config: %w", err)
+			}
+		}()
 
-func readConfig(name, token string) (config model.Config, err error) {
-	defer func() {
+		err = initWorkspaceIfNot(token, name)
 		if err != nil {
-			err = fmt.Errorf("cannot read config: %w", err)
+			return
 		}
-	}()
-
-	err = initWorkspaceIfNot(token, name)
-	if err != nil {
-		return
-	}
-	var contextFilepath string
-	contextFilepath, err = testsuiteConfigFilepath(name, token)
-	if err != nil {
-		return
-	}
-	var content []byte
-	content, err = os.ReadFile(contextFilepath)
-	if err != nil {
-		return
-	}
-	err = yaml.Unmarshal(content, &config)
-	//log.Printf("Read context from %s\n", contextFilepath)
-	return
-}
-
-func loadGlobalConfig(token string) (config model.Config, err error) {
-	defer func() {
+		var contextFilepath string
+		contextFilepath, err = testsuiteConfigFilepath(name, token)
 		if err != nil {
-			err = fmt.Errorf("cannot load global config: %w", err)
+			return
 		}
-	}()
-
-	config = model.NewGlobalDefaultConfig()
-	var loaded model.Config
-	loaded, err = readConfig(model.GlobalConfigTestSuiteName, token)
-	if err != nil {
-		return
-	}
-	loaded.TestSuite.Clear()
-	config.Merge(loaded)
-	return
-}
-
-func loadSuiteConfig(testSuite, token string) (config model.Config, err error) {
-	defer func() {
+		var content []byte
+		content, err = os.ReadFile(contextFilepath)
 		if err != nil {
-			err = fmt.Errorf("cannot load suite config: %w", err)
+			return
 		}
-	}()
-
-	var globalCfg, suiteCfg model.Config
-	globalCfg, err = loadGlobalConfig(token)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		err = yaml.Unmarshal(content, &config)
+		//log.Printf("Read context from %s\n", contextFilepath)
 		return
 	}
-	suiteCfg, err = readConfig(testSuite, token)
-	if err != nil {
+
+	func loadGlobalConfig(token string) (config model.Config, err error) {
+		defer func() {
+			if err != nil {
+				err = fmt.Errorf("cannot load global config: %w", err)
+			}
+		}()
+
+		config = model.NewGlobalDefaultConfig()
+		var loaded model.Config
+		loaded, err = readConfig(model.GlobalConfigTestSuiteName, token)
+		if err != nil {
+			return
+		}
+		loaded.TestSuite.Clear()
+		config.Merge(loaded)
 		return
 	}
-	logger.Debug("Loaded context", "global", globalCfg, "suite", suiteCfg)
-	config = globalCfg
-	config.Merge(suiteCfg)
-	//SetRulePrefix(config.Prefix)
-	logger.Debug("Merges context", "merged", config)
-	return
-}
 
-func cmdLogFiles(testSuite, token string, seq uint16) (stdoutFile, stderrFile, reportFile *os.File, err error) {
+	func loadSuiteConfig(testSuite, token string) (config model.Config, err error) {
+		defer func() {
+			if err != nil {
+				err = fmt.Errorf("cannot load suite config: %w", err)
+			}
+		}()
+
+		var globalCfg, suiteCfg model.Config
+		globalCfg, err = loadGlobalConfig(token)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return
+		}
+		suiteCfg, err = readConfig(testSuite, token)
+		if err != nil {
+			return
+		}
+		logger.Debug("Loaded context", "global", globalCfg, "suite", suiteCfg)
+		config = globalCfg
+		config.Merge(suiteCfg)
+		//SetRulePrefix(config.Prefix)
+		logger.Debug("Merges context", "merged", config)
+		return
+	}
+*/
+func cmdLogFiles(testSuite, token, isol string, seq uint16) (stdoutFile, stderrFile, reportFile *os.File, err error) {
 	var testDir string
-	testDir, err = testDirectoryPath(testSuite, token, seq)
+	testDir, err = testDirectoryPath(testSuite, token, isol, seq)
 	if err != nil {
 		return
 	}
@@ -623,9 +661,9 @@ func cmdLogFiles(testSuite, token string, seq uint16) (stdoutFile, stderrFile, r
 	return
 }
 
-func failureReports(testSuite, token string) (reports []string, err error) {
+func failureReports(testSuite, token, isol string) (reports []string, err error) {
 	var tmpDir string
-	tmpDir, err = testSuiteDirectoryPath(testSuite, token)
+	tmpDir, err = testSuiteDirectoryPath(testSuite, token, isol)
 	if err != nil {
 		return
 	}

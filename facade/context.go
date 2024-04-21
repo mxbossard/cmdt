@@ -21,35 +21,34 @@ import (
 
 var logger = slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 
-func NewGlobalContext(token string, inputCfg model.Config) GlobalContext {
-	if token == "" {
-		var err error
-		token, err = utils.ForgeContextualToken()
-		if err != nil {
-			log.Fatal(err)
-		}
+func NewGlobalContext(token, isolation string, inputCfg model.Config) GlobalContext {
+	var err error
+	token, err = utils.ForgeContextualToken(token)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	repo := repo.New(token)
+	repo := repo.New(token, isolation)
 
-	cfg, err := repo.LoadGlobalConfig()
+	cfg, err := repo.GetGlobalConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
 	cfg.Merge(inputCfg)
 
 	c := GlobalContext{
-		Token:  token,
-		Repo:   repo,
-		Config: cfg,
+		Token:     token,
+		Isolation: isolation,
+		Repo:      repo,
+		Config:    cfg,
 	}
 
 	return c
 }
 
-func NewSuiteContext(token, testSuite string, initless bool, action model.Action, inputCfg model.Config) SuiteContext {
-	globalCtx := NewGlobalContext(token, model.Config{})
-	suiteCfg, err := globalCtx.Repo.LoadSuiteConfig(testSuite, initless)
+func NewSuiteContext(token, isolation, testSuite string, initless bool, action model.Action, inputCfg model.Config) SuiteContext {
+	globalCtx := NewGlobalContext(token, isolation, model.Config{})
+	suiteCfg, err := globalCtx.Repo.GetSuiteConfig(testSuite, initless)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -69,8 +68,8 @@ func NewSuiteContext(token, testSuite string, initless bool, action model.Action
 	return suiteCtx
 }
 
-func NewTestContext(token, testSuite string, inputCfg model.Config, ppid uint32) TestContext {
-	suiteCtx := NewSuiteContext(token, testSuite, true, model.TestAction, model.Config{})
+func NewTestContext(token, isolation, testSuite string, inputCfg model.Config, ppid uint32) TestContext {
+	suiteCtx := NewSuiteContext(token, isolation, testSuite, true, model.TestAction, model.Config{})
 	mergedCfg := suiteCtx.Config
 	mergedCfg.Merge(inputCfg)
 
@@ -95,11 +94,12 @@ func NewTestContext(token, testSuite string, inputCfg model.Config, ppid uint32)
 }
 
 func NewTestContext2(testDef model.TestDefinition) (ctx TestContext) {
-	return NewTestContext(testDef.Token, testDef.TestSuite, testDef.Config, testDef.Ppid)
+	return NewTestContext(testDef.Token, testDef.Isolation, testDef.TestSuite, testDef.Config, testDef.Ppid)
 }
 
 type GlobalContext struct {
-	Token string
+	Token     string
+	Isolation string
 
 	Repo   repo.FileRepo
 	Config model.Config

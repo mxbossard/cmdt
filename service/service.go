@@ -11,7 +11,6 @@ import (
 	"mby.fr/cmdtest/display"
 	"mby.fr/cmdtest/facade"
 	"mby.fr/cmdtest/model"
-	"mby.fr/cmdtest/repo"
 	"mby.fr/cmdtest/utils"
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/printz"
@@ -78,6 +77,7 @@ func InitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int16, err error) {
 	exitCode = 1
 	token := ctx.Token
+	isolation := ctx.Isolation
 
 	var testSuites []string
 	testSuites, err = ctx.Repo.ListTestSuites()
@@ -94,7 +94,7 @@ func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int16, err error) {
 
 	exitCode = 0
 	for _, testSuite := range testSuites {
-		suiteCtx := facade.NewSuiteContext(token, testSuite, false, model.ReportAction, ctx.Config)
+		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, model.ReportAction, ctx.Config)
 		if suiteCtx.Repo.TestCount(testSuite) > 0 {
 			var code int16
 			code, err = ReportTestSuite(suiteCtx)
@@ -114,7 +114,7 @@ func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int16, err error) {
 
 func ProcessReportAllDef(def model.ReportDefinition) (exitCode int16) {
 	var err error
-	ctx := facade.NewGlobalContext(def.Token, model.Config{})
+	ctx := facade.NewGlobalContext(def.Token, def.Isolation, model.Config{})
 	exitCode, err = ReportAllTestSuites(ctx)
 	if err != nil {
 		log.Fatal(err)
@@ -155,7 +155,7 @@ func ReportTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 func ProcessReportDef(def model.ReportDefinition) (exitCode int16, err error) {
 	//logger.Warn("ProcessReportDef()", "def", def)
 	//var err error
-	ctx := facade.NewSuiteContext(def.Token, def.TestSuite, false, model.ReportAction, def.Config)
+	ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.ReportAction, def.Config)
 	exitCode, err = ReportTestSuite(ctx)
 	//ctx.NoErrorOrFatal(err)
 	return
@@ -256,13 +256,13 @@ func ProcessTestDef(testDef model.TestDefinition) (exitCode int16) {
 		ctId, exitCode, err = PerformTestInContainer(testCtx)
 		testCtx.NoErrorOrFatal(err)
 		if testCfg.ContainerScope.Is(model.GLOBAL_SCOPE) {
-			globalCfg, err2 := testCtx.Repo.LoadGlobalConfig()
+			globalCfg, err2 := testCtx.Repo.GetGlobalConfig()
 			testCtx.NoErrorOrFatal(err2)
 			globalCfg.ContainerId.Set(ctId)
 			err2 = testCtx.Repo.SaveGlobalConfig(globalCfg)
 			testCtx.NoErrorOrFatal(err2)
 		} else if testCfg.ContainerScope.Is(model.SUITE_SCOPE) {
-			suiteCfg, err2 := testCtx.Repo.LoadSuiteConfig(testSuite, true)
+			suiteCfg, err2 := testCtx.Repo.GetSuiteConfig(testSuite, true)
 			testCtx.NoErrorOrFatal(err2)
 			suiteCfg.ContainerId.Set(ctId)
 			err2 = testCtx.Repo.SaveSuiteConfig(suiteCfg)
@@ -287,7 +287,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 	defaultCfg := model.NewGlobalDefaultConfig()
 	envToken := utils.ReadEnvToken()
 	if envToken != "" {
-		envCtx := facade.NewGlobalContext(envToken, defaultCfg)
+		envCtx := facade.NewGlobalContext(envToken, "", defaultCfg)
 		defaultCfg = envCtx.Config
 	}
 	rulePrefix := defaultCfg.Prefix.Get()
@@ -303,6 +303,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 	}
 
 	token := inputConfig.Token.GetOr("")
+	isolation := inputConfig.Isol.GetOr("")
 	action := inputConfig.Action.Get()
 
 	var err error
@@ -311,14 +312,14 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 		if agg.GotError() {
 			log.Fatal(agg)
 		}
-		globalCtx := facade.NewGlobalContext(token, inputConfig)
+		globalCtx := facade.NewGlobalContext(token, isolation, inputConfig)
 		logger.Debug("Forged context", "ctx", globalCtx)
 		logger.Info("Processing global action", "token", token)
 		dpl.Quiet(globalCtx.Config.Quiet)
 		exitCode, err = GlobalConfig(globalCtx)
 	case model.InitAction:
 		testSuite := inputConfig.TestSuite.Get()
-		suiteCtx := facade.NewSuiteContext(token, testSuite, false, action, inputConfig)
+		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig)
 		logger.Debug("Forged context", "ctx", suiteCtx)
 		suiteCtx.NoErrorOrFatal(agg.Return())
 		logger.Info("Processing init action", "token", token)
@@ -337,7 +338,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 			if agg.GotError() {
 				log.Fatal(agg)
 			}
-			globalCtx := facade.NewGlobalContext(token, inputConfig)
+			globalCtx := facade.NewGlobalContext(token, isolation, inputConfig)
 			if globalCtx.Config.Async.Is(false) {
 				// Process report all without daemon
 				logger.Debug("Forged context", "ctx", globalCtx)
@@ -351,11 +352,12 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 				// Delegate report all processing to daemon
 				logger.Warn("executing report all async (queueing report)")
 				def := model.ReportDefinition{
-					Token: globalCtx.Token,
+					Token:     token,
+					Isolation: isolation,
 					//TestSuite: "__global",
 					Config: globalCtx.Config,
 				}
-				op := repo.ReportAllOperation(true, def) // FIXME should not block if test can be run simultaneously
+				op := model.ReportAllOperation(true, def) // FIXME should not block if test can be run simultaneously
 				err = globalCtx.Repo.QueueOperation(&op)
 				if err != nil {
 					log.Fatal(err)
@@ -378,15 +380,16 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 		} else {
 			// Reporting One test suite
 			testSuite := inputConfig.TestSuite.Get()
-			suiteCtx := facade.NewSuiteContext(token, testSuite, false, action, inputConfig)
+			suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig)
 			suiteCtx.NoErrorOrFatal(agg.Return())
 
 			def := model.ReportDefinition{
-				Token:     suiteCtx.Token,
+				Token:     token,
+				Isolation: isolation,
 				TestSuite: testSuite,
 				Config:    suiteCtx.Config,
 			}
-			op := repo.ReportOperation(testSuite, true, def) // FIXME should not block if test can be run simultaneously
+			op := model.ReportOperation(testSuite, true, def) // FIXME should not block if test can be run simultaneously
 
 			if suiteCtx.Config.Async.Is(false) {
 				// Process report without daemon
@@ -401,11 +404,12 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 				// Delegate report processing to daemon
 				logger.Warn("executing report async (queueing report)", "suite", testSuite)
 				def := model.ReportDefinition{
-					Token:     suiteCtx.Token,
+					Token:     token,
+					Isolation: isolation,
 					TestSuite: testSuite,
 					Config:    suiteCtx.Config,
 				}
-				op := repo.ReportOperation(testSuite, true, def) // FIXME should not block if test can be run simultaneously
+				op := model.ReportOperation(testSuite, true, def) // FIXME should not block if test can be run simultaneously
 				err = suiteCtx.Repo.QueueOperation(&op)
 				suiteCtx.NoErrorOrFatal(err)
 
@@ -429,7 +433,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 	case model.TestAction:
 		testSuite := inputConfig.TestSuite.Get()
 		ppid := uint32(utils.ReadEnvPpid())
-		testCtx := facade.NewTestContext(token, testSuite, inputConfig, ppid)
+		testCtx := facade.NewTestContext(token, isolation, testSuite, inputConfig, ppid)
 		var seq uint16
 		seq = testCtx.IncrementTestCount()
 		testCtx.NoErrorOrFatal(agg.Return())
@@ -440,6 +444,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 		testDef := model.TestDefinition{
 			Ppid:        ppid,
 			Token:       token,
+			Isolation:   isolation,
 			TestSuite:   testSuite,
 			Seq:         seq,
 			Config:      testCfg,
@@ -455,7 +460,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 		} else {
 			// Delegate test processing to daemon
 			logger.Info("executing test async (queueing test)", "suite", testSuite, "seq", seq)
-			testOp := repo.TestOperation(testSuite, seq, true, testDef) // FIXME should not block if test can be run simultaneously
+			testOp := model.TestOperation(testSuite, seq, true, testDef) // FIXME should not block if test can be run simultaneously
 			err = testCtx.Repo.QueueOperation(&testOp)
 			testCtx.NoErrorOrFatal(err)
 

@@ -32,8 +32,8 @@ cmdt="cmdt"
 cmdtIn="$cmdt $@"
 
 # Tested cmdt
-cmdt0="$newCmdt"
-cmdt1="$newCmdt @verbose @failuresLimit=-1" # Default verbose show passed test + perform all test beyond failures limit
+cmdt0="$newCmdt @isol=tested"
+cmdt1="$newCmdt @isol=tested @verbose @failuresLimit=-1" # Default verbose show passed test + perform all test beyond failures limit
 
 mkdir -p "$scriptDir/.tmp"
 reportFile="$( mktemp "$scriptDir/.tmp/XXXXXX.log" )"
@@ -172,8 +172,8 @@ $cmdtIn @test=meta1/ @exit=1 @stderr:"3 success" @stderr:"0 failure" @stderr:"1 
 tk0=$( $cmdt @init @printToken 2> /dev/null )
 >&2 echo "token: $tk0"
 $cmdtIn @init=meta2
-$cmdtIn @test=meta2/ @-- $cmdt0 true @token=$tk0
-$cmdtIn @test=meta2/ @-- $cmdt0 true @token=$tk0
+$cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt0 true @token=$tk0
+$cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#02" @-- $cmdt0 true @token=$tk0
 $cmdtIn @test=meta2/ @fail @-- $cmdt0 @report=main
 $cmdtIn @test=meta2/ @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @-- $cmdt0 @report @token=$tk0
 $cmdt @report 2>&1 | grep -v "Failures"
