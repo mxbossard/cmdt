@@ -11,7 +11,7 @@ import (
 
 func NewTest(db *zql.SynchronizedDB) (d Test, err error) {
 	d.db = db
-	d.init()
+	err = d.init()
 	return
 }
 
@@ -23,19 +23,20 @@ func (d Test) init() (err error) {
 	_, err = d.db.Exec(`
 		CREATE TABLE IF NOT EXISTS tested (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			suite TEXT NOT NULL,
 			title TEXT NOT NULL,
 			seq INTEGER NOT NULL,
 			outcome TEXT NOT NULL,
-			errorMsg TEXT NULL,
-			duration INTEGER NOT NULL,
-			passed INTEGER NOT NULL,
-			failed INTEGER NOT NULL,
-			errored INTEGER NOT NULL,
-			ignored INTEGER NOT NULL,
-			exitCode INTEGER NOT NULL,
-			stdout TEXT NULL,
-			stderr TEXT NULL,
-			report TEXT NULL,
+			errorMsg TEXT NOT NULL DEFAULT '',
+			duration INTEGER NOT NULL DEFAULT -1,
+			passed INTEGER NOT NULL DEFAULT 0,
+			failed INTEGER NOT NULL DEFAULT 0,
+			errored INTEGER NOT NULL DEFAULT 0,
+			ignored INTEGER NOT NULL DEFAULT 0,
+			exitCode INTEGER NOT NULL DEFAULT -1,
+			stdout TEXT NOT NULL DEFAULT '',
+			stderr TEXT NOT NULL DEFAULT '',
+			report TEXT NOT NULL DEFAULT '',
 			FOREIGN KEY(suite) REFERENCES suite(name)
 		);
 
@@ -50,7 +51,7 @@ func (d Test) init() (err error) {
 			errorMsg TEXT NULL,
 			success INTEGER NOT NULL,
 
-			FOREIGN KEY(testId) REFERENCES test(name)
+			FOREIGN KEY(testId) REFERENCES test(id)
 		);		
 	`)
 	return
@@ -168,7 +169,7 @@ func (d Test) SaveTestOutcome(suite, title string, outcome model.TestOutcome) (e
 	report := "NO REPORT"
 	_, err = d.db.Exec(`
 		INSERT INTO tested(suite, seq, title, errorMsg, duration, passed, ignored, failed, errored, exitCode, stdout, stderr, report) 
-		VALUES (@suite, @seq, @errorMsg, @micros, @passed, @ignored, @failed, @errored, @exitCode, @stdout, @stderr, @report);
+		VALUES (@suite, @seq, @title, @errorMsg, @micros, @passed, @ignored, @failed, @errored, @exitCode, @stdout, @stderr, @report);
 	`, sql.Named("suite", suite), sql.Named("seq", seq), sql.Named("title", title),
 		sql.Named("errorMsg", errorMsg), sql.Named("micros", micros),
 		sql.Named("passed", passed), sql.Named("ignored", ignored),

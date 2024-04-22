@@ -12,7 +12,7 @@ import (
 
 func NewSuite(db *zql.SynchronizedDB) (d Suite, err error) {
 	d.db = db
-	d.init()
+	err = d.init()
 	return
 }
 
@@ -25,16 +25,16 @@ func (d Suite) init() (err error) {
 		CREATE TABLE IF NOT EXISTS suite (
 			name TEXT UNIQUE NOT NULL,
 			config BLOB NOT NULL,
-			startTime INTEGER NULL,
-			seq INTEGER NOT NULL,
-			endTime INTEGER NULL,
-			outcome TEXT NULL
+			startTime INTEGER NOT NULL DEFAULT 0,
+			seq INTEGER NOT NULL DEFAULT 0,
+			endTime INTEGER NOT NULL DEFAULT 0,
+			outcome TEXT NOT NULL DEFAULT ''
 		);
 	`)
 	return
 }
 
-func (d Test) NextSeq(suite string) (seq int, err error) {
+func (d Suite) NextSeq(suite string) (seq int, err error) {
 	tx, err := d.db.Begin()
 	if err != nil {
 		return
@@ -45,12 +45,24 @@ func (d Test) NextSeq(suite string) (seq int, err error) {
 		FROM suite
 		WHERE name = ?
 	`, suite)
-	row.Scan(&seq)
+	err = row.Scan(&seq)
+	if err != nil {
+		return
+	}
 	_, err = tx.Exec(`
 		UPDATE suite SET seq = ? 
 		WHERE name = ?
 	`, seq+1, suite)
 	err = tx.Commit()
+	return
+}
+
+func (d Suite) UpdateStartTime(suite string, start time.Time) (err error) {
+	micros := start.UnixMicro()
+	_, err = d.db.Exec(`
+		UPDATE suite SET startTime = ?
+		WHERE name = ?
+	`, micros, suite)
 	return
 }
 
@@ -80,12 +92,26 @@ func (d Suite) Delete(suite string) (err error) {
 }
 
 func (d Suite) ListPassedFailedErrored() (suites []string, err error) {
-	_, err = d.db.Exec(`
+	rows, err := d.db.Query(`
 		SELECT name
 		FROM suite
 		WHERE outcome IN ('PASSED', 'FAILED', 'ERRORED') AND startTime IS NOT NULL
 		ORDER BY outcome DESC, startTime ASC
 	`)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var suiteName string
+		err = rows.Scan(&suiteName)
+		if err != nil {
+			return
+		}
+		suites = append(suites, suiteName)
+	}
+
 	return
 }
 
@@ -112,12 +138,14 @@ func (d Suite) FindGlobalConfig() (cfg *model.Config, err error) {
 func (d Suite) FindSuiteConfig(testSuite string) (cfg *model.Config, err error) {
 	logger.Warn("LoadSuiteConfig()")
 	var serializedConfig []byte
+	var startTime, endTime, seq int64
+	var outcome string
 	row := d.db.QueryRow(`
-		SELECT config 
+		SELECT config, startTime, endTime, outcome, seq 
 		FROM suite
 		WHERE name = @suite;
 	`, sql.Named("suite", testSuite))
-	err = row.Scan(&serializedConfig)
+	err = row.Scan(&serializedConfig, &startTime, &endTime, &outcome, &seq)
 	if err == sql.ErrNoRows {
 		err = nil
 		return

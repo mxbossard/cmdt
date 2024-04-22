@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	_ "modernc.org/sqlite"
+
 	"mby.fr/cmdtest/model"
 	"mby.fr/utils/zql"
 	"mby.fr/utils/zqlite"
