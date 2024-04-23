@@ -24,8 +24,9 @@ func (d Test) init() (err error) {
 		CREATE TABLE IF NOT EXISTS tested (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			suite TEXT NOT NULL,
-			title TEXT NOT NULL,
 			seq INTEGER NOT NULL,
+			name TEXT NOT NULL,
+			title TEXT NOT NULL,
 			outcome TEXT NOT NULL,
 			errorMsg TEXT NOT NULL DEFAULT '',
 			duration INTEGER NOT NULL DEFAULT -1,
@@ -45,10 +46,10 @@ func (d Test) init() (err error) {
 			testId INTEGER NOT NULL,
 			prefix TEXT NOT NULL,
 			name TEXT NOT NULL,
-			op TEXT NOT NULL,
-			expected TEXT NOT NULL,
-			value TEXT NOT NULL,
-			errorMsg TEXT NULL,
+			op TEXT NOT NULL DEFAULT '',
+			expected TEXT NOT NULL DEFAULT '',
+			value TEXT NOT NULL DEFAULT '',
+			errorMsg TEXT NOT NULL DEFAULT '',
 			success INTEGER NOT NULL,
 
 			FOREIGN KEY(testId) REFERENCES test(id)
@@ -155,10 +156,17 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 	return
 }
 
-func (d Test) SaveTestOutcome(suite, title string, outcome model.TestOutcome) (err error) {
+func (d Test) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 	seq := outcome.Seq
-	errorMsg := outcome.Err
+	suite := outcome.TestSuite
+	name := outcome.TestName
+	title := outcome.CmdTitle
+	errorMsg := ""
+	if outcome.Err != nil {
+		outcome.Err.Error()
+	}
 	micros := outcome.Duration.Microseconds()
+	oc := outcome.Outcome
 	passed := outcome.Outcome == model.PASSED
 	ignored := outcome.Outcome == model.IGNORED
 	failed := outcome.Outcome == model.FAILED
@@ -168,10 +176,10 @@ func (d Test) SaveTestOutcome(suite, title string, outcome model.TestOutcome) (e
 	stderr := outcome.Stderr
 	report := "NO REPORT"
 	_, err = d.db.Exec(`
-		INSERT INTO tested(suite, seq, title, errorMsg, duration, passed, ignored, failed, errored, exitCode, stdout, stderr, report) 
-		VALUES (@suite, @seq, @title, @errorMsg, @micros, @passed, @ignored, @failed, @errored, @exitCode, @stdout, @stderr, @report);
-	`, sql.Named("suite", suite), sql.Named("seq", seq), sql.Named("title", title),
-		sql.Named("errorMsg", errorMsg), sql.Named("micros", micros),
+		INSERT INTO tested(suite, seq, name, title, errorMsg, duration, outcome, passed, ignored, failed, errored, exitCode, stdout, stderr, report) 
+		VALUES (@suite, @seq, @name, @title, @errorMsg, @micros, @outcome, @passed, @ignored, @failed, @errored, @exitCode, @stdout, @stderr, @report);
+	`, sql.Named("suite", suite), sql.Named("seq", seq), sql.Named("name", name), sql.Named("title", title),
+		sql.Named("errorMsg", errorMsg), sql.Named("micros", micros), sql.Named("outcome", oc),
 		sql.Named("passed", passed), sql.Named("ignored", ignored),
 		sql.Named("failed", failed), sql.Named("errored", errored),
 		sql.Named("exitCode", exitCode), sql.Named("stdout", stdout),

@@ -12,13 +12,29 @@ import (
 	"mby.fr/utils/filez"
 )
 
-func initConfigDao(t *testing.T, dirpath string) Suite {
+func initSuiteDao(t *testing.T, dirpath string) Suite {
 	db, err := DbOpen(dirpath)
 	require.NoError(t, err)
 
 	dao, err := NewSuite(db)
 	require.NoError(t, err)
 	return dao
+}
+
+func addSuite(t *testing.T, dao Suite, name string) {
+	err := dao.SaveSuiteConfig(name, model.Config{})
+	require.NoError(t, err)
+}
+
+func addSuiteWithOutcome(t *testing.T, dao Suite, name string, outcome model.Outcome, startTime time.Time) {
+	err := dao.SaveSuiteConfig(name, model.Config{})
+	require.NoError(t, err)
+
+	err = dao.UpdateOutcome(name, outcome)
+	require.NoError(t, err)
+
+	err = dao.UpdateStartTime(name, startTime)
+	require.NoError(t, err)
 }
 
 func compareConfig(t *testing.T, expected, actual model.Config) {
@@ -57,7 +73,7 @@ func TestSerializeConfig_Then_DeserializeConfig(t *testing.T) {
 func TestFindGlobalConfig_Empty(t *testing.T) {
 	dirpath := filez.MkTempDir("", "")
 	defer os.RemoveAll(dirpath)
-	dao := initConfigDao(t, dirpath)
+	dao := initSuiteDao(t, dirpath)
 
 	cfg, err := dao.FindGlobalConfig()
 	require.NoError(t, err)
@@ -67,7 +83,7 @@ func TestFindGlobalConfig_Empty(t *testing.T) {
 func TestFindGlobalConfig_SaveAndGet(t *testing.T) {
 	dirpath := filez.MkTempDir("", "")
 	defer os.RemoveAll(dirpath)
-	dao := initConfigDao(t, dirpath)
+	dao := initSuiteDao(t, dirpath)
 
 	expected := model.NewGlobalDefaultConfig()
 	require.True(t, expected.Async.IsPresent(), "expected async empty")
@@ -87,7 +103,7 @@ func TestFindGlobalConfig_SaveAndGet(t *testing.T) {
 func TestFindSuiteConfig_Empty(t *testing.T) {
 	dirpath := filez.MkTempDir("", "")
 	defer os.RemoveAll(dirpath)
-	dao := initConfigDao(t, dirpath)
+	dao := initSuiteDao(t, dirpath)
 
 	expectedSuite := "foo"
 	cfg, err := dao.FindSuiteConfig(expectedSuite)
@@ -98,7 +114,7 @@ func TestFindSuiteConfig_Empty(t *testing.T) {
 func TestFindSuiteConfig_SaveAndGet(t *testing.T) {
 	dirpath := filez.MkTempDir("", "")
 	defer os.RemoveAll(dirpath)
-	dao := initConfigDao(t, dirpath)
+	dao := initSuiteDao(t, dirpath)
 
 	expectedSuite := "bar"
 	expected := model.NewSuiteDefaultConfig()
@@ -116,30 +132,14 @@ func TestFindSuiteConfig_SaveAndGet(t *testing.T) {
 	compareConfig(t, expected, *cfg)
 }
 
-func initSuite(t *testing.T, dao Suite, name string) {
-	err := dao.SaveSuiteConfig(name, model.Config{})
-	require.NoError(t, err)
-}
-
-func initSuiteWithOutcome(t *testing.T, dao Suite, name string, outcome model.Outcome, startTime time.Time) {
-	err := dao.SaveSuiteConfig(name, model.Config{})
-	require.NoError(t, err)
-
-	err = dao.UpdateOutcome(name, outcome)
-	require.NoError(t, err)
-
-	err = dao.UpdateStartTime(name, startTime)
-	require.NoError(t, err)
-}
-
 func TestNextSeq(t *testing.T) {
 	dirpath := filez.MkTempDir("", "")
 	defer os.RemoveAll(dirpath)
-	dao := initConfigDao(t, dirpath)
+	dao := initSuiteDao(t, dirpath)
 
-	initSuite(t, dao, "foo")
-	initSuite(t, dao, "bar")
-	initSuite(t, dao, "baz")
+	addSuite(t, dao, "foo")
+	addSuite(t, dao, "bar")
+	addSuite(t, dao, "baz")
 
 	var s int
 	var err error
@@ -176,11 +176,11 @@ func TestNextSeq(t *testing.T) {
 func TestUpdateEndTime(t *testing.T) {
 	dirpath := filez.MkTempDir("", "")
 	defer os.RemoveAll(dirpath)
-	dao := initConfigDao(t, dirpath)
+	dao := initSuiteDao(t, dirpath)
 
 	verifyQuery := "SELECT endTime from suite where name = ? AND endTime > 0"
 	expectedSuite := "foo"
-	initSuite(t, dao, expectedSuite)
+	addSuite(t, dao, expectedSuite)
 
 	row := dao.db.QueryRow(verifyQuery, expectedSuite)
 	var endTime int64
@@ -202,11 +202,11 @@ func TestUpdateEndTime(t *testing.T) {
 func TestUpdateOutcome(t *testing.T) {
 	dirpath := filez.MkTempDir("", "")
 	defer os.RemoveAll(dirpath)
-	dao := initConfigDao(t, dirpath)
+	dao := initSuiteDao(t, dirpath)
 
 	verifyQuery := "SELECT outcome from suite where name = ? AND outcome <> ''"
 	expectedSuite := "foo"
-	initSuite(t, dao, expectedSuite)
+	addSuite(t, dao, expectedSuite)
 
 	row := dao.db.QueryRow(verifyQuery, expectedSuite)
 	var outcome string
@@ -228,11 +228,11 @@ func TestUpdateOutcome(t *testing.T) {
 func TestDelete(t *testing.T) {
 	dirpath := filez.MkTempDir("", "")
 	defer os.RemoveAll(dirpath)
-	dao := initConfigDao(t, dirpath)
+	dao := initSuiteDao(t, dirpath)
 
-	initSuite(t, dao, "foo")
-	initSuite(t, dao, "bar")
-	initSuite(t, dao, "baz")
+	addSuite(t, dao, "foo")
+	addSuite(t, dao, "bar")
+	addSuite(t, dao, "baz")
 
 	verifyQuery := "SELECT count(*) from suite"
 	row := dao.db.QueryRow(verifyQuery)
@@ -253,16 +253,16 @@ func TestDelete(t *testing.T) {
 func TestListPassedFailedErrored(t *testing.T) {
 	dirpath := filez.MkTempDir("", "")
 	defer os.RemoveAll(dirpath)
-	dao := initConfigDao(t, dirpath)
+	dao := initSuiteDao(t, dirpath)
 
-	initSuiteWithOutcome(t, dao, "p1", "PASSED", time.Now())
-	initSuiteWithOutcome(t, dao, "f1", "FAILED", time.Now())
-	initSuiteWithOutcome(t, dao, "e1", "ERRORED", time.Now())
-	initSuiteWithOutcome(t, dao, "t1", "TIMEOUTED", time.Now())
-	initSuiteWithOutcome(t, dao, "e2", "ERRORED", time.Now())
-	initSuiteWithOutcome(t, dao, "f2", "FAILED", time.Now())
-	initSuiteWithOutcome(t, dao, "p2", "PASSED", time.Now())
-	initSuiteWithOutcome(t, dao, "t2", "TIMEOUTED", time.Now())
+	addSuiteWithOutcome(t, dao, "p1", "PASSED", time.Now())
+	addSuiteWithOutcome(t, dao, "f1", "FAILED", time.Now())
+	addSuiteWithOutcome(t, dao, "e1", "ERRORED", time.Now())
+	addSuiteWithOutcome(t, dao, "t1", "TIMEOUTED", time.Now())
+	addSuiteWithOutcome(t, dao, "e2", "ERRORED", time.Now())
+	addSuiteWithOutcome(t, dao, "f2", "FAILED", time.Now())
+	addSuiteWithOutcome(t, dao, "p2", "PASSED", time.Now())
+	addSuiteWithOutcome(t, dao, "t2", "TIMEOUTED", time.Now())
 
 	suites, err := dao.ListPassedFailedErrored()
 	require.NoError(t, err)
