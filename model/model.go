@@ -26,7 +26,7 @@ type TestDefinition struct {
 	Config      Config
 	SuitePrefix string
 	CmdArgs     []string
-	//Assertions []Assertion
+	Rules       []Rule
 }
 
 type ReportDefinition struct {

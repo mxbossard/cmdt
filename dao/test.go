@@ -3,6 +3,7 @@ package dao
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
 	"mby.fr/cmdtest/model"
@@ -22,7 +23,6 @@ type Test struct {
 func (d Test) init() (err error) {
 	_, err = d.db.Exec(`
 		CREATE TABLE IF NOT EXISTS tested (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			suite TEXT NOT NULL,
 			seq INTEGER NOT NULL,
 			name TEXT NOT NULL,
@@ -38,12 +38,16 @@ func (d Test) init() (err error) {
 			stdout TEXT NOT NULL DEFAULT '',
 			stderr TEXT NOT NULL DEFAULT '',
 			report TEXT NOT NULL DEFAULT '',
+			PRIMARY KEY (suite, seq),
 			FOREIGN KEY(suite) REFERENCES suite(name)
 		);
 
+		CREATE INDEX IF NOT EXISTS tested_suite_idx ON tested(suite);
+
 		CREATE TABLE IF NOT EXISTS assertion_result (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			testId INTEGER NOT NULL,
+			suite TEXT NOT NULL,
+			seq INTEGER NOT NULL,
 			prefix TEXT NOT NULL,
 			name TEXT NOT NULL,
 			op TEXT NOT NULL DEFAULT '',
@@ -52,8 +56,10 @@ func (d Test) init() (err error) {
 			errorMsg TEXT NOT NULL DEFAULT '',
 			success INTEGER NOT NULL,
 
-			FOREIGN KEY(testId) REFERENCES test(id)
-		);		
+			FOREIGN KEY(suite, seq) REFERENCES tested(suite, seq)
+		);	
+
+		CREATE UNIQUE INDEX IF NOT EXISTS assertion_result_fk_idx ON assertion_result(suite, seq);
 	`)
 	return
 }
@@ -83,8 +89,8 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 
 	rows, err := tx.Query(`
 		SELECT t.title, t.outcome, a.prefix, a.name, a.op, a.expected, a.value, a.errorMsg, a.success
-		FROM assertion_result a INNER JOIN tested t ON a.testId = t.id
-		WHERE t.name = @suite 
+		FROM assertion_result a INNER JOIN tested t ON a.suite = t.suite AND a.seq = t.seq
+		WHERE t.suite = @suite 
 	`, sql.Named("suite", suite))
 	if err != nil {
 		return
@@ -175,22 +181,59 @@ func (d Test) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 	stdout := outcome.Stdout
 	stderr := outcome.Stderr
 	report := "NO REPORT"
-	_, err = d.db.Exec(`
+
+	tx, err := d.db.Begin()
+	if err != nil {
+		return
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec(`
 		INSERT INTO tested(suite, seq, name, title, errorMsg, duration, outcome, passed, ignored, failed, errored, exitCode, stdout, stderr, report) 
 		VALUES (@suite, @seq, @name, @title, @errorMsg, @micros, @outcome, @passed, @ignored, @failed, @errored, @exitCode, @stdout, @stderr, @report);
-	`, sql.Named("suite", suite), sql.Named("seq", seq), sql.Named("name", name), sql.Named("title", title),
-		sql.Named("errorMsg", errorMsg), sql.Named("micros", micros), sql.Named("outcome", oc),
+	`, sql.Named("suite", suite), sql.Named("seq", seq), sql.Named("name", name),
+		sql.Named("title", title), sql.Named("errorMsg", errorMsg),
+		sql.Named("micros", micros), sql.Named("outcome", oc),
 		sql.Named("passed", passed), sql.Named("ignored", ignored),
 		sql.Named("failed", failed), sql.Named("errored", errored),
 		sql.Named("exitCode", exitCode), sql.Named("stdout", stdout),
 		sql.Named("stderr", stderr), sql.Named("report", report))
+	if err != nil {
+		return
+	}
+
+	for _, res := range outcome.AssertionResults {
+		rule := res.Assertion.Rule
+		rulePrefix := rule.Prefix
+		ruleName := rule.Name
+		ruleOp := rule.Op
+		ruleExpected := rule.Expected
+		value := res.Value
+		errorMsg := res.ErrMessage
+		success := res.Success
+		_, err = tx.Exec(`
+			INSERT INTO assertion_result(suite, seq, prefix, name, op, expected, value, errorMsg, success) 
+			VALUES (@suite, @seq, @rulePrefix, @ruleName, @ruleOp, @ruleExpected, @value, @errorMsg, @success)
+		`, sql.Named("suite", suite), sql.Named("seq", seq),
+			sql.Named("rulePrefix", rulePrefix), sql.Named("ruleName", ruleName),
+			sql.Named("ruleOp", ruleOp), sql.Named("ruleExpected", ruleExpected),
+			sql.Named("value", value), sql.Named("errorMsg", errorMsg),
+			sql.Named("success", success))
+		if err != nil {
+			return
+		}
+		log.Printf("Inserted assertion result, %v\n", res)
+	}
+
+	err = tx.Commit()
+
 	return
 }
 
 func (d Test) ClearSuite(suite string) (err error) {
 	_, err = d.db.Exec(`
 		DELETE FROM assertion_result
-		WHERE testId IN (select id from tested where suite = @suite);
+		WHERE suite = @suite;
 		DELETE FROM tested
 		WHERE suite = @suite;
 	`, sql.Named("suite", suite))
