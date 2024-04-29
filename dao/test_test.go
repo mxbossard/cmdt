@@ -110,6 +110,17 @@ func TestGetSuiteOutcome(t *testing.T) {
 	suiteDao.UpdateEndTime(expectedSuite1, expectedEndTime1)
 	suiteDao.UpdateEndTime(expectedSuite2, expectedEndTime2)
 
+	var count int
+	row := dao.db.QueryRow("SELECT count(*) FROM assertion_result WHERE suite = ?", expectedSuite1)
+	err := row.Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 4, count)
+
+	row = dao.db.QueryRow("SELECT count(*) FROM assertion_result WHERE suite = ?", expectedSuite2)
+	err = row.Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+
 	outcome, err := dao.GetSuiteOutcome(expectedSuite1)
 	require.NoError(t, err)
 	assert.Equal(t, expectedSuite1, outcome.TestSuite)
@@ -119,7 +130,7 @@ func TestGetSuiteOutcome(t *testing.T) {
 	assert.Equal(t, uint32(1), outcome.PassedCount)
 	assert.Equal(t, uint32(4), outcome.TestCount)
 	assert.Equal(t, expectedDuration1, outcome.Duration)
-	assert.Len(t, outcome.FailureReports, 3)
+	assert.Len(t, outcome.FailureReports, 4)
 
 	outcome, err = dao.GetSuiteOutcome(expectedSuite2)
 	require.NoError(t, err)

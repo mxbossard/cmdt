@@ -38,6 +38,7 @@ func (d Test) init() (err error) {
 			stdout TEXT NOT NULL DEFAULT '',
 			stderr TEXT NOT NULL DEFAULT '',
 			report TEXT NOT NULL DEFAULT '',
+
 			PRIMARY KEY (suite, seq),
 			FOREIGN KEY(suite) REFERENCES suite(name)
 		);
@@ -89,7 +90,7 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 
 	rows, err := tx.Query(`
 		SELECT t.title, t.outcome, a.prefix, a.name, a.op, a.expected, a.value, a.errorMsg, a.success
-		FROM assertion_result a INNER JOIN tested t ON a.suite = t.suite AND a.seq = t.seq
+		FROM assertion_result a JOIN tested t ON a.suite = t.suite AND a.seq = t.seq
 		WHERE t.suite = @suite 
 	`, sql.Named("suite", suite))
 	if err != nil {
@@ -97,25 +98,11 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 	}
 	defer rows.Close()
 
-	row = tx.QueryRow(`
-		SELECT startTime, endTime
-		FROM suite
-		WHERE name = @suite 
-	`, sql.Named("suite", suite))
-	err = row.Scan(&startTime, &endTime)
-	if err != nil {
-		return
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return
-	}
-
 	for rows.Next() {
 		if err = rows.Scan(&title, &oc, &prefix, &name, &op, &expected, &value, &errorMsg, &success); err != nil {
 			return
 		}
+		log.Printf("Found assertion result for suite: %s, %v\n", suite, name)
 		ocm := model.Outcome(oc)
 		var message string
 		switch ocm {
@@ -136,6 +123,20 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 		failedAssertionsMessages = append(failedAssertionsMessages, message)
 	}
 
+	row = tx.QueryRow(`
+		SELECT startTime, endTime
+		FROM suite
+		WHERE name = @suite 
+	`, sql.Named("suite", suite))
+	err = row.Scan(&startTime, &endTime)
+	if err != nil {
+		return
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return
+	}
 	testCount := passedCount + failedCount + erroredCount + ignoredCount
 	duration := time.Duration((endTime - startTime) * 1000)
 	var ocm model.Outcome
@@ -169,7 +170,7 @@ func (d Test) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 	title := outcome.CmdTitle
 	errorMsg := ""
 	if outcome.Err != nil {
-		outcome.Err.Error()
+		errorMsg = outcome.Err.Error()
 	}
 	micros := outcome.Duration.Microseconds()
 	oc := outcome.Outcome
@@ -222,7 +223,7 @@ func (d Test) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 		if err != nil {
 			return
 		}
-		log.Printf("Inserted assertion result, %v\n", res)
+		log.Printf("Inserted assertion result (%s, %d), %v\n", suite, seq, res)
 	}
 
 	err = tx.Commit()
