@@ -16,17 +16,27 @@ type Validater[T any] func(rule Rule, value T) error
 
 type Asserter func(cmdz.Executer) (AssertionResult, error)
 
+type TestSignature struct {
+	TestSuite  string
+	Seq        uint16
+	TestName   string
+	CmdAndArgs []string
+	//CmdTitle   string
+}
+
 type TestDefinition struct {
-	Ppid        uint32
-	Token       string
-	Isolation   string
-	TestSuite   string
-	TestName    string
-	Seq         uint16
-	Config      Config
-	SuitePrefix string
-	CmdArgs     []string
-	Rules       []Rule
+	TestSignature
+
+	Ppid      uint32
+	Token     string
+	Isolation string
+	//TestSuite string
+	//TestName  string
+	//Seq       uint16
+	Config Config
+	//SuitePrefix string
+	CmdArgs []string
+	Rules   []Rule
 }
 
 type ReportDefinition struct {
@@ -37,12 +47,12 @@ type ReportDefinition struct {
 }
 
 type TestOutcome struct {
-	TestDefinition
+	TestSignature
 	//TestSuite string
 	//TestName  string
 	//Seq       int
 	//TestQualifiedName string
-	CmdTitle         string
+	//CmdTitle         string
 	ExitCode         int16
 	Err              error
 	Duration         time.Duration
@@ -52,12 +62,34 @@ type TestOutcome struct {
 	AssertionResults []AssertionResult
 }
 
+func NewTestOutcome(suite string, seq uint16, name string, cmdAndArgs []string,
+	stdout, stderr string, exitCode int16, outcome Outcome, duration time.Duration,
+	err error, results []AssertionResult) TestOutcome {
+	sign := TestSignature{
+		TestSuite:  suite,
+		Seq:        seq,
+		TestName:   name,
+		CmdAndArgs: cmdAndArgs,
+	}
+	to := TestOutcome{
+		TestSignature:    sign,
+		AssertionResults: results,
+		//CmdTitle:         cmdTitle,
+		ExitCode: exitCode,
+		Stdout:   stdout,
+		Stderr:   stderr,
+		Outcome:  outcome,
+		Duration: duration,
+		Err:      err,
+	}
+	return to
+}
+
 type SuiteOutcome struct {
 	TestSuite string
 	//ExitCode    uint16
 	Duration time.Duration
 	//Err         error
-	FailureReports []string
 	TestCount      uint32
 	PassedCount    uint32
 	FailedCount    uint32
@@ -65,6 +97,8 @@ type SuiteOutcome struct {
 	IgnoredCount   uint32
 	TooMuchCount   uint32
 	Outcome        Outcome
+	FailureReports []string
+	TestOutcomes   []TestOutcome
 }
 
 type Rule struct {

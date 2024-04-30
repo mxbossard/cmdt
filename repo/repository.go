@@ -234,10 +234,10 @@ func (r FileRepo) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 	case model.FAILED:
 		failedAssertionsReport := ""
 		for _, result := range outcome.AssertionResults {
-			assertPrefix := result.Assertion.Prefix
-			assertName := result.Assertion.Name
-			assertOp := result.Assertion.Op
-			expected := result.Assertion.Expected
+			assertPrefix := result.Rule.Prefix
+			assertName := result.Rule.Name
+			assertOp := result.Rule.Op
+			expected := result.Rule.Expected
 			failedAssertionsReport += assertPrefix + assertName + assertOp + expected + " "
 		}
 		_, err = reportLog.WriteString(testTitle + "  => " + failedAssertionsReport)

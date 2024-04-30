@@ -191,7 +191,7 @@ func PerformTest(testDef model.TestDefinition) (exitCode int16, err error) {
 	}
 
 	// Build assertions
-	_, assertions, agg := ParseArgs(testDef.SuitePrefix, testDef.CmdArgs)
+	_, assertions, agg := ParseArgs(testDef.Config.Prefix.Get(), testDef.CmdArgs)
 	if agg.GotError() {
 		err = agg.Return()
 		return
@@ -442,14 +442,19 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 		token = testCtx.Token
 
 		testDef := model.TestDefinition{
-			Ppid:        ppid,
-			Token:       token,
-			Isolation:   isolation,
-			TestSuite:   testSuite,
-			Seq:         seq,
-			Config:      testCfg,
-			SuitePrefix: testCtx.Suite.Config.Prefix.Get(),
-			CmdArgs:     signifientArgs,
+			TestSignature: model.TestSignature{
+				TestSuite:  testSuite,
+				Seq:        seq,
+				TestName:   testCfg.TestName.GetOr(""),
+				CmdAndArgs: testCfg.CmdAndArgs,
+			},
+			Ppid:      ppid,
+			Token:     token,
+			Isolation: isolation,
+
+			Config: testCfg,
+			//SuitePrefix: testCtx.Suite.Config.Prefix.Get(),
+			CmdArgs: signifientArgs,
 		}
 
 		if testCfg.Async.Is(false) {

@@ -167,10 +167,10 @@ func (d BasicDisplay) assertionResult(result model.AssertionResult) {
 	defer d.Flush()
 	hlClr := reportColor
 	//log.Printf("failedResult: %v\n", result)
-	assertPrefix := result.Assertion.Prefix
-	assertName := result.Assertion.Name
-	assertOp := result.Assertion.Op
-	expected := result.Assertion.Expected
+	assertPrefix := result.Rule.Prefix
+	assertName := result.Rule.Name
+	assertOp := result.Rule.Op
+	expected := result.Rule.Expected
 	got := result.Value
 
 	if result.ErrMessage != "" {

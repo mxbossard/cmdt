@@ -16,8 +16,27 @@ type Assertion struct {
 }
 
 type AssertionResult struct {
-	Assertion  Assertion
+	Rule
+	//Assertion  Assertion
 	Success    bool
 	Value      any
 	ErrMessage string
+}
+
+func NewAssertionResult(prefix, name, op, expected string, value any, success bool,
+	errorMsg string) AssertionResult {
+	rule := Rule{
+		Prefix:   prefix,
+		Name:     name,
+		Op:       op,
+		Expected: expected,
+	}
+	res := AssertionResult{
+		Rule:       rule,
+		Success:    success,
+		Value:      value,
+		ErrMessage: errorMsg,
+	}
+
+	return res
 }

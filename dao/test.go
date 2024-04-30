@@ -26,7 +26,7 @@ func (d Test) init() (err error) {
 			suite TEXT NOT NULL,
 			seq INTEGER NOT NULL,
 			name TEXT NOT NULL,
-			title TEXT NOT NULL,
+			cmdTitle TEXT NOT NULL,
 			outcome TEXT NOT NULL,
 			errorMsg TEXT NOT NULL DEFAULT '',
 			duration INTEGER NOT NULL DEFAULT -1,
@@ -67,10 +67,12 @@ func (d Test) init() (err error) {
 
 func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err error) {
 	var passedCount, failedCount, erroredCount, ignoredCount uint32
-	var title, oc, prefix, name, op, expected, value, errorMsg string
+	var testName, cmdTitle, testOc, stdout, stderr, testErrorMsg, prefix, assertName, op, expected, value, assertErrorMsg string
 	var success bool
-	var startTime, endTime int64
-	var failedAssertionsMessages []string
+	var startTime, endTime, testDuration int64
+	var seq uint16
+	var exitCode int16
+	//var failedAssertionsMessages []string
 
 	tx, err := d.db.Begin()
 	if err != nil {
@@ -89,38 +91,67 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 	}
 
 	rows, err := tx.Query(`
-		SELECT t.title, t.outcome, a.prefix, a.name, a.op, a.expected, a.value, a.errorMsg, a.success
+		SELECT t.seq, t.name, t.cmdTitle, t.outcome, t.exitCode, t.errorMsg, t.duration, 
+			t.stdout, t.stderr,	a.prefix, a.name, a.op, a.expected, a.value, a.errorMsg, a.success
 		FROM assertion_result a JOIN tested t ON a.suite = t.suite AND a.seq = t.seq
 		WHERE t.suite = @suite 
+		ORDER BY t.seq ASC
 	`, sql.Named("suite", suite))
 	if err != nil {
 		return
 	}
 	defer rows.Close()
 
+	testOutcomeBySeq := make(map[uint16]model.TestOutcome)
 	for rows.Next() {
-		if err = rows.Scan(&title, &oc, &prefix, &name, &op, &expected, &value, &errorMsg, &success); err != nil {
+		if err = rows.Scan(&seq, &testName, &cmdTitle, &testOc, exitCode, testErrorMsg, testDuration,
+			stdout, stderr, &prefix, &assertName, &op, &expected, &value, &assertErrorMsg, &success); err != nil {
 			return
 		}
-		log.Printf("Found assertion result for suite: %s, %v\n", suite, name)
-		ocm := model.Outcome(oc)
-		var message string
-		switch ocm {
-		case model.PASSED:
-			// Nothing to do
-		case model.FAILED:
-			message = title + "  => " + prefix + name + op + expected
-		case model.IGNORED:
-			// Nothing to do
-		case model.ERRORED:
-			message = title + "  => not executed"
-		case model.TIMEOUT:
-			message = title + "  => timed out"
-		default:
-			err = fmt.Errorf("outcome %s not supported", ocm)
+
+		var testOutcome model.TestOutcome
+		if testOutcome, ok := testOutcomeBySeq[seq]; !ok {
+			label := model.TestLabel{
+				TestSuite: suite,
+				Seq:       seq,
+				TestName:  testName,
+				CmdTitle:  cmdTitle,
+			}
+			testOutcome = model.TestOutcome{
+				TestLabel: label,
+				Outcome:   model.Outcome(testOc),
+				ExitCode:  exitCode,
+				Err:       fmt.Errorf(testErrorMsg),
+				Duration:  time.Duration(testDuration * 1000),
+				Stdout:    stdout,
+				Stderr:    stderr,
+			}
+			testOutcomeBySeq[seq] = testOutcome
 		}
 
-		failedAssertionsMessages = append(failedAssertionsMessages, message)
+		res := model.NewAssertionResult(prefix, assertName, op, expected, value, success, assertErrorMsg)
+		testOutcome.AssertionResults = append(testOutcome.AssertionResults, res)
+
+		/*
+			ocm := model.Outcome(oc)
+			var message string
+			switch ocm {
+			case model.PASSED:
+				// Nothing to do
+			case model.FAILED:
+				message = testName + "  => " + prefix + assertName + op + expected
+			case model.IGNORED:
+				// Nothing to do
+			case model.ERRORED:
+				message = testName + "  => not executed"
+			case model.TIMEOUT:
+				message = testName + "  => timed out"
+			default:
+				err = fmt.Errorf("outcome %s not supported", ocm)
+			}
+
+			outcome.FailureReports = append(outcome.FailureReports, message)
+		*/
 	}
 
 	row = tx.QueryRow(`
@@ -158,7 +189,7 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 	outcome.ErroredCount = erroredCount
 	outcome.IgnoredCount = ignoredCount
 	outcome.Outcome = ocm
-	outcome.FailureReports = failedAssertionsMessages
+	//outcome.FailureReports = failedAssertionsMessages
 
 	return
 }
@@ -204,7 +235,7 @@ func (d Test) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 	}
 
 	for _, res := range outcome.AssertionResults {
-		rule := res.Assertion.Rule
+		rule := res.Rule
 		rulePrefix := rule.Prefix
 		ruleName := rule.Name
 		ruleOp := rule.Op

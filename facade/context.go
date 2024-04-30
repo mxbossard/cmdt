@@ -279,7 +279,7 @@ func (c TestContext) AssertCmdExecBlocking(seq uint16, assertions []model.Assert
 		for _, assertion := range assertions {
 			var result model.AssertionResult
 			result, err = assertion.Asserter(c.CmdExec)
-			result.Assertion = assertion
+			result.Rule = assertion.Rule
 			if err != nil {
 				// FIXME: aggregate errors
 				result.ErrMessage += fmt.Sprintf("%s ", err)
