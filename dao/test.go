@@ -4,10 +4,16 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"mby.fr/cmdtest/model"
+	"mby.fr/utils/collections"
 	"mby.fr/utils/zql"
+)
+
+const (
+	CMD_AND_ARGS_SEPARATOR = ","
 )
 
 func NewTest(db *zql.SynchronizedDB) (d Test, err error) {
@@ -26,7 +32,7 @@ func (d Test) init() (err error) {
 			suite TEXT NOT NULL,
 			seq INTEGER NOT NULL,
 			name TEXT NOT NULL,
-			cmdTitle TEXT NOT NULL,
+			cmdAndArgs TEXT NOT NULL,
 			outcome TEXT NOT NULL,
 			errorMsg TEXT NOT NULL DEFAULT '',
 			duration INTEGER NOT NULL DEFAULT -1,
@@ -60,14 +66,14 @@ func (d Test) init() (err error) {
 			FOREIGN KEY(suite, seq) REFERENCES tested(suite, seq)
 		);	
 
-		CREATE UNIQUE INDEX IF NOT EXISTS assertion_result_fk_idx ON assertion_result(suite, seq);
+		CREATE INDEX IF NOT EXISTS assertion_result_fk_idx ON assertion_result(suite, seq);
 	`)
 	return
 }
 
 func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err error) {
 	var passedCount, failedCount, erroredCount, ignoredCount uint32
-	var testName, cmdTitle, testOc, stdout, stderr, testErrorMsg, prefix, assertName, op, expected, value, assertErrorMsg string
+	var testName, cmdAndArgs, testOc, stdout, stderr, testErrorMsg, prefix, assertName, op, expected, value, assertErrorMsg string
 	var success bool
 	var startTime, endTime, testDuration int64
 	var seq uint16
@@ -91,9 +97,11 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 	}
 
 	rows, err := tx.Query(`
-		SELECT t.seq, t.name, t.cmdTitle, t.outcome, t.exitCode, t.errorMsg, t.duration, 
-			t.stdout, t.stderr,	a.prefix, a.name, a.op, a.expected, a.value, a.errorMsg, a.success
-		FROM assertion_result a JOIN tested t ON a.suite = t.suite AND a.seq = t.seq
+		SELECT t.seq, t.name, t.cmdAndArgs, t.outcome, t.exitCode, t.errorMsg, t.duration, 
+			t.stdout, t.stderr,	COALESCE(a.prefix, ''), COALESCE(a.name, ''), COALESCE(a.op, ''), 
+			COALESCE(a.expected, ''), COALESCE(a.value, ''), COALESCE(a.errorMsg, ''), 
+			COALESCE(a.success, 0)
+		FROM tested t LEFT JOIN assertion_result a ON a.suite = t.suite AND a.seq = t.seq
 		WHERE t.suite = @suite 
 		ORDER BY t.seq ASC
 	`, sql.Named("suite", suite))
@@ -104,54 +112,38 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 
 	testOutcomeBySeq := make(map[uint16]model.TestOutcome)
 	for rows.Next() {
-		if err = rows.Scan(&seq, &testName, &cmdTitle, &testOc, exitCode, testErrorMsg, testDuration,
-			stdout, stderr, &prefix, &assertName, &op, &expected, &value, &assertErrorMsg, &success); err != nil {
+		if err = rows.Scan(&seq, &testName, &cmdAndArgs, &testOc, &exitCode, &testErrorMsg,
+			&testDuration, &stdout, &stderr, &prefix, &assertName, &op, &expected, &value,
+			&assertErrorMsg, &success); err != nil {
 			return
 		}
-
+		cmdAndArgsArray := strings.Split(cmdAndArgs, CMD_AND_ARGS_SEPARATOR)
 		var testOutcome model.TestOutcome
-		if testOutcome, ok := testOutcomeBySeq[seq]; !ok {
-			label := model.TestLabel{
-				TestSuite: suite,
-				Seq:       seq,
-				TestName:  testName,
-				CmdTitle:  cmdTitle,
+		var ok bool
+		if testOutcome, ok = testOutcomeBySeq[seq]; !ok {
+			sign := model.TestSignature{
+				TestSuite:  suite,
+				Seq:        seq,
+				TestName:   testName,
+				CmdAndArgs: cmdAndArgsArray,
 			}
 			testOutcome = model.TestOutcome{
-				TestLabel: label,
-				Outcome:   model.Outcome(testOc),
-				ExitCode:  exitCode,
-				Err:       fmt.Errorf(testErrorMsg),
-				Duration:  time.Duration(testDuration * 1000),
-				Stdout:    stdout,
-				Stderr:    stderr,
+				TestSignature: sign,
+				Outcome:       model.Outcome(testOc),
+				ExitCode:      exitCode,
+				Err:           fmt.Errorf(testErrorMsg),
+				Duration:      time.Duration(testDuration * 1000),
+				Stdout:        stdout,
+				Stderr:        stderr,
 			}
 			testOutcomeBySeq[seq] = testOutcome
 		}
 
-		res := model.NewAssertionResult(prefix, assertName, op, expected, value, success, assertErrorMsg)
-		testOutcome.AssertionResults = append(testOutcome.AssertionResults, res)
-
-		/*
-			ocm := model.Outcome(oc)
-			var message string
-			switch ocm {
-			case model.PASSED:
-				// Nothing to do
-			case model.FAILED:
-				message = testName + "  => " + prefix + assertName + op + expected
-			case model.IGNORED:
-				// Nothing to do
-			case model.ERRORED:
-				message = testName + "  => not executed"
-			case model.TIMEOUT:
-				message = testName + "  => timed out"
-			default:
-				err = fmt.Errorf("outcome %s not supported", ocm)
-			}
-
-			outcome.FailureReports = append(outcome.FailureReports, message)
-		*/
+		if assertName != "" {
+			res := model.NewAssertionResult(prefix, assertName, op, expected, value, success, assertErrorMsg)
+			testOutcome.AssertionResults = append(testOutcome.AssertionResults, res)
+			testOutcomeBySeq[seq] = testOutcome
+		}
 	}
 
 	row = tx.QueryRow(`
@@ -190,6 +182,7 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 	outcome.IgnoredCount = ignoredCount
 	outcome.Outcome = ocm
 	//outcome.FailureReports = failedAssertionsMessages
+	outcome.TestOutcomes = collections.MapOrderedValues(testOutcomeBySeq)
 
 	return
 }
@@ -198,7 +191,7 @@ func (d Test) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 	seq := outcome.Seq
 	suite := outcome.TestSuite
 	name := outcome.TestName
-	title := outcome.CmdTitle
+	cmdAndArgs := strings.Join(outcome.CmdAndArgs, CMD_AND_ARGS_SEPARATOR)
 	errorMsg := ""
 	if outcome.Err != nil {
 		errorMsg = outcome.Err.Error()
@@ -221,10 +214,10 @@ func (d Test) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 	defer tx.Rollback()
 
 	_, err = tx.Exec(`
-		INSERT INTO tested(suite, seq, name, title, errorMsg, duration, outcome, passed, ignored, failed, errored, exitCode, stdout, stderr, report) 
-		VALUES (@suite, @seq, @name, @title, @errorMsg, @micros, @outcome, @passed, @ignored, @failed, @errored, @exitCode, @stdout, @stderr, @report);
+		INSERT INTO tested(suite, seq, name, cmdAndArgs, errorMsg, duration, outcome, passed, ignored, failed, errored, exitCode, stdout, stderr, report) 
+		VALUES (@suite, @seq, @name, @cmdAndArgs, @errorMsg, @micros, @outcome, @passed, @ignored, @failed, @errored, @exitCode, @stdout, @stderr, @report);
 	`, sql.Named("suite", suite), sql.Named("seq", seq), sql.Named("name", name),
-		sql.Named("title", title), sql.Named("errorMsg", errorMsg),
+		sql.Named("cmdAndArgs", cmdAndArgs), sql.Named("errorMsg", errorMsg),
 		sql.Named("micros", micros), sql.Named("outcome", oc),
 		sql.Named("passed", passed), sql.Named("ignored", ignored),
 		sql.Named("failed", failed), sql.Named("errored", errored),
