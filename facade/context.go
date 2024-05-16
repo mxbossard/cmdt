@@ -21,7 +21,17 @@ import (
 
 var logger = slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 
+var (
+	g *GlobalContext
+	s *SuiteContext
+	t *TestContext
+)
+
 func NewGlobalContext(token, isolation string, inputCfg model.Config) GlobalContext {
+	if g != nil {
+		return *g
+	}
+
 	var err error
 	token, err = utils.ForgeContextualToken(token)
 	if err != nil {
@@ -42,11 +52,15 @@ func NewGlobalContext(token, isolation string, inputCfg model.Config) GlobalCont
 		Repo:      repo,
 		Config:    cfg,
 	}
-
+	g = &c
 	return c
 }
 
 func NewSuiteContext(token, isolation, testSuite string, initless bool, action model.Action, inputCfg model.Config) SuiteContext {
+	if s != nil {
+		return *s
+	}
+
 	globalCtx := NewGlobalContext(token, isolation, model.Config{})
 	suiteCfg, err := globalCtx.Repo.GetSuiteConfig(testSuite, initless)
 	if err != nil {
@@ -65,10 +79,15 @@ func NewSuiteContext(token, isolation, testSuite string, initless bool, action m
 		GlobalContext: globalCtx,
 		Action:        action,
 	}
+	s = &suiteCtx
 	return suiteCtx
 }
 
-func NewTestContext(token, isolation, testSuite string, inputCfg model.Config, ppid uint32) TestContext {
+func NewTestContext(token, isolation, testSuite string, seq uint16, inputCfg model.Config, ppid uint32) TestContext {
+	if t != nil {
+		return *t
+	}
+
 	suiteCtx := NewSuiteContext(token, isolation, testSuite, true, model.TestAction, model.Config{})
 	mergedCfg := suiteCtx.Config
 	mergedCfg.Merge(inputCfg)
@@ -78,6 +97,7 @@ func NewTestContext(token, isolation, testSuite string, inputCfg model.Config, p
 	}
 	testCtx.Config = mergedCfg
 	testCtx.Suite = suiteCtx
+	testCtx.Seq = seq
 	//logger.Warn("NewTestContext", "testCtx", testCtx)
 	err := testCtx.initExecuter(ppid)
 	if err != nil {
@@ -90,18 +110,22 @@ func NewTestContext(token, isolation, testSuite string, inputCfg model.Config, p
 		_, testCtx.ContainerImage = utils.ReadEnvValue(model.EnvContainerImageKey)
 	}
 
+	if testCtx.Seq == 0 {
+		testCtx.Seq = testCtx.IncrementTestCount()
+	}
+	t = &testCtx
 	return testCtx
 }
 
 func NewTestContext2(testDef model.TestDefinition) (ctx TestContext) {
-	return NewTestContext(testDef.Token, testDef.Isolation, testDef.TestSuite, testDef.Config, testDef.Ppid)
+	return NewTestContext(testDef.Token, testDef.Isolation, testDef.TestSuite, testDef.Seq, testDef.Config, testDef.Ppid)
 }
 
 type GlobalContext struct {
 	Token     string
 	Isolation string
 
-	Repo   repo.FileRepo
+	Repo   repo.Repo
 	Config model.Config
 }
 
@@ -179,7 +203,7 @@ func (c SuiteContext) NoErrorOrFatal(err error) {
 			c.Fatal(err)
 			return nil
 		})
-		log.Fatal(err)
+		c.Fatal(err)
 	}
 }
 
@@ -187,18 +211,34 @@ type TestContext struct {
 	SuiteContext
 	Suite SuiteContext
 
+	Seq uint16
+
 	//MockDir        string
 	ContainerId    string
 	ContainerScope string
 	ContainerImage string
 	CmdExec        cmdz.Executer
-	TestOutcome    utilz.AnyOptional[model.TestOutcome]
+	//TestOutcome    utilz.AnyOptional[model.TestOutcome]
 }
 
 func (c TestContext) TestId() (id string) {
 	// TODO
 	log.Fatal("not implemented yet")
 	return
+}
+
+func (c TestContext) NoErrorOrFatal(err error) {
+	if err != nil {
+		outcome := model.NewTestOutcome2(c.Config, c.Seq)
+		outcome.Outcome = model.ERRORED
+		outcome.Err = err
+		err2 := c.Repo.SaveTestOutcome(outcome)
+		if err2 != nil {
+			c.Fatal(err2)
+		}
+		c.Fatal(err)
+	}
+	c.SuiteContext.NoErrorOrFatal(err)
 }
 
 func (c TestContext) ProcessTooMuchFailures() (n uint32) {

@@ -26,7 +26,8 @@ func (d Suite) init() (err error) {
 			name TEXT UNIQUE NOT NULL,
 			config BLOB NOT NULL,
 			startTime INTEGER NOT NULL DEFAULT 0,
-			seq INTEGER NOT NULL DEFAULT 0,
+			seq INTEGER NOT NULL DEFAULT 1,
+			tooMuch INTEGER NOT NULL DEFAULT 0,
 			endTime INTEGER NOT NULL DEFAULT 0,
 			outcome TEXT NOT NULL DEFAULT ''
 		);
@@ -34,16 +35,16 @@ func (d Suite) init() (err error) {
 	return
 }
 
-func (d Suite) NextSeq(suite string) (seq int, err error) {
+func (d Suite) NextSeq(suite string) (seq uint32, err error) {
 	tx, err := d.db.Begin()
 	if err != nil {
 		return
 	}
 	defer tx.Rollback()
 	row := tx.QueryRow(`
-		SELECT seq
-		FROM suite
-		WHERE name = ?
+		SELECT s.seq
+		FROM suite s
+		WHERE s.name = ?
 	`, suite)
 	err = row.Scan(&seq)
 	if err != nil {
@@ -54,6 +55,49 @@ func (d Suite) NextSeq(suite string) (seq int, err error) {
 		WHERE name = ?
 	`, seq+1, suite)
 	err = tx.Commit()
+	return
+}
+
+func (d Suite) IncrementTooMuchCount(suite string) (seq uint32, err error) {
+	tx, err := d.db.Begin()
+	if err != nil {
+		return
+	}
+	defer tx.Rollback()
+	row := tx.QueryRow(`
+		SELECT tooMuch
+		FROM suite s
+		WHERE s.name = ?
+	`, suite)
+	err = row.Scan(&seq)
+	if err != nil {
+		return
+	}
+	_, err = tx.Exec(`
+		UPDATE suite SET tooMuch = ? 
+		WHERE name = ?
+	`, seq+1, suite)
+	err = tx.Commit()
+	return
+}
+
+func (d Suite) TestCount(suite string) (n uint32, err error) {
+	row := d.db.QueryRow(`
+		SELECT coalesce(max(s.seq), 0)
+		FROM suite s
+		WHERE s.name = @suite
+	`, sql.Named("suite", suite))
+	err = row.Scan(&n)
+	return
+}
+
+func (d Suite) TooMuchCount(suite string) (n uint32, err error) {
+	row := d.db.QueryRow(`
+		SELECT s.tooMuch
+		FROM suite s
+		WHERE s.name = @suite
+	`, sql.Named("suite", suite))
+	err = row.Scan(&n)
 	return
 }
 
@@ -93,10 +137,10 @@ func (d Suite) Delete(suite string) (err error) {
 
 func (d Suite) ListPassedFailedErrored() (suites []string, err error) {
 	rows, err := d.db.Query(`
-		SELECT name
-		FROM suite
-		WHERE outcome IN ('PASSED', 'FAILED', 'ERRORED') AND startTime IS NOT NULL
-		ORDER BY outcome DESC, startTime ASC
+		SELECT s.name
+		FROM suite s
+		WHERE s.outcome IN ('PASSED', 'FAILED', 'ERRORED') AND s.startTime IS NOT NULL
+		ORDER BY s.outcome DESC, s.startTime ASC
 	`)
 	if err != nil {
 		return
@@ -116,11 +160,11 @@ func (d Suite) ListPassedFailedErrored() (suites []string, err error) {
 }
 
 func (d Suite) FindGlobalConfig() (cfg *model.Config, err error) {
-	logger.Warn("LoadGlobalConfig()")
+	logger.Warn("FindGlobalConfig()")
 	var serializedConfig []byte
 	row := d.db.QueryRow(`
-		SELECT config 
-		FROM suite
+		SELECT s.config 
+		FROM suite s
 		WHERE name = '';
 	`)
 	err = row.Scan(&serializedConfig)
@@ -136,13 +180,13 @@ func (d Suite) FindGlobalConfig() (cfg *model.Config, err error) {
 }
 
 func (d Suite) FindSuiteConfig(testSuite string) (cfg *model.Config, err error) {
-	logger.Warn("LoadSuiteConfig()")
+	logger.Warn("FindSuiteConfig()")
 	var serializedConfig []byte
 	var startTime, endTime, seq int64
 	var outcome string
 	row := d.db.QueryRow(`
-		SELECT config, startTime, endTime, outcome, seq 
-		FROM suite
+		SELECT s.config, s.startTime, s.endTime, s.outcome, s.seq 
+		FROM suite s
 		WHERE name = @suite;
 	`, sql.Named("suite", testSuite))
 	err = row.Scan(&serializedConfig, &startTime, &endTime, &outcome, &seq)
@@ -158,7 +202,7 @@ func (d Suite) FindSuiteConfig(testSuite string) (cfg *model.Config, err error) 
 }
 
 func (d Suite) SaveGlobalConfig(cfg model.Config) (err error) {
-	logger.Warn("PersistGlobalConfig()")
+	logger.Warn("SaveGlobalConfig()")
 	serializedConfig, err := serializeConfig(cfg)
 	if err != nil {
 		return
@@ -170,7 +214,7 @@ func (d Suite) SaveGlobalConfig(cfg model.Config) (err error) {
 }
 
 func (d Suite) SaveSuiteConfig(testSuite string, cfg model.Config) (err error) {
-	logger.Warn("PersistGlobalConfig()")
+	logger.Warn("SaveSuiteConfig()")
 	serializedConfig, err := serializeConfig(cfg)
 	if err != nil {
 		return

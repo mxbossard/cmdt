@@ -157,7 +157,7 @@ grep "4 errors" "$of" || die "reporting should_error bad errors count"
 
 nothingToReportExpectedStderrMsg="you must perform some test prior to report"
 >&2 echo "## Test @report without test"
-$cmdtIn @init=meta1
+$cmdtIn @init=meta1 @verbose=4
 $cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=foo
 $cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=foo
 

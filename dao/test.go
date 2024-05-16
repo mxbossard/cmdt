@@ -3,7 +3,6 @@ package dao
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -87,9 +86,9 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 	defer tx.Rollback()
 
 	row := tx.QueryRow(`
-		SELECT sum(passed), sum(failed), sum(errored), sum(ignored)
-		FROM tested
-		WHERE suite = @suite
+		SELECT coalesce(sum(t.passed), 0), coalesce(sum(t.failed), 0), coalesce(sum(t.errored), 0), coalesce(sum(t.ignored), 0)
+		FROM tested t
+		WHERE t.suite = @suite
 	`, sql.Named("suite", suite))
 	err = row.Scan(&passedCount, &failedCount, &erroredCount, &ignoredCount)
 	if err != nil {
@@ -98,9 +97,9 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 
 	rows, err := tx.Query(`
 		SELECT t.seq, t.name, t.cmdAndArgs, t.outcome, t.exitCode, t.errorMsg, t.duration, 
-			t.stdout, t.stderr,	COALESCE(a.prefix, ''), COALESCE(a.name, ''), COALESCE(a.op, ''), 
-			COALESCE(a.expected, ''), COALESCE(a.value, ''), COALESCE(a.errorMsg, ''), 
-			COALESCE(a.success, 0)
+			t.stdout, t.stderr,	coalesce(a.prefix, ''), coalesce(a.name, ''), coalesce(a.op, ''), 
+			coalesce(a.expected, ''), coalesce(a.value, ''), coalesce(a.errorMsg, ''), 
+			coalesce(a.success, 0)
 		FROM tested t LEFT JOIN assertion_result a ON a.suite = t.suite AND a.seq = t.seq
 		WHERE t.suite = @suite 
 		ORDER BY t.seq ASC
@@ -147,9 +146,9 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 	}
 
 	row = tx.QueryRow(`
-		SELECT startTime, endTime
-		FROM suite
-		WHERE name = @suite 
+		SELECT s.startTime, s.endTime
+		FROM suite s
+		WHERE s.name = @suite 
 	`, sql.Named("suite", suite))
 	err = row.Scan(&startTime, &endTime)
 	if err != nil {
@@ -183,6 +182,8 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 	outcome.Outcome = ocm
 	//outcome.FailureReports = failedAssertionsMessages
 	outcome.TestOutcomes = collections.MapOrderedValues(testOutcomeBySeq)
+
+	logger.Warn("suite outcome", "outcome", outcome)
 
 	return
 }
@@ -226,6 +227,7 @@ func (d Test) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 	if err != nil {
 		return
 	}
+	logger.Warn("Inserted test outcome", "suite", suite, "seq", seq, "outcome", outcome.Outcome)
 
 	for _, res := range outcome.AssertionResults {
 		rule := res.Rule
@@ -247,7 +249,7 @@ func (d Test) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 		if err != nil {
 			return
 		}
-		log.Printf("Inserted assertion result (%s, %d), %v\n", suite, seq, res)
+		logger.Warn("Inserted assertion result", "suite", suite, "seq", seq, "result", res)
 	}
 
 	err = tx.Commit()
@@ -262,6 +264,56 @@ func (d Test) ClearSuite(suite string) (err error) {
 		DELETE FROM tested
 		WHERE suite = @suite;
 	`, sql.Named("suite", suite))
+	return
+}
+
+func (d Test) TestedCount(suite string) (n uint32, err error) {
+	row := d.db.QueryRow(`
+		SELECT count(*)
+		FROM tested t
+		WHERE t.suite = @suite
+	`, sql.Named("suite", suite))
+	err = row.Scan(&n)
+	return
+}
+
+func (d Test) PassedCount(suite string) (n uint32, err error) {
+	row := d.db.QueryRow(`
+		SELECT coalesce(sum(t.passed), 0)
+		FROM tested t
+		WHERE t.suite = @suite
+	`, sql.Named("suite", suite))
+	err = row.Scan(&n)
+	return
+}
+
+func (d Test) IgnoredCount(suite string) (n uint32, err error) {
+	row := d.db.QueryRow(`
+		SELECT coalesce(sum(t.ignored), 0)
+		FROM tested t
+		WHERE t.suite = @suite
+	`, sql.Named("suite", suite))
+	err = row.Scan(&n)
+	return
+}
+
+func (d Test) FailedCount(suite string) (n uint32, err error) {
+	row := d.db.QueryRow(`
+		SELECT coalesce(sum(t.failed), 0)
+		FROM tested t
+		WHERE t.suite = @suite
+	`, sql.Named("suite", suite))
+	err = row.Scan(&n)
+	return
+}
+
+func (d Test) ErroredCount(suite string) (n uint32, err error) {
+	row := d.db.QueryRow(`
+		SELECT coalesce(sum(t.errored), 0)
+		FROM tested t
+		WHERE t.suite = @suite
+	`, sql.Named("suite", suite))
+	err = row.Scan(&n)
 	return
 }
 

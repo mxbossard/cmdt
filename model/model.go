@@ -85,6 +85,22 @@ func NewTestOutcome(suite string, seq uint16, name string, cmdAndArgs []string,
 	return to
 }
 
+func NewTestOutcome2(cfg Config, seq uint16) TestOutcome {
+	sign := TestSignature{
+		TestSuite:  cfg.TestSuite.Get(),
+		Seq:        seq,
+		CmdAndArgs: cfg.CmdAndArgs,
+	}
+	if cfg.TestName.IsPresent() {
+		sign.TestName = cfg.TestName.Get()
+	}
+
+	to := TestOutcome{
+		TestSignature: sign,
+	}
+	return to
+}
+
 type SuiteOutcome struct {
 	TestSuite string
 	//ExitCode    uint16

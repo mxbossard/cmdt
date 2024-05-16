@@ -78,9 +78,9 @@ func (d Queue) QueueOperater(op model.Operater) (err error) {
 
 func (d Queue) IsOperationsDone(op model.Operater) (done bool, exitCode int16, err error) {
 	row := d.db.QueryRow(`
-		SELECT exitCode 
-		FROM operation_queue 
-		WHERE id = @opId AND exitCode IS NOT NULL;
+		SELECT q.exitCode 
+		FROM operation_queue q
+		WHERE q.id = @opId AND q.exitCode IS NOT NULL;
 	`, sql.Named("opId", op.Id()))
 	err = row.Scan(&exitCode)
 	if err == sql.ErrNoRows {
@@ -95,16 +95,21 @@ func (d Queue) IsOperationsDone(op model.Operater) (done bool, exitCode int16, e
 
 func (d Queue) isOperationsDone0(op model.Operater) (done bool, exitCode int16, err error) {
 	row := d.db.QueryRow(`
-		SELECT count(*) = 1, exitCode 
-		FROM operation_queue 
-		WHERE id = @opId AND exitCode IS NOT NULL;
+		SELECT count(*) = 1, q.exitCode 
+		FROM operation_queue q
+		WHERE q.id = @opId AND q.exitCode IS NOT NULL;
 	`, sql.Named("opId", op.Id()))
 	err = row.Scan(&done, &exitCode)
 	return
 }
 
 func (d Queue) QueuedSuites() (queued []string, err error) {
-	rows, err := d.db.Query("SELECT name FROM suite_queue WHERE open = 0 ORDER BY id;")
+	rows, err := d.db.Query(`
+		SELECT s.name 
+		FROM suite_queue s 
+		WHERE s.open = 0 
+		ORDER BY s.id;
+	`)
 	if err != nil {
 		return
 	}
@@ -121,7 +126,12 @@ func (d Queue) QueuedSuites() (queued []string, err error) {
 }
 
 func (d Queue) OpenedNotBlockingSuites() (opened []string, err error) {
-	rows, err := d.db.Query("SELECT name FROM suite_queue WHERE open = 1 AND blocking IS NULL ORDER BY id;")
+	rows, err := d.db.Query(`
+		SELECT s.name 
+		FROM suite_queue s
+		WHERE s.open = 1 AND s.blocking IS NULL 
+		ORDER BY s.id;
+	`)
 	if err != nil {
 		return
 	}
@@ -181,7 +191,11 @@ func (d Queue) CloseSuite(suite string) (err error) {
 }
 
 func (d Queue) QueuedOperationsCount() (count int, err error) {
-	row := d.db.QueryRow("SELECT count(*) FROM operation_queue WHERE unqueued = 0;")
+	row := d.db.QueryRow(`
+		SELECT count(*) 
+		FROM operation_queue q
+		WHERE q.unqueued = 0;
+	`)
 	err = row.Scan(&count)
 	return
 }
@@ -192,13 +206,20 @@ func (d Queue) QueuedOperationsCountBySuite(suite string, tx *zql.SynchronizedTx
 	if tx != nil {
 		qr = tx
 	}
-	row := qr.QueryRow("SELECT count(*) FROM operation_queue WHERE suite = ? and unqueued = 0;", suite)
+	row := qr.QueryRow(`
+		SELECT count(*) 
+		FROM operation_queue q
+		WHERE q.suite = ? and q.unqueued = 0;
+	`, suite)
 	err = row.Scan(&count)
 	return
 }
 
 func (d Queue) GlobalOperationsCount() (count int, err error) {
-	row := d.db.QueryRow("SELECT count(*) FROM operation_queue;")
+	row := d.db.QueryRow(`
+		SELECT count(*) 
+		FROM operation_queue q
+	;`)
 	err = row.Scan(&count)
 	return
 }
@@ -210,10 +231,10 @@ func (d Queue) NextQueuedOperation(suite string, tx *zql.SynchronizedTx) (op mod
 		qr = tx
 	}
 	row := qr.QueryRow(`
-		SELECT id, op 
-		FROM operation_queue 
-		WHERE suite = @suite and unqueued = 0 
-		ORDER BY id 
+		SELECT q.id, q.op 
+		FROM operation_queue q
+		WHERE q.suite = @suite and q.unqueued = 0 
+		ORDER BY q.id 
 		LIMIT 1;
 	`, sql.Named("suite", suite))
 	var b []byte
@@ -275,10 +296,10 @@ func (d Queue) UnqueueOperater() (op model.Operater, err error) {
 	if electedSuite == "" {
 		// Select first closed suite
 		row := tx.QueryRow(`
-			SELECT name 
-			FROM suite_queue
-			WHERE open = 0
-			ORDER BY id
+			SELECT s.name 
+			FROM suite_queue s
+			WHERE s.open = 0
+			ORDER BY s.id
 			LIMIT 1;
 		`)
 		err = row.Scan(&electedSuite)

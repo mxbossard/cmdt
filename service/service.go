@@ -433,9 +433,8 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 	case model.TestAction:
 		testSuite := inputConfig.TestSuite.Get()
 		ppid := uint32(utils.ReadEnvPpid())
-		testCtx := facade.NewTestContext(token, isolation, testSuite, inputConfig, ppid)
-		var seq uint16
-		seq = testCtx.IncrementTestCount()
+		testCtx := facade.NewTestContext(token, isolation, testSuite, 0, inputConfig, ppid)
+		seq := testCtx.Seq
 		testCtx.NoErrorOrFatal(agg.Return())
 		logger.Debug("Forged context", "ctx", testCtx)
 		testCfg := testCtx.Config

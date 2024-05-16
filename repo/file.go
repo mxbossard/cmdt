@@ -45,19 +45,6 @@ func (r FileRepo) MockDirectoryPath(testSuite string, testId uint32) (mockDir st
 	return
 }
 
-func (r FileRepo) InitSuite(cfg model.Config) (err error) {
-	err = r.ClearTestSuite(cfg.TestSuite.Get())
-	if err != nil {
-		return
-	}
-	//err = persistSuiteConfig(r.token, cfg)
-	err = r.persistSuiteConfig(cfg)
-	if err != nil {
-		err = fmt.Errorf("unable to init suite: %w", err)
-	}
-	return
-}
-
 func (r FileRepo) SaveGlobalConfig(cfg model.Config) (err error) {
 	cfg.TestSuite.Set(model.GlobalConfigTestSuiteName)
 	//err = persistSuiteConfig(r.token, cfg)
@@ -83,6 +70,19 @@ func (r FileRepo) GetGlobalConfig() (cfg model.Config, err error) {
 		cfg.Token.Set(r.token)
 		cfg.GlobalStartTime.Set(time.Now())
 		err = r.SaveGlobalConfig(cfg)
+	}
+	return
+}
+
+func (r FileRepo) InitSuite(cfg model.Config) (err error) {
+	err = r.ClearTestSuite(cfg.TestSuite.Get())
+	if err != nil {
+		return
+	}
+	//err = persistSuiteConfig(r.token, cfg)
+	err = r.persistSuiteConfig(cfg)
+	if err != nil {
+		err = fmt.Errorf("unable to init suite: %w", err)
 	}
 	return
 }
@@ -131,137 +131,6 @@ func (r FileRepo) GetSuiteConfig(testSuite string, initless bool) (cfg model.Con
 		err = r.SaveSuiteConfig(cfg)
 	}
 	return
-}
-
-func (r FileRepo) readSuiteSeq(testSuite, name string) (n uint32) {
-	//logger.Warn("readSuiteSeq()", "testSuite", testSuite, "name", name)
-	suiteDir, err := testSuiteDirectoryPath(testSuite, r.token, r.isolation)
-	if err != nil {
-		log.Fatal(err)
-	}
-	n = utils.ReadSeq(suiteDir, name)
-	return
-}
-
-func (r FileRepo) TestCount(testSuite string) (n uint32) {
-	return r.readSuiteSeq(testSuite, model.TestSequenceFilename)
-}
-
-func (r FileRepo) PassedCount(testSuite string) (n uint32) {
-	return r.readSuiteSeq(testSuite, model.PassedSequenceFilename)
-}
-
-func (r FileRepo) IgnoredCount(testSuite string) (n uint32) {
-	return r.readSuiteSeq(testSuite, model.IgnoredSequenceFilename)
-}
-
-func (r FileRepo) FailedCount(testSuite string) (n uint32) {
-	//logger.Warn("failedCount()", "testSuite", testSuite)
-	return r.readSuiteSeq(testSuite, model.FailedSequenceFilename)
-}
-
-func (r FileRepo) ErroredCount(testSuite string) (n uint32) {
-	return r.readSuiteSeq(testSuite, model.ErroredSequenceFilename)
-}
-
-func (r FileRepo) TooMuchCount(testSuite string) (n uint32) {
-	return r.readSuiteSeq(testSuite, model.TooMuchSequenceFilename)
-}
-
-func (r FileRepo) IncrementSuiteSeq(testSuite, name string) (n uint32) {
-	suiteDir, err := testSuiteDirectoryPath(testSuite, r.token, r.isolation)
-	if err != nil {
-		log.Fatal(err)
-	}
-	n = utils.IncrementSeq(suiteDir, name)
-	logger.Debug("Incrementing seq", "testSuite", testSuite, "name", name, "next", n)
-	return
-}
-
-func (r FileRepo) SaveTestOutcome(outcome model.TestOutcome) (err error) {
-	var stdoutLog, stderrLog, reportLog *os.File
-	stdoutLog, stderrLog, reportLog, err = cmdLogFiles(outcome.TestSuite, r.token, r.isolation, outcome.Seq)
-	if err != nil {
-		return
-	}
-	defer stdoutLog.Close()
-	defer stderrLog.Close()
-	defer reportLog.Close()
-
-	_, err = stdoutLog.WriteString(outcome.Stdout)
-	if err != nil {
-		return
-	}
-	_, err = stderrLog.WriteString(outcome.Stderr)
-	if err != nil {
-		return
-	}
-
-	qualifiedName := fmt.Sprintf("[%s]> %s", outcome.TestSuite, outcome.TestName)
-	testTitle := format.PadRight(qualifiedName, 70)
-	switch outcome.Outcome {
-	case model.PASSED:
-		// Nothing to do
-	case model.FAILED:
-		failedAssertionsReport := ""
-		for _, result := range outcome.AssertionResults {
-			assertPrefix := result.Rule.Prefix
-			assertName := result.Rule.Name
-			assertOp := result.Rule.Op
-			expected := result.Rule.Expected
-			failedAssertionsReport += assertPrefix + assertName + assertOp + expected + " "
-		}
-		_, err = reportLog.WriteString(testTitle + "  => " + failedAssertionsReport)
-	case model.IGNORED:
-		// Nothing to do
-	case model.ERRORED:
-		_, err = reportLog.WriteString(testTitle + "  => not executed")
-	case model.TIMEOUT:
-		_, err = reportLog.WriteString(testTitle + "  => timed out")
-	default:
-		err = fmt.Errorf("outcome %s not supported", outcome.Outcome)
-	}
-	return
-}
-
-func (r FileRepo) LoadSuiteOutcome(testSuite string) (outcome model.SuiteOutcome, err error) {
-	var suiteCfg model.Config
-	suiteCfg, err = r.GetSuiteConfig(testSuite, false)
-	if err != nil {
-		return
-	}
-
-	outcome.TestSuite = testSuite
-	outcome.TestCount = r.TestCount(testSuite)
-	outcome.PassedCount = r.PassedCount(testSuite)
-	outcome.FailedCount = r.FailedCount(testSuite)
-	outcome.ErroredCount = r.ErroredCount(testSuite)
-	outcome.IgnoredCount = r.IgnoredCount(testSuite)
-	outcome.TooMuchCount = r.TooMuchCount(testSuite)
-	startTime := suiteCfg.SuiteStartTime.Get()
-	endTime := suiteCfg.LastTestTime.GetOr(time.Now())
-	outcome.Duration = endTime.Sub(startTime)
-	failureReports, err := failureReports(testSuite, r.token, r.isolation)
-	if err != nil {
-		return
-	}
-	outcome.FailureReports = failureReports
-	logger.Debug("Loaded suite outcome", "testSuite", testSuite, "outcome", outcome)
-	return
-}
-
-func (r FileRepo) UpdateLastTestTime(testSuite string) {
-	//cfg, err := loadSuiteConfig(testSuite, r.token)
-	cfg, err := r.loadSuiteConfig(testSuite)
-	if err != nil {
-		log.Fatal(err)
-	}
-	cfg.LastTestTime = utilz.OptionalOf(time.Now())
-	err = r.persistSuiteConfig(*cfg)
-	if err != nil {
-		err = fmt.Errorf("unable to update last test time: %w", err)
-		log.Fatal(err)
-	}
 }
 
 func (r FileRepo) ClearTestSuite(testSuite string) (err error) {
@@ -331,6 +200,127 @@ func (r FileRepo) ListTestSuites() (suites []string, err error) {
 	return
 }
 
+func (r FileRepo) SaveTestOutcome(outcome model.TestOutcome) (err error) {
+	var stdoutLog, stderrLog, reportLog *os.File
+	stdoutLog, stderrLog, reportLog, err = cmdLogFiles(outcome.TestSuite, r.token, r.isolation, outcome.Seq)
+	if err != nil {
+		return
+	}
+	defer stdoutLog.Close()
+	defer stderrLog.Close()
+	defer reportLog.Close()
+
+	_, err = stdoutLog.WriteString(outcome.Stdout)
+	if err != nil {
+		return
+	}
+	_, err = stderrLog.WriteString(outcome.Stderr)
+	if err != nil {
+		return
+	}
+
+	qualifiedName := fmt.Sprintf("[%s]> %s", outcome.TestSuite, outcome.TestName)
+	testTitle := format.PadRight(qualifiedName, 70)
+	switch outcome.Outcome {
+	case model.PASSED:
+		// Nothing to do
+	case model.FAILED:
+		failedAssertionsReport := ""
+		for _, result := range outcome.AssertionResults {
+			assertPrefix := result.Rule.Prefix
+			assertName := result.Rule.Name
+			assertOp := result.Rule.Op
+			expected := result.Rule.Expected
+			failedAssertionsReport += assertPrefix + assertName + assertOp + expected + " "
+		}
+		_, err = reportLog.WriteString(testTitle + "  => " + failedAssertionsReport)
+	case model.IGNORED:
+		// Nothing to do
+	case model.ERRORED:
+		_, err = reportLog.WriteString(testTitle + "  => not executed")
+	case model.TIMEOUT:
+		_, err = reportLog.WriteString(testTitle + "  => timed out")
+	default:
+		err = fmt.Errorf("outcome %s not supported", outcome.Outcome)
+	}
+	return
+}
+
+func (r FileRepo) UpdateLastTestTime(testSuite string) {
+	//cfg, err := loadSuiteConfig(testSuite, r.token)
+	cfg, err := r.loadSuiteConfig(testSuite)
+	if err != nil {
+		log.Fatal(err)
+	}
+	cfg.LastTestTime = utilz.OptionalOf(time.Now())
+	err = r.persistSuiteConfig(*cfg)
+	if err != nil {
+		err = fmt.Errorf("unable to update last test time: %w", err)
+		log.Fatal(err)
+	}
+}
+
+func (r FileRepo) LoadSuiteOutcome(testSuite string) (outcome model.SuiteOutcome, err error) {
+	var suiteCfg model.Config
+	suiteCfg, err = r.GetSuiteConfig(testSuite, false)
+	if err != nil {
+		return
+	}
+
+	outcome.TestSuite = testSuite
+	outcome.TestCount = r.TestCount(testSuite)
+	outcome.PassedCount = r.PassedCount(testSuite)
+	outcome.FailedCount = r.FailedCount(testSuite)
+	outcome.ErroredCount = r.ErroredCount(testSuite)
+	outcome.IgnoredCount = r.IgnoredCount(testSuite)
+	outcome.TooMuchCount = r.TooMuchCount(testSuite)
+	startTime := suiteCfg.SuiteStartTime.Get()
+	endTime := suiteCfg.LastTestTime.GetOr(time.Now())
+	outcome.Duration = endTime.Sub(startTime)
+	failureReports, err := failureReports(testSuite, r.token, r.isolation)
+	if err != nil {
+		return
+	}
+	outcome.FailureReports = failureReports
+	logger.Debug("Loaded suite outcome", "testSuite", testSuite, "outcome", outcome)
+	return
+}
+
+func (r FileRepo) IncrementSuiteSeq(testSuite, name string) (n uint32) {
+	suiteDir, err := testSuiteDirectoryPath(testSuite, r.token, r.isolation)
+	if err != nil {
+		log.Fatal(err)
+	}
+	n = utils.IncrementSeq(suiteDir, name)
+	logger.Debug("Incrementing seq", "testSuite", testSuite, "name", name, "next", n)
+	return
+}
+
+func (r FileRepo) TestCount(testSuite string) (n uint32) {
+	return r.readSuiteSeq(testSuite, model.TestSequenceFilename)
+}
+
+func (r FileRepo) PassedCount(testSuite string) (n uint32) {
+	return r.readSuiteSeq(testSuite, model.PassedSequenceFilename)
+}
+
+func (r FileRepo) IgnoredCount(testSuite string) (n uint32) {
+	return r.readSuiteSeq(testSuite, model.IgnoredSequenceFilename)
+}
+
+func (r FileRepo) FailedCount(testSuite string) (n uint32) {
+	//logger.Warn("failedCount()", "testSuite", testSuite)
+	return r.readSuiteSeq(testSuite, model.FailedSequenceFilename)
+}
+
+func (r FileRepo) ErroredCount(testSuite string) (n uint32) {
+	return r.readSuiteSeq(testSuite, model.ErroredSequenceFilename)
+}
+
+func (r FileRepo) TooMuchCount(testSuite string) (n uint32) {
+	return r.readSuiteSeq(testSuite, model.TooMuchSequenceFilename)
+}
+
 func (r FileRepo) QueueOperation(op model.Operater) (err error) {
 	err = r.dbRepo.QueueOperation(op)
 
@@ -350,7 +340,7 @@ func (r FileRepo) Done(op model.Operater) (err error) {
 }
 
 func (r FileRepo) WaitOperationDone(op model.Operater, timeout time.Duration) (exitCode int16, err error) {
-	return r.dbRepo.WaitOperaterDone(op, timeout)
+	return r.dbRepo.WaitOperationDone(op, timeout)
 }
 
 func (r FileRepo) WaitEmptyQueue(testSuite string, timeout time.Duration) {
@@ -359,6 +349,16 @@ func (r FileRepo) WaitEmptyQueue(testSuite string, timeout time.Duration) {
 
 func (r FileRepo) WaitAllEmpty(timeout time.Duration) {
 	r.dbRepo.WaitAllEmpty(timeout)
+}
+
+func (r FileRepo) readSuiteSeq(testSuite, name string) (n uint32) {
+	//logger.Warn("readSuiteSeq()", "testSuite", testSuite, "name", name)
+	suiteDir, err := testSuiteDirectoryPath(testSuite, r.token, r.isolation)
+	if err != nil {
+		log.Fatal(err)
+	}
+	n = utils.ReadSeq(suiteDir, name)
+	return
 }
 
 func (r FileRepo) loadGlobalConfig() (cfg *model.Config, err error) {

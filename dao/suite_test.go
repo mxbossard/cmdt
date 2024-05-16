@@ -141,36 +141,36 @@ func TestNextSeq(t *testing.T) {
 	addSuite(t, dao, "bar")
 	addSuite(t, dao, "baz")
 
-	var s int
+	var s uint32
 	var err error
 
 	s, err = dao.NextSeq("foo")
 	require.NoError(t, err)
-	assert.Equal(t, 0, s)
+	assert.Equal(t, uint32(0), s)
 
 	s, err = dao.NextSeq("foo")
 	require.NoError(t, err)
-	assert.Equal(t, 1, s)
+	assert.Equal(t, uint32(1), s)
 
 	s, err = dao.NextSeq("foo")
 	require.NoError(t, err)
-	assert.Equal(t, 2, s)
+	assert.Equal(t, uint32(2), s)
 
 	s, err = dao.NextSeq("bar")
 	require.NoError(t, err)
-	assert.Equal(t, 0, s)
+	assert.Equal(t, uint32(0), s)
 
 	s, err = dao.NextSeq("foo")
 	require.NoError(t, err)
-	assert.Equal(t, 3, s)
+	assert.Equal(t, uint32(3), s)
 
 	s, err = dao.NextSeq("bar")
 	require.NoError(t, err)
-	assert.Equal(t, 1, s)
+	assert.Equal(t, uint32(1), s)
 
 	s, err = dao.NextSeq("baz")
 	require.NoError(t, err)
-	assert.Equal(t, 0, s)
+	assert.Equal(t, uint32(0), s)
 }
 
 func TestUpdateEndTime(t *testing.T) {

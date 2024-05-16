@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"time"
 
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/utils"
@@ -22,7 +23,74 @@ var (
 	testSuiteNameSanitizerPattern = regexp.MustCompile("[^a-zA-Z0-9]")
 )
 
-func New(token, isolation string) (repo FileRepo) {
+type Repo interface {
+	BackingFilepath() string
+
+	MockDirectoryPath(testSuite string, testId uint32) (mockDir string, err error)
+
+	SaveGlobalConfig(cfg model.Config) (err error)
+
+	GetGlobalConfig() (cfg model.Config, err error)
+
+	InitSuite(cfg model.Config) (err error)
+
+	SaveSuiteConfig(cfg model.Config) (err error)
+
+	GetSuiteConfig(testSuite string, initless bool) (cfg model.Config, err error)
+
+	ClearTestSuite(testSuite string) (err error)
+
+	ListTestSuites() (suites []string, err error)
+
+	SaveTestOutcome(outcome model.TestOutcome) (err error)
+
+	UpdateLastTestTime(testSuite string)
+
+	LoadSuiteOutcome(testSuite string) (outcome model.SuiteOutcome, err error)
+
+	IncrementSuiteSeq(testSuite, name string) (n uint32)
+
+	TestCount(testSuite string) (n uint32)
+
+	PassedCount(testSuite string) (n uint32)
+
+	IgnoredCount(testSuite string) (n uint32)
+
+	FailedCount(testSuite string) (n uint32)
+
+	ErroredCount(testSuite string) (n uint32)
+
+	TooMuchCount(testSuite string) (n uint32)
+
+	QueueOperation(op model.Operater) (err error)
+
+	UnqueueOperation() (op model.Operater, err error)
+
+	Done(op model.Operater) (err error)
+
+	WaitOperationDone(op model.Operater, timeout time.Duration) (exitCode int16, err error)
+
+	WaitEmptyQueue(testSuite string, timeout time.Duration) (err error)
+
+	WaitAllEmpty(timeout time.Duration) (err error)
+}
+
+func New(token, isolation string) (repo dbRepo) {
+	logger.Warn("new repo", "token", token, "isolation", isolation)
+	path, err := forgeWorkDirectoryPath(token, isolation)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	repo, err = newDbRepo(path, isolation, token)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return
+}
+
+func NewFile(token, isolation string) (repo FileRepo) {
 	repo.token = token
 	repo.isolation = isolation
 	logger.Warn("new repo", "token", token, "isolation", isolation)
@@ -31,7 +99,7 @@ func New(token, isolation string) (repo FileRepo) {
 		log.Fatal(err)
 	}
 
-	repo.dbRepo, err = newDbRepo(path)
+	repo.dbRepo, err = newDbRepo(path, isolation, token)
 	if err != nil {
 		log.Fatal(err)
 	}

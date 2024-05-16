@@ -55,7 +55,7 @@ Ideas:
 
 type daemon struct {
 	token string
-	repo  repo.FileRepo
+	repo  repo.Repo
 }
 
 func (d daemon) unqueue() (ok bool, err error) {
