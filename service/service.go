@@ -126,12 +126,13 @@ func ReportTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	exitCode = 1
 	cfg := ctx.Config
 	testSuite := cfg.TestSuite.Get()
-	if ctx.Repo.TestCount(testSuite) == 0 {
+	testCount := ctx.Repo.TestCount(testSuite)
+	if testCount == 0 {
 		err = fmt.Errorf("you must perform some test prior to report: [%s] suite", testSuite)
 		return
 	}
 
-	//logger.Info("Reporting suite", "ctx", ctx)
+	//logger.Info("Reporting suite", "testCount", testCount, "ctx", ctx)
 
 	var suiteOutcome model.SuiteOutcome
 	suiteOutcome, err = ctx.Repo.LoadSuiteOutcome(testSuite)
@@ -434,6 +435,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 		testSuite := inputConfig.TestSuite.Get()
 		ppid := uint32(utils.ReadEnvPpid())
 		testCtx := facade.NewTestContext(token, isolation, testSuite, 0, inputConfig, ppid)
+		testCtx.IncrementTestCount()
 		seq := testCtx.Seq
 		testCtx.NoErrorOrFatal(agg.Return())
 		logger.Debug("Forged context", "ctx", testCtx)

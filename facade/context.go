@@ -22,16 +22,17 @@ import (
 var logger = slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 
 var (
-	g *GlobalContext
-	s *SuiteContext
-	t *TestContext
+// g *GlobalContext
+// s *SuiteContext
+// t *TestContext
 )
 
 func NewGlobalContext(token, isolation string, inputCfg model.Config) GlobalContext {
-	if g != nil {
-		return *g
-	}
-
+	/*
+		if g != nil {
+			return *g
+		}
+	*/
 	var err error
 	token, err = utils.ForgeContextualToken(token)
 	if err != nil {
@@ -52,15 +53,16 @@ func NewGlobalContext(token, isolation string, inputCfg model.Config) GlobalCont
 		Repo:      repo,
 		Config:    cfg,
 	}
-	g = &c
+	//g = &c
 	return c
 }
 
 func NewSuiteContext(token, isolation, testSuite string, initless bool, action model.Action, inputCfg model.Config) SuiteContext {
-	if s != nil {
-		return *s
-	}
-
+	/*
+		if s != nil {
+			return *s
+		}
+	*/
 	globalCtx := NewGlobalContext(token, isolation, model.Config{})
 	suiteCfg, err := globalCtx.Repo.GetSuiteConfig(testSuite, initless)
 	if err != nil {
@@ -79,15 +81,16 @@ func NewSuiteContext(token, isolation, testSuite string, initless bool, action m
 		GlobalContext: globalCtx,
 		Action:        action,
 	}
-	s = &suiteCtx
+	//s = &suiteCtx
 	return suiteCtx
 }
 
 func NewTestContext(token, isolation, testSuite string, seq uint16, inputCfg model.Config, ppid uint32) TestContext {
-	if t != nil {
-		return *t
-	}
-
+	/*
+		if t != nil {
+			return *t
+		}
+	*/
 	suiteCtx := NewSuiteContext(token, isolation, testSuite, true, model.TestAction, model.Config{})
 	mergedCfg := suiteCtx.Config
 	mergedCfg.Merge(inputCfg)
@@ -110,10 +113,7 @@ func NewTestContext(token, isolation, testSuite string, seq uint16, inputCfg mod
 		_, testCtx.ContainerImage = utils.ReadEnvValue(model.EnvContainerImageKey)
 	}
 
-	if testCtx.Seq == 0 {
-		testCtx.Seq = testCtx.IncrementTestCount()
-	}
-	t = &testCtx
+	//t = &testCtx
 	return testCtx
 }
 
@@ -225,6 +225,12 @@ func (c TestContext) TestId() (id string) {
 	// TODO
 	log.Fatal("not implemented yet")
 	return
+}
+
+func (c *TestContext) IncrementTestCount() (n uint16) {
+	n = c.SuiteContext.IncrementTestCount()
+	c.Seq = n
+	return n
 }
 
 func (c TestContext) NoErrorOrFatal(err error) {

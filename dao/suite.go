@@ -26,7 +26,7 @@ func (d Suite) init() (err error) {
 			name TEXT UNIQUE NOT NULL,
 			config BLOB NOT NULL,
 			startTime INTEGER NOT NULL DEFAULT 0,
-			seq INTEGER NOT NULL DEFAULT 1,
+			seq INTEGER NOT NULL DEFAULT 0,
 			tooMuch INTEGER NOT NULL DEFAULT 0,
 			endTime INTEGER NOT NULL DEFAULT 0,
 			outcome TEXT NOT NULL DEFAULT ''
@@ -50,10 +50,11 @@ func (d Suite) NextSeq(suite string) (seq uint32, err error) {
 	if err != nil {
 		return
 	}
+	seq++
 	_, err = tx.Exec(`
 		UPDATE suite SET seq = ? 
 		WHERE name = ?
-	`, seq+1, suite)
+	`, seq, suite)
 	err = tx.Commit()
 	return
 }
@@ -139,9 +140,10 @@ func (d Suite) ListPassedFailedErrored() (suites []string, err error) {
 	rows, err := d.db.Query(`
 		SELECT s.name
 		FROM suite s
-		WHERE s.outcome IN ('PASSED', 'FAILED', 'ERRORED') AND s.startTime IS NOT NULL
+		WHERE s.startTime IS NOT NULL
 		ORDER BY s.outcome DESC, s.startTime ASC
 	`)
+	// s.outcome IN ('PASSED', 'FAILED', 'ERRORED') AND
 	if err != nil {
 		return
 	}

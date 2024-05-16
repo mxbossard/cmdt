@@ -171,7 +171,7 @@ $cmdtIn @test=meta1/ @exit=1 @stderr:"3 success" @stderr:"0 failure" @stderr:"1 
 >&2 echo "## Test printed token"
 tk0=$( $cmdt @init @printToken 2> /dev/null )
 >&2 echo "token: $tk0"
-$cmdtIn @init=meta2
+$cmdtIn @init=meta2 @verbose=4
 $cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt0 true @token=$tk0
 $cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#02" @-- $cmdt0 true @token=$tk0
 $cmdtIn @test=meta2/ @fail @-- $cmdt0 @report=main
