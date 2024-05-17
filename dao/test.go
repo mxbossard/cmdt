@@ -70,6 +70,27 @@ func (d Test) init() (err error) {
 	return
 }
 
+func (d Test) Delete(suite string) (err error) {
+	tx, err := d.db.Begin()
+	if err != nil {
+		return
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec(`
+		DELETE FROM assertion_result
+		WHERE suite = @suite;
+		DELETE FROM tested
+		WHERE suite = @suite;
+	`, sql.Named("suite", suite))
+	if err != nil {
+		return
+	}
+
+	err = tx.Commit()
+	return
+}
+
 func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err error) {
 	var passedCount, failedCount, erroredCount, ignoredCount uint32
 	var testName, cmdAndArgs, testOc, stdout, stderr, testErrorMsg, prefix, assertName, op, expected, value, assertErrorMsg string

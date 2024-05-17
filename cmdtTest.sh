@@ -257,6 +257,7 @@ $cmdtIn @test=meta/ @stderr:"FAILED" @-- $cmdt0 sh -c ">&2 echo foo bar" @stderr
 $cmdtIn @test=meta/ @stderr:"FAILED" @-- $cmdt0 sh -c ">&2 echo foo bar" @stderr:foo @stderr:baz @stdout=
 $cmdtIn @test=meta/ @stderr:"FAILED" @-- $cmdt0 sh -c ">&2 echo foo bar" @stderr!:foo
 $cmdtIn @test=meta/ @stderr:"PASSED" @-- $cmdt0 sh -c ">&2 echo foo bar" @stderr!=foo @stderr:bar @stderr!:baz
+$cmdtIn @test=meta/ @fail @stderr:"11 success" @stderr:"13 failures" @-- $cmdt1 @report=main
 
 
 ## Forge a token for remaining tests

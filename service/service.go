@@ -303,6 +303,11 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 		model.LoggerLevel.Set(slog.Level(8 - inputConfig.Debug.Get()*4))
 	}
 
+	if inputConfig.Action.Is(model.UsageAction) {
+		usage()
+		return
+	}
+
 	token := inputConfig.Token.GetOr("")
 	isolation := inputConfig.Isol.GetOr("")
 	action := inputConfig.Action.Get()

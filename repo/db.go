@@ -124,6 +124,10 @@ func (r dbRepo) GetSuiteConfig(testSuite string, initless bool) (cfg model.Confi
 }
 
 func (r dbRepo) ClearTestSuite(testSuite string) (err error) {
+	err = r.testDao.Delete(testSuite)
+	if err != nil {
+		return
+	}
 	err = r.suiteDao.Delete(testSuite)
 	return
 }

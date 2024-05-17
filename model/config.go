@@ -67,6 +67,7 @@ const (
 	InitAction   = Action("init")
 	TestAction   = Action("test")
 	ReportAction = Action("report")
+	UsageAction  = Action("usage")
 )
 
 var (
@@ -85,7 +86,7 @@ var (
 
 var (
 	Actions = []RuleDefinition{ruleDef("global", ""), ruleDef("init", "", "="), ruleDef("test", "", "="),
-		ruleDef("report", "", "=")}
+		ruleDef("report", "", "="), ruleDef("usage", "")}
 	// Global config available to global
 	GlobalConfigs = []RuleDefinition{ruleDef("fork", "="), ruleDef("suiteTimeout", "="), ruleDef("prefix", "=")}
 	// Suite config available to suite
@@ -100,7 +101,7 @@ var (
 	// Config of test flow (init -> test -> report)
 	FlowConfigs = []RuleDefinition{ruleDef("token", "="), ruleDef("isol", "="), ruleDef("verbose", "", "="),
 		ruleDef("debug", "", "="), ruleDef("failuresLimit", "="), ruleDef("async", "", "="), ruleDef("wait", "", "="),
-		ruleDef("keep", "", "=")}
+		ruleDef("keep", "", "="), ruleDef("help", "")}
 	Assertions = []RuleDefinition{ruleDef("success", ""), ruleDef("fail", ""), ruleDef("exit", "="),
 		ruleDef("cmd", "="), ruleDef("exists", "="),
 		ruleDef("stdout", "=", ":", "~", "!=", "!:", "!~", "@=", "@:"),
@@ -213,6 +214,8 @@ type CmdMock struct {
 }
 
 type Config struct {
+	Help bool
+
 	// TestSuite only
 	Token     utilz.Optional[string]
 	Isol      utilz.Optional[string]

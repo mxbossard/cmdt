@@ -468,6 +468,10 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 
 	if ok {
 		switch rule.Name {
+		case "help":
+			c.Help = true
+		case "usage":
+			c.Action = utilz.OptionalOf(model.Action(rule.Name))
 		case "global":
 			c.Action = utilz.OptionalOf(model.Action(rule.Name))
 			if rule.Op != "" || rule.Expected != "" {
@@ -920,15 +924,24 @@ func ParseArgs(rulePrefix string, args []string) (cfg model.Config, assertions [
 	}
 
 	if cfg.Action.IsEmpty() {
-		// If no action supplied add implicit test rule.
-		var rule model.Rule
-		_, rule, err = ApplyConfig(&cfg, cfg.Prefix.Get()+"test")
-		if err != nil {
-			agg.Add(err)
+		// If no action supplied
+
+		if len(cfg.CmdAndArgs) > 0 {
+			// If cmdAndArgs supplied => Test action
+
+			// add implicit test rule.
+			var rule model.Rule
+			_, rule, err = ApplyConfig(&cfg, cfg.Prefix.Get()+"test")
+			if err != nil {
+				agg.Add(err)
+			}
+			rules = append(rules, rule)
+			cfg.Action.Default(model.TestAction)
+			cfg.TestSuite.Default(model.DefaultTestSuiteName)
+		} else {
+			// Otherwise => Usage action
+			cfg.Action.Default(model.UsageAction)
 		}
-		rules = append(rules, rule)
-		cfg.Action.Default(model.TestAction)
-		cfg.TestSuite.Default(model.DefaultTestSuiteName)
 	}
 
 	if cfg.Action.Is(model.TestAction) {
