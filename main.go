@@ -87,6 +87,7 @@ import (
 ## TODO:
 
 Bugs:
+- %f logged on stderr is badly formatted by display : %!f(MISSING)
 - @verbose @debug=0 log some INFO level (maybe daemon only)
 - @async test not compatible with stdin usage (because it's the daemon who shoud read from stdin
 - Environ not passed to test run by daemon => should embed cmdt environ into operation

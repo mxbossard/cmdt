@@ -162,7 +162,7 @@ func (d Suite) ListPassedFailedErrored() (suites []string, err error) {
 }
 
 func (d Suite) FindGlobalConfig() (cfg *model.Config, err error) {
-	logger.Warn("FindGlobalConfig()")
+	logger.Debug("FindGlobalConfig()")
 	var serializedConfig []byte
 	row := d.db.QueryRow(`
 		SELECT s.config 
@@ -182,7 +182,6 @@ func (d Suite) FindGlobalConfig() (cfg *model.Config, err error) {
 }
 
 func (d Suite) FindSuiteConfig(testSuite string) (cfg *model.Config, err error) {
-	logger.Warn("FindSuiteConfig()")
 	var serializedConfig []byte
 	var startTime, endTime, seq int64
 	var outcome string
@@ -200,11 +199,12 @@ func (d Suite) FindSuiteConfig(testSuite string) (cfg *model.Config, err error) 
 	}
 	cfg = &model.Config{}
 	err = deserializeConfig(serializedConfig, cfg)
+	logger.Debug("FindSuiteConfig()", "cfg", *cfg)
 	return
 }
 
 func (d Suite) SaveGlobalConfig(cfg model.Config) (err error) {
-	logger.Warn("SaveGlobalConfig()")
+	logger.Debug("SaveGlobalConfig()")
 	serializedConfig, err := serializeConfig(cfg)
 	if err != nil {
 		return
@@ -216,7 +216,7 @@ func (d Suite) SaveGlobalConfig(cfg model.Config) (err error) {
 }
 
 func (d Suite) SaveSuiteConfig(testSuite string, cfg model.Config) (err error) {
-	logger.Warn("SaveSuiteConfig()")
+	logger.Debug("SaveSuiteConfig()", "cfg", cfg)
 	serializedConfig, err := serializeConfig(cfg)
 	if err != nil {
 		return

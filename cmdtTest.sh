@@ -157,7 +157,7 @@ grep "4 errors" "$of" || die "reporting should_error bad errors count"
 
 nothingToReportExpectedStderrMsg="you must perform some test prior to report"
 >&2 echo "## Test @report without test"
-$cmdtIn @init=meta1 @verbose=4
+$cmdtIn @init=meta1 #@verbose=4
 $cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=foo
 $cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=foo
 
@@ -171,7 +171,7 @@ $cmdtIn @test=meta1/ @exit=1 @stderr:"3 success" @stderr:"0 failure" @stderr:"1 
 >&2 echo "## Test printed token"
 tk0=$( $cmdt @init @printToken 2> /dev/null )
 >&2 echo "token: $tk0"
-$cmdtIn @init=meta2 @verbose=4
+$cmdtIn @init=meta2 #@verbose=4
 $cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt0 true @token=$tk0
 $cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#02" @-- $cmdt0 true @token=$tk0
 $cmdtIn @test=meta2/ @fail @-- $cmdt0 @report=main
@@ -355,7 +355,7 @@ $cmdtIn @test=test_config/ @stderr:FAILED @success @-- $cmdt1 false
 $cmdtIn @test=test_config/ @stderr:FAILED @fail @-- $cmdt1 false @stopOnFailure
 $cmdtIn @test=test_config/ @stderr:FAILED @success @-- $cmdt1 false
 
-$cmdtIn @test=test_config/ @stderr:FAILED @-- $cmdt1 @prefix=% %fail true
+$cmdtIn @test=test_config/ @stderr:FAILED @-- $cmdt1 @prefix=, ,fail true
 $cmdtIn @test=test_config/ @stderr:PASSED @-- $cmdt1 @prefix=% %fail false
 $cmdtIn @test=test_config/ @stderr:PASSED @-- $cmdt1 @prefix=% %success true
 
@@ -368,7 +368,7 @@ $cmdtIn @test=test_config/ @fail @-- $cmdt1 @report=main
 
 
 >&2 echo "## Test suite config"
-$cmdt @init=suite_config_quiet @quiet
+$cmdt1 @init=suite_config_quiet @quiet
 $cmdtIn @init=suite_config
 $cmdtIn @test=suite_config/ @stdout= @stderr= @-- $cmdt1 @test=suite_config_quiet/ echo foo
 $cmdtIn @test=suite_config/ @stderr:PASSED @-- $cmdt1 @test=suite_config_quiet/ echo foo @quiet=false
@@ -454,19 +454,20 @@ $cmdtIn @test=export/ @stdout~"/foo='bar'/m" sh -c "export"
 
 
 >&2 echo "## Interlaced tests"
-$cmdtIn @init="testA" @verbose=0
-$cmdtIn @init="testB" @verbose=0
+$cmdtIn @init=interlaced
+$cmdtIn @test=interlaced/ @-- $cmdt1 @init="testA" @verbose=0
+$cmdtIn @test=interlaced/ @-- $cmdt1 @init="testB" @verbose=0
 
-$cmdtIn echo ignored1 @ignore @test="testA/"
-$cmdtIn echo ignored2 @ignore @test="testA/"
-$cmdtIn false @test="testA/" 2> /dev/null
+$cmdtIn @test=interlaced/ @stderr:IGNORED @-- $cmdt1 echo ignored1 @ignore @test="testA/"
+$cmdtIn @test=interlaced/ @stderr:IGNORED @-- $cmdt1 echo ignored2 @ignore @test="testA/"
+$cmdtIn @test=interlaced/ @stderr:FAILED @-- $cmdt1 false @test="testA/"
 
-$cmdtIn echo another test @test="testB/"
-$cmdtIn echo ignored3 @ignore @test="testA/"
-$cmdtIn echo interlaced test @test="testA/"
-$cmdtIn false @test="testB/" 2> /dev/null
-$cmdtIn true @test="testB/"
-$cmdtIn false @test="testA/" 2> /dev/null
+$cmdtIn @test=interlaced/ @stderr:PASSED @-- $cmdt1 echo another test @test="testB/"
+$cmdtIn @test=interlaced/ @stderr:IGNORED @-- $cmdt1 echo ignored3 @ignore @test="testA/"
+$cmdtIn @test=interlaced/ @stderr:PASSED @-- $cmdt1 echo interlaced test @test="testA/"
+$cmdtIn @test=interlaced/ @stderr:FAILED @-- $cmdt1 false @test="testB/"
+$cmdtIn @test=interlaced/ @stderr:PASSED @-- $cmdt1 true @test="testB/"
+$cmdtIn @test=interlaced/ @stderr:FAILED @-- $cmdt1 false @test="testA/"
 
 $cmdtIn @init=interlaced
 # should have 1 success 2 failures and 3 ignored
@@ -518,6 +519,7 @@ done
 >&2 echo "## Test flow"
 $cmdt @init=main 2> /dev/null # clear main test suite
 $cmdtIn @init=test_flow
+$cmdtIn @test=test_flow/ @-- $cmdt1 @init=main
 $cmdtIn @test=test_flow/ @stderr:"#01" @stderr:PASSED @-- $cmdt1 @fail false
 $cmdtIn @test=test_flow/ @stderr:"#02" @stderr:PASSED @-- $cmdt1 true
 $cmdtIn @test=test_flow/ @fail @stderr:"mutually exclusive" @-- $cmdt1 "@test" "@fork=5" # Should error because of bad param
@@ -688,7 +690,7 @@ $cmdtIn @test=ephemeralContainer/ @stderr:PASSED @-- $cmdt1 ls "$testFile" @fail
 $cmdtIn @test=ephemeralContainer/ @-- $cmdt1 @report=main
 
 $cmdtIn @init=suiteContainer #@keepOutputs
-$cmdt @init=sub @container 2> /dev/null # container should live the test suite
+$cmdtIn @test=suiteContainer/ @-- $cmdt1 @init=sub @container # container should live the test suite
 $cmdtIn @test=suiteContainer/run_in_container @stderr:PASSED @-- $cmdt1 @test=sub/ sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox #check run inside container
 $cmdtIn @test=suiteContainer/ @stderr:PASSED @-- $cmdt1 @test=sub/ ls "$testFile" @fail @stdout= @stderr:"$testFile" # file should not exist in suite container
 $cmdtIn @test=suiteContainer/ @stderr:PASSED @-- $cmdt1 @test=sub/ ls "$hostFile" @fail @stdout= @stderr:"$hostFile" # file should not exist in suite container
@@ -700,7 +702,7 @@ $cmdtIn @test=suiteContainer/ @stderr:PASSED @-- $cmdt1 @test=sub/ ls "$testFile
 $cmdtIn @test=suiteContainer/ @-- $cmdt1 @report=sub
 
 $cmdtIn @init=dirtyContainer #@keepOutputs
-$cmdt @init=sub @container 2> /dev/null # container should live the test suite
+$cmdtIn @test=dirtyContainer/ @-- $cmdt1 @init=sub @container # container should live the test suite
 $cmdtIn @test=dirtyContainer/run_in_container @stderr:PASSED @-- $cmdt1 @test=sub/ sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox #check run inside container
 $cmdtIn @test=dirtyContainer/ @stderr:PASSED @-- $cmdt1 @test=sub/ ls "$testFile" @fail @stderr:"$testFile" # file should not exist in container
 $cmdtIn @test=dirtyContainer/ @stderr:PASSED @-- $cmdt1 @test=sub/ ls "$hostFile" @fail @stderr:"$hostFile" # file should not exist in container
@@ -717,7 +719,7 @@ $cmdtIn @test=dirtyContainer/ @stderr:PASSED @-- $cmdt1 @test=sub/ ls "$testFile
 $cmdtIn @test=dirtyContainer/ @-- $cmdt1 @report=sub
 
 $cmdtIn @init=testContainer #@keepOutputs
-$cmdt @init=sub @container @dirtyContainer=beforeTest 2> /dev/null # container should live for each test
+$cmdtIn @test=testContainer/ @-- $cmdt1 @init=sub @container @dirtyContainer=beforeTest # container should live for each test
 $cmdtIn @test=testContainer/run_in_container @stderr:PASSED @-- $cmdt1 @test=sub/ sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox #check run inside container
 $cmdtIn @test=testContainer/ @stderr:PASSED @-- $cmdt1 @test=sub/ ls "$testFile" @fail @stderr:"$testFile" # file should not exist in container
 $cmdtIn @test=testContainer/ @stderr:PASSED @-- $cmdt1 @test=sub/ ls "$hostFile" @fail @stderr:"$hostFile" # file should not exist in container

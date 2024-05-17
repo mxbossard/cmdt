@@ -23,6 +23,15 @@ import (
 	}
 */
 
+func ReplacingPrefix(prefix, rule string) string {
+	prefixPattern := regexp.MustCompile("^" + prefix + "prefix=(.)$")
+	submatch := prefixPattern.FindStringSubmatch(rule)
+	if submatch != nil {
+		return submatch[1]
+	}
+	return prefix
+}
+
 func SplitRuleExpr(cfg model.Config, ruleExpr string) (ok bool, r model.Rule) {
 	return cfg.SplitRuleExpr(ruleExpr)
 }
@@ -438,7 +447,9 @@ func TranslateOptional[T comparable](rule model.Rule, m model.Mapper[T], validat
 }
 
 func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, err error) {
-	c.Prefix.Default(model.DefaultRulePrefix)
+	if c.Prefix.IsEmpty() {
+		c.Prefix.Default(model.DefaultRulePrefix)
+	}
 	ok, rule = c.SplitRuleExpr(ruleExpr)
 	if !ok {
 		return
@@ -829,31 +840,36 @@ func BuildAssertion(cfg model.Config, ruleExpr string) (ok bool, assertion model
 
 func ParseArgs(rulePrefix string, args []string) (cfg model.Config, assertions []model.Assertion, agg errorz.Aggregated) {
 	var err error
+	prefix := rulePrefix
 	cfg.Prefix.Default(rulePrefix)
-	ruleParsingStopper := rulePrefix + "--"
 
 	// Check if ruleParsingStopper is present
 	ruleParsingStopperPresent := false
 	for _, arg := range args {
+		prefix = ReplacingPrefix(prefix, arg)
+		ruleParsingStopper := prefix + "--"
 		if arg == ruleParsingStopper {
 			ruleParsingStopperPresent = true
 			break
 		}
 	}
 
+	prefix = rulePrefix
 	// Concatenate args with space before ruleParsingStopper
 	if ruleParsingStopperPresent {
 		var concatenatedArgs []string
 		// Check all args before ruleParsingStopper
 		var buffer string
 		for p, arg := range args {
+			prefix = ReplacingPrefix(prefix, arg)
+			ruleParsingStopper := prefix + "--"
 			if arg == ruleParsingStopper {
 				if buffer != "" {
 					concatenatedArgs = append(concatenatedArgs, buffer)
 				}
 				concatenatedArgs = append(concatenatedArgs, args[p:]...)
 				break
-			} else if model.MatchRuleDef(rulePrefix, arg, model.Concatenables...) {
+			} else if model.MatchRuleDef(prefix, arg, model.Concatenables...) {
 				// Concatenable rule
 				if buffer != "" {
 					// flush buffer
@@ -861,7 +877,7 @@ func ParseArgs(rulePrefix string, args []string) (cfg model.Config, assertions [
 				}
 				// init buffer
 				buffer = arg
-			} else if strings.HasPrefix(arg, rulePrefix) {
+			} else if strings.HasPrefix(arg, prefix) {
 				if buffer != "" {
 					// flush buffer
 					concatenatedArgs = append(concatenatedArgs, buffer)
@@ -880,11 +896,13 @@ func ParseArgs(rulePrefix string, args []string) (cfg model.Config, assertions [
 		args = concatenatedArgs
 	}
 
+	prefix = rulePrefix
 	var rules []model.Rule
 	parseRules := true
 	for _, arg := range args {
-
 		var ok bool
+		prefix = ReplacingPrefix(prefix, arg)
+		ruleParsingStopper := prefix + "--"
 		if parseRules && arg == ruleParsingStopper {
 			// Reached rule parsing stopper
 			if len(cfg.CmdAndArgs) > 0 {

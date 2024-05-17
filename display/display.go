@@ -12,7 +12,6 @@ import (
 	"mby.fr/utils/format"
 	"mby.fr/utils/inout"
 	"mby.fr/utils/printz"
-	"mby.fr/utils/utilz"
 )
 
 var (
@@ -334,8 +333,8 @@ func (d BasicDisplay) Flush() error {
 	return d.printer.Flush()
 }
 
-func (d *BasicDisplay) Quiet(quiet utilz.Optional[bool]) {
-	if quiet.Is(true) {
+func (d *BasicDisplay) Quiet(quiet bool) {
+	if quiet {
 		d.printer = printz.NewDiscarding()
 	} else {
 		d.printer = d.notQuietPrinter

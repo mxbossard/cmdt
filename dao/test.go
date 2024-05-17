@@ -204,7 +204,7 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 	//outcome.FailureReports = failedAssertionsMessages
 	outcome.TestOutcomes = collections.MapOrderedValues(testOutcomeBySeq)
 
-	logger.Warn("suite outcome", "outcome", outcome)
+	logger.Debug("suite outcome", "outcome", outcome)
 
 	return
 }
@@ -248,7 +248,7 @@ func (d Test) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 	if err != nil {
 		return
 	}
-	logger.Warn("Inserted test outcome", "suite", suite, "seq", seq, "outcome", outcome.Outcome)
+	logger.Debug("Inserted test outcome", "suite", suite, "seq", seq, "outcome", outcome.Outcome)
 
 	for _, res := range outcome.AssertionResults {
 		rule := res.Rule
@@ -257,6 +257,9 @@ func (d Test) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 		ruleOp := rule.Op
 		ruleExpected := rule.Expected
 		value := res.Value
+		if value == nil {
+			value = ""
+		}
 		errorMsg := res.ErrMessage
 		success := res.Success
 		_, err = tx.Exec(`
@@ -270,7 +273,7 @@ func (d Test) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 		if err != nil {
 			return
 		}
-		logger.Warn("Inserted assertion result", "suite", suite, "seq", seq, "result", res)
+		logger.Debug("Inserted assertion result", "suite", suite, "seq", seq, "result", res)
 	}
 
 	err = tx.Commit()

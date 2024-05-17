@@ -76,7 +76,7 @@ type Repo interface {
 }
 
 func New(token, isolation string) (repo dbRepo) {
-	logger.Warn("new repo", "token", token, "isolation", isolation)
+	logger.Debug("new repo", "token", token, "isolation", isolation)
 	path, err := forgeWorkDirectoryPath(token, isolation)
 	if err != nil {
 		log.Fatal(err)
@@ -93,7 +93,7 @@ func New(token, isolation string) (repo dbRepo) {
 func NewFile(token, isolation string) (repo FileRepo) {
 	repo.token = token
 	repo.isolation = isolation
-	logger.Warn("new repo", "token", token, "isolation", isolation)
+	logger.Debug("new repo", "token", token, "isolation", isolation)
 	path, err := forgeWorkDirectoryPath(token, isolation)
 	if err != nil {
 		log.Fatal(err)

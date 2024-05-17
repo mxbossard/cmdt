@@ -48,7 +48,7 @@ func DbOpen(dirpath string) (db *zql.SynchronizedDB, err error) {
 
 	db.SetMaxOpenConns(5)
 
-	logger.Warn("opened db", "file", file)
+	logger.Debug("opened db", "file", file)
 	return
 }
 
