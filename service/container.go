@@ -57,7 +57,7 @@ func StartContainer(testCtx facade.TestContext) (id string, err error) {
 func MockInContainer(testCtx facade.TestContext, id string) (err error) {
 	var script string
 	var mockDir string
-	mockDir, err = testCtx.MockDirectoryPath(testCtx.Repo.TestCount(testCtx.Config.TestSuite.Get()) + 1)
+	mockDir, err = testCtx.MockDirectoryPath(testCtx.Seq)
 	if err != nil {
 		return
 	}
@@ -122,6 +122,7 @@ func ExecInContainer(testCtx facade.TestContext, id string, cmdAndArgs []string)
 	start := time.Now()
 	envArgs := make(map[string]string)
 	envArgs[model.ContextTokenEnvVarName] = testCtx.Token
+	envArgs[model.ContextTestSeqEnvVarName] = fmt.Sprintf("%d", testCtx.Seq)
 	envArgs[model.EnvContainerScopeKey] = fmt.Sprintf("%d", testCtx.Config.ContainerScope.Get())
 	envArgs[model.EnvContainerImageKey] = testCtx.Config.ContainerImage.Get()
 	envArgs[model.EnvContainerIdKey] = id
@@ -129,7 +130,7 @@ func ExecInContainer(testCtx facade.TestContext, id string, cmdAndArgs []string)
 	user := fmt.Sprintf("%d", os.Getuid())
 	exec = ctnrz.Engine().Container(id).Exec(cmdAndArgs...).AddEnvMap(envArgs).User(user).Executer()
 	exec.SetOutputs(os.Stdout, os.Stderr)
-	logger.Debug("executing in container", "id", id, "cmdAndArgs", cmdAndArgs)
+	logger.Warn("executing in container", "id", id, "cmdAndArgs", cmdAndArgs, "seq", testCtx.Seq)
 	_, err = exec.BlockRun()
 	duration := time.Since(start)
 	logger.Debug("executed in container", "duration", duration, "id", id, "cmdAndArgs", cmdAndArgs)

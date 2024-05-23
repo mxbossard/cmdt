@@ -26,7 +26,7 @@ var (
 type Repo interface {
 	BackingFilepath() string
 
-	MockDirectoryPath(testSuite string, testId uint32) (mockDir string, err error)
+	MockDirectoryPath(testSuite string, testId uint16) (mockDir string, err error)
 
 	SaveGlobalConfig(cfg model.Config) (err error)
 
@@ -48,19 +48,19 @@ type Repo interface {
 
 	LoadSuiteOutcome(testSuite string) (outcome model.SuiteOutcome, err error)
 
-	IncrementSuiteSeq(testSuite, name string) (n uint32)
+	IncrementSuiteSeq(testSuite, name string) (n uint16)
 
-	TestCount(testSuite string) (n uint32)
+	TestCount(testSuite string) (n uint16)
 
-	PassedCount(testSuite string) (n uint32)
+	PassedCount(testSuite string) (n uint16)
 
-	IgnoredCount(testSuite string) (n uint32)
+	IgnoredCount(testSuite string) (n uint16)
 
-	FailedCount(testSuite string) (n uint32)
+	FailedCount(testSuite string) (n uint16)
 
-	ErroredCount(testSuite string) (n uint32)
+	ErroredCount(testSuite string) (n uint16)
 
-	TooMuchCount(testSuite string) (n uint32)
+	TooMuchCount(testSuite string) (n uint16)
 
 	QueueOperation(op model.Operater) (err error)
 

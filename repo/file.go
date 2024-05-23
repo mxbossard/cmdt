@@ -30,7 +30,7 @@ func (r FileRepo) BackingFilepath() string {
 	return path
 }
 
-func (r FileRepo) MockDirectoryPath(testSuite string, testId uint32) (mockDir string, err error) {
+func (r FileRepo) MockDirectoryPath(testSuite string, testId uint16) (mockDir string, err error) {
 	var path string
 	path, err = testSuiteDirectoryPath(testSuite, r.token, r.isolation)
 	if err != nil {

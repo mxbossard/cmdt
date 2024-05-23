@@ -158,23 +158,23 @@ func (c SuiteContext) IncrementTestCount() (n uint16) {
 	return uint16(s)
 }
 
-func (c SuiteContext) IncrementPassedCount() (n uint32) {
+func (c SuiteContext) IncrementPassedCount() (n uint16) {
 	return c.Repo.IncrementSuiteSeq(c.Config.TestSuite.Get(), model.PassedSequenceFilename)
 }
 
-func (c SuiteContext) IncrementIgnoredCount() (n uint32) {
+func (c SuiteContext) IncrementIgnoredCount() (n uint16) {
 	return c.Repo.IncrementSuiteSeq(c.Config.TestSuite.Get(), model.IgnoredSequenceFilename)
 }
 
-func (c SuiteContext) IncrementFailedCount() (n uint32) {
+func (c SuiteContext) IncrementFailedCount() (n uint16) {
 	return c.Repo.IncrementSuiteSeq(c.Config.TestSuite.Get(), model.FailedSequenceFilename)
 }
 
-func (c SuiteContext) IncrementErroredCount() (n uint32) {
+func (c SuiteContext) IncrementErroredCount() (n uint16) {
 	return c.Repo.IncrementSuiteSeq(c.Config.TestSuite.Get(), model.ErroredSequenceFilename)
 }
 
-func (c SuiteContext) IncrementTooMuchCount() (n uint32) {
+func (c SuiteContext) IncrementTooMuchCount() (n uint16) {
 	return c.Repo.IncrementSuiteSeq(c.Config.TestSuite.Get(), model.TooMuchSequenceFilename)
 }
 
@@ -228,7 +228,12 @@ func (c TestContext) TestId() (id string) {
 }
 
 func (c *TestContext) IncrementTestCount() (n uint16) {
-	n = c.SuiteContext.IncrementTestCount()
+	if utils.IsWithinContainer() {
+		// Do not increment seq
+		n = utils.ReadEnvTestSeq()
+	} else {
+		n = c.SuiteContext.IncrementTestCount()
+	}
 	c.Seq = n
 	return n
 }
@@ -240,18 +245,17 @@ func (c TestContext) NoErrorOrFatal(err error) {
 		outcome.Err = err
 		err2 := c.Repo.SaveTestOutcome(outcome)
 		if err2 != nil {
-			c.Fatal(err2)
+			logger.Error("unable to save errored test outcome", "error", err2)
 		}
-		c.Fatal(err)
 	}
 	c.SuiteContext.NoErrorOrFatal(err)
 }
 
-func (c TestContext) ProcessTooMuchFailures() (n uint32) {
+func (c TestContext) ProcessTooMuchFailures() (n uint16) {
 	cfg := c.Config
 	testSuite := cfg.TestSuite.Get()
 	failures := c.Repo.ErroredCount(testSuite) + c.Repo.FailedCount(testSuite)
-	if !c.Config.TooMuchFailures.Is(model.TooMuchFailuresNoLimit) && failures >= uint32(c.Config.TooMuchFailures.Get()) {
+	if !c.Config.TooMuchFailures.Is(model.TooMuchFailuresNoLimit) && int32(failures) >= c.Config.TooMuchFailures.Get() {
 		// Too much failures do not execute more tests
 		n = c.IncrementTooMuchCount()
 	}
@@ -404,7 +408,7 @@ func (c TestContext) ConfigMocking() (err error) {
 	// Mocking config
 	currentPath := os.Getenv("PATH")
 	var mockDir string
-	mockDir, err = c.MockDirectoryPath(c.Repo.TestCount(cfg.TestSuite.Get()))
+	mockDir, err = c.MockDirectoryPath(c.Seq)
 	if err != nil {
 		return
 	}
@@ -429,7 +433,7 @@ func (c TestContext) ConfigMocking() (err error) {
 	return
 }
 
-func (c TestContext) MockDirectoryPath(testId uint32) (mockDir string, err error) {
+func (c TestContext) MockDirectoryPath(testId uint16) (mockDir string, err error) {
 	return c.Repo.MockDirectoryPath(c.Config.TestSuite.Get(), testId)
 }
 

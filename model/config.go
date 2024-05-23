@@ -30,6 +30,7 @@ const (
 
 	ContextTokenEnvVarName    = "__CMDT_TOKEN"
 	ContextPpidEnvVarName     = "__CMDT_PPID"
+	ContextTestSeqEnvVarName  = "__CMDT_TEST_SEQ"
 	GlobalConfigTestSuiteName = "__global"
 	DefaultTestSuiteName      = "main"
 

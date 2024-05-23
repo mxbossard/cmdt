@@ -141,7 +141,7 @@ func TestNextSeq(t *testing.T) {
 	addSuite(t, dao, "bar")
 	addSuite(t, dao, "baz")
 
-	var s uint32
+	var s uint16
 	var err error
 
 	s, err = dao.NextSeq("foo")

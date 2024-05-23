@@ -162,6 +162,21 @@ func ReadEnvPpid() (ppid int) {
 	return
 }
 
+func ReadEnvTestSeq() (seq uint16) {
+	// Search uniqKey in env
+	if ok, seqEnv := ReadEnvValue(model.ContextTestSeqEnvVarName); ok {
+		s, err := strconv.Atoi(seqEnv)
+		if err != nil {
+			panic(err)
+		}
+		seq = uint16(s)
+		logger.Debug("found env seq", "seq", seq)
+	} else {
+		logger.Debug("env ppid not found", "seq", seq)
+	}
+	return
+}
+
 func ForgeContextualToken(token string) (string, error) {
 	if token == "" {
 		token = ReadEnvToken()

@@ -689,7 +689,7 @@ $cmdtIn @test=ephemeralContainer/ @stderr:PASSED @-- $cmdt1 @container ls "$host
 $cmdtIn @test=ephemeralContainer/ @stderr:PASSED @-- $cmdt1 ls "$testFile" @fail @stdout= @stderr:"$testFile" # file should not exist on host
 $cmdtIn @test=ephemeralContainer/ @-- $cmdt1 @report=main
 
-$cmdtIn @init=suiteContainer #@keepOutputs
+$cmdtIn @init=suiteContainer @verbose=4 #@keepOutputs
 $cmdtIn @test=suiteContainer/ @-- $cmdt1 @init=sub @container # container should live the test suite
 $cmdtIn @test=suiteContainer/run_in_container @stderr:PASSED @-- $cmdt1 @test=sub/ sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox #check run inside container
 $cmdtIn @test=suiteContainer/ @stderr:PASSED @-- $cmdt1 @test=sub/ ls "$testFile" @fail @stdout= @stderr:"$testFile" # file should not exist in suite container

@@ -35,7 +35,7 @@ func (d Suite) init() (err error) {
 	return
 }
 
-func (d Suite) NextSeq(suite string) (seq uint32, err error) {
+func (d Suite) NextSeq(suite string) (seq uint16, err error) {
 	tx, err := d.db.Begin()
 	if err != nil {
 		return
@@ -56,10 +56,15 @@ func (d Suite) NextSeq(suite string) (seq uint32, err error) {
 		WHERE name = ?
 	`, seq, suite)
 	err = tx.Commit()
+	if err != nil {
+		return
+	}
+	logger.Warn("incremented seq", "suite", suite, "seq", seq, "filelock", d.db.FileLockPath())
+
 	return
 }
 
-func (d Suite) IncrementTooMuchCount(suite string) (seq uint32, err error) {
+func (d Suite) IncrementTooMuchCount(suite string) (seq uint16, err error) {
 	tx, err := d.db.Begin()
 	if err != nil {
 		return
@@ -82,7 +87,7 @@ func (d Suite) IncrementTooMuchCount(suite string) (seq uint32, err error) {
 	return
 }
 
-func (d Suite) TestCount(suite string) (n uint32, err error) {
+func (d Suite) TestCount(suite string) (n uint16, err error) {
 	row := d.db.QueryRow(`
 		SELECT coalesce(max(s.seq), 0)
 		FROM suite s
@@ -92,7 +97,7 @@ func (d Suite) TestCount(suite string) (n uint32, err error) {
 	return
 }
 
-func (d Suite) TooMuchCount(suite string) (n uint32, err error) {
+func (d Suite) TooMuchCount(suite string) (n uint16, err error) {
 	row := d.db.QueryRow(`
 		SELECT s.tooMuch
 		FROM suite s
@@ -204,7 +209,7 @@ func (d Suite) FindSuiteConfig(testSuite string) (cfg *model.Config, err error) 
 }
 
 func (d Suite) SaveGlobalConfig(cfg model.Config) (err error) {
-	logger.Debug("SaveGlobalConfig()")
+	logger.Warn("SaveGlobalConfig()")
 	serializedConfig, err := serializeConfig(cfg)
 	if err != nil {
 		return
@@ -221,17 +226,65 @@ func (d Suite) SaveSuiteConfig(testSuite string, cfg model.Config) (err error) {
 	if err != nil {
 		return
 	}
+
+	_, err = d.db.Exec(`INSERT OR IGNORE INTO suite(name) VALUES (@suite);`, sql.Named("suite", testSuite))
+	if err != nil {
+		return
+	}
+
 	if cfg.SuiteStartTime.IsPresent() {
 		micros := cfg.SuiteStartTime.Get().UnixMicro()
-		_, err = d.db.Exec("INSERT OR REPLACE INTO suite(name, config, startTime) VALUES (@suite, @serCfg, @startTime);",
+
+		_, err = d.db.Exec(`INSERT OR REPLACE INTO suite(seq, name, config, startTime) VALUES (
+					(SELECT seq FROM suite WHERE name = @suite),
+					@suite,
+					@serCfg,
+					@startTime
+				);`,
 			sql.Named("suite", testSuite), sql.Named("serCfg", serializedConfig),
 			sql.Named("startTime", micros),
 		)
+
+		/*
+			_, err = d.db.Exec(`
+					UPDATE suite SET config = @serCfg, startTime = @startTime
+					WHERE name = @suite;`,
+				sql.Named("suite", testSuite), sql.Named("serCfg", serializedConfig),
+				sql.Named("startTime", micros),
+			)
+		*/
 	} else {
-		_, err = d.db.Exec("INSERT OR REPLACE INTO suite(name, config) VALUES (@suite, @serCfg);",
+
+		_, err = d.db.Exec(`INSERT OR REPLACE INTO suite(seq, name, config) VALUES (
+				(SELECT seq FROM suite WHERE name = @suite),
+				@suite,
+				@serCfg
+				);`,
 			sql.Named("suite", testSuite), sql.Named("serCfg", serializedConfig),
 		)
+		/*
+			_, err = d.db.Exec(`
+					UPDATE suite SET config = @serCfg
+					WHERE name = @suite;`,
+				sql.Named("suite", testSuite), sql.Named("serCfg", serializedConfig),
+			)
+		*/
 	}
+	if err != nil {
+		return
+	}
+
+	row := d.db.QueryRow(`
+		SELECT s.seq
+		FROM suite s
+		WHERE s.name = ?
+	`, testSuite)
+	var seq uint16
+	err = row.Scan(&seq)
+	if err != nil {
+		return
+	}
+	logger.Warn("saved suite config", "suite", testSuite, "seq", seq)
 	return
 }
 

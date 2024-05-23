@@ -30,7 +30,7 @@ func (r dbRepo) BackingFilepath() string {
 	return path
 }
 
-func (r dbRepo) MockDirectoryPath(testSuite string, testId uint32) (mockDir string, err error) {
+func (r dbRepo) MockDirectoryPath(testSuite string, testId uint16) (mockDir string, err error) {
 	var path string
 	path, err = testSuiteDirectoryPath(testSuite, r.token, r.isolation)
 	if err != nil {
@@ -154,7 +154,7 @@ func (r dbRepo) LoadSuiteOutcome(testSuite string) (outcome model.SuiteOutcome, 
 	return
 }
 
-func (r dbRepo) IncrementSuiteSeq(testSuite, name string) (n uint32) {
+func (r dbRepo) IncrementSuiteSeq(testSuite, name string) (n uint16) {
 	// FIXME should this be used ?
 
 	var err error
@@ -164,7 +164,7 @@ func (r dbRepo) IncrementSuiteSeq(testSuite, name string) (n uint32) {
 		n, err = r.suiteDao.IncrementTooMuchCount(testSuite)
 	} else {
 		// Other seq increment are supported by counter in DB
-		return 99999
+		return 9999
 	}
 	if err != nil {
 		log.Fatal(err)
@@ -172,7 +172,7 @@ func (r dbRepo) IncrementSuiteSeq(testSuite, name string) (n uint32) {
 	return
 }
 
-func (r dbRepo) TestCount(testSuite string) (n uint32) {
+func (r dbRepo) TestCount(testSuite string) (n uint16) {
 	n, err := r.suiteDao.TestCount(testSuite)
 	if err != nil {
 		log.Fatal(err)
@@ -180,7 +180,7 @@ func (r dbRepo) TestCount(testSuite string) (n uint32) {
 	return
 }
 
-func (r dbRepo) PassedCount(testSuite string) (n uint32) {
+func (r dbRepo) PassedCount(testSuite string) (n uint16) {
 	n, err := r.testDao.PassedCount(testSuite)
 	if err != nil {
 		log.Fatal(err)
@@ -188,7 +188,7 @@ func (r dbRepo) PassedCount(testSuite string) (n uint32) {
 	return
 }
 
-func (r dbRepo) IgnoredCount(testSuite string) (n uint32) {
+func (r dbRepo) IgnoredCount(testSuite string) (n uint16) {
 	n, err := r.testDao.IgnoredCount(testSuite)
 	if err != nil {
 		log.Fatal(err)
@@ -196,7 +196,7 @@ func (r dbRepo) IgnoredCount(testSuite string) (n uint32) {
 	return
 }
 
-func (r dbRepo) FailedCount(testSuite string) (n uint32) {
+func (r dbRepo) FailedCount(testSuite string) (n uint16) {
 	n, err := r.testDao.FailedCount(testSuite)
 	if err != nil {
 		log.Fatal(err)
@@ -204,7 +204,7 @@ func (r dbRepo) FailedCount(testSuite string) (n uint32) {
 	return
 }
 
-func (r dbRepo) ErroredCount(testSuite string) (n uint32) {
+func (r dbRepo) ErroredCount(testSuite string) (n uint16) {
 	n, err := r.testDao.ErroredCount(testSuite)
 	if err != nil {
 		log.Fatal(err)
@@ -212,7 +212,7 @@ func (r dbRepo) ErroredCount(testSuite string) (n uint32) {
 	return
 }
 
-func (r dbRepo) TooMuchCount(testSuite string) (n uint32) {
+func (r dbRepo) TooMuchCount(testSuite string) (n uint16) {
 	n, err := r.suiteDao.TooMuchCount(testSuite)
 	if err != nil {
 		log.Fatal(err)
