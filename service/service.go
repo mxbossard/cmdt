@@ -350,7 +350,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 			if globalCtx.Config.Async.Is(false) {
 				// Process report all without daemon
 				logger.Debug("Forged context", "ctx", globalCtx)
-				logger.Warn("executing report all in sync (not queueing test)")
+				logger.Warn("executing report all in sync (not queueing report)")
 				dpl.Quiet(globalCtx.Config.Quiet.Is(true))
 				// TODO: wait all tests run
 				// Daemon must be off or No test remaining in suite queue

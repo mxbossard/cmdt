@@ -124,11 +124,11 @@ func (r dbRepo) GetSuiteConfig(testSuite string, initless bool) (cfg model.Confi
 }
 
 func (r dbRepo) ClearTestSuite(testSuite string) (err error) {
-	err = r.testDao.Delete(testSuite)
+	err = r.testDao.DeleteTest(testSuite)
 	if err != nil {
 		return
 	}
-	err = r.suiteDao.Delete(testSuite)
+	err = r.suiteDao.DeleteSuite(testSuite)
 	return
 }
 
@@ -143,7 +143,7 @@ func (r dbRepo) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 }
 
 func (r dbRepo) UpdateLastTestTime(testSuite string) {
-	err := r.suiteDao.UpdateEndTime(testSuite, time.Now())
+	err := r.suiteDao.UpdateSuiteEndTime(testSuite, time.Now())
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -30,10 +30,10 @@ func addSuiteWithOutcome(t *testing.T, dao Suite, name string, outcome model.Out
 	err := dao.SaveSuiteConfig(name, model.Config{})
 	require.NoError(t, err)
 
-	err = dao.UpdateOutcome(name, outcome)
+	err = dao.UpdateSuiteOutcome(name, outcome)
 	require.NoError(t, err)
 
-	err = dao.UpdateStartTime(name, startTime)
+	err = dao.UpdateSuiteStartTime(name, startTime)
 	require.NoError(t, err)
 }
 
@@ -190,7 +190,7 @@ func TestUpdateEndTime(t *testing.T) {
 	assert.ErrorIs(t, err, sql.ErrNoRows)
 
 	expectedTime := time.Now()
-	err = dao.UpdateEndTime(expectedSuite, expectedTime)
+	err = dao.UpdateSuiteEndTime(expectedSuite, expectedTime)
 	require.NoError(t, err)
 
 	row = dao.db.QueryRow(verifyQuery, expectedSuite)
@@ -216,7 +216,7 @@ func TestUpdateOutcome(t *testing.T) {
 	assert.ErrorIs(t, err, sql.ErrNoRows)
 
 	expectedOutcome := model.FAILED
-	err = dao.UpdateOutcome(expectedSuite, expectedOutcome)
+	err = dao.UpdateSuiteOutcome(expectedSuite, expectedOutcome)
 	require.NoError(t, err)
 
 	row = dao.db.QueryRow(verifyQuery, expectedSuite)
@@ -241,7 +241,7 @@ func TestDelete(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 3, count)
 
-	err = dao.Delete("bar")
+	err = dao.DeleteSuite("bar")
 	require.NoError(t, err)
 
 	row = dao.db.QueryRow(verifyQuery)

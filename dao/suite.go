@@ -36,6 +36,7 @@ func (d Suite) init() (err error) {
 }
 
 func (d Suite) NextSeq(suite string) (seq uint16, err error) {
+	logger.Debug("NextSeq() start", "suite", suite, "filelock", d.db.FileLockPath())
 	tx, err := d.db.Begin()
 	if err != nil {
 		return
@@ -59,7 +60,7 @@ func (d Suite) NextSeq(suite string) (seq uint16, err error) {
 	if err != nil {
 		return
 	}
-	logger.Warn("incremented seq", "suite", suite, "seq", seq, "filelock", d.db.FileLockPath())
+	logger.Debug("NextSeq() end", "suite", suite, "seq", seq, "filelock", d.db.FileLockPath())
 
 	return
 }
@@ -88,60 +89,85 @@ func (d Suite) IncrementTooMuchCount(suite string) (seq uint16, err error) {
 }
 
 func (d Suite) TestCount(suite string) (n uint16, err error) {
+	logger.Debug("TestCount() start", "suite", suite)
 	row := d.db.QueryRow(`
 		SELECT coalesce(max(s.seq), 0)
 		FROM suite s
 		WHERE s.name = @suite
 	`, sql.Named("suite", suite))
 	err = row.Scan(&n)
+	logger.Debug("TestCount() end", "suite", suite)
 	return
 }
 
 func (d Suite) TooMuchCount(suite string) (n uint16, err error) {
+	logger.Debug("TooMuchCount() start", "suite", suite)
 	row := d.db.QueryRow(`
 		SELECT s.tooMuch
 		FROM suite s
 		WHERE s.name = @suite
 	`, sql.Named("suite", suite))
 	err = row.Scan(&n)
+	logger.Debug("TooMuchCount() end", "suite", suite)
 	return
 }
 
-func (d Suite) UpdateStartTime(suite string, start time.Time) (err error) {
+func (d Suite) UpdateSuiteStartTime(suite string, start time.Time) (err error) {
+	logger.Debug("UpdateSuiteStartTime() start", "suite", suite)
 	micros := start.UnixMicro()
 	_, err = d.db.Exec(`
 		UPDATE suite SET startTime = ?
 		WHERE name = ?
 	`, micros, suite)
+	logger.Debug("UpdateSuiteStartTime() end", "suite", suite)
 	return
 }
 
-func (d Suite) UpdateEndTime(suite string, end time.Time) (err error) {
+func (d Suite) UpdateSuiteEndTime(suite string, end time.Time) (err error) {
+	logger.Debug("UpdateSuiteEndTime() start", "suite", suite)
+	/*
+		q, err := d.db.Prepare(`
+			UPDATE suite SET endTime = ?
+			WHERE name = ?
+		`)
+		if err != nil {
+			return
+		}*/
 	micros := end.UnixMicro()
+
 	_, err = d.db.Exec(`
-		UPDATE suite SET endTime = ?
-		WHERE name = ?
-	`, micros, suite)
+			UPDATE suite SET endTime = ?
+			WHERE name = ?
+		`, micros, suite)
+
+	//_, err = q.Exec(micros, suite)
+
+	logger.Debug("UpdateSuiteEndTime() end", "suite", suite)
 	return
 }
 
-func (d Suite) UpdateOutcome(suite string, outcome model.Outcome) (err error) {
+func (d Suite) UpdateSuiteOutcome(suite string, outcome model.Outcome) (err error) {
+	logger.Debug("UpdateSuiteOutcome() start", "suite", suite)
 	_, err = d.db.Exec(`
 		UPDATE suite SET outcome = ?
 		WHERE name = ?
 	`, outcome, suite)
+	logger.Debug("UpdateSuiteOutcome() end", "suite", suite)
 	return
 }
 
-func (d Suite) Delete(suite string) (err error) {
+func (d Suite) DeleteSuite(suite string) (err error) {
+	logger.Debug("DeleteSuite() start", "suite", suite)
 	_, err = d.db.Exec(`
 		DELETE FROM suite
 		WHERE name = ?
 	`, suite)
+	logger.Debug("DeleteSuite() end", "suite", suite)
 	return
 }
 
 func (d Suite) ListPassedFailedErrored() (suites []string, err error) {
+	logger.Debug("ListPassedFailedErrored() start")
 	rows, err := d.db.Query(`
 		SELECT s.name
 		FROM suite s
@@ -162,12 +188,12 @@ func (d Suite) ListPassedFailedErrored() (suites []string, err error) {
 		}
 		suites = append(suites, suiteName)
 	}
-
+	logger.Debug("ListPassedFailedErrored() end")
 	return
 }
 
 func (d Suite) FindGlobalConfig() (cfg *model.Config, err error) {
-	logger.Debug("FindGlobalConfig()")
+	logger.Debug("FindGlobalConfig() start")
 	var serializedConfig []byte
 	row := d.db.QueryRow(`
 		SELECT s.config 
@@ -183,10 +209,12 @@ func (d Suite) FindGlobalConfig() (cfg *model.Config, err error) {
 	}
 	cfg = &model.Config{}
 	err = deserializeConfig(serializedConfig, cfg)
+	logger.Debug("FindGlobalConfig() end")
 	return
 }
 
 func (d Suite) FindSuiteConfig(testSuite string) (cfg *model.Config, err error) {
+	logger.Debug("FindSuiteConfig() start", "testSuite", testSuite)
 	var serializedConfig []byte
 	var startTime, endTime, seq int64
 	var outcome string
@@ -204,12 +232,12 @@ func (d Suite) FindSuiteConfig(testSuite string) (cfg *model.Config, err error) 
 	}
 	cfg = &model.Config{}
 	err = deserializeConfig(serializedConfig, cfg)
-	logger.Debug("FindSuiteConfig()", "cfg", *cfg)
+	logger.Debug("FindSuiteConfig() end", "testSuite", testSuite)
 	return
 }
 
 func (d Suite) SaveGlobalConfig(cfg model.Config) (err error) {
-	logger.Warn("SaveGlobalConfig()")
+	logger.Debug("SaveGlobalConfig() start")
 	serializedConfig, err := serializeConfig(cfg)
 	if err != nil {
 		return
@@ -217,58 +245,36 @@ func (d Suite) SaveGlobalConfig(cfg model.Config) (err error) {
 	_, err = d.db.Exec("INSERT OR REPLACE INTO suite(name, config) VALUES ('', @serCfg);",
 		sql.Named("serCfg", serializedConfig),
 	)
+	logger.Debug("SaveGlobalConfig() end")
 	return
 }
 
 func (d Suite) SaveSuiteConfig(testSuite string, cfg model.Config) (err error) {
-	logger.Debug("SaveSuiteConfig()", "cfg", cfg)
+	logger.Debug("SaveSuiteConfig() start", "testSuite", testSuite)
 	serializedConfig, err := serializeConfig(cfg)
 	if err != nil {
 		return
 	}
 
-	_, err = d.db.Exec(`INSERT OR IGNORE INTO suite(name) VALUES (@suite);`, sql.Named("suite", testSuite))
+	_, err = d.db.Exec(`INSERT OR IGNORE INTO suite(name, config) VALUES (@suite, '');`, sql.Named("suite", testSuite))
 	if err != nil {
 		return
 	}
 
 	if cfg.SuiteStartTime.IsPresent() {
 		micros := cfg.SuiteStartTime.Get().UnixMicro()
-
-		_, err = d.db.Exec(`INSERT OR REPLACE INTO suite(seq, name, config, startTime) VALUES (
-					(SELECT seq FROM suite WHERE name = @suite),
-					@suite,
-					@serCfg,
-					@startTime
-				);`,
+		_, err = d.db.Exec(`
+				UPDATE suite SET config = @serCfg, startTime = @startTime
+				WHERE name = @suite;`,
 			sql.Named("suite", testSuite), sql.Named("serCfg", serializedConfig),
 			sql.Named("startTime", micros),
 		)
-
-		/*
-			_, err = d.db.Exec(`
-					UPDATE suite SET config = @serCfg, startTime = @startTime
-					WHERE name = @suite;`,
-				sql.Named("suite", testSuite), sql.Named("serCfg", serializedConfig),
-				sql.Named("startTime", micros),
-			)
-		*/
 	} else {
-
-		_, err = d.db.Exec(`INSERT OR REPLACE INTO suite(seq, name, config) VALUES (
-				(SELECT seq FROM suite WHERE name = @suite),
-				@suite,
-				@serCfg
-				);`,
+		_, err = d.db.Exec(`
+				UPDATE suite SET config = @serCfg
+				WHERE name = @suite;`,
 			sql.Named("suite", testSuite), sql.Named("serCfg", serializedConfig),
 		)
-		/*
-			_, err = d.db.Exec(`
-					UPDATE suite SET config = @serCfg
-					WHERE name = @suite;`,
-				sql.Named("suite", testSuite), sql.Named("serCfg", serializedConfig),
-			)
-		*/
 	}
 	if err != nil {
 		return
@@ -284,7 +290,7 @@ func (d Suite) SaveSuiteConfig(testSuite string, cfg model.Config) (err error) {
 	if err != nil {
 		return
 	}
-	logger.Warn("saved suite config", "suite", testSuite, "seq", seq)
+	logger.Debug("SaveSuiteConfig() end", "suite", testSuite, "seq", seq)
 	return
 }
 

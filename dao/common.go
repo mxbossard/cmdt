@@ -8,6 +8,7 @@ import (
 	"time"
 
 	_ "modernc.org/sqlite"
+	//_ "github.com/mattn/go-sqlite3"
 
 	"mby.fr/cmdtest/model"
 	"mby.fr/utils/zql"
@@ -46,7 +47,15 @@ func DbOpen(dirpath string) (db *zql.SynchronizedDB, err error) {
 		return
 	}
 
-	db.SetMaxOpenConns(5)
+	db.SetMaxOpenConns(1)
+
+	// Config to increase DB speed : temp objets and transaction journal stored in memory.
+	db.Exec(`
+		PRAGMA TEMP_STORE = MEMORY;
+		PRAGMA JOURNAL_MODE = MEMORY;
+		PRAGMA SYNCHRONOUS = OFF;
+		PRAGMA LOCKING_MODE = NORMAL;
+	`)
 
 	logger.Debug("opened db", "file", file)
 	return

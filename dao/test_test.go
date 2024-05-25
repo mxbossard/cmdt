@@ -120,8 +120,8 @@ func TestGetSuiteOutcome(t *testing.T) {
 	addTest(t, dao, expectedSuite1, 2, "bazName", []string{"echo", "baz"}, "bazStdout", "bazStderr", 3, model.PASSED, results(rFailOk, rExit0Ok))
 	addTest(t, dao, expectedSuite1, 3, "pifName", []string{"echo", "pif"}, "pifStdout", "pifStderr", 2, model.FAILED, results(rSuccessKo))
 	addTest(t, dao, expectedSuite2, 0, "pafName", []string{"echo", "paf"}, "", "", -1, model.IGNORED, results())
-	suiteDao.UpdateEndTime(expectedSuite1, expectedEndTime1)
-	suiteDao.UpdateEndTime(expectedSuite2, expectedEndTime2)
+	suiteDao.UpdateSuiteEndTime(expectedSuite1, expectedEndTime1)
+	suiteDao.UpdateSuiteEndTime(expectedSuite2, expectedEndTime2)
 
 	var count int
 	row := dao.db.QueryRow("SELECT count(*) FROM assertion_result WHERE suite = ?", expectedSuite1)
