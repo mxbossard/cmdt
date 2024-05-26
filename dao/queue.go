@@ -93,16 +93,6 @@ func (d Queue) IsOperationsDone(op model.Operater) (done bool, exitCode int16, e
 	return
 }
 
-func (d Queue) isOperationsDone0(op model.Operater) (done bool, exitCode int16, err error) {
-	row := d.db.QueryRow(`
-		SELECT count(*) = 1, q.exitCode 
-		FROM operation_queue q
-		WHERE q.id = @opId AND q.exitCode IS NOT NULL;
-	`, sql.Named("opId", op.Id()))
-	err = row.Scan(&done, &exitCode)
-	return
-}
-
 func (d Queue) QueuedSuites() (queued []string, err error) {
 	rows, err := d.db.Query(`
 		SELECT s.name 

@@ -54,9 +54,8 @@ func TestBuildAssertion(t *testing.T) {
 	var ok bool
 	var assertion model.Assertion
 	var err error
-	var cfg model.Config
 
-	cfg = model.NewGlobalDefaultConfig()
+	cfg := model.NewGlobalDefaultConfig()
 	ok, _, err = BuildAssertion(cfg, "foo")
 	assert.NoError(t, err)
 	assert.False(t, ok)

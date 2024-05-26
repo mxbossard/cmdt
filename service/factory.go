@@ -1050,7 +1050,7 @@ func ValidateOnceOnlyDefinedRule(rules ...model.Rule) (err error) {
 	}
 	matches := map[model.RuleKey][]model.Rule{}
 	for _, rule := range rules {
-		key := model.RuleKey{rule.Name, rule.Op}
+		key := model.RuleKey{Name: rule.Name, Op: rule.Op}
 		matches[key] = append(matches[key], rule)
 	}
 
