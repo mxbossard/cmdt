@@ -18,8 +18,7 @@ import (
 	"mby.fr/utils/zlog"
 )
 
-var _ = zlog.ColoredConfig()
-var logger = zlog.NewColored() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
+var logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 
 func InitSeq(pathes ...string) (err error) {
 	seqFilepath := filepath.Join(pathes...)

@@ -20,7 +20,7 @@ const (
 )
 
 var (
-	logger = zlog.NewColored() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
+	logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 )
 
 func DbOpen(dirpath string) (db *zql.SynchronizedDB, err error) {

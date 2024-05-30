@@ -25,7 +25,7 @@ const (
 	ExtraRunningSecs   = 5
 )
 
-var logger = zlog.NewColored() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
+var logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 
 /*
 Keys:

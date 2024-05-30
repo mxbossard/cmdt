@@ -20,8 +20,7 @@ import (
 
 var (
 	dpl    = display.New()
-	_      = zlog.ColoredConfig()
-	logger = zlog.NewColored() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
+	logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 )
 
 func usage() {

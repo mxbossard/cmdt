@@ -19,7 +19,7 @@ const (
 )
 
 var (
-	logger                        = zlog.NewColored() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
+	logger                        = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 	testSuiteNameSanitizerPattern = regexp.MustCompile("[^a-zA-Z0-9]")
 )
 
