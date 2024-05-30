@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,9 +16,10 @@ import (
 	"mby.fr/cmdtest/utils"
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/utilz"
+	"mby.fr/utils/zlog"
 )
 
-var logger = slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
+var logger = zlog.NewColored() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 
 var (
 // g *GlobalContext

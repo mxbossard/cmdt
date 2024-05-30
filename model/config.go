@@ -24,7 +24,7 @@ const (
 	DefaultInitlessAsync        = false
 	DefaultInitlessWait         = true
 	StartDebugLevel             = WARN
-	DefaultDebugLevel           = INFO
+	DefaultDebugLevel           = DEBUG
 	DefaultTooMuchFailures      = 3
 	TooMuchFailuresNoLimit      = -1
 
@@ -194,10 +194,12 @@ const (
 type DebugLevel int16
 
 const (
-	ERROR DebugLevel = iota
+	FATAL DebugLevel = iota
+	ERROR
 	WARN
 	INFO
 	DEBUG
+	PERF
 	TRACE
 )
 

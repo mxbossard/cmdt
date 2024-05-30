@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -16,9 +15,11 @@ import (
 	"mby.fr/cmdtest/model"
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/trust"
+	"mby.fr/utils/zlog"
 )
 
-var logger = slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
+var _ = zlog.ColoredConfig()
+var logger = zlog.NewColored() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 
 func InitSeq(pathes ...string) (err error) {
 	seqFilepath := filepath.Join(pathes...)

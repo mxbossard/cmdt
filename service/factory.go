@@ -15,6 +15,7 @@ import (
 	"mby.fr/utils/errorz"
 	"mby.fr/utils/filez"
 	"mby.fr/utils/utilz"
+	"mby.fr/utils/zlog"
 )
 
 /*
@@ -632,6 +633,7 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 			var level uint16
 			level, err = Translate(rule, Uint16Mapper, OperatorValidater[uint16]("="), Uint16ValueValidater(0, uint16(model.TRACE)))
 			c.Debug.Set(model.DebugLevel(level))
+			zlog.SetLogLevelThreshold0IsFatal(int(level))
 		case "failuresLimit":
 			c.TooMuchFailures, err = TranslateOptional(rule, Int32Mapper, OperatorValidater[int32]("="), Int32ValueValidater(-1, 1000))
 		default:

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -12,6 +11,7 @@ import (
 
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/utils"
+	"mby.fr/utils/zlog"
 )
 
 const (
@@ -19,7 +19,7 @@ const (
 )
 
 var (
-	logger                        = slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
+	logger                        = zlog.NewColored() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 	testSuiteNameSanitizerPattern = regexp.MustCompile("[^a-zA-Z0-9]")
 )
 

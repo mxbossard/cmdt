@@ -15,11 +15,14 @@ import (
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/printz"
 	"mby.fr/utils/utilz"
+	"mby.fr/utils/zlog"
 )
 
-var dpl = display.New()
-
-var logger = slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
+var (
+	dpl    = display.New()
+	_      = zlog.ColoredConfig()
+	logger = zlog.NewColored() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
+)
 
 func usage() {
 	usagePrinter := printz.NewStandard()

@@ -17,12 +17,12 @@ package main
 
 import (
 	"fmt"
-	"log/slog"
 	"os"
 
 	"mby.fr/cmdtest/daemon"
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/service"
+	"mby.fr/utils/zlog"
 )
 
 /*
@@ -232,6 +232,11 @@ Features:
 
 */
 
+func init() {
+	zlog.ColoredConfig()
+	zlog.SetLogLevelThreshold0IsFatal(int(model.StartDebugLevel))
+}
+
 func RecoverExiting() {
 	if r := recover(); r != nil {
 		fmt.Printf("Cause of panic ==>> %q\n", r)
@@ -245,7 +250,8 @@ func main() {
 
 	daemon.TakeOver()
 
-	model.LoggerLevel.Set(slog.Level(8 - model.StartDebugLevel*4))
+	//model.LoggerLevel.Set(slog.Level(8 - model.StartDebugLevel*4))
+
 	daemonToken, wait := service.ProcessArgs(os.Args)
 
 	if daemonToken != "" {

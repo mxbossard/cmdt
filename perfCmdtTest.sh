@@ -65,11 +65,11 @@ export -n __CMDT_TOKEN
 #$cmdt @init=main
 
 >&2 echo "## Test cmdt basic assertions should passed"
-$cmdt1 @init=perf
+$cmdt1 @init=perf @verbose=4 @debug=5
 
-$cmdt1 @verbose=4 @debug=4 @test=perf/echo_foo echo foo
+$cmdt1 @test=perf/echo_foo echo foo
 
-$cmdt1 @verbose=4 @debug=4 @test=perf/sleep_1 sleep 1
+$cmdt1 @test=perf/sleep_1 sleep 1
 
 $cmdt1 @report
 

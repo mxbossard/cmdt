@@ -15,6 +15,7 @@ import (
 	"mby.fr/cmdtest/repo"
 	"mby.fr/cmdtest/service"
 	"mby.fr/utils/filez"
+	"mby.fr/utils/zlog"
 )
 
 const (
@@ -24,7 +25,7 @@ const (
 	ExtraRunningSecs   = 5
 )
 
-var logger = slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
+var logger = zlog.NewColored() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 
 /*
 Keys:

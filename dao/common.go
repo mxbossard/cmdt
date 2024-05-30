@@ -1,7 +1,6 @@
 package dao
 
 import (
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,7 +9,7 @@ import (
 	_ "modernc.org/sqlite"
 	//_ "github.com/mattn/go-sqlite3"
 
-	"mby.fr/cmdtest/model"
+	"mby.fr/utils/zlog"
 	"mby.fr/utils/zql"
 	"mby.fr/utils/zqlite"
 )
@@ -21,7 +20,7 @@ const (
 )
 
 var (
-	logger = slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
+	logger = zlog.NewColored() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 )
 
 func DbOpen(dirpath string) (db *zql.SynchronizedDB, err error) {
