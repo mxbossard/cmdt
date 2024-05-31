@@ -226,7 +226,7 @@ func PerformTest(testDef model.TestDefinition) (exitCode int16, err error) {
 }
 
 func ProcessTestDef(testDef model.TestDefinition) (exitCode int16) {
-	token := testDef.Token
+	//token := testDef.Token
 	testSuite := testDef.TestSuite
 	testCfg := testDef.Config
 	testCtx := facade.NewTestContext2(testDef)
@@ -247,8 +247,6 @@ func ProcessTestDef(testDef model.TestDefinition) (exitCode int16) {
 		err = fmt.Errorf("cannot mock absolute path outside a container")
 		testCtx.NoErrorOrFatal(err)
 	}
-
-	logger.Debug("Processing test action", "token", token)
 
 	dpl.Quiet(testCfg.Quiet.Is(true))
 	if testCfg.ContainerDisabled.Is(true) || testCfg.ContainerImage.IsEmpty() {
@@ -298,11 +296,9 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 	rulePrefix := defaultCfg.Prefix.Get()
 
 	signifientArgs := allArgs[1:]
-	logger.Debug("Processing cmdt args", "args", signifientArgs)
 	inputConfig, assertions, agg := ParseArgs(rulePrefix, signifientArgs)
-	//loadedConfig := inputConfig
 	inputConfig.Token.Default(envToken)
-	logger.Debug("Parsed args", "inputConfig", inputConfig, "assertions", assertions, "error", agg)
+	logger.Debug("Parsed args", "args", signifientArgs, "inputConfig", inputConfig, "assertions", assertions, "error", agg)
 	if inputConfig.Debug.IsPresent() {
 		model.LoggerLevel.Set(slog.Level(8 - inputConfig.Debug.Get()*4))
 	}
@@ -323,15 +319,15 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 			log.Fatal(agg)
 		}
 		globalCtx := facade.NewGlobalContext(token, isolation, inputConfig)
-		logger.Debug("Forged context", "ctx", globalCtx)
+		logger.Trace("Forged context", "ctx", globalCtx)
 		logger.Info("Processing global action", "token", token)
 		dpl.Quiet(globalCtx.Config.Quiet.Is(true))
 		exitCode, err = GlobalConfig(globalCtx)
 	case model.InitAction:
 		testSuite := inputConfig.TestSuite.Get()
 		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig)
-		logger.Debug("Forged context", "ctx", suiteCtx)
 		suiteCtx.NoErrorOrFatal(agg.Return())
+		logger.Trace("Forged context", "ctx", suiteCtx)
 		logger.Info("Processing init action", "token", token)
 		dpl.Quiet(suiteCtx.Config.Quiet.Is(true))
 		exitCode, err = InitTestSuite(suiteCtx)
@@ -351,8 +347,8 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 			globalCtx := facade.NewGlobalContext(token, isolation, inputConfig)
 			if globalCtx.Config.Async.Is(false) {
 				// Process report all without daemon
-				logger.Debug("Forged context", "ctx", globalCtx)
-				logger.Warn("executing report all in sync (not queueing report)")
+				logger.Trace("Forged context", "ctx", globalCtx)
+				logger.Info("executing report all in sync (not queueing report)")
 				dpl.Quiet(globalCtx.Config.Quiet.Is(true))
 				// TODO: wait all tests run
 				// Daemon must be off or No test remaining in suite queue
@@ -360,7 +356,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 				exitCode, err = ReportAllTestSuites(globalCtx)
 			} else {
 				// Delegate report all processing to daemon
-				logger.Warn("executing report all async (queueing report)")
+				logger.Info("executing report all async (queueing report)")
 				def := model.ReportDefinition{
 					Token:     token,
 					Isolation: isolation,
@@ -403,8 +399,8 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 
 			if suiteCtx.Config.Async.Is(false) {
 				// Process report without daemon
-				logger.Debug("Forged context", "ctx", suiteCtx)
-				logger.Warn("executing report in sync (not queueing report)", "suite", testSuite)
+				logger.Trace("Forged context", "ctx", suiteCtx)
+				logger.Info("executing report in sync (not queueing report)", "suite", testSuite)
 				dpl.Quiet(suiteCtx.Config.Quiet.Is(true))
 				suiteCtx.Repo.WaitEmptyQueue(testSuite, suiteCtx.Config.SuiteTimeout.Get())
 				//exitCode, err = ReportTestSuite(suiteCtx)
@@ -412,7 +408,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 				suiteCtx.Repo.Done(&op)
 			} else {
 				// Delegate report processing to daemon
-				logger.Warn("executing report async (queueing report)", "suite", testSuite)
+				logger.Info("executing report async (queueing report)", "suite", testSuite)
 				def := model.ReportDefinition{
 					Token:     token,
 					Isolation: isolation,
@@ -426,12 +422,12 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 				if suiteCtx.Config.Wait.Is(true) {
 					wait = func() int16 {
 						// FIXME: bad timeout
-						logger.Warn("waiting report done ...", "suite", testSuite)
+						p := logger.QualifiedPerfTimer("waiting report done ...", "suite", testSuite)
 						exitCode, err := suiteCtx.Repo.WaitOperationDone(&op, suiteCtx.Config.SuiteTimeout.Get())
 						if err != nil {
 							panic(err)
 						}
-						logger.Warn("report done", "suite", testSuite)
+						p.End()
 						return exitCode
 					}
 				} else {
@@ -449,7 +445,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 		testCtx.NoErrorOrFatal(agg.Return())
 		testCfg := testCtx.Config
 		token = testCtx.Token
-		logger.Debug("Forged context", "ctx", testCtx)
+		logger.Trace("Forged context", "ctx", testCtx)
 
 		testDef := model.TestDefinition{
 			TestSignature: model.TestSignature{

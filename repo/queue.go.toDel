@@ -32,7 +32,7 @@ func (r *OperationQueueRepo) Queue(op model.Operater) {
 		r.QueuedSuites = append(r.QueuedSuites, testSuite)
 		q = OperationQueue{}
 	}
-	logger.Debug("Queue()", "testSuite", testSuite, "operation", op)
+	logger.Trace("Queue()", "testSuite", testSuite, "operation", op)
 
 	sop := model.SerializeOp0(op)
 	q.Operations = append(q.Operations, sop)
@@ -47,7 +47,7 @@ func (r *OperationQueueRepo) Unqueue() (ok bool, op model.Operater) {
 	if len(r.QueuedSuites) == 0 {
 		return
 	}
-	logger.Debug("Unqueue()", "QueuedSuites", r.QueuedSuites, "OpenedSuites", r.OpenedSuites)
+	logger.Trace("Unqueue()", "QueuedSuites", r.QueuedSuites, "OpenedSuites", r.OpenedSuites)
 	var electedSuite string
 	for _, suite := range r.OpenedSuites {
 		// Elect first open not blocked queue
@@ -86,7 +86,7 @@ func (r *OperationQueueRepo) Unqueue() (ok bool, op model.Operater) {
 		panic(err)
 	}
 	size := len(q.Operations)
-	logger.Debug("Unqueue()", "electedSuite", electedSuite, "size", size)
+	logger.Trace("Unqueue()", "electedSuite", electedSuite, "size", size)
 
 	if size > 0 {
 		// Unqueue operation
@@ -101,7 +101,7 @@ func (r *OperationQueueRepo) Unqueue() (ok bool, op model.Operater) {
 	}
 
 	if len(q.Operations) == 0 {
-		logger.Debug("Unqueue() clearing QueuedSuites")
+		logger.Trace("Unqueue() clearing QueuedSuites")
 		// Empty queue => remove it
 		if len(r.QueuedSuites) == 1 {
 			r.QueuedSuites = []string{}
@@ -181,7 +181,7 @@ func (r OperationQueueRepo) Persist() (err error) {
 	if err != nil {
 		return
 	}
-	logger.Debug("Persisting queue", "context", content, "file", r.backingFilepath)
+	logger.Trace("Persisting queue", "context", content, "file", r.backingFilepath)
 	err = os.WriteFile(r.backingFilepath, content, 0600)
 	if err != nil {
 		err = fmt.Errorf("cannot persist context: %w", err)
@@ -205,7 +205,7 @@ func (r *OperationQueueRepo) Update() (err error) {
 	} else if err != nil {
 		return
 	}
-	//logger.Debug("Update()", "backingFilepath", r.backingFilepath, "content", content)
+	//logger.Trace("Update()", "backingFilepath", r.backingFilepath, "content", content)
 	err = yaml.Unmarshal(content, r)
 	r.lastUpdate = time.Now()
 	return

@@ -252,7 +252,7 @@ func (r dbRepo) WaitOperationDone(op model.Operater, timeout time.Duration) (exi
 			return
 		}
 		time.Sleep(1 * time.Millisecond)
-		//logger.Debug("waiting ...", "op", op)
+		logger.Trace("waiting ...", "op", op)
 	}
 	err = errors.New("WaitOperationDone() timed out")
 	return
@@ -266,7 +266,7 @@ func (r dbRepo) WaitEmptyQueue(testSuite string, timeout time.Duration) (err err
 		if err != nil {
 			return
 		}
-		//logger.Warn("WaitEmptyQueue()", "testSuite", testSuite, "count", count)
+		logger.Trace("WaitEmptyQueue()", "testSuite", testSuite, "count", count)
 		if count == 0 {
 			// Queue is empty
 			return

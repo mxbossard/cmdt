@@ -47,10 +47,10 @@ func StartContainer(testCtx facade.TestContext) (id string, err error) {
 	// discard stdout which should contain only container id (because of Detach option)
 	e.SetOutputs(io.Discard, os.Stderr)
 
-	logger.Debug("starting container", "id", id, "image", image)
+	p := logger.QualifiedPerfTimer("starting container", "id", id, "image", image)
 	_, err = e.BlockRun()
 	duration := time.Since(start)
-	logger.Debug("started container", "duration", duration, "id", id, "image", image)
+	p.End("duration", duration)
 	return
 }
 
@@ -104,7 +104,7 @@ func RemoveContainer(id string) (err error) {
 	e.SetOutputs(os.Stdout, os.Stderr)
 
 	go func() {
-		logger.Debug("removing container", "id", id)
+		p := logger.PerfTimer("removing container", "id", id)
 		exitCode, err := e.BlockRun()
 		if err != nil {
 			logger.Error("error stopping container", "error", err)
@@ -113,7 +113,7 @@ func RemoveContainer(id string) (err error) {
 			logger.Error("error stopping container", "exitCode", exitCode)
 		}
 		duration := time.Since(start)
-		logger.Debug("removed container", "duration", duration, "id", id)
+		p.End("duration", duration, "id", id)
 	}()
 	return
 }
@@ -130,10 +130,10 @@ func ExecInContainer(testCtx facade.TestContext, id string, cmdAndArgs []string)
 	user := fmt.Sprintf("%d", os.Getuid())
 	exec = ctnrz.Engine().Container(id).Exec(cmdAndArgs...).AddEnvMap(envArgs).User(user).Executer()
 	exec.SetOutputs(os.Stdout, os.Stderr)
-	logger.Warn("executing in container", "id", id, "cmdAndArgs", cmdAndArgs, "seq", testCtx.Seq)
+	p := logger.QualifiedPerfTimer("executing in container", "id", id, "cmdAndArgs", cmdAndArgs, "seq", testCtx.Seq)
 	_, err = exec.BlockRun()
 	duration := time.Since(start)
-	logger.Debug("executed in container", "duration", duration, "id", id, "cmdAndArgs", cmdAndArgs)
+	p.End("duration", duration, "id", id, "cmdAndArgs", cmdAndArgs)
 	return
 }
 

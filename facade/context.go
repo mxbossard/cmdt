@@ -21,18 +21,7 @@ import (
 
 var logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 
-var (
-// g *GlobalContext
-// s *SuiteContext
-// t *TestContext
-)
-
 func NewGlobalContext(token, isolation string, inputCfg model.Config) GlobalContext {
-	/*
-		if g != nil {
-			return *g
-		}
-	*/
 	var err error
 	token, err = utils.ForgeContextualToken(token)
 	if err != nil {
@@ -53,16 +42,10 @@ func NewGlobalContext(token, isolation string, inputCfg model.Config) GlobalCont
 		Repo:      repo,
 		Config:    cfg,
 	}
-	//g = &c
 	return c
 }
 
 func NewSuiteContext(token, isolation, testSuite string, initless bool, action model.Action, inputCfg model.Config) SuiteContext {
-	/*
-		if s != nil {
-			return *s
-		}
-	*/
 	globalCtx := NewGlobalContext(token, isolation, model.Config{})
 	suiteCfg, err := globalCtx.Repo.GetSuiteConfig(testSuite, initless)
 	if err != nil {
@@ -70,27 +53,18 @@ func NewSuiteContext(token, isolation, testSuite string, initless bool, action m
 	}
 
 	mergedCfg := globalCtx.Config
-	logger.Debug("before suite merge", "cfg", mergedCfg)
 	mergedCfg.Merge(suiteCfg)
-	logger.Debug("after suite merge", "suiteCfg", suiteCfg, "mergedCfg", mergedCfg)
 	mergedCfg.Merge(inputCfg)
-	logger.Debug("merged suite context", "testSuite", testSuite, "inputCfg", inputCfg, "mergedCfg", mergedCfg)
 	globalCtx.Config = mergedCfg
 
 	suiteCtx := SuiteContext{
 		GlobalContext: globalCtx,
 		Action:        action,
 	}
-	//s = &suiteCtx
 	return suiteCtx
 }
 
 func NewTestContext(token, isolation, testSuite string, seq uint16, inputCfg model.Config, ppid uint32) TestContext {
-	/*
-		if t != nil {
-			return *t
-		}
-	*/
 	suiteCtx := NewSuiteContext(token, isolation, testSuite, true, model.TestAction, model.Config{})
 	mergedCfg := suiteCtx.Config
 	mergedCfg.Merge(inputCfg)
@@ -101,7 +75,6 @@ func NewTestContext(token, isolation, testSuite string, seq uint16, inputCfg mod
 	testCtx.Config = mergedCfg
 	testCtx.Suite = suiteCtx
 	testCtx.Seq = seq
-	//logger.Warn("NewTestContext", "testCtx", testCtx)
 	err := testCtx.initExecuter(ppid)
 	if err != nil {
 		testCtx.NoErrorOrFatal(err)
@@ -113,7 +86,6 @@ func NewTestContext(token, isolation, testSuite string, seq uint16, inputCfg mod
 		_, testCtx.ContainerImage = utils.ReadEnvValue(model.EnvContainerImageKey)
 	}
 
-	//t = &testCtx
 	return testCtx
 }
 

@@ -71,7 +71,9 @@ func (d Test) init() (err error) {
 }
 
 func (d Test) DeleteTest(suite string) (err error) {
-	logger.Debug("DeleteTest() start", "suite", suite)
+	p := logger.PerfTimer("suite", suite)
+	defer p.End()
+
 	tx, err := d.db.Begin()
 	if err != nil {
 		return
@@ -89,12 +91,12 @@ func (d Test) DeleteTest(suite string) (err error) {
 	}
 
 	err = tx.Commit()
-	logger.Debug("DeleteTest() end", "suite", suite)
 	return
 }
 
 func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err error) {
-	logger.Debug("GetSuiteOutcome() start", "suite", suite)
+	p := logger.PerfTimer("suite", suite)
+	defer p.End()
 
 	var passedCount, failedCount, erroredCount, ignoredCount uint32
 	var testName, cmdAndArgs, testOc, stdout, stderr, testErrorMsg, prefix, assertName, op, expected, value, assertErrorMsg string
@@ -208,15 +210,15 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 	//outcome.FailureReports = failedAssertionsMessages
 	outcome.TestOutcomes = collections.MapOrderedValues(testOutcomeBySeq)
 
-	logger.Debug("GetSuiteOutcome() end", "suite", suite)
-
 	return
 }
 
 func (d Test) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 	seq := outcome.Seq
 	suite := outcome.TestSuite
-	logger.Debug("SaveTestOutcome() start", "suite", suite, "seq", seq)
+	p := logger.PerfTimer("suite", suite, "seq", seq)
+	defer p.End()
+
 	name := outcome.TestName
 	cmdAndArgs := strings.Join(outcome.CmdAndArgs, CMD_AND_ARGS_SEPARATOR)
 	errorMsg := ""
@@ -253,7 +255,7 @@ func (d Test) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 	if err != nil {
 		return
 	}
-	logger.Debug("Inserted test outcome", "suite", suite, "seq", seq, "outcome", outcome.Outcome)
+	logger.Trace("Inserted test outcome", "suite", suite, "seq", seq, "outcome", outcome.Outcome)
 
 	for _, res := range outcome.AssertionResults {
 		rule := res.Rule
@@ -278,16 +280,16 @@ func (d Test) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 		if err != nil {
 			return
 		}
-		logger.Debug("Inserted assertion result", "suite", suite, "seq", seq, "result", res)
+		logger.Trace("Inserted assertion result", "suite", suite, "seq", seq, "result", res)
 	}
 
 	err = tx.Commit()
-	logger.Debug("SaveTestOutcome() end", "suite", suite, "seq", seq)
 	return
 }
 
 func (d Test) ClearSuite(suite string) (err error) {
-	logger.Debug("ClearSuite() start", "suite", suite, "filelock", d.db.FileLockPath())
+	p := logger.PerfTimer("suite", suite, "filelock", d.db.FileLockPath())
+	defer p.End()
 
 	_, err = d.db.Exec(`
 		DELETE FROM assertion_result
@@ -298,7 +300,6 @@ func (d Test) ClearSuite(suite string) (err error) {
 	if err != nil {
 		return
 	}
-	logger.Debug("ClearSuite() end", "suite", suite, "filelock", d.db.FileLockPath())
 	return
 }
 

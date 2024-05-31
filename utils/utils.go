@@ -142,7 +142,7 @@ func ReadEnvValue(key string) (ok bool, value string) {
 func ReadEnvToken() (token string) {
 	// Search uniqKey in env
 	_, token = ReadEnvValue(model.ContextTokenEnvVarName)
-	logger.Debug("Found a token in env: " + token)
+	logger.Trace("Found a token in env: " + token)
 	return
 }
 
@@ -154,10 +154,10 @@ func ReadEnvPpid() (ppid int) {
 		if err != nil {
 			panic(err)
 		}
-		logger.Debug("found env ppid", "ppid", ppid)
+		logger.Trace("found env ppid", "ppid", ppid)
 	} else {
 		ppid = os.Getppid()
-		logger.Debug("env ppid not found", "ppid", ppid)
+		logger.Trace("env ppid not found", "ppid", ppid)
 	}
 	return
 }
@@ -170,9 +170,9 @@ func ReadEnvTestSeq() (seq uint16) {
 			panic(err)
 		}
 		seq = uint16(s)
-		logger.Debug("found env seq", "seq", seq)
+		logger.Trace("found env seq", "seq", seq)
 	} else {
-		logger.Debug("env ppid not found", "seq", seq)
+		logger.Trace("env ppid not found", "seq", seq)
 	}
 	return
 }
@@ -202,7 +202,7 @@ func ForgeContextualToken(token string) (string, error) {
 			err = fmt.Errorf("cannot hash workspace dir: %w", err)
 			return "", err
 		}
-		logger.Debug("token signature", "workDirPath", "token", token, workDirPath, "ppidStr", ppidStr)
+		logger.Trace("token signature", "workDirPath", "token", token, workDirPath, "ppidStr", ppidStr)
 		//log.Printf("contextual token: %s base on workDirPath: %s and ppid: %s\n", token, workDirPath, ppid)
 	}
 

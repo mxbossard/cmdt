@@ -97,14 +97,14 @@ func (d daemon) unqueue() (ok bool, err error) {
 }
 
 func (d daemon) run() {
-	logger.Warn("daemon: starting ...", "token", d.token)
+	logger.Info("daemon: starting ...", "token", d.token)
 	startTime := time.Now()
 	debugTime := time.Now()
 	lastUnqueue := time.Now()
 	for {
 		if time.Since(debugTime) > time.Second {
 			debugTime = time.Now()
-			logger.Warn("daemon running", "token", d.token, "for", time.Since(startTime))
+			logger.Trace("daemon running", "token", d.token, "for", time.Since(startTime))
 		}
 
 		if ok, err := d.unqueue(); err != nil {
@@ -113,7 +113,7 @@ func (d daemon) run() {
 			// nothing to unqueue wait 1ms
 			duration := time.Since(lastUnqueue)
 			if duration > ExtraRunningSecs*time.Second {
-				logger.Info("daemon: nothing to unqueue", "duration", duration, "token", d.token)
+				logger.Debug("daemon: nothing to unqueue", "duration", duration, "token", d.token)
 				// More than ExtraRunningSecs since last unqueue
 				break
 			}
@@ -123,28 +123,27 @@ func (d daemon) run() {
 
 		lastUnqueue = time.Now()
 	}
-	logger.Warn("daemon: stopping ...", "token", d.token, "after", time.Since(startTime))
+	logger.Info("daemon: stopping ...", "token", d.token, "after", time.Since(startTime))
 }
 
 func (d daemon) performTest(testDef model.TestDefinition) (exitCode int16) {
-	//logger.Warn("daemon performing test", "testDef", testDef)
-	logger.Debug("daemon: processing test...")
+	perf := logger.PerfTimer()
+	defer perf.End()
 	exitCode = service.ProcessTestDef(testDef)
-	logger.Debug("daemon: test done.")
 	return
 }
 
 func (d daemon) report(def model.ReportDefinition) (exitCode int16, err error) {
-	logger.Debug("daemon: reporting test suite...")
+	perf := logger.PerfTimer()
+	defer perf.End()
 	exitCode, err = service.ProcessReportDef(def)
-	logger.Debug("daemon: reporting done.")
 	return
 }
 
 func (d daemon) reportAll(def model.ReportDefinition) (exitCode int16) {
-	logger.Debug("daemon: reporting all test suites...")
+	perf := logger.PerfTimer()
+	defer perf.End()
 	exitCode = service.ProcessReportAllDef(def)
-	logger.Debug("daemon: reporting done.")
 	return
 }
 
@@ -189,6 +188,7 @@ func TakeOver() {
 		return
 	}
 
+	zlog.ColoredConfig(slog.String("part", "daemon"))
 	token := os.Args[2]
 	repo := repo.New(token, "")
 	d := daemon{token: token, repo: repo}
@@ -274,7 +274,7 @@ func TakeOver() {
 }
 
 func LanchProcessIfNeeded(token string) error {
-	logger.Warn("daemon: should I launch daemon ?", "token", token)
+	logger.Debug("daemon: should I launch daemon ?", "token", token)
 	if token == "" {
 		// No token => no daemon to launch
 		return nil
@@ -328,6 +328,6 @@ func LanchProcessIfNeeded(token string) error {
 		err = proc.Release()
 	*/
 
-	logger.Warn("daemon process released")
+	logger.Debug("daemon process released")
 	return err
 }

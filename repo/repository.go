@@ -76,7 +76,9 @@ type Repo interface {
 }
 
 func New(token, isolation string) (repo dbRepo) {
-	logger.Debug("new repo", "token", token, "isolation", isolation)
+	p := logger.PerfTimer("token", token, "isolation", isolation)
+	defer p.End()
+
 	path, err := forgeWorkDirectoryPath(token, isolation)
 	if err != nil {
 		log.Fatal(err)
@@ -91,9 +93,11 @@ func New(token, isolation string) (repo dbRepo) {
 }
 
 func NewFile(token, isolation string) (repo FileRepo) {
+	p := logger.PerfTimer("token", token, "isolation", isolation)
+	defer p.End()
+
 	repo.token = token
 	repo.isolation = isolation
-	logger.Debug("new repo", "token", token, "isolation", isolation)
 	path, err := forgeWorkDirectoryPath(token, isolation)
 	if err != nil {
 		log.Fatal(err)

@@ -282,7 +282,7 @@ func (r FileRepo) LoadSuiteOutcome(testSuite string) (outcome model.SuiteOutcome
 		return
 	}
 	outcome.FailureReports = failureReports
-	logger.Debug("Loaded suite outcome", "testSuite", testSuite, "outcome", outcome)
+	logger.Trace("Loaded suite outcome", "testSuite", testSuite, "outcome", outcome)
 	return
 }
 
@@ -292,7 +292,7 @@ func (r FileRepo) IncrementSuiteSeq(testSuite, name string) (n uint32) {
 		log.Fatal(err)
 	}
 	n = utils.IncrementSeq(suiteDir, name)
-	logger.Debug("Incrementing seq", "testSuite", testSuite, "name", name, "next", n)
+	logger.Trace("Incrementing seq", "testSuite", testSuite, "name", name, "next", n)
 	return
 }
 
@@ -477,7 +477,7 @@ func clearSuiteWorkspace(testSuite, token, isol string) (err error) {
 		if err2 != nil {
 			return err2
 		}
-		logger.Debug("Persisting config", "suite", testSuite, "file", contextFilepath, "content", content)
+		logger.Trace("Persisting config", "suite", testSuite, "file", contextFilepath, "content", content)
 		err2 = os.WriteFile(contextFilepath, content, 0600)
 		if err2 != nil {
 			return err2
@@ -548,11 +548,11 @@ func clearSuiteWorkspace(testSuite, token, isol string) (err error) {
 		if err != nil {
 			return
 		}
-		logger.Debug("Loaded context", "global", globalCfg, "suite", suiteCfg)
+		logger.Trace("Loaded context", "global", globalCfg, "suite", suiteCfg)
 		config = globalCfg
 		config.Merge(suiteCfg)
 		//SetRulePrefix(config.Prefix)
-		logger.Debug("Merges context", "merged", config)
+		logger.Trace("Merges context", "merged", config)
 		return
 	}
 */

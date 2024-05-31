@@ -44,7 +44,9 @@ func (d Queue) QueueOperater(op model.Operater) (err error) {
 	if err != nil {
 		return
 	}
-	logger.Debug("queueing operater", "kind", op.Kind())
+	perf := logger.PerfTimer("kind", op.Kind())
+	defer perf.End()
+
 	tx, err := d.db.Begin()
 	if err != nil {
 		return
@@ -71,7 +73,6 @@ func (d Queue) QueueOperater(op model.Operater) (err error) {
 	}
 
 	op.SetId(uint16(id))
-	logger.Debug("queued operater", "id", id, "suite", op.Suite())
 
 	return
 }
@@ -245,6 +246,9 @@ func (d Queue) NextQueuedOperation(suite string, tx *zql.SynchronizedTx) (op mod
 }
 
 func (d Queue) UnqueueOperater() (op model.Operater, err error) {
+	perf := logger.PerfTimer()
+	defer perf.End()
+
 	// 1- Elect suite : first already open not blocking suite
 	// 2- Get next operation
 	// 3- Record blocking state
@@ -318,7 +322,7 @@ func (d Queue) UnqueueOperater() (op model.Operater, err error) {
 	}
 	opId := op.Id()
 
-	logger.Debug("unqueueOperater()", "electedSuite", electedSuite, "opId", opId)
+	logger.Trace("unqueueOperater()", "electedSuite", electedSuite, "opId", opId)
 
 	// Open this suite & Record blocking state
 	if op.Block() {

@@ -103,7 +103,7 @@ func FileContentMapper(s, op string) (v string, err error) {
 		// treat supplied value as a filepath
 		path := s
 		v, err = filez.ReadString(path)
-		logger.Debug("reading file", "path", path, "content", v)
+		logger.Trace("reading file", "path", path, "content", v)
 	} else {
 		v = strings.ReplaceAll(s, "\\n", "\n")
 	}
