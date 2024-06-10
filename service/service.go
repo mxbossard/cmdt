@@ -2,7 +2,6 @@ package service
 
 import (
 	"fmt"
-	"log"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -13,6 +12,7 @@ import (
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/utils"
 	"mby.fr/utils/cmdz"
+	"mby.fr/utils/errorz"
 	"mby.fr/utils/printz"
 	"mby.fr/utils/utilz"
 	"mby.fr/utils/zlog"
@@ -119,7 +119,7 @@ func ProcessReportAllDef(def model.ReportDefinition) (exitCode int16) {
 	ctx := facade.NewGlobalContext(def.Token, def.Isolation, model.Config{})
 	exitCode, err = ReportAllTestSuites(ctx)
 	if err != nil {
-		log.Fatal(err)
+		errorz.Fatal(err)
 	}
 	return
 }
@@ -129,6 +129,8 @@ func ReportTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	cfg := ctx.Config
 	testSuite := cfg.TestSuite.Get()
 	testCount := ctx.Repo.TestCount(testSuite)
+	logger.Debug("reporting suite", "suite", testSuite, "testCount", testCount)
+
 	if testCount == 0 {
 		err = fmt.Errorf("you must perform some test prior to report: [%s] suite", testSuite)
 		return
@@ -297,6 +299,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 
 	signifientArgs := allArgs[1:]
 	inputConfig, assertions, agg := ParseArgs(rulePrefix, signifientArgs)
+
 	inputConfig.Token.Default(envToken)
 	logger.Debug("Parsed args", "args", signifientArgs, "inputConfig", inputConfig, "assertions", assertions, "error", agg)
 	if inputConfig.Debug.IsPresent() {
@@ -315,10 +318,14 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 	var err error
 	switch action {
 	case model.GlobalAction:
+		// if agg.GotError() {
+		// 	log.Fatal(agg.Error())
+		// }
 		if agg.GotError() {
-			log.Fatal(agg)
+			errorz.Fatal(agg)
 		}
 		globalCtx := facade.NewGlobalContext(token, isolation, inputConfig)
+		globalCtx.NoErrorOrFatal(agg.Return())
 		logger.Trace("Forged context", "ctx", globalCtx)
 		logger.Info("Processing global action", "token", token)
 		dpl.Quiet(globalCtx.Config.Quiet.Is(true))
@@ -342,7 +349,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 		if inputConfig.ReportAll.Is(true) {
 			// Reporting All test suite
 			if agg.GotError() {
-				log.Fatal(agg)
+				errorz.Fatal(agg)
 			}
 			globalCtx := facade.NewGlobalContext(token, isolation, inputConfig)
 			if globalCtx.Config.Async.Is(false) {
@@ -366,7 +373,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 				op := model.ReportAllOperation(true, def) // FIXME should not block if test can be run simultaneously
 				err = globalCtx.Repo.QueueOperation(&op)
 				if err != nil {
-					log.Fatal(err)
+					errorz.Fatal(err)
 				}
 
 				if globalCtx.Config.Wait.Is(true) {
@@ -405,6 +412,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 				suiteCtx.Repo.WaitEmptyQueue(testSuite, suiteCtx.Config.SuiteTimeout.Get())
 				//exitCode, err = ReportTestSuite(suiteCtx)
 				exitCode, err = ProcessReportDef(def)
+				suiteCtx.NoErrorOrFatal(err)
 				suiteCtx.Repo.Done(&op)
 			} else {
 				// Delegate report processing to daemon
@@ -496,7 +504,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 	logger.Info("exiting", "exitCode", exitCode)
 
 	if err != nil {
-		log.Fatal(inputConfig.TestSuite, inputConfig.Token, err)
+		errorz.Fatal(inputConfig.TestSuite, inputConfig.Token, err)
 	}
 	return
 }

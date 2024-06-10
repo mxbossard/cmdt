@@ -7,7 +7,8 @@ workspaceDir="/tmp/cmdtWorkspace"
 >&2 echo "##### Building cmdtest binary ..."
 export GOBIN="$scriptDir/bin"
 cd "$scriptDir"
-go install
+#go install
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go install -tags netgo -ldflags '-w'
 
 rm -rf -- "$workspaceDir"
 

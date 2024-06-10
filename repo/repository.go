@@ -3,7 +3,6 @@ package repo
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -11,6 +10,7 @@ import (
 
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/utils"
+	"mby.fr/utils/errorz"
 	"mby.fr/utils/zlog"
 )
 
@@ -81,12 +81,12 @@ func New(token, isolation string) (repo dbRepo) {
 
 	path, err := forgeWorkDirectoryPath(token, isolation)
 	if err != nil {
-		log.Fatal(err)
+		errorz.Fatal(err)
 	}
 
 	repo, err = newDbRepo(path, isolation, token)
 	if err != nil {
-		log.Fatal(err)
+		errorz.Fatal(err)
 	}
 
 	return
@@ -100,12 +100,12 @@ func NewFile(token, isolation string) (repo FileRepo) {
 	repo.isolation = isolation
 	path, err := forgeWorkDirectoryPath(token, isolation)
 	if err != nil {
-		log.Fatal(err)
+		errorz.Fatal(err)
 	}
 
 	repo.dbRepo, err = newDbRepo(path, isolation, token)
 	if err != nil {
-		log.Fatal(err)
+		errorz.Fatal(err)
 	}
 
 	return

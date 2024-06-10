@@ -13,14 +13,14 @@ cd "$scriptDir"
 #CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go install -a -tags netgo -ldflags '-w'
 #CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go install -a -tags netgo -ldflags '-w -extldflags "-static"'
 
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go install -tags netgo -ldflags '-w'
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o "$GOBIN/cmdt" -tags netgo -ldflags '-w'
 
 cd - > /dev/null
 
 rm -rf -- "$workspaceDir"
 
 cmd="TO_REPLACE"
-newCmdt="$GOBIN/cmdtest"
+newCmdt="$GOBIN/cmdt"
 ls -lh "$newCmdt"
 
 # Trusted cmdt to works
@@ -158,8 +158,8 @@ grep "4 errors" "$of" || die "reporting should_error bad errors count"
 nothingToReportExpectedStderrMsg="you must perform some test prior to report"
 >&2 echo "## Test @report without test"
 $cmdtIn @init=meta1 #@verbose=4
-$cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=foo
-$cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=foo
+$cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=foo #@debug=4
+$cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=foo #@debug=4
 
 >&2 echo "## Meta1 test context not shared without token"
 $cmdtIn @test=meta1/"without token one" @stderr:"PASSED" @stderr:"#01" @-- $cmdt1 true @debug

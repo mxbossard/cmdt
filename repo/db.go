@@ -3,13 +3,13 @@ package repo
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"time"
 
 	"mby.fr/cmdtest/dao"
 	"mby.fr/cmdtest/model"
+	"mby.fr/utils/errorz"
 )
 
 type dbRepo struct {
@@ -25,7 +25,7 @@ type dbRepo struct {
 func (r dbRepo) BackingFilepath() string {
 	path, err := forgeWorkDirectoryPath(r.token, r.isolation)
 	if err != nil {
-		log.Fatal(err)
+		errorz.Fatal(err)
 	}
 	return path
 }
@@ -145,7 +145,7 @@ func (r dbRepo) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 func (r dbRepo) UpdateLastTestTime(testSuite string) {
 	err := r.suiteDao.UpdateSuiteEndTime(testSuite, time.Now())
 	if err != nil {
-		log.Fatal(err)
+		errorz.Fatal(err)
 	}
 }
 
@@ -167,7 +167,7 @@ func (r dbRepo) IncrementSuiteSeq(testSuite, name string) (n uint16) {
 		return 9999
 	}
 	if err != nil {
-		log.Fatal(err)
+		errorz.Fatal(err)
 	}
 	return
 }
@@ -175,7 +175,7 @@ func (r dbRepo) IncrementSuiteSeq(testSuite, name string) (n uint16) {
 func (r dbRepo) TestCount(testSuite string) (n uint16) {
 	n, err := r.suiteDao.TestCount(testSuite)
 	if err != nil {
-		log.Fatal(err)
+		errorz.Fatal(err)
 	}
 	return
 }
@@ -183,7 +183,7 @@ func (r dbRepo) TestCount(testSuite string) (n uint16) {
 func (r dbRepo) PassedCount(testSuite string) (n uint16) {
 	n, err := r.testDao.PassedCount(testSuite)
 	if err != nil {
-		log.Fatal(err)
+		errorz.Fatal(err)
 	}
 	return
 }
@@ -191,7 +191,7 @@ func (r dbRepo) PassedCount(testSuite string) (n uint16) {
 func (r dbRepo) IgnoredCount(testSuite string) (n uint16) {
 	n, err := r.testDao.IgnoredCount(testSuite)
 	if err != nil {
-		log.Fatal(err)
+		errorz.Fatal(err)
 	}
 	return
 }
@@ -199,7 +199,7 @@ func (r dbRepo) IgnoredCount(testSuite string) (n uint16) {
 func (r dbRepo) FailedCount(testSuite string) (n uint16) {
 	n, err := r.testDao.FailedCount(testSuite)
 	if err != nil {
-		log.Fatal(err)
+		errorz.Fatal(err)
 	}
 	return
 }
@@ -207,7 +207,7 @@ func (r dbRepo) FailedCount(testSuite string) (n uint16) {
 func (r dbRepo) ErroredCount(testSuite string) (n uint16) {
 	n, err := r.testDao.ErroredCount(testSuite)
 	if err != nil {
-		log.Fatal(err)
+		errorz.Fatal(err)
 	}
 	return
 }
@@ -215,7 +215,7 @@ func (r dbRepo) ErroredCount(testSuite string) (n uint16) {
 func (r dbRepo) TooMuchCount(testSuite string) (n uint16) {
 	n, err := r.suiteDao.TooMuchCount(testSuite)
 	if err != nil {
-		log.Fatal(err)
+		errorz.Fatal(err)
 	}
 	return
 }

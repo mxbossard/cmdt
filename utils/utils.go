@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -14,6 +13,7 @@ import (
 
 	"mby.fr/cmdtest/model"
 	"mby.fr/utils/cmdz"
+	"mby.fr/utils/errorz"
 	"mby.fr/utils/trust"
 	"mby.fr/utils/zlog"
 )
@@ -35,13 +35,13 @@ func IncrementSeq(pathes ...string) (seq uint32) {
 
 	file, err := os.OpenFile(seqFilepath, os.O_RDWR|os.O_CREATE, 0600)
 	if err != nil {
-		log.Fatalf("cannot open seq file (%s) to increment: %s", seqFilepath, err)
+		errorz.Fatalf("cannot open seq file (%s) to increment: %s", seqFilepath, err)
 	}
 	defer file.Close()
 	var strSeq string
 	_, err = fmt.Fscanln(file, &strSeq)
 	if err != nil && err != io.EOF {
-		log.Fatalf("cannot read seq file (%s) to increment: %s", seqFilepath, err)
+		errorz.Fatalf("cannot read seq file (%s) to increment: %s", seqFilepath, err)
 	}
 	if strSeq == "" {
 		seq = 0
@@ -49,7 +49,7 @@ func IncrementSeq(pathes ...string) (seq uint32) {
 		var i int
 		i, err = strconv.Atoi(strSeq)
 		if err != nil {
-			log.Fatalf("cannot convert seq file (%s) to an integer to increment: %s", seqFilepath, err)
+			errorz.Fatalf("cannot convert seq file (%s) to an integer to increment: %s", seqFilepath, err)
 		}
 		seq = uint32(i)
 	}
@@ -57,7 +57,7 @@ func IncrementSeq(pathes ...string) (seq uint32) {
 	newSec := seq + 1
 	_, err = file.WriteAt([]byte(fmt.Sprint(newSec)), 0)
 	if err != nil {
-		log.Fatalf("cannot write seq file (%s) to increment: %s", seqFilepath, err)
+		errorz.Fatalf("cannot write seq file (%s) to increment: %s", seqFilepath, err)
 	}
 
 	//fmt.Printf("Incremented seq(%s %s %s): %d => %d\n", testSuite, token, filename, seq, newSec)
@@ -73,7 +73,7 @@ func ReadSeq(pathes ...string) (c uint32) {
 		if os.IsNotExist(err) {
 			return 0
 		}
-		log.Fatalf("cannot open seq file (%s) to read: %s", seqFilepath, err)
+		errorz.Fatalf("cannot open seq file (%s) to read: %s", seqFilepath, err)
 	}
 	defer file.Close()
 	var strSeq string
@@ -82,12 +82,12 @@ func ReadSeq(pathes ...string) (c uint32) {
 		if err == io.EOF {
 			return 0
 		}
-		log.Fatalf("cannot read seq file (%s) to read: %s", seqFilepath, err)
+		errorz.Fatalf("cannot read seq file (%s) to read: %s", seqFilepath, err)
 	}
 	var i int
 	i, err = strconv.Atoi(strSeq)
 	if err != nil {
-		log.Fatalf("cannot convert seq file (%s) as an integer to read: %s", seqFilepath, err)
+		errorz.Fatalf("cannot convert seq file (%s) as an integer to read: %s", seqFilepath, err)
 	}
 	c = uint32(i)
 	return
@@ -185,7 +185,7 @@ func ForgeContextualToken(token string) (string, error) {
 		// If no token supplied use Workspace dir + ppid to forge tmp directory path
 		workDirPath, err := os.Getwd()
 		if err != nil {
-			//log.Fatalf("cannot find workspace dir: %s", err)
+			//errorz.Fatalf("cannot find workspace dir: %s", err)
 			return "", fmt.Errorf("cannot find workspace dir: %w", err)
 		}
 
@@ -193,7 +193,7 @@ func ForgeContextualToken(token string) (string, error) {
 		ppidStr := fmt.Sprintf("%d", ppid)
 		ppidStartTime, err := GetProcessStartTime(ppid)
 		if err != nil {
-			//log.Fatalf("cannot find parent process start time: %s", err)
+			//errorz.Fatalf("cannot find parent process start time: %s", err)
 			return "", fmt.Errorf("cannot find parent process start time: %w", err)
 		}
 		ppidStartTimeStr := fmt.Sprintf("%d", ppidStartTime)

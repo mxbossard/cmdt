@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +14,7 @@ import (
 	"mby.fr/cmdtest/repo"
 	"mby.fr/cmdtest/utils"
 	"mby.fr/utils/cmdz"
+	"mby.fr/utils/errorz"
 	"mby.fr/utils/utilz"
 	"mby.fr/utils/zlog"
 )
@@ -25,14 +25,14 @@ func NewGlobalContext(token, isolation string, inputCfg model.Config) GlobalCont
 	var err error
 	token, err = utils.ForgeContextualToken(token)
 	if err != nil {
-		log.Fatal(err)
+		errorz.Fatal(err)
 	}
 
 	repo := repo.New(token, isolation)
 
 	cfg, err := repo.GetGlobalConfig()
 	if err != nil {
-		log.Fatal(err)
+		errorz.Fatal(err)
 	}
 	cfg.Merge(inputCfg)
 
@@ -49,7 +49,7 @@ func NewSuiteContext(token, isolation, testSuite string, initless bool, action m
 	globalCtx := NewGlobalContext(token, isolation, model.Config{})
 	suiteCfg, err := globalCtx.Repo.GetSuiteConfig(testSuite, initless)
 	if err != nil {
-		log.Fatal(err)
+		errorz.Fatal(err)
 	}
 
 	mergedCfg := globalCtx.Config
@@ -108,6 +108,21 @@ func (c GlobalContext) MergeConfig(newCfg model.Config) {
 func (c GlobalContext) Save() error {
 	return c.Repo.SaveGlobalConfig(c.Config)
 }
+func (c GlobalContext) Fatal(v ...any) {
+	fmt.Fprint(os.Stderr, v...)
+	os.Exit(1)
+}
+
+func (c GlobalContext) NoErrorOrFatal(err error) {
+	if err != nil {
+		c.Config.TestSuite.IfPresent(func(testSuite string) error {
+			c.Repo.UpdateLastTestTime(testSuite)
+			c.Fatal(err)
+			return nil
+		})
+		c.Fatal(err)
+	}
+}
 
 type SuiteContext struct {
 	GlobalContext
@@ -161,7 +176,7 @@ func (c SuiteContext) SuiteErrorf(format string, v ...any) error {
 
 func (c SuiteContext) Fatal(v ...any) {
 	c.IncrementErroredCount()
-	log.Fatal(v...)
+	c.GlobalContext.Fatal(v...)
 }
 
 func (c SuiteContext) Fatalf(format string, v ...any) {
@@ -195,7 +210,7 @@ type TestContext struct {
 
 func (c TestContext) TestId() (id string) {
 	// TODO
-	log.Fatal("not implemented yet")
+	errorz.Fatal("not implemented yet")
 	return
 }
 

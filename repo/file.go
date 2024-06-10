@@ -3,7 +3,6 @@ package repo
 import (
 	"fmt"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +10,7 @@ import (
 
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/utils"
+	"mby.fr/utils/errorz"
 	"mby.fr/utils/format"
 	"mby.fr/utils/utilz"
 )
@@ -25,7 +25,7 @@ type FileRepo struct {
 func (r FileRepo) BackingFilepath() string {
 	path, err := forgeWorkDirectoryPath(r.token, "")
 	if err != nil {
-		log.Fatal(err)
+		errorz.Fatal(err)
 	}
 	return path
 }
@@ -250,13 +250,13 @@ func (r FileRepo) UpdateLastTestTime(testSuite string) {
 	//cfg, err := loadSuiteConfig(testSuite, r.token)
 	cfg, err := r.loadSuiteConfig(testSuite)
 	if err != nil {
-		log.Fatal(err)
+		errorz.Fatal(err)
 	}
 	cfg.LastTestTime = utilz.OptionalOf(time.Now())
 	err = r.persistSuiteConfig(*cfg)
 	if err != nil {
 		err = fmt.Errorf("unable to update last test time: %w", err)
-		log.Fatal(err)
+		errorz.Fatal(err)
 	}
 }
 
@@ -289,7 +289,7 @@ func (r FileRepo) LoadSuiteOutcome(testSuite string) (outcome model.SuiteOutcome
 func (r FileRepo) IncrementSuiteSeq(testSuite, name string) (n uint32) {
 	suiteDir, err := testSuiteDirectoryPath(testSuite, r.token, r.isolation)
 	if err != nil {
-		log.Fatal(err)
+		errorz.Fatal(err)
 	}
 	n = utils.IncrementSeq(suiteDir, name)
 	logger.Trace("Incrementing seq", "testSuite", testSuite, "name", name, "next", n)
@@ -355,7 +355,7 @@ func (r FileRepo) readSuiteSeq(testSuite, name string) (n uint32) {
 	//logger.Warn("readSuiteSeq()", "testSuite", testSuite, "name", name)
 	suiteDir, err := testSuiteDirectoryPath(testSuite, r.token, r.isolation)
 	if err != nil {
-		log.Fatal(err)
+		errorz.Fatal(err)
 	}
 	n = utils.ReadSeq(suiteDir, name)
 	return
