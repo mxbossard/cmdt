@@ -250,19 +250,17 @@ func (d BasicDisplay) assertionResult(result model.AssertionResult) {
 	}
 }
 
-func (d BasicDisplay) ReportSuite(ctx facade.SuiteContext, outcome model.SuiteOutcome) {
+func (d BasicDisplay) ReportSuite(ctx facade.SuiteContext, outcome model.SuiteOutcome, padding int) {
 	defer d.Flush()
 	testCount := outcome.TestCount
 	ignoredCount := outcome.IgnoredCount
 	failedCount := outcome.FailedCount
 	errorCount := outcome.ErroredCount
-	//passedCount := testCount - failedCount - ignoredCount
 	passedCount := outcome.PassedCount
 	tooMuchCount := outcome.TooMuchCount
 
 	testSuite := ctx.Config.TestSuite.Get()
-	//testSuiteLabel := fmt.Sprintf("%s%s%s", testColor, testSuite, resetColor)
-	testSuiteLabel := printz.NewAnsi(testColor, testSuite)
+	testSuiteLabel := printz.NewAnsiRightPadded(testColor, testSuite, padding)
 
 	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
 		d.printer.ColoredErrf(messageColor, "Reporting [%s] test suite (%s) ...\n", testSuiteLabel, ctx.Token)

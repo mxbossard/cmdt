@@ -2,27 +2,14 @@
 set -e
 scriptDir=$( dirname $( readlink -f $0 ) )
 
+. $scriptDir/buildCmdt.sh
+newCmdt="$BUILT_CMDT_BIN"
+ls -lh "$newCmdt"
+
 workspaceDir="/tmp/cmdtWorkspace"
-
->&2 echo "##### Building cmdtest binary ..."
-export GOBIN="$scriptDir/bin"
-cd "$scriptDir"
-#go install
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go install -tags netgo -ldflags '-w'
-
 rm -rf -- "$workspaceDir"
 
-cmd="$GOBIN/cmdtest"
-ls -lh "$cmd"
-
-mkdir -p "$scriptDir/.tmp"
-reportFile="$( mktemp "$scriptDir/.tmp/XXXXXX.log" )"
-rm -- "$scriptDir/.tmp/"*.log || true
-
-RED_COLOR="\e[41m\e[30m"
-GREEN_COLOR="\e[42m\e[37m"
-CYAN_COLOR="\e[46m\e[30m"
-RESET_COLOR="\e[0m"
+cmd="$newCmdt"
 
 die() {
 	>&2 echo "$1"

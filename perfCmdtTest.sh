@@ -2,25 +2,8 @@
 set -e -o pipefail
 scriptDir=$( dirname $( readlink -f $0 ) )
 
-workspaceDir="/tmp/cmdtWorkspace"
-
->&2 echo "##### Building cmdtest binary ..."
-export GOBIN="$scriptDir/bin"
-cd "$scriptDir"
-#go install
-#CGO_ENABLED=0 GOOS=linux go install -a -ldflags '-extldflags "-static"'
-#CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go install -ldflags '-extldflags "-static"'
-#CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go install -a -tags netgo -ldflags '-w'
-#CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go install -a -tags netgo -ldflags '-w -extldflags "-static"'
-
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go install -tags netgo -ldflags '-w'
-
-cd - > /dev/null
-
-rm -rf -- "$workspaceDir"
-
-cmd="TO_REPLACE"
-newCmdt="$GOBIN/cmdtest"
+. $scriptDir/buildCmdt.sh
+newCmdt="$BUILT_CMDT_BIN"
 ls -lh "$newCmdt"
 
 # Trusted cmdt to works

@@ -143,7 +143,7 @@ func ReportTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	if err != nil {
 		return
 	}
-	dpl.ReportSuite(ctx, suiteOutcome)
+	dpl.ReportSuite(ctx, suiteOutcome, 16)
 
 	if suiteOutcome.FailedCount == 0 && suiteOutcome.ErroredCount == 0 {
 		exitCode = 0
