@@ -135,6 +135,7 @@ func NewGlobalDefaultConfig() Config {
 		ContainerImage:    utilz.OptionalOf(DefaultContainerImage),
 		ContainerDirties:  utilz.OptionalOf(DirtyBeforeSuite),
 		ContainerScope:    utilz.OptionalOf(SUITE_SCOPE),
+		Verbose:           utilz.OptionalOf(DefaultVerboseLevel),
 	}
 }
 

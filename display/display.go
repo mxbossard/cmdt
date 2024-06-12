@@ -46,6 +46,7 @@ type BasicDisplay struct {
 	clearAnsiFormatter inout.Formatter
 	outFormatter       inout.Formatter
 	errFormatter       inout.Formatter
+	verbose            model.VerboseLevel
 }
 
 func (d BasicDisplay) Global(ctx facade.GlobalContext) {
@@ -176,7 +177,7 @@ func (d BasicDisplay) assertionResult(result model.AssertionResult) {
 		d.printer.ColoredErrf(errorColor, result.ErrMessage+"\n")
 	}
 
-	assertLabel := ansi.Sprintf(testColor, "%s%s", assertPrefix, assertName)
+	assertLabel := format.Sprintf(testColor, "%s%s", assertPrefix, assertName)
 
 	if assertName == "success" || assertName == "fail" {
 		d.printer.Errf("\t%sExpected%s %s\n", hlClr, resetColor, assertLabel)
@@ -196,6 +197,7 @@ func (d BasicDisplay) assertionResult(result model.AssertionResult) {
 		return
 	}
 
+	var stringifiedGot string
 	if expected != got {
 		expected = strings.ReplaceAll(expected, "\n", "\\n")
 		if s, ok := got.(string); ok {
@@ -232,18 +234,23 @@ func (d BasicDisplay) assertionResult(result model.AssertionResult) {
 					expected = d.clearAnsiFormatter.Format(expected)
 					got = d.clearAnsiFormatter.Format(s)
 			*/
+
+			// if d.verbose < model.SHOW_FAILED_OUTS {
+			// 	s = format.TruncateMiddle(s, 64, "[...]")
+			// }
+			stringifiedGot = ansi.TruncateMid(s, 64, "[...]")
 		}
 
 		if assertOp == "=" || assertOp == "@=" {
-			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto be%s: \t\t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, got)
+			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto be%s: \t\t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, stringifiedGot)
 		} else if assertOp == ":" || assertOp == "@:" {
-			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto contains%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, got)
+			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto contains%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, stringifiedGot)
 		} else if assertOp == "!:" {
-			d.printer.Errf("\t%sExpected%s %s \n\t\t%snot to contains%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, got)
+			d.printer.Errf("\t%sExpected%s %s \n\t\t%snot to contains%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, stringifiedGot)
 		} else if assertOp == "~" {
-			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto match%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, got)
+			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto match%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, stringifiedGot)
 		} else if assertOp == "!~" {
-			d.printer.Errf("\t%sExpected%s %s \n\t\t%snot to match%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, got)
+			d.printer.Errf("\t%sExpected%s %s \n\t\t%snot to match%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, stringifiedGot)
 		}
 	} else {
 		d.printer.Errf("assertion %s%s%s failed\n", assertLabel, assertOp, expected)
@@ -260,11 +267,13 @@ func (d BasicDisplay) ReportSuite(ctx facade.SuiteContext, outcome model.SuiteOu
 	tooMuchCount := outcome.TooMuchCount
 
 	testSuite := ctx.Config.TestSuite.Get()
-	testSuiteLabel := printz.NewAnsiRightPadded(testColor, testSuite, padding)
+	//testSuiteLabel := printz.NewAnsiRightPadded(testColor, testSuite, padding)
+	testSuiteLabel := format.New(testColor, testSuite)
+	testSuiteLabel.LeftPad = padding
 
-	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
-		d.printer.ColoredErrf(messageColor, "Reporting [%s] test suite (%s) ...\n", testSuiteLabel, ctx.Token)
-	}
+	// if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
+	// 	d.printer.ColoredErrf(messageColor, "Reporting [%s] test suite (%s) ...\n", testSuite, ctx.Token)
+	// }
 
 	ignoredMessage := ""
 	if ignoredCount > 0 {
@@ -275,11 +284,11 @@ func (d BasicDisplay) ReportSuite(ctx facade.SuiteContext, outcome model.SuiteOu
 	duration := endTime.Sub(startTime)
 	fmtDuration := NormalizeDurationInSec(duration)
 	if failedCount == 0 && errorCount == 0 {
-		d.printer.ColoredErrf(successColor, "Successfuly ran [%s] test suite (%d success in %s)", testSuiteLabel, passedCount, fmtDuration)
+		d.printer.ColoredErrf(successColor, "Successfuly ran  [ %s ] test suite (%d success in %s)", testSuiteLabel, passedCount, fmtDuration)
 		d.printer.ColoredErrf(warningColor, "%s", ignoredMessage)
 		d.printer.Errf("\n")
 	} else {
-		d.printer.ColoredErrf(failureColor, "Failures in [%s] test suite (%d success, %d failures, %d errors on %d tests in %s)", testSuiteLabel, passedCount, failedCount, errorCount, testCount, fmtDuration)
+		d.printer.ColoredErrf(failureColor, "Failures running [ %s ] test suite (%d success, %d failures, %d errors on %d tests in %s)", testSuiteLabel, passedCount, failedCount, errorCount, testCount, fmtDuration)
 		d.printer.ColoredErrf(warningColor, "%s", ignoredMessage)
 		d.printer.Errf("\n")
 		for _, report := range outcome.FailureReports {
@@ -340,12 +349,17 @@ func (d *BasicDisplay) Quiet(quiet bool) {
 
 }
 
+func (d *BasicDisplay) SetVerbose(level model.VerboseLevel) {
+	d.verbose = level
+}
+
 func New() BasicDisplay {
 	d := BasicDisplay{
 		notQuietPrinter:    printz.NewStandard(),
 		clearAnsiFormatter: inout.AnsiFormatter{AnsiFormat: ansi.Reset},
 		outFormatter:       inout.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", testColor, resetColor)},
 		errFormatter:       inout.PrefixFormatter{Prefix: fmt.Sprintf("%serr%s>", reportColor, resetColor)},
+		verbose:            model.DefaultVerboseLevel,
 	}
 	d.printer = d.notQuietPrinter
 	return d

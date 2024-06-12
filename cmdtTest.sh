@@ -8,7 +8,7 @@ ls -lh "$newCmdt"
 
 # Trusted cmdt to works
 cmdt="cmdt"
-#cmdt="$newCmdt"
+cmdt="$newCmdt"
 
 # Cmdt used to test
 #cmdtIn="cmdt"
@@ -129,6 +129,7 @@ nothingToReportExpectedStderrMsg="you must perform some test prior to report"
 $cmdtIn @init=meta1 #@verbose=4
 $cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=foo #@debug=4
 $cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=foo #@debug=4
+$cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report @debug=4
 
 >&2 echo "## Meta1 test context not shared without token"
 $cmdtIn @test=meta1/"without token one" @stderr:"PASSED" @stderr:"#01" @-- $cmdt1 true @debug
@@ -239,7 +240,7 @@ $cmdtIn @test=outputs_assertions/ @stderr:"#01..." @stderr:"PASSED" @-- $cmdt0 t
 $cmdtIn @test=outputs_assertions/ @stderr:"#02..." @stderr:"PASSED" @-- $cmdt0 true @test=t1/
 $cmdtIn @test=outputs_assertions/ @stderr:"#03..." @stderr:"FAILED" @-- $cmdt0 false @test=t1/
 $cmdtIn @test=outputs_assertions/ @stderr:"#04..." @stderr:"PASSED" @-- $cmdt0 false @fail @test=t1/
-$cmdtIn @test=outputs_assertions/ @fail @stderr~"/Failures in \[.*t1.*\] test suite \(3 success, 1 failures, 0 errors on 4 tests in/" @-- $cmdt0 @report=t1
+$cmdtIn @test=outputs_assertions/ @fail @stderr~"/Failures running \[.*t1.*\] test suite \(3 success, 1 failures, 0 errors on 4 tests in/" @-- $cmdt0 @report=t1
 
 
 >&2 echo "## Test namings"
@@ -253,9 +254,9 @@ $cmdtIn @test=naming/ @stderr~"/Test \[suite1\].*name1 #01.../" @stderr:"PASSED"
 $cmdtIn @test=naming/ @stderr~"/Test \[suite1\].*name2 #02.../" @stderr:"PASSED" @-- $cmdt1 true @test=suite1/name2
 $cmdtIn @test=naming/ @stderr~"/Test \[suite2\].*/" @stderr:"#01..." @stderr:"PASSED" @-- $cmdt1 true @test=suite2/
 $cmdtIn @test=naming/ @stderr~"/Test \[suite2\].*/" @stderr:"#02..." @stderr:"PASSED" @-- $cmdt1 true @test=suite2/
-$cmdtIn @test=naming/ @stderr~"/Successfuly ran \[.*suite1.*\] test suite/" @-- $cmdt1  @report=suite1
-$cmdtIn @test=naming/ @stderr~"/Successfuly ran \[.*suite2.*\] test suite/" @-- $cmdt1 @report=suite2
-$cmdtIn @test=naming/ @stderr~"/Successfuly ran \[.*main.*\] test suite/" @-- $cmdt1 @report=main
+$cmdtIn @test=naming/ @stderr~"/Successfuly ran  \[.*suite1.*\] test suite/" @-- $cmdt1  @report=suite1
+$cmdtIn @test=naming/ @stderr~"/Successfuly ran  \[.*suite2.*\] test suite/" @-- $cmdt1 @report=suite2
+$cmdtIn @test=naming/ @stderr~"/Successfuly ran  \[.*main.*\] test suite/" @-- $cmdt1 @report=main
 
 
 >&2 echo "## Test display verbosity"

@@ -89,17 +89,23 @@ func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int16, err error) {
 
 	logger.Info("Reporting all suites", "token", token, "suites", testSuites)
 
-	if len(testSuites) == 0 {
-		err = fmt.Errorf("you must perform some test prior to report all suites")
-		return
+	var testCount uint16
+	exitCode = 0
+
+	maxSuiteNameSize := 0
+	for _, testSuite := range testSuites {
+		if len(testSuite) > maxSuiteNameSize {
+			maxSuiteNameSize = len(testSuite)
+		}
 	}
 
-	exitCode = 0
 	for _, testSuite := range testSuites {
 		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, model.ReportAction, ctx.Config)
-		if suiteCtx.Repo.TestCount(testSuite) > 0 {
+		count := suiteCtx.Repo.TestCount(testSuite)
+		if count > 0 {
+			testCount += count
 			var code int16
-			code, err = ReportTestSuite(suiteCtx)
+			code, err = ReportTestSuite(suiteCtx, maxSuiteNameSize)
 			if code != 0 {
 				exitCode = code
 			}
@@ -109,6 +115,12 @@ func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int16, err error) {
 			}
 		}
 	}
+
+	if testCount == 0 {
+		err = fmt.Errorf("you must perform some test prior to report all suites")
+		return
+	}
+
 	dpl.ReportAllFooter(ctx)
 
 	return
@@ -124,12 +136,12 @@ func ProcessReportAllDef(def model.ReportDefinition) (exitCode int16) {
 	return
 }
 
-func ReportTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
+func ReportTestSuite(ctx facade.SuiteContext, titlePadding int) (exitCode int16, err error) {
 	exitCode = 1
 	cfg := ctx.Config
 	testSuite := cfg.TestSuite.Get()
 	testCount := ctx.Repo.TestCount(testSuite)
-	logger.Debug("reporting suite", "suite", testSuite, "testCount", testCount)
+	logger.Info("Reporting suite", "suite", testSuite, "testCount", testCount)
 
 	if testCount == 0 {
 		err = fmt.Errorf("you must perform some test prior to report: [%s] suite", testSuite)
@@ -143,7 +155,7 @@ func ReportTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	if err != nil {
 		return
 	}
-	dpl.ReportSuite(ctx, suiteOutcome, 16)
+	dpl.ReportSuite(ctx, suiteOutcome, titlePadding)
 
 	if suiteOutcome.FailedCount == 0 && suiteOutcome.ErroredCount == 0 {
 		exitCode = 0
@@ -161,7 +173,7 @@ func ProcessReportDef(def model.ReportDefinition) (exitCode int16, err error) {
 	//logger.Warn("ProcessReportDef()", "def", def)
 	//var err error
 	ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.ReportAction, def.Config)
-	exitCode, err = ReportTestSuite(ctx)
+	exitCode, err = ReportTestSuite(ctx, 0)
 	//ctx.NoErrorOrFatal(err)
 	return
 }
@@ -326,6 +338,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 		}
 		globalCtx := facade.NewGlobalContext(token, isolation, inputConfig)
 		globalCtx.NoErrorOrFatal(agg.Return())
+		dpl.SetVerbose(globalCtx.Config.Verbose.Get())
 		logger.Trace("Forged context", "ctx", globalCtx)
 		logger.Info("Processing global action", "token", token)
 		dpl.Quiet(globalCtx.Config.Quiet.Is(true))
@@ -334,6 +347,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 		testSuite := inputConfig.TestSuite.Get()
 		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig)
 		suiteCtx.NoErrorOrFatal(agg.Return())
+		dpl.SetVerbose(suiteCtx.Config.Verbose.Get())
 		logger.Trace("Forged context", "ctx", suiteCtx)
 		logger.Info("Processing init action", "token", token)
 		dpl.Quiet(suiteCtx.Config.Quiet.Is(true))
@@ -352,6 +366,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 				errorz.Fatal(agg)
 			}
 			globalCtx := facade.NewGlobalContext(token, isolation, inputConfig)
+			dpl.SetVerbose(globalCtx.Config.Verbose.Get())
 			if globalCtx.Config.Async.Is(false) {
 				// Process report all without daemon
 				logger.Trace("Forged context", "ctx", globalCtx)
@@ -395,6 +410,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 			testSuite := inputConfig.TestSuite.Get()
 			suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig)
 			suiteCtx.NoErrorOrFatal(agg.Return())
+			dpl.SetVerbose(suiteCtx.Config.Verbose.Get())
 
 			def := model.ReportDefinition{
 				Token:     token,
@@ -449,6 +465,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 		ppid := uint32(utils.ReadEnvPpid())
 		testCtx := facade.NewTestContext(token, isolation, testSuite, 0, inputConfig, ppid)
 		testCtx.IncrementTestCount()
+		dpl.SetVerbose(testCtx.Config.Verbose.Get())
 		seq := testCtx.Seq
 		testCtx.NoErrorOrFatal(agg.Return())
 		testCfg := testCtx.Config

@@ -248,7 +248,7 @@ $cmdtIn @test=outputs_assertions/ @stderr:"#01..." @stderr:"PASSED" @-- $cmdt0 t
 $cmdtIn @test=outputs_assertions/ @stderr:"#02..." @stderr:"PASSED" @-- $cmdt0 true @test=t1/
 $cmdtIn @test=outputs_assertions/ @stderr:"#03..." @stderr:"FAILED" @-- $cmdt0 false @test=t1/
 $cmdtIn @test=outputs_assertions/ @stderr:"#04..." @stderr:"PASSED" @-- $cmdt0 false @fail @test=t1/
-$cmdtIn @test=outputs_assertions/ @fail @stderr~"/Failures in \[.*t1.*\] test suite \(3 success, 1 failures, 0 errors on 4 tests in/" @-- $cmdt0 @report=t1
+$cmdtIn @test=outputs_assertions/ @fail @stderr~"/Failures running \[.*t1.*\] test suite \(3 success, 1 failures, 0 errors on 4 tests in/" @-- $cmdt0 @report=t1
 
 
 >&2 echo "## Test namings"
@@ -262,9 +262,9 @@ $cmdtIn @test=naming/ @stderr~"/Test \[suite1\].*name1 #01.../" @stderr:"PASSED"
 $cmdtIn @test=naming/ @stderr~"/Test \[suite1\].*name2 #02.../" @stderr:"PASSED" @-- $cmdt1 true @test=suite1/name2
 $cmdtIn @test=naming/ @stderr~"/Test \[suite2\].*/" @stderr:"#01..." @stderr:"PASSED" @-- $cmdt1 true @test=suite2/
 $cmdtIn @test=naming/ @stderr~"/Test \[suite2\].*/" @stderr:"#02..." @stderr:"PASSED" @-- $cmdt1 true @test=suite2/
-$cmdtIn @test=naming/ @stderr~"/Successfuly ran \[.*suite1.*\] test suite/" @-- $cmdt1  @report=suite1
-$cmdtIn @test=naming/ @stderr~"/Successfuly ran \[.*suite2.*\] test suite/" @-- $cmdt1 @report=suite2
-$cmdtIn @test=naming/ @stderr~"/Successfuly ran \[.*main.*\] test suite/" @-- $cmdt1 @report=main
+$cmdtIn @test=naming/ @stderr~"/Successfuly ran  \[.*suite1.*\] test suite/" @-- $cmdt1  @report=suite1
+$cmdtIn @test=naming/ @stderr~"/Successfuly ran  \[.*suite2.*\] test suite/" @-- $cmdt1 @report=suite2
+$cmdtIn @test=naming/ @stderr~"/Successfuly ran  \[.*main.*\] test suite/" @-- $cmdt1 @report=main
 
 
 >&2 echo "## Test display verbosity"
