@@ -46,7 +46,7 @@ func DbOpen(dirpath string) (db *zql.SynchronizedDB, err error) {
 		return
 	}
 
-	db.SetMaxOpenConns(1)
+	db.SetMaxOpenConns(5)
 
 	// Config to increase DB speed : temp objets and transaction journal stored in memory.
 	db.Exec(`

@@ -52,11 +52,12 @@ func (d Queue) QueueOperater(op model.Operater) (err error) {
 	if err != nil {
 		return
 	}
-	defer func() {
-		if err != nil {
-			tx.Rollback()
-		}
-	}()
+	defer tx.Rollback()
+	// defer func() {
+	// 	if err != nil {
+	// 		tx.Rollback()
+	// 	}
+	// }()
 
 	res, err := tx.Exec(`
 		INSERT OR IGNORE INTO suite_queue(name, open) VALUES (@suite, 0);
@@ -160,6 +161,11 @@ func (d Queue) Done(op model.Operater) (err error) {
 		return
 	}
 	defer tx.Rollback()
+	// defer func() {
+	// 	if err != nil {
+	// 		tx.Rollback()
+	// 	}
+	// }()
 
 	count, err := d.QueuedOperationsCountBySuite(suite, tx)
 	if err != nil {
@@ -280,15 +286,9 @@ func (d Queue) UnqueueOperater() (op model.Operater, err error) {
 
 	logger.Debug("UnqueueOperater() 1", "electedSuite", electedSuite)
 
-	tx, err := d.db.Begin()
-	if err != nil {
-		return
-	}
-	defer tx.Rollback()
-
 	if electedSuite == "" {
 		// Select first closed suite
-		row := tx.QueryRow(`
+		row := d.db.QueryRow(`
 			SELECT s.name 
 			FROM suite_queue s
 			WHERE s.open = 0
@@ -297,6 +297,7 @@ func (d Queue) UnqueueOperater() (op model.Operater, err error) {
 		`)
 		err = row.Scan(&electedSuite)
 		if err == sql.ErrNoRows {
+			logger.Debug("no closed suite_queue found")
 			err = nil
 		} else if err != nil {
 			return
@@ -309,6 +310,17 @@ func (d Queue) UnqueueOperater() (op model.Operater, err error) {
 	}
 
 	logger.Debug("UnqueueOperater() 2", "electedSuite", electedSuite)
+
+	tx, err := d.db.Begin()
+	if err != nil {
+		return
+	}
+	defer tx.Rollback()
+	// defer func() {
+	// 	if err != nil {
+	// 		tx.Rollback()
+	// 	}
+	// }()
 
 	// Get next operation
 	op, err = d.NextQueuedOperation(electedSuite, tx)

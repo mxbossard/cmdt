@@ -236,6 +236,7 @@ func init() {
 	zlog.ColoredConfig()
 	zlog.SetPart("cmdt")
 	zlog.SetLogLevelThreshold0IsFatal(int(model.StartDebugLevel))
+	zlog.SetTruncatedArgsLength(64)
 }
 
 func RecoverExiting() {
@@ -253,10 +254,10 @@ func main() {
 
 	//model.LoggerLevel.Set(slog.Level(8 - model.StartDebugLevel*4))
 
-	daemonToken, wait := service.ProcessArgs(os.Args)
+	daemonToken, daemonIsol, wait := service.ProcessArgs(os.Args)
 
 	if daemonToken != "" {
-		err := daemon.LanchProcessIfNeeded(daemonToken)
+		err := daemon.LanchProcessIfNeeded(daemonToken, daemonIsol)
 		if err != nil {
 			panic(err)
 		}

@@ -293,7 +293,7 @@ func ProcessTestDef(testDef model.TestDefinition) (exitCode int16) {
 	return
 }
 
-func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
+func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() int16) {
 	var exitCode int16
 	exitCode = 1
 	wait = func() int16 { return exitCode }
@@ -406,6 +406,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 				} else {
 					exitCode = 0
 				}
+				daemonIsol = globalCtx.Isolation
 				daemonToken = globalCtx.Token
 			}
 		} else {
@@ -460,6 +461,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 				} else {
 					exitCode = 0
 				}
+				daemonIsol = suiteCtx.Isolation
 				daemonToken = suiteCtx.Token
 			}
 		}
@@ -515,6 +517,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 				// Don't wait return exit code 0
 				exitCode = 0
 			}
+			daemonIsol = isolation
 			daemonToken = token
 		}
 	default:

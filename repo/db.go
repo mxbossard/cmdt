@@ -10,16 +10,37 @@ import (
 	"mby.fr/cmdtest/dao"
 	"mby.fr/cmdtest/model"
 	"mby.fr/utils/errorz"
+	"mby.fr/utils/zql"
 )
 
 type dbRepo struct {
+	dirpath   string
 	token     string
 	isolation string
-
-	suiteDao dao.Suite
-	queueDao dao.Queue
-	testDao  dao.Test
+	db        *zql.SynchronizedDB
+	suiteDao  dao.Suite
+	queueDao  dao.Queue
+	testDao   dao.Test
 	//lastUpdate time.Time
+}
+
+func (r *dbRepo) Init() (err error) {
+	if r.db != nil {
+		err = r.db.Close()
+		if err != nil {
+			return
+		}
+	}
+	db, err := dao.DbOpen(r.dirpath)
+	if err != nil {
+		return
+	}
+	if r.db == nil {
+		r.db = db
+	} else {
+		*r.db = *db
+	}
+	return
 }
 
 func (r dbRepo) BackingFilepath() string {
@@ -330,13 +351,15 @@ func (r dbRepo) Unqueue0() (ok bool, op model.Operater, err error) {
 }
 
 func newDbRepo(dirpath, isolation, token string) (r dbRepo, err error) {
+	r.dirpath = dirpath
 	r.token = token
 	r.isolation = isolation
 
-	db, err := dao.DbOpen(dirpath)
+	err = r.Init()
 	if err != nil {
 		return
 	}
+	db := r.db
 	r.queueDao, err = dao.NewQueue(db)
 	if err != nil {
 		return

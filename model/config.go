@@ -79,10 +79,10 @@ var (
 )
 
 var (
-	DefaultTestTimeout, _ = time.ParseDuration("24h")
-	AbsNamePattern        = fmt.Sprintf("(%s/)?(%s)?", NamePattern, NamePattern)
-	NameRegexp            = regexp.MustCompile("^" + NamePattern + "$")
-	AbsNameRegexp         = regexp.MustCompile("^" + AbsNamePattern + "$")
+	DefaultTestTimeout = 5 * time.Second
+	AbsNamePattern     = fmt.Sprintf("(%s/)?(%s)?", NamePattern, NamePattern)
+	NameRegexp         = regexp.MustCompile("^" + NamePattern + "$")
+	AbsNameRegexp      = regexp.MustCompile("^" + AbsNamePattern + "$")
 )
 
 var (
@@ -128,7 +128,7 @@ func NewGlobalDefaultConfig() Config {
 		StopOnFailure:     utilz.OptionalOf(false),
 		KeepStdout:        utilz.OptionalOf(false),
 		KeepStderr:        utilz.OptionalOf(false),
-		Timeout:           utilz.OptionalOf(10 * time.Second),
+		Timeout:           utilz.OptionalOf(DefaultTestTimeout),
 		RunCount:          utilz.OptionalOf(uint16(1)),
 		Parallel:          utilz.OptionalOf(uint16(1)),
 		ContainerDisabled: utilz.OptionalOf(true),

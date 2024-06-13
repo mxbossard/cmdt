@@ -16,8 +16,8 @@ cmdtIn="$cmdt $@"
 
 # Tested cmdt
 newCmdt="$newCmdt"
-cmdt0="$newCmdt @isol=tested @debug=5"
-cmdt1="$newCmdt @isol=tested @verbose @failuresLimit=-1 @async @debug=5" # Default verbose show passed test + perform all test beyond failures limit
+cmdt0="$newCmdt @isol=tested"
+cmdt1="$newCmdt @isol=tested @verbose @failuresLimit=-1 @async" # Default verbose show passed test + perform all test beyond failures limit
 #cmdt2="$newCmdt @verbose @failuresLimit=-1 @async @wait"
 
 die() {

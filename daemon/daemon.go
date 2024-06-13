@@ -24,7 +24,7 @@ const (
 	DaemonPidFilename     = "daemon.pid"
 	LockWatingSecs        = 5
 	ExtraRunningSecs      = 5
-	AsyncPollingSleepInMs = 1000
+	AsyncPollingSleepInMs = 50
 )
 
 var logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
@@ -104,6 +104,10 @@ func (d daemon) run() {
 	debugTime := time.Now()
 	lastUnqueue := time.Now()
 	for {
+		// err := d.repo.Init()
+		// if err != nil {
+		// 	return
+		// }
 		if time.Since(debugTime) > time.Second {
 			debugTime = time.Now()
 			logger.Trace("daemon running", "token", d.token, "for", time.Since(startTime))
@@ -182,7 +186,7 @@ func TakeOver() {
 
 	//logger.Warn("daemon: should I take over ?", "args", os.Args)
 	if len(os.Args) > 1 && os.Args[1] == "@_daemon" {
-		if len(os.Args) != 4 {
+		if len(os.Args) != 5 {
 			panic("bad usage of @_daemon")
 		}
 	} else {
@@ -192,14 +196,15 @@ func TakeOver() {
 	zlog.ColoredConfig()
 	zlog.SetPart("daemon")
 	token := os.Args[2]
-	debugLevel, err := strconv.Atoi(os.Args[3])
+	isolation := os.Args[3]
+	debugLevel, err := strconv.Atoi(os.Args[4])
 	if err != nil {
 		panic("bad debug level")
 	}
 	zlog.SetLogLevelThreshold(slog.Level(debugLevel))
 
-	repo := repo.New(token, "")
-	d := daemon{token: token, repo: repo}
+	repo := repo.New(token, isolation)
+	d := daemon{token: token, repo: &repo}
 	lockFilepath := filepath.Join(repo.BackingFilepath(), DaemonLockFilename)
 	fileLock := flock.New(lockFilepath)
 
@@ -280,7 +285,7 @@ func TakeOver() {
 	os.Exit(0)
 }
 
-func LanchProcessIfNeeded(token string) error {
+func LanchProcessIfNeeded(token, isolation string) error {
 	logger.Debug("daemon: should I launch daemon ?", "token", token)
 	if token == "" {
 		// No token => no daemon to launch
@@ -308,7 +313,8 @@ func LanchProcessIfNeeded(token string) error {
 	}
 
 	debugLevel := int(zlog.GetLogLevelThreshold())
-	cmd := exec.Command(os.Args[0], "@_daemon", token, fmt.Sprintf("%d", debugLevel))
+
+	cmd := exec.Command(os.Args[0], "@_daemon", token, isolation, fmt.Sprintf("%d", debugLevel))
 	cmd.Dir = cwd
 	cmd.Env = os.Environ()
 	//cmd.Stdout = os.Stdout

@@ -39,7 +39,7 @@ func NewGlobalContext(token, isolation string, inputCfg model.Config) GlobalCont
 	c := GlobalContext{
 		Token:     token,
 		Isolation: isolation,
-		Repo:      repo,
+		Repo:      &repo,
 		Config:    cfg,
 	}
 	return c
