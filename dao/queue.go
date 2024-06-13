@@ -40,24 +40,29 @@ func (d Queue) init() (err error) {
 }
 
 func (d Queue) QueueOperater(op model.Operater) (err error) {
+	perf := logger.PerfTimer("kind", op.Kind())
+	defer perf.End("op", op, "err", err)
+
 	b, err := model.SerializeOp(op)
 	if err != nil {
 		return
 	}
-	perf := logger.PerfTimer("kind", op.Kind())
-	defer perf.End()
 
 	tx, err := d.db.Begin()
 	if err != nil {
 		return
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
 
 	res, err := tx.Exec(`
 		INSERT OR IGNORE INTO suite_queue(name, open) VALUES (@suite, 0);
 		INSERT INTO operation_queue(suite, op, unqueued, block, exitCode) 
 			VALUES (@suite, @opBlob, 0, @block, NULL);
-		`, sql.Named("suite", op.Suite()), sql.Named("opBlob", b), sql.Named("block", op.Block()))
+		`, sql.Named("suite", op.Suite()), sql.Named("opBlob", b), sql.Named("block", op.Block())) // OR IGNORE
 	if err != nil {
 		return
 	}
@@ -117,6 +122,9 @@ func (d Queue) QueuedSuites() (queued []string, err error) {
 }
 
 func (d Queue) OpenedNotBlockingSuites() (opened []string, err error) {
+	perf := logger.PerfTimer()
+	defer perf.End("opened", opened)
+
 	rows, err := d.db.Query(`
 		SELECT s.name 
 		FROM suite_queue s
@@ -139,6 +147,9 @@ func (d Queue) OpenedNotBlockingSuites() (opened []string, err error) {
 }
 
 func (d Queue) Done(op model.Operater) (err error) {
+	perf := logger.PerfTimer()
+	defer perf.End()
+
 	// 1- Flag operation done
 	// 2- Flag suite done or Remove suite if no operation remaining
 
@@ -162,9 +173,11 @@ func (d Queue) Done(op model.Operater) (err error) {
 
 	if count == 0 {
 		// Remove suite
+		logger.Debug("deleting suite_queue", "name", suite)
 		_, err = tx.Exec(`DELETE FROM suite_queue WHERE name = ?;`, suite)
 	} else {
 		// Unblock suite
+		logger.Debug("unblocking suite_queue", "suite", suite)
 		_, err = tx.Exec(`UPDATE suite_queue SET blocking = NULL WHERE name = ?;`, suite)
 	}
 	if err != nil {
@@ -247,7 +260,7 @@ func (d Queue) NextQueuedOperation(suite string, tx *zql.SynchronizedTx) (op mod
 
 func (d Queue) UnqueueOperater() (op model.Operater, err error) {
 	perf := logger.PerfTimer()
-	defer perf.End()
+	defer perf.End("op", op, "err", err)
 
 	// 1- Elect suite : first already open not blocking suite
 	// 2- Get next operation
@@ -263,29 +276,15 @@ func (d Queue) UnqueueOperater() (op model.Operater, err error) {
 	}
 	if len(openedNotBlockingSuites) > 0 {
 		electedSuite = openedNotBlockingSuites[0]
-		//logger.Warn("unqueueOperater()", "openedNotBlockingSuites", openedNotBlockingSuites)
 	}
 
-	//rollback := true
+	logger.Debug("UnqueueOperater() 1", "electedSuite", electedSuite)
+
 	tx, err := d.db.Begin()
 	if err != nil {
 		return
 	}
 	defer tx.Rollback()
-
-	/*
-		defer func() {
-			var err2 error
-			if rollback {
-				err2 = tx.Rollback()
-			} else {
-				err2 = tx.Commit()
-			}
-			if err2 != nil {
-				err = err2
-			}
-		}()
-	*/
 
 	if electedSuite == "" {
 		// Select first closed suite
@@ -309,7 +308,7 @@ func (d Queue) UnqueueOperater() (op model.Operater, err error) {
 		}
 	}
 
-	//logger.Warn("unqueueOperater()", "electedSuite", electedSuite)
+	logger.Debug("UnqueueOperater() 2", "electedSuite", electedSuite)
 
 	// Get next operation
 	op, err = d.NextQueuedOperation(electedSuite, tx)
@@ -317,12 +316,12 @@ func (d Queue) UnqueueOperater() (op model.Operater, err error) {
 		return
 	}
 	if op == nil {
-		//logger.Warn("unqueueOperater() no operation found")
+		logger.Debug("UnqueueOperater() no operation found")
 		return
 	}
 	opId := op.Id()
 
-	logger.Trace("unqueueOperater()", "electedSuite", electedSuite, "opId", opId)
+	logger.Debug("UnqueueOperater()", "electedSuite", electedSuite, "opId", opId)
 
 	// Open this suite & Record blocking state
 	if op.Block() {

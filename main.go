@@ -17,7 +17,6 @@ package main
 
 import (
 	"fmt"
-	"log/slog"
 	"os"
 
 	"mby.fr/cmdtest/daemon"
@@ -234,7 +233,8 @@ Features:
 */
 
 func init() {
-	zlog.ColoredConfig(slog.String("part", "cmdt"))
+	zlog.ColoredConfig()
+	zlog.SetPart("cmdt")
 	zlog.SetLogLevelThreshold0IsFatal(int(model.StartDebugLevel))
 }
 

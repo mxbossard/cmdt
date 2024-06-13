@@ -8,16 +8,16 @@ ls -lh "$newCmdt"
 
 # Trusted cmdt to works
 cmdt="cmdt"
-#cmdt="$newCmdt"
+cmdt="$newCmdt"
 
 # Cmdt used to test
 #cmdtIn="cmdt"
 cmdtIn="$cmdt $@"
 
 # Tested cmdt
-newCmdt="$newCmdt @debug=5"
-cmdt0="$newCmdt @isol=tested"
-cmdt1="$newCmdt @isol=tested @verbose @failuresLimit=-1 @async" # Default verbose show passed test + perform all test beyond failures limit
+newCmdt="$newCmdt"
+cmdt0="$newCmdt @isol=tested @debug=5"
+cmdt1="$newCmdt @isol=tested @verbose @failuresLimit=-1 @async @debug=5" # Default verbose show passed test + perform all test beyond failures limit
 #cmdt2="$newCmdt @verbose @failuresLimit=-1 @async @wait"
 
 die() {
@@ -133,10 +133,10 @@ $cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt
 $cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt1 @report=foo
 
 >&2 echo "## Meta1 test context not shared without token"
-$cmdtIn @test=meta1/"without token one" @stderr= @-- $cmdt1 true @debug=0
-$cmdtIn @test=meta1/"without token two" @stderr= @-- $cmdt1 true @debug=0
+$cmdtIn @test=meta1/"without token one" @stderr= @-- $cmdt1 true
+$cmdtIn @test=meta1/"without token two" @stderr= @-- $cmdt1 true 
 $cmdtIn @test=meta1/"command before rule stop" @fail @stderr:"before rule parsing stopper" @-- $cmdt1 true @-- @success
-$cmdtIn @test=meta1/"rule on 2 args" @stderr= @-- $cmdt1 @stdout:foo bar @debug=0 @-- echo foo bar
+$cmdtIn @test=meta1/"rule on 2 args" @stderr= @-- $cmdt1 @stdout:foo bar @-- echo foo bar
 $cmdtIn @test=meta1/ @exit=1 @stderr:"3 success" @stderr:"0 failure" @stderr:"1 error" @-- $cmdt1 @report=main
 
 >&2 echo "## Test printed token"

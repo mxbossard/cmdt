@@ -92,12 +92,7 @@ func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int16, err error) {
 	var testCount uint16
 	exitCode = 0
 
-	maxSuiteNameSize := 0
-	for _, testSuite := range testSuites {
-		if len(testSuite) > maxSuiteNameSize {
-			maxSuiteNameSize = len(testSuite)
-		}
-	}
+	var suiteOutcomes []model.SuiteOutcome
 
 	for _, testSuite := range testSuites {
 		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, model.ReportAction, ctx.Config)
@@ -105,14 +100,16 @@ func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int16, err error) {
 		if count > 0 {
 			testCount += count
 			var code int16
-			code, err = ReportTestSuite(suiteCtx, maxSuiteNameSize)
-			if code != 0 {
-				exitCode = code
-			}
+			var suiteOutcome model.SuiteOutcome
+			suiteOutcome, code, err = reportTestSuite(suiteCtx)
 			if err != nil {
 				// FIXME: aggregate errors
 				return
 			}
+			if code != 0 {
+				exitCode = code
+			}
+			suiteOutcomes = append(suiteOutcomes, suiteOutcome)
 		}
 	}
 
@@ -121,6 +118,7 @@ func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int16, err error) {
 		return
 	}
 
+	dpl.ReportSuites(suiteOutcomes)
 	dpl.ReportAllFooter(ctx)
 
 	return
@@ -136,7 +134,7 @@ func ProcessReportAllDef(def model.ReportDefinition) (exitCode int16) {
 	return
 }
 
-func ReportTestSuite(ctx facade.SuiteContext, titlePadding int) (exitCode int16, err error) {
+func reportTestSuite(ctx facade.SuiteContext) (suiteOutcome model.SuiteOutcome, exitCode int16, err error) {
 	exitCode = 1
 	cfg := ctx.Config
 	testSuite := cfg.TestSuite.Get()
@@ -150,12 +148,11 @@ func ReportTestSuite(ctx facade.SuiteContext, titlePadding int) (exitCode int16,
 
 	//logger.Info("Reporting suite", "testCount", testCount, "ctx", ctx)
 
-	var suiteOutcome model.SuiteOutcome
 	suiteOutcome, err = ctx.Repo.LoadSuiteOutcome(testSuite)
 	if err != nil {
 		return
 	}
-	dpl.ReportSuite(ctx, suiteOutcome, titlePadding)
+	//dpl.ReportSuite(suiteOutcome)
 
 	if suiteOutcome.FailedCount == 0 && suiteOutcome.ErroredCount == 0 {
 		exitCode = 0
@@ -169,11 +166,17 @@ func ReportTestSuite(ctx facade.SuiteContext, titlePadding int) (exitCode int16,
 	return
 }
 
+func ReportTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
+	suiteOutcome, exitCode, err := reportTestSuite(ctx)
+	dpl.ReportSuite(suiteOutcome)
+	return
+}
+
 func ProcessReportDef(def model.ReportDefinition) (exitCode int16, err error) {
 	//logger.Warn("ProcessReportDef()", "def", def)
 	//var err error
 	ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.ReportAction, def.Config)
-	exitCode, err = ReportTestSuite(ctx, 0)
+	exitCode, err = ReportTestSuite(ctx)
 	//ctx.NoErrorOrFatal(err)
 	return
 }
@@ -488,7 +491,7 @@ func ProcessArgs(allArgs []string) (daemonToken string, wait func() int16) {
 			CmdArgs: signifientArgs,
 		}
 
-		if testCfg.Async.Is(false) {
+		if !testCfg.Async.Is(true) {
 			// Process test without daemon
 			// enforce wait
 			logger.Info("executing test in sync (not queueing test)", "suite", testSuite, "seq", seq)

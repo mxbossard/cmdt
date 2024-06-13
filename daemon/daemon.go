@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/gofrs/flock"
@@ -19,10 +20,11 @@ import (
 )
 
 const (
-	DaemonLockFilename = "daemon.lock"
-	DaemonPidFilename  = "daemon.pid"
-	LockWatingSecs     = 5
-	ExtraRunningSecs   = 5
+	DaemonLockFilename    = "daemon.lock"
+	DaemonPidFilename     = "daemon.pid"
+	LockWatingSecs        = 5
+	ExtraRunningSecs      = 5
+	AsyncPollingSleepInMs = 1000
 )
 
 var logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
@@ -117,7 +119,7 @@ func (d daemon) run() {
 				// More than ExtraRunningSecs since last unqueue
 				break
 			}
-			time.Sleep(time.Millisecond)
+			time.Sleep(AsyncPollingSleepInMs * time.Millisecond)
 			continue
 		}
 
@@ -180,16 +182,22 @@ func TakeOver() {
 
 	//logger.Warn("daemon: should I take over ?", "args", os.Args)
 	if len(os.Args) > 1 && os.Args[1] == "@_daemon" {
-		//fmt.Printf("@_daemon args: %s", os.Args)
-		if len(os.Args) != 3 {
+		if len(os.Args) != 4 {
 			panic("bad usage of @_daemon")
 		}
 	} else {
 		return
 	}
 
-	zlog.ColoredConfig(slog.String("part", "daemon"))
+	zlog.ColoredConfig()
+	zlog.SetPart("daemon")
 	token := os.Args[2]
+	debugLevel, err := strconv.Atoi(os.Args[3])
+	if err != nil {
+		panic("bad debug level")
+	}
+	zlog.SetLogLevelThreshold(slog.Level(debugLevel))
+
 	repo := repo.New(token, "")
 	d := daemon{token: token, repo: repo}
 	lockFilepath := filepath.Join(repo.BackingFilepath(), DaemonLockFilename)
@@ -243,8 +251,7 @@ func TakeOver() {
 		logger = slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 	*/
 
-	fmt.Printf("daemon: TakeOver() args: %s\n", os.Args)
-	logger.Debug("daemon: taking over ...")
+	logger.Info("daemon taking over", "pid", os.Getpid(), "cmd", os.Args)
 
 	// Run daemon
 	d.run()
@@ -300,7 +307,8 @@ func LanchProcessIfNeeded(token string) error {
 		panic(err)
 	}
 
-	cmd := exec.Command(os.Args[0], "@_daemon", token)
+	debugLevel := int(zlog.GetLogLevelThreshold())
+	cmd := exec.Command(os.Args[0], "@_daemon", token, fmt.Sprintf("%d", debugLevel))
 	cmd.Dir = cwd
 	cmd.Env = os.Environ()
 	//cmd.Stdout = os.Stdout
@@ -328,6 +336,6 @@ func LanchProcessIfNeeded(token string) error {
 		err = proc.Release()
 	*/
 
-	logger.Debug("daemon process released")
+	logger.Info("daemon process released", "cmd", cmd)
 	return err
 }

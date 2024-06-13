@@ -109,7 +109,7 @@ func (c GlobalContext) Save() error {
 	return c.Repo.SaveGlobalConfig(c.Config)
 }
 func (c GlobalContext) Fatal(v ...any) {
-	fmt.Fprint(os.Stderr, v...)
+	fmt.Fprintln(os.Stderr, v...)
 	os.Exit(1)
 }
 

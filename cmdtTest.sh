@@ -8,7 +8,7 @@ ls -lh "$newCmdt"
 
 # Trusted cmdt to works
 cmdt="cmdt"
-cmdt="$newCmdt"
+#cmdt="$newCmdt"
 
 # Cmdt used to test
 #cmdtIn="cmdt"
@@ -240,7 +240,7 @@ $cmdtIn @test=outputs_assertions/ @stderr:"#01..." @stderr:"PASSED" @-- $cmdt0 t
 $cmdtIn @test=outputs_assertions/ @stderr:"#02..." @stderr:"PASSED" @-- $cmdt0 true @test=t1/
 $cmdtIn @test=outputs_assertions/ @stderr:"#03..." @stderr:"FAILED" @-- $cmdt0 false @test=t1/
 $cmdtIn @test=outputs_assertions/ @stderr:"#04..." @stderr:"PASSED" @-- $cmdt0 false @fail @test=t1/
-$cmdtIn @test=outputs_assertions/ @fail @stderr~"/Failures running \[.*t1.*\] test suite \(3 success, 1 failures, 0 errors on 4 tests in/" @-- $cmdt0 @report=t1
+$cmdtIn @test=outputs_assertions/ @fail @stderr~"/Failures running \[.*t1.*\] test suite .*\(\s*3 success, \s*1 failures, \s*0 errors on \s*4 tests\)/" @-- $cmdt0 @report=t1
 
 
 >&2 echo "## Test namings"

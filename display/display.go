@@ -14,6 +14,10 @@ import (
 	"mby.fr/utils/printz"
 )
 
+const (
+	MinReportSuiteLabelPadding = 20
+)
+
 var (
 	messageColor = ansi.HiPurple
 	testColor    = ansi.HiCyan
@@ -201,44 +205,10 @@ func (d BasicDisplay) assertionResult(result model.AssertionResult) {
 	if expected != got {
 		expected = strings.ReplaceAll(expected, "\n", "\\n")
 		if s, ok := got.(string); ok {
-			got = strings.ReplaceAll(s, "\n", "\\n")
-			/*
-				const sliceSize = 16
-				minStrLen := min(len(s), len(expected))
-				for k := range minStrLen / sliceSize {
-					left := expected[k*sliceSize : min(len(expected), (k+1)*sliceSize-1)]
-					right := s[k*sliceSize : min(len(s), (k+1)*sliceSize-1)]
-					if left == right {
-						continue
-					} else {
-						shortenExpected := ""
-						if k > 0 {
-							shortenExpected += "[...]"
-						}
-						shortenExpected += left
-						if k*minStrLen < len(expected) {
-							shortenExpected += "[...]"
-						}
-						shortenGot := ""
-						if k > 0 {
-							shortenGot += "[...]"
-						}
-						shortenGot += right
-						if k*minStrLen < len(s) {
-							shortenGot += "[...]"
-						}
-						expected = shortenExpected
-						s = shortenGot
-					}
-				}
-					expected = d.clearAnsiFormatter.Format(expected)
-					got = d.clearAnsiFormatter.Format(s)
-			*/
+			s = strings.ReplaceAll(s, "\n", "\\n")
+			got = s
 
-			// if d.verbose < model.SHOW_FAILED_OUTS {
-			// 	s = format.TruncateMiddle(s, 64, "[...]")
-			// }
-			stringifiedGot = ansi.TruncateMid(s, 64, "[...]")
+			stringifiedGot = ansi.TruncateMid(s, 100, "[...]")
 		}
 
 		if assertOp == "=" || assertOp == "@=" {
@@ -257,7 +227,7 @@ func (d BasicDisplay) assertionResult(result model.AssertionResult) {
 	}
 }
 
-func (d BasicDisplay) ReportSuite(ctx facade.SuiteContext, outcome model.SuiteOutcome, padding int) {
+func (d BasicDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 	defer d.Flush()
 	testCount := outcome.TestCount
 	ignoredCount := outcome.IgnoredCount
@@ -266,8 +236,7 @@ func (d BasicDisplay) ReportSuite(ctx facade.SuiteContext, outcome model.SuiteOu
 	passedCount := outcome.PassedCount
 	tooMuchCount := outcome.TooMuchCount
 
-	testSuite := ctx.Config.TestSuite.Get()
-	//testSuiteLabel := printz.NewAnsiRightPadded(testColor, testSuite, padding)
+	testSuite := outcome.TestSuite
 	testSuiteLabel := format.New(testColor, testSuite)
 	testSuiteLabel.LeftPad = padding
 
@@ -279,16 +248,14 @@ func (d BasicDisplay) ReportSuite(ctx facade.SuiteContext, outcome model.SuiteOu
 	if ignoredCount > 0 {
 		ignoredMessage = fmt.Sprintf(" (%d ignored)", ignoredCount)
 	}
-	startTime := ctx.Config.SuiteStartTime.Get()
-	endTime := ctx.Config.LastTestTime.GetOr(time.Now())
-	duration := endTime.Sub(startTime)
+	duration := outcome.Duration
 	fmtDuration := NormalizeDurationInSec(duration)
 	if failedCount == 0 && errorCount == 0 {
-		d.printer.ColoredErrf(successColor, "Successfuly ran  [ %s ] test suite (%d success in %s)", testSuiteLabel, passedCount, fmtDuration)
+		d.printer.ColoredErrf(successColor, "Successfuly ran  [ %s ] test suite in %10s (%3d success)", testSuiteLabel, fmtDuration, passedCount)
 		d.printer.ColoredErrf(warningColor, "%s", ignoredMessage)
 		d.printer.Errf("\n")
 	} else {
-		d.printer.ColoredErrf(failureColor, "Failures running [ %s ] test suite (%d success, %d failures, %d errors on %d tests in %s)", testSuiteLabel, passedCount, failedCount, errorCount, testCount, fmtDuration)
+		d.printer.ColoredErrf(failureColor, "Failures running [ %s ] test suite in %10s (%3d success, %3d failures, %3d errors on %3d tests)", testSuiteLabel, fmtDuration, passedCount, failedCount, errorCount, testCount)
 		d.printer.ColoredErrf(warningColor, "%s", ignoredMessage)
 		d.printer.Errf("\n")
 		for _, report := range outcome.FailureReports {
@@ -301,6 +268,22 @@ func (d BasicDisplay) ReportSuite(ctx facade.SuiteContext, outcome model.SuiteOu
 	}
 	if tooMuchCount > 0 {
 		d.printer.ColoredErrf(warningColor, "Too much failures (%d tests not executed)\n", tooMuchCount)
+	}
+}
+
+func (d BasicDisplay) ReportSuite(outcome model.SuiteOutcome) {
+	d.reportSuite(outcome, MinReportSuiteLabelPadding)
+}
+
+func (d BasicDisplay) ReportSuites(outcomes []model.SuiteOutcome) {
+	maxSuiteNameSize := 0
+	for _, outcome := range outcomes {
+		if len(outcome.TestSuite) > maxSuiteNameSize {
+			maxSuiteNameSize = len(outcome.TestSuite)
+		}
+	}
+	for _, outcome := range outcomes {
+		d.reportSuite(outcome, max(MinReportSuiteLabelPadding, maxSuiteNameSize))
 	}
 }
 

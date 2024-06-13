@@ -29,7 +29,7 @@ func (d Suite) init() (err error) {
 			seq INTEGER NOT NULL DEFAULT 0,
 			tooMuch INTEGER NOT NULL DEFAULT 0,
 			endTime INTEGER NOT NULL DEFAULT 0,
-			outcome TEXT NOT NULL DEFAULT ''
+			outcome TEXT NOT NULL DEFAULT 'Z'
 		);
 	`)
 	return
@@ -159,8 +159,8 @@ func (d Suite) UpdateSuiteOutcome(suite string, outcome model.Outcome) (err erro
 
 	_, err = d.db.Exec(`
 		UPDATE suite SET outcome = ?
-		WHERE name = ?
-	`, outcome, suite)
+		WHERE name = ? AND outcome > ?
+	`, outcome, suite, outcome)
 	return
 }
 

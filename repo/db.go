@@ -139,6 +139,10 @@ func (r dbRepo) ListTestSuites() (suites []string, err error) {
 
 func (r dbRepo) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 	err = r.testDao.SaveTestOutcome(outcome)
+	if err != nil {
+		return
+	}
+	err = r.suiteDao.UpdateSuiteOutcome(outcome.TestSuite, outcome.Outcome)
 	return
 }
 
@@ -222,12 +226,17 @@ func (r dbRepo) TooMuchCount(testSuite string) (n uint16) {
 
 func (r dbRepo) QueueOperation(op model.Operater) (err error) {
 	err = r.queueDao.QueueOperater(op)
-	//logger.Warn("Queue() added", "testSuite", testSuite, "kind", op.Kind(), "seq", op.Seq())
+	if err == nil {
+		logger.Info("Queued operation", "testSuite", op.Suite(), "kind", op.Kind(), "seq", op.Seq())
+	}
 	return
 }
 
 func (r dbRepo) UnqueueOperation() (op model.Operater, err error) {
 	op, err = r.queueDao.UnqueueOperater()
+	if op != nil {
+		logger.Info("Unqueued operation", "testSuite", op.Suite(), "kind", op.Kind(), "seq", op.Seq(), "err", err)
+	}
 	return
 }
 

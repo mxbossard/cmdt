@@ -986,8 +986,8 @@ func ParseArgs(rulePrefix string, args []string) (cfg model.Config, assertions [
 		cfg.Wait.Set(true)
 	}
 
-	if cfg.Wait.Is(true) {
-		// Force Async false if Wait is true
+	if cfg.Wait.Is(true) && !cfg.Wait.IsDefault() {
+		// Force Async false if Wait is true not by default
 		cfg.Async.Set(false)
 	}
 
