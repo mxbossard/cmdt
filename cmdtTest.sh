@@ -23,10 +23,6 @@ die() {
 	exit 1
 }
 
-### NOTES
-# - Il est facile de sortir un test de la bonne test suite, et ce test ne sera jamais report !
-# => Should @report report all opened tests suites by default ?
-
 #$cmdt @global @silent
 
 # Clear context
@@ -129,11 +125,11 @@ nothingToReportExpectedStderrMsg="you must perform some test prior to report"
 $cmdtIn @init=meta1 #@verbose=4
 $cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=foo #@debug=4
 $cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=foo #@debug=4
-$cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report @debug=4
+$cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report #@debug=4
 
 >&2 echo "## Meta1 test context not shared without token"
-$cmdtIn @test=meta1/"without token one" @stderr:"PASSED" @stderr:"#01" @-- $cmdt1 true @debug
-$cmdtIn @test=meta1/"without token two" @stderr:"PASSED" @stderr:"#02" @-- $cmdt1 true @debug
+$cmdtIn @test=meta1/"without token one" @stderr:"PASSED" @stderr:"#01" @-- $cmdt1 true #@debug
+$cmdtIn @test=meta1/"without token two" @stderr:"PASSED" @stderr:"#02" @-- $cmdt1 true #@debug
 $cmdtIn @test=meta1/"command before rule stop" @fail @stderr:"before rule parsing stopper" @-- $cmdt1 true @-- @success
 $cmdtIn @test=meta1/"rule on 2 args" @stderr:"PASSED" @-- $cmdt1 @stdout:foo bar @-- echo foo bar
 $cmdtIn @test=meta1/ @exit=1 @stderr:"3 success" @stderr:"0 failure" @stderr:"1 error" @-- $cmdt0 @report=main
@@ -142,26 +138,26 @@ $cmdtIn @test=meta1/ @exit=1 @stderr:"3 success" @stderr:"0 failure" @stderr:"1 
 tk0=$( $cmdt @init @printToken 2> /dev/null )
 >&2 echo "token: $tk0"
 $cmdtIn @init=meta2 #@verbose=4
-$cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt0 true @token=$tk0
-$cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#02" @-- $cmdt0 true @token=$tk0
-$cmdtIn @test=meta2/ @fail @-- $cmdt0 @report=main
-$cmdtIn @test=meta2/ @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @-- $cmdt0 @report @token=$tk0
+$cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt1 true @token=$tk0
+$cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#02" @-- $cmdt1 true @token=$tk0
+$cmdtIn @test=meta2/ @fail @-- $cmdt1 @report=main
+$cmdtIn @test=meta2/ @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @-- $cmdt1 @report @token=$tk0
 $cmdt @report 2>&1 | grep -v "Failures"
 
 >&2 echo "## Test exported token"
 eval $( $cmdt @init @exportToken 2> /dev/null )
 >&2 echo "token: $__CMDT_TOKEN"
 $cmdtIn @init=meta3
-$cmdtIn @test=meta3/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt0 true
-$cmdtIn @test=meta3/ @stderr:"PASSED" @stderr:"#02" @-- $cmdt0 true
-$cmdtIn @test=meta3/ @stderr:"Successfuly ran" @-- $cmdt0 @report=main
-$cmdtIn @test=meta3/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=main @token=$tk0
+$cmdtIn @test=meta3/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt1 true
+$cmdtIn @test=meta3/ @stderr:"PASSED" @stderr:"#02" @-- $cmdt1 true
+$cmdtIn @test=meta3/ @stderr:"Successfuly ran" @-- $cmdt1 @report=main
+$cmdtIn @test=meta3/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt1 @report=main @token=$tk0
 
 $cmdtIn @init=meta4
-$cmdtIn @test=meta4/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt0 @test=sub4/ true
-$cmdtIn @test=meta4/ @stderr:"PASSED" @stderr:"#02" @-- $cmdt0 @test=sub4/ true
-$cmdtIn @test=meta4/ @stderr:"Successfuly ran" @-- $cmdt0 @report=sub4
-$cmdtIn @test=meta4/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=sub4 @token=$tk0
+$cmdtIn @test=meta4/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt1 @test=sub4/ true
+$cmdtIn @test=meta4/ @stderr:"PASSED" @stderr:"#02" @-- $cmdt1 @test=sub4/ true
+$cmdtIn @test=meta4/ @stderr:"Successfuly ran" @-- $cmdt1 @report=sub4
+$cmdtIn @test=meta4/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt1 @report=sub4 @token=$tk0
 $cmdt @report 2>&1 | grep -v "Failures"
 
 export -n __CMDT_TOKEN

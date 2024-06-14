@@ -19,9 +19,13 @@ import (
 )
 
 var (
-	dpl    = display.New()
+	Dpl    display.Displayer
 	logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 )
+
+func init() {
+	Dpl = display.New()
+}
 
 func usage() {
 	usagePrinter := printz.NewStandard()
@@ -72,7 +76,7 @@ func InitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 		ctx.NoErrorOrFatal(err)
 	}
 
-	dpl.Suite(ctx)
+	Dpl.Suite(ctx)
 	return
 }
 
@@ -118,8 +122,8 @@ func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int16, err error) {
 		return
 	}
 
-	dpl.ReportSuites(suiteOutcomes)
-	dpl.ReportAllFooter(ctx)
+	Dpl.ReportSuites(suiteOutcomes)
+	Dpl.ReportAllFooter(ctx)
 
 	return
 }
@@ -168,7 +172,7 @@ func reportTestSuite(ctx facade.SuiteContext) (suiteOutcome model.SuiteOutcome, 
 
 func ReportTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	suiteOutcome, exitCode, err := reportTestSuite(ctx)
-	dpl.ReportSuite(suiteOutcome)
+	Dpl.ReportSuite(suiteOutcome)
 	return
 }
 
@@ -187,13 +191,13 @@ func PerformTest(testDef model.TestDefinition) (exitCode int16, err error) {
 	ctx := facade.NewTestContext2(testDef)
 	seq := testDef.Seq
 
-	dpl.TestTitle(ctx, seq)
+	Dpl.TestTitle(ctx, seq)
 
 	if cfg.Ignore.Is(true) {
 		ctx.IncrementIgnoredCount()
 		oc := ctx.IgnoredTestOutcome(seq)
 		ctx.Repo.SaveTestOutcome(oc)
-		dpl.TestOutcome(ctx, oc)
+		Dpl.TestOutcome(ctx, oc)
 		exitCode = 0
 		return
 	}
@@ -220,7 +224,7 @@ func PerformTest(testDef model.TestDefinition) (exitCode int16, err error) {
 	}
 	outcome := ctx.AssertCmdExecBlocking(seq, assertions)
 
-	dpl.TestOutcome(ctx, outcome)
+	Dpl.TestOutcome(ctx, outcome)
 
 	for _, after := range cfg.After {
 		cmdAfter := cmdz.Cmd(after...)
@@ -252,7 +256,7 @@ func ProcessTestDef(testDef model.TestDefinition) (exitCode int16) {
 
 	if tooMuchFailures == 1 {
 		// First time detecting TOO MUCH FAILURES
-		dpl.TooMuchFailures(testCtx.SuiteContext, testSuite)
+		Dpl.TooMuchFailures(testCtx.SuiteContext, testSuite)
 	}
 	if tooMuchFailures > 0 {
 		exitCode = 0
@@ -265,7 +269,7 @@ func ProcessTestDef(testDef model.TestDefinition) (exitCode int16) {
 		testCtx.NoErrorOrFatal(err)
 	}
 
-	dpl.Quiet(testCfg.Quiet.Is(true))
+	Dpl.Quiet(testCfg.Quiet.Is(true))
 	if testCfg.ContainerDisabled.Is(true) || testCfg.ContainerImage.IsEmpty() {
 		logger.Debug("Performing test outside container", "image", testCfg.ContainerImage, "containerDisabled", testCfg.ContainerDisabled, "testConfig", testCfg)
 		exitCode, err = PerformTest(testDef)
@@ -341,19 +345,19 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		}
 		globalCtx := facade.NewGlobalContext(token, isolation, inputConfig)
 		globalCtx.NoErrorOrFatal(agg.Return())
-		dpl.SetVerbose(globalCtx.Config.Verbose.Get())
+		Dpl.SetVerbose(globalCtx.Config.Verbose.Get())
 		logger.Trace("Forged context", "ctx", globalCtx)
 		logger.Info("Processing global action", "token", token)
-		dpl.Quiet(globalCtx.Config.Quiet.Is(true))
+		Dpl.Quiet(globalCtx.Config.Quiet.Is(true))
 		exitCode, err = GlobalConfig(globalCtx)
 	case model.InitAction:
 		testSuite := inputConfig.TestSuite.Get()
 		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig)
 		suiteCtx.NoErrorOrFatal(agg.Return())
-		dpl.SetVerbose(suiteCtx.Config.Verbose.Get())
+		Dpl.SetVerbose(suiteCtx.Config.Verbose.Get())
 		logger.Trace("Forged context", "ctx", suiteCtx)
 		logger.Info("Processing init action", "token", token)
-		dpl.Quiet(suiteCtx.Config.Quiet.Is(true))
+		Dpl.Quiet(suiteCtx.Config.Quiet.Is(true))
 		exitCode, err = InitTestSuite(suiteCtx)
 	case model.ReportAction:
 		// Report can be async (run by daemon) or not
@@ -369,12 +373,12 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				errorz.Fatal(agg)
 			}
 			globalCtx := facade.NewGlobalContext(token, isolation, inputConfig)
-			dpl.SetVerbose(globalCtx.Config.Verbose.Get())
+			Dpl.SetVerbose(globalCtx.Config.Verbose.Get())
 			if globalCtx.Config.Async.Is(false) {
 				// Process report all without daemon
 				logger.Trace("Forged context", "ctx", globalCtx)
 				logger.Info("executing report all in sync (not queueing report)")
-				dpl.Quiet(globalCtx.Config.Quiet.Is(true))
+				Dpl.Quiet(globalCtx.Config.Quiet.Is(true))
 				// TODO: wait all tests run
 				// Daemon must be off or No test remaining in suite queue
 				globalCtx.Repo.WaitAllEmpty(globalCtx.Config.SuiteTimeout.GetOr(defaultGlobalTimeout)) // FIXME: bad timeout
@@ -414,7 +418,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			testSuite := inputConfig.TestSuite.Get()
 			suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig)
 			suiteCtx.NoErrorOrFatal(agg.Return())
-			dpl.SetVerbose(suiteCtx.Config.Verbose.Get())
+			Dpl.SetVerbose(suiteCtx.Config.Verbose.Get())
 
 			def := model.ReportDefinition{
 				Token:     token,
@@ -428,7 +432,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				// Process report without daemon
 				logger.Trace("Forged context", "ctx", suiteCtx)
 				logger.Info("executing report in sync (not queueing report)", "suite", testSuite)
-				dpl.Quiet(suiteCtx.Config.Quiet.Is(true))
+				Dpl.Quiet(suiteCtx.Config.Quiet.Is(true))
 				suiteCtx.Repo.WaitEmptyQueue(testSuite, suiteCtx.Config.SuiteTimeout.Get())
 				//exitCode, err = ReportTestSuite(suiteCtx)
 				exitCode, err = ProcessReportDef(def)
@@ -470,7 +474,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		ppid := uint32(utils.ReadEnvPpid())
 		testCtx := facade.NewTestContext(token, isolation, testSuite, 0, inputConfig, ppid)
 		testCtx.IncrementTestCount()
-		dpl.SetVerbose(testCtx.Config.Verbose.Get())
+		Dpl.SetVerbose(testCtx.Config.Verbose.Get())
 		seq := testCtx.Seq
 		testCtx.NoErrorOrFatal(agg.Return())
 		testCfg := testCtx.Config

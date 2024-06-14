@@ -429,6 +429,17 @@ func testDirectoryPath(testSuite, token, isol string, seq uint16) (testDir strin
 	return
 }
 
+func DaemonSuiteReportFilepathes(testSuite, token, isol string) (outPath, errPath string, err error) {
+	suitePath, err := testSuiteDirectoryPath(testSuite, token, isol)
+	if err != nil {
+		return
+	}
+
+	outPath = filepath.Join(suitePath, model.StdoutFilename)
+	errPath = filepath.Join(suitePath, model.StderrFilename)
+	return
+}
+
 func testsuiteConfigFilepath(testSuite, token, isol string) (path string, err error) {
 	var testDir string
 	testDir, err = testSuiteDirectoryPath(testSuite, token, isol)

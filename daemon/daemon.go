@@ -12,6 +12,7 @@ import (
 
 	"github.com/gofrs/flock"
 
+	"mby.fr/cmdtest/display"
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/repo"
 	"mby.fr/cmdtest/service"
@@ -57,15 +58,101 @@ Ideas:
 */
 
 type daemon struct {
-	token string
-	repo  repo.Repo
+	token, isolation string
+	repo             repo.Repo
 }
 
-func (d daemon) unqueue() (ok bool, err error) {
-	op, err := d.repo.UnqueueOperation()
+func (d daemon) run() {
+	logger.Info("daemon: starting ...", "token", d.token)
+	startTime := time.Now()
+	debugTime := time.Now()
+	lastUnqueue := time.Now()
+
+	dpl := display.NewFiled()
+	service.Dpl = dpl
+
+	var openedSuite string
+	var stdout, stderr *os.File
+	defer func() {
+		if stdout != nil {
+			stdout.Close()
+		}
+		if stderr != nil {
+			stderr.Close()
+		}
+	}()
+
+	for {
+		// err := d.repo.Init()
+		// if err != nil {
+		// 	return
+		// }
+
+		if time.Since(debugTime) > time.Second {
+			debugTime = time.Now()
+			logger.Trace("daemon running", "token", d.token, "for", time.Since(startTime))
+		}
+
+		if op, err := d.unqueue(); err != nil {
+			panic(err)
+		} else if op != nil {
+			suite := op.Suite()
+			if openedSuite != suite {
+				// close previous files
+				if stdout != nil {
+					stdout.Close()
+				}
+				if stderr != nil {
+					stderr.Close()
+				}
+				// open suite files
+				outFilepath, errFilepath, err := repo.DaemonSuiteReportFilepathes(op.Suite(), d.token, d.isolation)
+				if err != nil {
+					return
+				}
+				stdout, err = os.OpenFile(outFilepath, os.O_WRONLY+os.O_CREATE+os.O_APPEND, 0644)
+				if err != nil {
+					return
+				}
+				stderr, err = os.OpenFile(errFilepath, os.O_WRONLY+os.O_CREATE+os.O_APPEND, 0644)
+				if err != nil {
+					return
+				}
+				*os.Stdout = *stdout
+				*os.Stderr = *stderr
+				dpl.SetOutputFiles(stdout, stderr)
+			}
+
+			_, err := d.process(op)
+			if err != nil {
+				return
+			}
+		} else {
+			// nothing to unqueue wait 1ms
+			duration := time.Since(lastUnqueue)
+			if duration > ExtraRunningSecs*time.Second {
+				logger.Debug("daemon: nothing to unqueue", "duration", duration, "token", d.token)
+				// More than ExtraRunningSecs since last unqueue
+				break
+			}
+			time.Sleep(AsyncPollingSleepInMs * time.Millisecond)
+			continue
+		}
+
+		lastUnqueue = time.Now()
+	}
+	logger.Info("daemon: stopping ...", "token", d.token, "after", time.Since(startTime))
+}
+
+func (d daemon) unqueue() (op model.Operater, err error) {
+	op, err = d.repo.UnqueueOperation()
 	if err != nil {
 		return
 	}
+	return
+}
+
+func (d daemon) process(op model.Operater) (ok bool, err error) {
 	defer func() {
 		if op != nil {
 			//logger.Warn("doning op ...", "op", op)
@@ -96,40 +183,6 @@ func (d daemon) unqueue() (ok bool, err error) {
 		ok = true
 	}
 	return
-}
-
-func (d daemon) run() {
-	logger.Info("daemon: starting ...", "token", d.token)
-	startTime := time.Now()
-	debugTime := time.Now()
-	lastUnqueue := time.Now()
-	for {
-		// err := d.repo.Init()
-		// if err != nil {
-		// 	return
-		// }
-		if time.Since(debugTime) > time.Second {
-			debugTime = time.Now()
-			logger.Trace("daemon running", "token", d.token, "for", time.Since(startTime))
-		}
-
-		if ok, err := d.unqueue(); err != nil {
-			panic(err)
-		} else if !ok {
-			// nothing to unqueue wait 1ms
-			duration := time.Since(lastUnqueue)
-			if duration > ExtraRunningSecs*time.Second {
-				logger.Debug("daemon: nothing to unqueue", "duration", duration, "token", d.token)
-				// More than ExtraRunningSecs since last unqueue
-				break
-			}
-			time.Sleep(AsyncPollingSleepInMs * time.Millisecond)
-			continue
-		}
-
-		lastUnqueue = time.Now()
-	}
-	logger.Info("daemon: stopping ...", "token", d.token, "after", time.Since(startTime))
 }
 
 func (d daemon) performTest(testDef model.TestDefinition) (exitCode int16) {
@@ -204,7 +257,7 @@ func TakeOver() {
 	zlog.SetLogLevelThreshold(slog.Level(debugLevel))
 
 	repo := repo.New(token, isolation)
-	d := daemon{token: token, repo: &repo}
+	d := daemon{token: token, isolation: isolation, repo: &repo}
 	lockFilepath := filepath.Join(repo.BackingFilepath(), DaemonLockFilename)
 	fileLock := flock.New(lockFilepath)
 
@@ -286,7 +339,7 @@ func TakeOver() {
 }
 
 func LanchProcessIfNeeded(token, isolation string) error {
-	logger.Debug("daemon: should I launch daemon ?", "token", token)
+	logger.Debug("daemon: should I launch daemon ?", "token", token, "isolation", isolation)
 	if token == "" {
 		// No token => no daemon to launch
 		return nil

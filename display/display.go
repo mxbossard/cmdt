@@ -29,21 +29,24 @@ var (
 	resetColor   = ansi.Reset
 )
 
-/*
-	type Displayer interface {
-		Global(facade.Context)
-		Suite(facade.Context)
-		TestTitle(facade.Context)
-		TestOutcome(ctx facade.Context)
-		AssertionResult(model.AssertionResult)
-		ReportSuite(facade.Context)
-		ReportAll(facade.Context)
-		Stdout(string)
-		Stderr(string)
-		Error(error)
-		Flush() error
-	}
-*/
+type Displayer interface {
+	Global(facade.GlobalContext)
+	Suite(facade.SuiteContext)
+	TestTitle(facade.TestContext, uint16)
+	TestOutcome(facade.TestContext, model.TestOutcome)
+	//AssertionResult(model.AssertionResult)
+	ReportSuite(model.SuiteOutcome)
+	ReportSuites([]model.SuiteOutcome)
+	ReportAllFooter(facade.GlobalContext)
+	TooMuchFailures(facade.SuiteContext, string)
+	Stdout(string)
+	Stderr(string)
+	Error(error)
+	Flush() error
+	Quiet(bool)
+	SetVerbose(model.VerboseLevel)
+}
+
 type BasicDisplay struct {
 	printer            printz.Printer
 	notQuietPrinter    printz.Printer
@@ -336,8 +339,8 @@ func (d *BasicDisplay) SetVerbose(level model.VerboseLevel) {
 	d.verbose = level
 }
 
-func New() BasicDisplay {
-	d := BasicDisplay{
+func New() *BasicDisplay {
+	d := &BasicDisplay{
 		notQuietPrinter:    printz.NewStandard(),
 		clearAnsiFormatter: inout.AnsiFormatter{AnsiFormat: ansi.Reset},
 		outFormatter:       inout.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", testColor, resetColor)},
