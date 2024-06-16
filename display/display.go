@@ -47,7 +47,7 @@ type Displayer interface {
 	SetVerbose(model.VerboseLevel)
 }
 
-type BasicDisplay struct {
+type basicDisplay struct {
 	printer            printz.Printer
 	notQuietPrinter    printz.Printer
 	clearAnsiFormatter inout.Formatter
@@ -56,7 +56,7 @@ type BasicDisplay struct {
 	verbose            model.VerboseLevel
 }
 
-func (d BasicDisplay) Global(ctx facade.GlobalContext) {
+func (d basicDisplay) Global(ctx facade.GlobalContext) {
 	defer d.Flush()
 	// Do nothing ?
 	if ctx.Config.Verbose.Get() >= model.SHOW_FAILED_OUTS {
@@ -64,14 +64,14 @@ func (d BasicDisplay) Global(ctx facade.GlobalContext) {
 	}
 }
 
-func (d BasicDisplay) Suite(ctx facade.SuiteContext) {
+func (d basicDisplay) Suite(ctx facade.SuiteContext) {
 	defer d.Flush()
 	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
 		d.printer.ColoredErrf(messageColor, "## Test suite [%s] (token: %s)\n", ctx.Config.TestSuite.Get(), ctx.Token)
 	}
 }
 
-func (d BasicDisplay) TestTitle(ctx facade.TestContext, seq uint16) {
+func (d basicDisplay) TestTitle(ctx facade.TestContext, seq uint16) {
 	if ctx.Config.Verbose.Get() == model.SHOW_REPORTS_ONLY {
 		return
 	}
@@ -108,7 +108,7 @@ func (d BasicDisplay) TestTitle(ctx facade.TestContext, seq uint16) {
 	*/
 }
 
-func (d BasicDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutcome) {
+func (d basicDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutcome) {
 	if ctx.Config.Verbose.Get() == model.SHOW_REPORTS_ONLY {
 		return
 	}
@@ -170,7 +170,7 @@ func (d BasicDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutc
 
 }
 
-func (d BasicDisplay) assertionResult(result model.AssertionResult) {
+func (d basicDisplay) assertionResult(result model.AssertionResult) {
 	defer d.Flush()
 	hlClr := reportColor
 	//log.Printf("failedResult: %v\n", result)
@@ -230,7 +230,7 @@ func (d BasicDisplay) assertionResult(result model.AssertionResult) {
 	}
 }
 
-func (d BasicDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
+func (d basicDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 	defer d.Flush()
 	testCount := outcome.TestCount
 	ignoredCount := outcome.IgnoredCount
@@ -274,11 +274,11 @@ func (d BasicDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 	}
 }
 
-func (d BasicDisplay) ReportSuite(outcome model.SuiteOutcome) {
+func (d basicDisplay) ReportSuite(outcome model.SuiteOutcome) {
 	d.reportSuite(outcome, MinReportSuiteLabelPadding)
 }
 
-func (d BasicDisplay) ReportSuites(outcomes []model.SuiteOutcome) {
+func (d basicDisplay) ReportSuites(outcomes []model.SuiteOutcome) {
 	maxSuiteNameSize := 0
 	for _, outcome := range outcomes {
 		if len(outcome.TestSuite) > maxSuiteNameSize {
@@ -290,7 +290,7 @@ func (d BasicDisplay) ReportSuites(outcomes []model.SuiteOutcome) {
 	}
 }
 
-func (d BasicDisplay) ReportAllFooter(globalCtx facade.GlobalContext) {
+func (d basicDisplay) ReportAllFooter(globalCtx facade.GlobalContext) {
 	defer d.Flush()
 
 	globalStartTime := globalCtx.Config.GlobalStartTime.Get()
@@ -298,7 +298,7 @@ func (d BasicDisplay) ReportAllFooter(globalCtx facade.GlobalContext) {
 	d.printer.ColoredErrf(messageColor, "Global duration time: %s\n", globalDuration)
 }
 
-func (d BasicDisplay) TooMuchFailures(ctx facade.SuiteContext, testSuite string) {
+func (d basicDisplay) TooMuchFailures(ctx facade.SuiteContext, testSuite string) {
 	if ctx.Config.Verbose.Get() == model.SHOW_REPORTS_ONLY {
 		return
 	}
@@ -306,27 +306,27 @@ func (d BasicDisplay) TooMuchFailures(ctx facade.SuiteContext, testSuite string)
 	d.printer.ColoredErrf(warningColor, "Too much failure for [%s] test suite. Stop testing.\n", testSuite)
 }
 
-func (d BasicDisplay) Stdout(s string) {
+func (d basicDisplay) Stdout(s string) {
 	if s != "" {
 		d.notQuietPrinter.Out(d.outFormatter.Format(s))
 	}
 }
 
-func (d BasicDisplay) Stderr(s string) {
+func (d basicDisplay) Stderr(s string) {
 	if s != "" {
 		d.notQuietPrinter.Err(d.errFormatter.Format(s))
 	}
 }
 
-func (d BasicDisplay) Error(err error) {
+func (d basicDisplay) Error(err error) {
 
 }
 
-func (d BasicDisplay) Flush() error {
+func (d basicDisplay) Flush() error {
 	return d.printer.Flush()
 }
 
-func (d *BasicDisplay) Quiet(quiet bool) {
+func (d *basicDisplay) Quiet(quiet bool) {
 	if quiet {
 		d.printer = printz.NewDiscarding()
 	} else {
@@ -335,12 +335,12 @@ func (d *BasicDisplay) Quiet(quiet bool) {
 
 }
 
-func (d *BasicDisplay) SetVerbose(level model.VerboseLevel) {
+func (d *basicDisplay) SetVerbose(level model.VerboseLevel) {
 	d.verbose = level
 }
 
-func New() *BasicDisplay {
-	d := &BasicDisplay{
+func New() *basicDisplay {
+	d := &basicDisplay{
 		notQuietPrinter:    printz.NewStandard(),
 		clearAnsiFormatter: inout.AnsiFormatter{AnsiFormat: ansi.Reset},
 		outFormatter:       inout.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", testColor, resetColor)},

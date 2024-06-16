@@ -7,16 +7,16 @@ import (
 )
 
 type FiledDisplay struct {
-	*BasicDisplay
+	*basicDisplay
 }
 
 func (d *FiledDisplay) SetOutputFiles(out, err *os.File) {
 	outs := printz.NewOutputs(out, err)
-	d.BasicDisplay.notQuietPrinter = printz.New(outs)
+	d.basicDisplay.notQuietPrinter = printz.New(outs)
 }
 
 func NewFiled() (d *FiledDisplay) {
 	return &FiledDisplay{
-		BasicDisplay: New(),
+		basicDisplay: New(),
 	}
 }
