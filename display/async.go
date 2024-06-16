@@ -2,11 +2,15 @@ package display
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"mby.fr/cmdtest/facade"
 	"mby.fr/cmdtest/model"
+	"mby.fr/cmdtest/repo"
 	"mby.fr/utils/ansi"
 	"mby.fr/utils/format"
 	"mby.fr/utils/inout"
@@ -14,8 +18,8 @@ import (
 )
 
 const (
-	FlushFrequencyInMs     = 1
-	NoActivityTimeoutInSec = 30
+	FlushFrequency    = 1 * time.Millisecond
+	NoActivityTimeout = 30 * time.Second
 )
 
 /**
@@ -42,44 +46,82 @@ const (
 - can start flushing global instantly
 - can start flushing suite after @init or first @test
 - can start flushing test after init and after @test
+- every async operations to display are buffered and flush in order into files.
+- StartDisplayRecorded() will tail in order those files and print them into stdout & stderr alternatively.
+
+## Open questions
+- @report actions is never async ? => always print to stdout/stderr ?
+- other actions should be writen in two separete files (stdout/stderr) ?
+-
 
 May need to split actions in half : init by cmdt ; processing by daemon => cmdt async return must guarantee action is inited and will be processed by daemon.
 Or simpler may display testTitle on queueing the test ?
 */
 
+func newFileOutputs(outFile, errFile string) (io.Writer, io.Writer, error) {
+	outW, err := os.OpenFile(outFile, os.O_WRONLY+os.O_APPEND+os.O_CREATE, 0644)
+	if err != nil {
+		return nil, nil, err
+	}
+	errW, err := os.OpenFile(errFile, os.O_WRONLY+os.O_APPEND+os.O_CREATE, 0644)
+	if err != nil {
+		return nil, nil, err
+	}
+	return outW, errW, nil
+}
+
 type suitePrinters struct {
-	inited        bool
-	suite         string
-	main          printz.Printer
-	mainBuffer    printz.Flusher
-	tests         []printz.Printer
-	testsBuffer   []printz.Flusher
+	inited             bool
+	suite, token, isol string
+	outW, errW         io.Writer
+	main               printz.Printer
+	//mainBuffer    printz.Flusher
+	tests []printz.Printer
+	//testsBuffer   []printz.Flusher
 	cursor, ended int
 	startTime     time.Time
 }
 
-func (p *suitePrinters) suitePrinter() printz.Printer {
+func (p *suitePrinters) suitePrinter() (printz.Printer, error) {
 	if p.main == nil {
-		stdOuts := printz.NewStandardOutputs()
-		bufferedOuts := printz.NewBufferedOutputs(stdOuts)
+		if p.outW == nil {
+			stdout, stderr, err := repo.DaemonSuiteReportFilepathes(p.suite, p.token, p.isol)
+			if err != nil {
+				return nil, err
+			}
+			p.outW, p.errW, err = newFileOutputs(stdout, stderr)
+			if err != nil {
+				return nil, err
+			}
+		}
+		bufferedOuts := printz.NewBufferedOutputs(printz.NewOutputs(p.outW, p.errW))
 		prtr := printz.New(bufferedOuts)
 		p.main = prtr
-		p.mainBuffer = bufferedOuts
+		//p.mainBuffer = bufferedOuts
 	}
 	p.startTime = time.Now()
-	return p.main
+	return p.main, nil
 }
 
-func (p *suitePrinters) testPrinter(seq int) printz.Printer {
+func (p *suitePrinters) testPrinter(seq int) (printz.Printer, error) {
 	printer := p.tests[seq]
 	if printer == nil {
-		stdOuts := printz.NewStandardOutputs()
-		bufferedOuts := printz.NewBufferedOutputs(stdOuts)
+		if p.outW == nil {
+			stdout, stderr, err := repo.DaemonSuiteReportFilepathes(p.suite, p.token, p.isol)
+			if err != nil {
+				return nil, err
+			}
+			p.outW, p.errW, err = newFileOutputs(stdout, stderr)
+			if err != nil {
+				return nil, err
+			}
+		}
+		bufferedOuts := printz.NewBufferedOutputs(printz.NewOutputs(p.outW, p.errW))
 		prtr := printz.New(bufferedOuts)
 		p.tests[seq] = prtr
-		p.testsBuffer[seq] = bufferedOuts
+		// p.testsBuffer[seq] = bufferedOuts
 	}
-	return printer
+	return printer, nil
 }
 
 func (p *suitePrinters) testEnded(seq int) {
@@ -94,14 +136,14 @@ func (p *suitePrinters) flush() (done bool, err error) {
 	// 3- increment cursor
 	// 4- flush suite
 
-	if time.Since(p.startTime) > NoActivityTimeoutInSec {
-		err = fmt.Errorf("timeout flushing async display after %s", NoActivityTimeoutInSec)
+	if time.Since(p.startTime) > NoActivityTimeout {
+		err = fmt.Errorf("timeout flushing async display after %s", NoActivityTimeout)
 	}
 
-	prtr := p.testsBuffer[p.cursor]
+	prtr := p.tests[p.cursor]
 	if !p.inited {
 		// flush suite printer on init
-		p.mainBuffer.Flush()
+		p.main.Flush()
 		p.inited = true
 	}
 
@@ -114,11 +156,11 @@ func (p *suitePrinters) flush() (done bool, err error) {
 		// current printer is done
 		p.cursor++
 		// flush suite printer
-		p.mainBuffer.Flush()
+		p.main.Flush()
 		p.startTime = time.Now()
 	}
 
-	if p.cursor >= len(p.testsBuffer) {
+	if p.cursor >= len(p.tests) {
 		// All printers are done
 		done = true
 	}
@@ -126,6 +168,7 @@ func (p *suitePrinters) flush() (done bool, err error) {
 }
 
 type asyncPrinters struct {
+	*sync.Mutex
 	globalPrinter  printz.Printer
 	globalBuffer   printz.Flusher
 	suitesPrinters map[string]suitePrinters
@@ -153,25 +196,57 @@ func (p *asyncPrinters) printer(suite string, seq int) printz.Printer {
 		}
 	}
 
+	var prtr printz.Printer
+	var err error
 	if seq == 0 {
-		return sprtr.suitePrinter()
+		prtr, err = sprtr.suitePrinter()
 	} else {
-		return sprtr.testPrinter(seq)
+		prtr, err = sprtr.testPrinter(seq)
+	}
+	if err != nil {
+		panic(err)
+	}
+	return prtr
+}
+
+func (p *asyncPrinters) testEnded(suite string, seq int) {
+	if sp, ok := p.suitesPrinters[suite]; ok {
+		sp.testEnded(seq)
 	}
 }
 
-func (p *asyncPrinters) flushAll() (done bool, err error) {
+func (p *asyncPrinters) flush(suite string) (err error) {
+	p.Lock()
+	// Must flush a suite only once
+	var suitePrinters suitePrinters
+	var ok bool
+	if suitePrinters, ok = p.suitesPrinters[suite]; ok {
+		delete(p.suitesPrinters, suite)
+	} else {
+		// If suitePrinters not in map, nothing to flush
+		return
+	}
+	p.Unlock()
+
+	for done, err := suitePrinters.flush(); !done; {
+		if err != nil {
+			return err
+		}
+		time.Sleep(FlushFrequency * time.Millisecond)
+	}
+	p.globalBuffer.Flush()
+	return
+}
+
+func (p *asyncPrinters) flushAll() (err error) {
 	// Current implem need all suites printers to be registered before starting to flush.
 	p.globalBuffer.Flush()
 
-	for _, suitePrinters := range p.suitesPrinters {
-		for done, err = suitePrinters.flush(); !done; {
-			if err != nil {
-				return
-			}
-			time.Sleep(FlushFrequencyInMs * time.Millisecond)
+	for suite, _ := range p.suitesPrinters {
+		err = p.flush(suite)
+		if err != nil {
+			return
 		}
-		p.globalBuffer.Flush()
 	}
 
 	return
@@ -180,7 +255,7 @@ func (p *asyncPrinters) flushAll() (done bool, err error) {
 type asyncDisplay struct {
 	token, isolation   string
 	printers           asyncPrinters
-	notQuietPrinter    printz.Printer
+	stdPrinter         printz.Printer
 	clearAnsiFormatter inout.Formatter
 	outFormatter       inout.Formatter
 	errFormatter       inout.Formatter
@@ -258,9 +333,9 @@ func (d asyncDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutc
 	}
 	// FIXME get outcome from ctx
 	cfg := ctx.Config
+	suite := cfg.TestSuite.Get()
 	verbose := cfg.Verbose.Get()
 	testDuration := outcome.Duration
-	defer d.Flush()
 
 	if verbose < model.SHOW_PASSED && outcome.Outcome != model.PASSED && outcome.Outcome != model.IGNORED {
 		// Print back test title not printed yed
@@ -269,7 +344,8 @@ func (d asyncDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutc
 		d.TestTitle(clone, outcome.Seq)
 	}
 
-	printer := d.printers.printer(cfg.TestSuite.Get(), int(outcome.Seq))
+	printer := d.printers.printer(suite, int(outcome.Seq))
+	defer d.printers.testEnded(suite, int(outcome.Seq))
 
 	switch outcome.Outcome {
 	case model.PASSED:
@@ -391,7 +467,7 @@ func (d asyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 	// 	d.printer.ColoredErrf(messageColor, "Reporting [%s] test suite (%s) ...\n", testSuite, ctx.Token)
 	// }
 
-	printer := d.printers.printer("", 0)
+	printer := d.stdPrinter // Do not print async
 
 	ignoredMessage := ""
 	if ignoredCount > 0 {
@@ -446,7 +522,7 @@ func (d asyncDisplay) ReportAllFooter(globalCtx facade.GlobalContext) {
 	if d.quiet {
 		return
 	}
-	printer := d.printers.printer("", 0)
+	printer := d.stdPrinter // Do not print async
 	globalStartTime := globalCtx.Config.GlobalStartTime.Get()
 	globalDuration := model.NormalizeDurationInSec(time.Since(globalStartTime))
 	printer.ColoredErrf(messageColor, "Global duration time: %s\n", globalDuration)
@@ -465,13 +541,15 @@ func (d asyncDisplay) TooMuchFailures(ctx facade.SuiteContext, testSuite string)
 
 func (d asyncDisplay) Stdout(s string) {
 	if s != "" {
-		d.notQuietPrinter.Out(d.outFormatter.Format(s))
+		printer := d.printers.printer("", 0)
+		printer.Out(d.outFormatter.Format(s))
 	}
 }
 
 func (d asyncDisplay) Stderr(s string) {
 	if s != "" {
-		d.notQuietPrinter.Err(d.errFormatter.Format(s))
+		printer := d.printers.printer("", 0)
+		printer.Err(d.errFormatter.Format(s))
 	}
 }
 
@@ -491,14 +569,33 @@ func (d *asyncDisplay) SetVerbose(level model.VerboseLevel) {
 	d.verbose = level
 }
 
-func newAsyncPrinter() *asyncDisplay {
+func (d *asyncDisplay) StartDisplayRecorded(suites []string) {
+	// Launch suitepPrinters flush async
+	go func() {
+		for _, suite := range suites {
+			err := d.printers.flush(suite)
+			if err != nil {
+				panic(err)
+			}
+		}
+	}()
+}
+
+func (d *asyncDisplay) EndDisplayRecorded(suites []string) {
+
+}
+
+func NewAsyncPrinter(token, isolation string) *asyncDisplay {
 	d := &asyncDisplay{
-		notQuietPrinter:    printz.NewStandard(),
+		token:              token,
+		isolation:          isolation,
+		stdPrinter:         printz.NewStandard(),
 		clearAnsiFormatter: inout.AnsiFormatter{AnsiFormat: ansi.Reset},
 		outFormatter:       inout.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", testColor, resetColor)},
 		errFormatter:       inout.PrefixFormatter{Prefix: fmt.Sprintf("%serr%s>", reportColor, resetColor)},
 		verbose:            model.DefaultVerboseLevel,
+		quiet:              false,
+		printers:           asyncPrinters{Mutex: &sync.Mutex{}},
 	}
-	d.printers = asyncPrinters{}
 	return d
 }
