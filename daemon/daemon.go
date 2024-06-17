@@ -68,26 +68,10 @@ func (d daemon) run() {
 	debugTime := time.Now()
 	lastUnqueue := time.Now()
 
-	dpl := display.NewFiled()
+	dpl := display.NewAsync(d.token, d.isolation)
 	service.Dpl = dpl
 
-	var openedSuite string
-	var stdout, stderr *os.File
-	defer func() {
-		if stdout != nil {
-			stdout.Close()
-		}
-		if stderr != nil {
-			stderr.Close()
-		}
-	}()
-
 	for {
-		// err := d.repo.Init()
-		// if err != nil {
-		// 	return
-		// }
-
 		if time.Since(debugTime) > time.Second {
 			debugTime = time.Now()
 			logger.Trace("daemon running", "token", d.token, "for", time.Since(startTime))
@@ -96,33 +80,6 @@ func (d daemon) run() {
 		if op, err := d.unqueue(); err != nil {
 			panic(err)
 		} else if op != nil {
-			suite := op.Suite()
-			if openedSuite != suite {
-				// close previous files
-				if stdout != nil {
-					stdout.Close()
-				}
-				if stderr != nil {
-					stderr.Close()
-				}
-				// open suite files
-				outFilepath, errFilepath, err := repo.DaemonSuiteReportFilepathes(op.Suite(), d.token, d.isolation)
-				if err != nil {
-					return
-				}
-				stdout, err = os.OpenFile(outFilepath, os.O_WRONLY+os.O_CREATE+os.O_APPEND, 0644)
-				if err != nil {
-					return
-				}
-				stderr, err = os.OpenFile(errFilepath, os.O_WRONLY+os.O_CREATE+os.O_APPEND, 0644)
-				if err != nil {
-					return
-				}
-				*os.Stdout = *stdout
-				*os.Stderr = *stderr
-				dpl.SetOutputFiles(stdout, stderr)
-			}
-
 			_, err := d.process(op)
 			if err != nil {
 				return

@@ -366,22 +366,26 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 
 		defaultGlobalTimeout := 5 * time.Minute
 
-		//inputConfig.Async.Set(false) // For now enforce async false on report
+		// For now enforce async false on report
+		inputConfig.Async.Set(false)
+		asyncDpl := display.NewAsync(token, isolation)
+
 		if inputConfig.ReportAll.Is(true) {
 			// Reporting All test suite
 			if agg.GotError() {
 				errorz.Fatal(agg)
 			}
 			globalCtx := facade.NewGlobalContext(token, isolation, inputConfig)
-			Dpl.SetVerbose(globalCtx.Config.Verbose.Get())
+			asyncDpl.SetVerbose(globalCtx.Config.Verbose.Get())
 			if globalCtx.Config.Async.Is(false) {
 				// Process report all without daemon
 				logger.Trace("Forged context", "ctx", globalCtx)
 				logger.Info("executing report all in sync (not queueing report)")
-				Dpl.Quiet(globalCtx.Config.Quiet.Is(true))
-				// TODO: wait all tests run
+				asyncDpl.Quiet(globalCtx.Config.Quiet.Is(true))
+				asyncDpl.StartDisplayAllRecorded()
 				// Daemon must be off or No test remaining in suite queue
 				globalCtx.Repo.WaitAllEmpty(globalCtx.Config.SuiteTimeout.GetOr(defaultGlobalTimeout)) // FIXME: bad timeout
+				asyncDpl.EndDisplayAllRecorded()
 				exitCode, err = ReportAllTestSuites(globalCtx)
 			} else {
 				// Delegate report all processing to daemon
@@ -433,7 +437,9 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				logger.Trace("Forged context", "ctx", suiteCtx)
 				logger.Info("executing report in sync (not queueing report)", "suite", testSuite)
 				Dpl.Quiet(suiteCtx.Config.Quiet.Is(true))
+				asyncDpl.StartDisplayRecorded(testSuite)
 				suiteCtx.Repo.WaitEmptyQueue(testSuite, suiteCtx.Config.SuiteTimeout.Get())
+				asyncDpl.EndDisplayRecorded(testSuite)
 				//exitCode, err = ReportTestSuite(suiteCtx)
 				exitCode, err = ProcessReportDef(def)
 				suiteCtx.NoErrorOrFatal(err)

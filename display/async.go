@@ -75,11 +75,9 @@ type suitePrinters struct {
 	suite, token, isol string
 	outW, errW         io.Writer
 	main               printz.Printer
-	//mainBuffer    printz.Flusher
-	tests []printz.Printer
-	//testsBuffer   []printz.Flusher
-	cursor, ended int
-	startTime     time.Time
+	tests              map[int]printz.Printer
+	cursor, ended      int
+	startTime          time.Time
 }
 
 func (p *suitePrinters) suitePrinter() (printz.Printer, error) {
@@ -104,8 +102,8 @@ func (p *suitePrinters) suitePrinter() (printz.Printer, error) {
 }
 
 func (p *suitePrinters) testPrinter(seq int) (printz.Printer, error) {
-	printer := p.tests[seq]
-	if printer == nil {
+	printer, ok := p.tests[seq]
+	if !ok {
 		if p.outW == nil {
 			stdout, stderr, err := repo.DaemonSuiteReportFilepathes(p.suite, p.token, p.isol)
 			if err != nil {
@@ -117,8 +115,8 @@ func (p *suitePrinters) testPrinter(seq int) (printz.Printer, error) {
 			}
 		}
 		bufferedOuts := printz.NewBufferedOutputs(printz.NewOutputs(p.outW, p.errW))
-		prtr := printz.New(bufferedOuts)
-		p.tests[seq] = prtr
+		printer = printz.New(bufferedOuts)
+		p.tests[seq] = printer
 		// p.testsBuffer[seq] = bufferedOuts
 	}
 	return printer, nil
@@ -170,7 +168,6 @@ func (p *suitePrinters) flush() (done bool, err error) {
 type asyncPrinters struct {
 	*sync.Mutex
 	globalPrinter  printz.Printer
-	globalBuffer   printz.Flusher
 	suitesPrinters map[string]suitePrinters
 	currentSuite   string
 }
@@ -182,7 +179,6 @@ func (p *asyncPrinters) printer(suite string, seq int) printz.Printer {
 			bufferedOuts := printz.NewBufferedOutputs(stdOuts)
 			prtr := printz.New(bufferedOuts)
 			p.globalPrinter = prtr
-			p.globalBuffer = bufferedOuts
 		}
 		return p.globalPrinter
 	}
@@ -193,6 +189,7 @@ func (p *asyncPrinters) printer(suite string, seq int) printz.Printer {
 	if sprtr, ok = p.suitesPrinters[suite]; !ok {
 		sprtr = suitePrinters{
 			suite: suite,
+			tests: make(map[int]printz.Printer),
 		}
 	}
 
@@ -234,13 +231,13 @@ func (p *asyncPrinters) flush(suite string) (err error) {
 		}
 		time.Sleep(FlushFrequency * time.Millisecond)
 	}
-	p.globalBuffer.Flush()
+	p.printer("", 0).Flush()
 	return
 }
 
 func (p *asyncPrinters) flushAll() (err error) {
 	// Current implem need all suites printers to be registered before starting to flush.
-	p.globalBuffer.Flush()
+	p.printer("", 0).Flush()
 
 	for suite, _ := range p.suitesPrinters {
 		err = p.flush(suite)
@@ -569,23 +566,35 @@ func (d *asyncDisplay) SetVerbose(level model.VerboseLevel) {
 	d.verbose = level
 }
 
-func (d *asyncDisplay) StartDisplayRecorded(suites []string) {
+func (d *asyncDisplay) StartDisplayRecorded(suite string) {
 	// Launch suitepPrinters flush async
 	go func() {
-		for _, suite := range suites {
-			err := d.printers.flush(suite)
-			if err != nil {
-				panic(err)
-			}
+		err := d.printers.flush(suite)
+		if err != nil {
+			panic(err)
 		}
 	}()
 }
 
-func (d *asyncDisplay) EndDisplayRecorded(suites []string) {
-
+func (d *asyncDisplay) StartDisplayAllRecorded() {
+	// Launch suitepPrinters flush async
+	go func() {
+		err := d.printers.flushAll()
+		if err != nil {
+			panic(err)
+		}
+	}()
 }
 
-func NewAsyncPrinter(token, isolation string) *asyncDisplay {
+func (d *asyncDisplay) EndDisplayRecorded(suite string) {
+	// Something to do ?
+}
+
+func (d *asyncDisplay) EndDisplayAllRecorded() {
+	// Something to do ?
+}
+
+func NewAsync(token, isolation string) *asyncDisplay {
 	d := &asyncDisplay{
 		token:              token,
 		isolation:          isolation,

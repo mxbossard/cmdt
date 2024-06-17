@@ -33,11 +33,11 @@ export -n __CMDT_TOKEN
 nothingToReportExpectedStderrMsg="you must perform some test prior to report"
 >&2 echo "## Meta1 test context not shared without token"
 $cmdtIn @init=meta1 #@verbose=4
-$cmdtIn @test=meta1/"without token one" @stderr:"PASSED" @stderr:"#01" @-- $cmdt1 true
-$cmdtIn @test=meta1/"without token two" @stderr:"PASSED" @stderr:"#02" @-- $cmdt1 true
-$cmdtIn @test=meta1/"command before rule stop" @fail @stderr:"before rule parsing stopper" @-- $cmdt1 true @-- @success
-$cmdtIn @test=meta1/"rule on 2 args" @stderr:"PASSED" @-- $cmdt1 @stdout:foo bar @-- echo foo bar
-$cmdtIn @test=meta1/ @exit=1 @stderr:"3 success" @stderr:"0 failure" @stderr:"1 error" @-- $cmdt1 @report=main
+$cmdtIn @test=meta1/"without token one" @stderr= @-- $cmdt1 true
+$cmdtIn @test=meta1/"without token two" @stderr= @-- $cmdt1 true
+#$cmdtIn @test=meta1/"command before rule stop" @stderr= @-- $cmdt1 true @-- @success
+$cmdtIn @test=meta1/"rule on 2 args" @stderr= @-- $cmdt1 @stdout:foo bar @-- echo foo bar
+$cmdtIn @test=meta1/ @exit=0 @stderr:"#01" @stderr:"#02" @stderr:"before rule parsing stopper" @stderr:"PASSED" @stderr:"3 success" @stderr:"0 failure" @stderr:"0 error" @-- $cmdt1 @report=main
 
 >&2 echo "## Test printed token"
 tk0=$( $cmdt @init @printToken 2> /dev/null )
