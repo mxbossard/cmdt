@@ -566,23 +566,31 @@ func (d *asyncDisplay) SetVerbose(level model.VerboseLevel) {
 	d.verbose = level
 }
 
+func (d *asyncDisplay) DisplayRecorded(suite string) {
+	err := d.printers.flush(suite)
+	if err != nil {
+		panic(err)
+	}
+}
+
 func (d *asyncDisplay) StartDisplayRecorded(suite string) {
 	// Launch suitepPrinters flush async
 	go func() {
-		err := d.printers.flush(suite)
-		if err != nil {
-			panic(err)
-		}
+		d.DisplayRecorded(suite)
 	}()
+}
+
+func (d *asyncDisplay) DisplayAllRecorded() {
+	err := d.printers.flushAll()
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (d *asyncDisplay) StartDisplayAllRecorded() {
 	// Launch suitepPrinters flush async
 	go func() {
-		err := d.printers.flushAll()
-		if err != nil {
-			panic(err)
-		}
+		d.DisplayAllRecorded()
 	}()
 }
 

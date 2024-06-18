@@ -146,31 +146,31 @@ func TestNextSeq(t *testing.T) {
 
 	s, err = dao.NextSeq("foo")
 	require.NoError(t, err)
-	assert.Equal(t, uint32(0), s)
+	assert.Equal(t, uint16(1), s)
 
 	s, err = dao.NextSeq("foo")
 	require.NoError(t, err)
-	assert.Equal(t, uint32(1), s)
+	assert.Equal(t, uint16(2), s)
 
 	s, err = dao.NextSeq("foo")
 	require.NoError(t, err)
-	assert.Equal(t, uint32(2), s)
+	assert.Equal(t, uint16(3), s)
 
 	s, err = dao.NextSeq("bar")
 	require.NoError(t, err)
-	assert.Equal(t, uint32(0), s)
+	assert.Equal(t, uint16(1), s)
 
 	s, err = dao.NextSeq("foo")
 	require.NoError(t, err)
-	assert.Equal(t, uint32(3), s)
+	assert.Equal(t, uint16(4), s)
 
 	s, err = dao.NextSeq("bar")
 	require.NoError(t, err)
-	assert.Equal(t, uint32(1), s)
+	assert.Equal(t, uint16(2), s)
 
 	s, err = dao.NextSeq("baz")
 	require.NoError(t, err)
-	assert.Equal(t, uint32(0), s)
+	assert.Equal(t, uint16(1), s)
 }
 
 func TestUpdateEndTime(t *testing.T) {
@@ -204,7 +204,7 @@ func TestUpdateOutcome(t *testing.T) {
 	defer os.RemoveAll(dirpath)
 	dao := initSuiteDao(t, dirpath)
 
-	verifyQuery := "SELECT outcome from suite where name = ? AND outcome <> ''"
+	verifyQuery := "SELECT outcome from suite where name = ? AND outcome <> 'Z'"
 	expectedSuite := "foo"
 	addSuite(t, dao, expectedSuite)
 
@@ -258,13 +258,13 @@ func TestListPassedFailedErrored(t *testing.T) {
 	addSuiteWithOutcome(t, dao, "p1", "PASSED", time.Now())
 	addSuiteWithOutcome(t, dao, "f1", "FAILED", time.Now())
 	addSuiteWithOutcome(t, dao, "e1", "ERRORED", time.Now())
-	addSuiteWithOutcome(t, dao, "t1", "TIMEOUTED", time.Now())
+	addSuiteWithOutcome(t, dao, "t1", "TIMEOUT", time.Now())
 	addSuiteWithOutcome(t, dao, "e2", "ERRORED", time.Now())
 	addSuiteWithOutcome(t, dao, "f2", "FAILED", time.Now())
 	addSuiteWithOutcome(t, dao, "p2", "PASSED", time.Now())
-	addSuiteWithOutcome(t, dao, "t2", "TIMEOUTED", time.Now())
+	addSuiteWithOutcome(t, dao, "t2", "TIMEOUT", time.Now())
 
 	suites, err := dao.ListPassedFailedErrored()
 	require.NoError(t, err)
-	assert.Equal(t, []string{"p1", "p2", "f1", "f2", "e1", "e2"}, suites)
+	assert.Equal(t, []string{"p1", "p2", "f1", "f2", "t1", "t2", "e1", "e2"}, suites)
 }

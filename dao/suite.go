@@ -16,6 +16,24 @@ func NewSuite(db *zql.SynchronizedDB) (d Suite, err error) {
 	return
 }
 
+func outcomeOrder(o model.Outcome) int {
+	switch o {
+	case model.PASSED:
+		return 10
+	case model.FAILED:
+		return 20
+	case model.TIMEOUT:
+		return 30
+	case model.ERRORED:
+		return 40
+	case model.IGNORED:
+		return 50
+	default:
+		panic("bad outcome")
+	}
+	return 99
+}
+
 type Suite struct {
 	db *zql.SynchronizedDB
 }
@@ -29,7 +47,8 @@ func (d Suite) init() (err error) {
 			seq INTEGER NOT NULL DEFAULT 0,
 			tooMuch INTEGER NOT NULL DEFAULT 0,
 			endTime INTEGER NOT NULL DEFAULT 0,
-			outcome TEXT NOT NULL DEFAULT 'Z'
+			outcome TEXT NOT NULL DEFAULT 'Z',
+			outcomeOrder INTEGER DEFAULT 0
 		);
 	`)
 	return
@@ -157,10 +176,11 @@ func (d Suite) UpdateSuiteOutcome(suite string, outcome model.Outcome) (err erro
 	p := logger.PerfTimer("suite", suite)
 	defer p.End()
 
+	order := outcomeOrder(outcome)
 	_, err = d.db.Exec(`
-		UPDATE suite SET outcome = ?
+		UPDATE suite SET outcome = ?, outcomeOrder = ?
 		WHERE name = ? AND outcome > ?
-	`, outcome, suite, outcome)
+	`, outcome, order, suite, outcome)
 	return
 }
 
@@ -183,9 +203,8 @@ func (d Suite) ListPassedFailedErrored() (suites []string, err error) {
 		SELECT s.name
 		FROM suite s
 		WHERE s.startTime IS NOT NULL
-		ORDER BY s.outcome DESC, s.startTime ASC
-	`)
-	// s.outcome IN ('PASSED', 'FAILED', 'ERRORED') AND
+		ORDER BY s.outcomeOrder ASC, s.startTime ASC
+	`) // s.outcome IN ('PASSED', 'FAILED', 'ERRORED') AND
 	if err != nil {
 		return
 	}
