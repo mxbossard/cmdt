@@ -58,12 +58,24 @@ May need to split actions in half : init by cmdt ; processing by daemon => cmdt 
 Or simpler may display testTitle on queueing the test ?
 */
 
-func newFileOutputs(outFile, errFile string) (io.Writer, io.Writer, error) {
+func newFileWriters(outFile, errFile string) (io.Writer, io.Writer, error) {
 	outW, err := os.OpenFile(outFile, os.O_WRONLY+os.O_APPEND+os.O_CREATE, 0644)
 	if err != nil {
 		return nil, nil, err
 	}
 	errW, err := os.OpenFile(errFile, os.O_WRONLY+os.O_APPEND+os.O_CREATE, 0644)
+	if err != nil {
+		return nil, nil, err
+	}
+	return outW, errW, nil
+}
+
+func newFileReaders(outFile, errFile string) (io.Reader, io.Reader, error) {
+	outW, err := os.OpenFile(outFile, os.O_RDONLY+os.O_CREATE, 0644)
+	if err != nil {
+		return nil, nil, err
+	}
+	errW, err := os.OpenFile(errFile, os.O_RDONLY+os.O_CREATE, 0644)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -87,7 +99,7 @@ func (p *suitePrinters) suitePrinter() (printz.Printer, error) {
 			if err != nil {
 				return nil, err
 			}
-			p.outW, p.errW, err = newFileOutputs(stdout, stderr)
+			p.outW, p.errW, err = newFileWriters(stdout, stderr)
 			if err != nil {
 				return nil, err
 			}
@@ -109,7 +121,7 @@ func (p *suitePrinters) testPrinter(seq int) (printz.Printer, error) {
 			if err != nil {
 				return nil, err
 			}
-			p.outW, p.errW, err = newFileOutputs(stdout, stderr)
+			p.outW, p.errW, err = newFileWriters(stdout, stderr)
 			if err != nil {
 				return nil, err
 			}
@@ -210,6 +222,13 @@ func (p *asyncPrinters) testEnded(suite string, seq int) {
 	if sp, ok := p.suitesPrinters[suite]; ok {
 		sp.testEnded(seq)
 	}
+}
+
+func (p *asyncPrinters) recordedSuites() (suites []string) {
+	for suite, _ := range p.suitesPrinters {
+		suites = append(suites, suite)
+	}
+	return
 }
 
 func (p *asyncPrinters) flush(suite string) (err error) {
@@ -566,11 +585,51 @@ func (d *asyncDisplay) SetVerbose(level model.VerboseLevel) {
 	d.verbose = level
 }
 
-func (d *asyncDisplay) DisplayRecorded(suite string) {
-	err := d.printers.flush(suite)
+func (d *asyncDisplay) DisplayRecorded(suite string) error {
+	stdout, stderr, err := repo.DaemonSuiteReportFilepathes(suite, d.token, d.isolation)
 	if err != nil {
-		panic(err)
+		return err
 	}
+
+	err = d.printers.flush(suite)
+	if err != nil {
+		return err
+	}
+
+	outR, errR, err := newFileReaders(stdout, stderr)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(d.stdPrinter.Outputs().Out(), outR)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(d.stdPrinter.Outputs().Err(), errR)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (d *asyncDisplay) DisplayAllRecorded() (err error) {
+	err = d.DisplayRecorded("")
+	if err != nil {
+		return
+	}
+
+	recordedSuites := d.printers.recordedSuites()
+	for _, suite := range recordedSuites {
+		err = d.DisplayRecorded(suite)
+		if err != nil {
+			return
+		}
+
+		err = d.DisplayRecorded("")
+		if err != nil {
+			return
+		}
+	}
+	return
 }
 
 func (d *asyncDisplay) StartDisplayRecorded(suite string) {
@@ -578,13 +637,6 @@ func (d *asyncDisplay) StartDisplayRecorded(suite string) {
 	go func() {
 		d.DisplayRecorded(suite)
 	}()
-}
-
-func (d *asyncDisplay) DisplayAllRecorded() {
-	err := d.printers.flushAll()
-	if err != nil {
-		panic(err)
-	}
 }
 
 func (d *asyncDisplay) StartDisplayAllRecorded() {

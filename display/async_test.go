@@ -5,17 +5,19 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"mby.fr/utils/printz"
 )
 
 func TestUsage(t *testing.T) {
-	out := &strings.Builder{}
-	err := &strings.Builder{}
 	d := NewAsync("foo", "bar")
-	d.stdPrinter = printz.New(printz.NewOutputs(out, err))
+	// Replace stdPrinter std outputs by 2 string builders
+	outW := &strings.Builder{}
+	errW := &strings.Builder{}
+	d.stdPrinter = printz.New(printz.NewOutputs(outW, errW))
 
-	assert.Empty(t, out.String())
-	assert.Empty(t, err.String())
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
 
 	// Writing async
 	outMsg := "stdout"
@@ -23,12 +25,13 @@ func TestUsage(t *testing.T) {
 	d.Stdout(outMsg)
 	d.Stderr(errMsg)
 
-	assert.Empty(t, out.String())
-	assert.Empty(t, err.String())
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
 
-	d.DisplayAllRecorded()
+	err := d.DisplayAllRecorded()
+	require.NoError(t, err)
 
-	assert.Equal(t, outMsg, out.String())
-	assert.Equal(t, errMsg, err.String())
+	assert.Equal(t, outMsg, outW.String())
+	assert.Equal(t, errMsg, errW.String())
 
 }
