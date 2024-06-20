@@ -15,11 +15,16 @@ import (
 	"mby.fr/utils/format"
 	"mby.fr/utils/inout"
 	"mby.fr/utils/printz"
+	"mby.fr/utils/zlog"
 )
 
 const (
 	FlushFrequency    = 1 * time.Millisecond
 	NoActivityTimeout = 30 * time.Second
+)
+
+var (
+	logger = zlog.New()
 )
 
 /**
@@ -153,12 +158,14 @@ func (p *suitePrinters) flush() (done bool, err error) {
 	prtr := p.tests[p.cursor]
 	if !p.inited {
 		// flush suite printer on init
+		logger.Debug("flushing suite printer", "suite", p.suite)
 		p.main.Flush()
 		p.inited = true
 	}
 
 	if prtr != nil {
 		// flush cursor test printer
+		logger.Debug("flushing test printer", "suite", p.suite, "seq", p.cursor)
 		prtr.Flush()
 	}
 
@@ -166,6 +173,7 @@ func (p *suitePrinters) flush() (done bool, err error) {
 		// current printer is done
 		p.cursor++
 		// flush suite printer
+		logger.Debug("flushing suite printer", "suite", p.suite)
 		p.main.Flush()
 		p.startTime = time.Now()
 	}
@@ -181,7 +189,7 @@ type asyncPrinters struct {
 	*sync.Mutex
 	globalPrinter  printz.Printer
 	suitesPrinters map[string]suitePrinters
-	currentSuite   string
+	//currentSuite   string
 }
 
 func (p *asyncPrinters) printer(suite string, seq int) printz.Printer {
@@ -233,6 +241,9 @@ func (p *asyncPrinters) recordedSuites() (suites []string) {
 
 func (p *asyncPrinters) flush(suite string) (err error) {
 	p.Lock()
+	logger.Debug("flushing global printer")
+	p.printer("", 0).Flush()
+
 	// Must flush a suite only once
 	var suitePrinters suitePrinters
 	var ok bool
@@ -250,7 +261,6 @@ func (p *asyncPrinters) flush(suite string) (err error) {
 		}
 		time.Sleep(FlushFrequency * time.Millisecond)
 	}
-	p.printer("", 0).Flush()
 	return
 }
 
@@ -586,6 +596,9 @@ func (d *asyncDisplay) SetVerbose(level model.VerboseLevel) {
 }
 
 func (d *asyncDisplay) DisplayRecorded(suite string) error {
+	p := logger.PerfTimer("suite", suite)
+	defer p.End()
+
 	stdout, stderr, err := repo.DaemonSuiteReportFilepathes(suite, d.token, d.isolation)
 	if err != nil {
 		return err
@@ -612,6 +625,9 @@ func (d *asyncDisplay) DisplayRecorded(suite string) error {
 }
 
 func (d *asyncDisplay) DisplayAllRecorded() (err error) {
+	p := logger.PerfTimer()
+	defer p.End()
+
 	err = d.DisplayRecorded("")
 	if err != nil {
 		return

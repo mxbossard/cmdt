@@ -1,13 +1,22 @@
 package display
 
 import (
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"mby.fr/utils/printz"
+	"mby.fr/utils/zlog"
 )
+
+func TestMain(m *testing.M) {
+	// test context initialization here
+	// zlog.ColoredConfig()
+	zlog.SetLogLevelThreshold(zlog.LevelPerf)
+	os.Exit(m.Run())
+}
 
 func TestUsage(t *testing.T) {
 	d := NewAsync("foo", "bar")
