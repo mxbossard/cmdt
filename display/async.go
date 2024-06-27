@@ -87,8 +87,8 @@ func newFileReaders(outFile, errFile string) (io.Reader, io.Reader, error) {
 	return outW, errW, nil
 }
 
-func newSuitePrinters(suite string) suitePrinters {
-	return suitePrinters{
+func newSuitePrinters(suite string) *suitePrinters {
+	return &suitePrinters{
 		suite:     suite,
 		tests:     make(map[int]printz.Printer),
 		startTime: time.Now(),
@@ -199,37 +199,45 @@ func (p *suitePrinters) flush() (done bool, err error) {
 	return
 }
 
-func newAsyncPrinters(global printz.Printer) asyncPrinters {
-	return asyncPrinters{
-		Mutex:          &sync.Mutex{},
-		globalPrinter:  global,
-		suitesPrinters: make(map[string]suitePrinters),
+func newAsyncPrinters(outW, errW io.Writer) *asyncPrinters {
+	return &asyncPrinters{
+		Mutex: &sync.Mutex{},
+		//globalPrinter:  global,
+		suitesPrinters: make(map[string]*suitePrinters),
+		outW:           outW,
+		errW:           errW,
 	}
 }
 
 type asyncPrinters struct {
 	*sync.Mutex
-	globalPrinter  printz.Printer
-	suitesPrinters map[string]suitePrinters
+	//globalPrinter  printz.Printer
+	suitesPrinters map[string]*suitePrinters
 	//currentSuite   string
+	outW, errW io.Writer
 }
 
 func (p *asyncPrinters) printer(suite string, seq int) printz.Printer {
-	if suite == "" {
-		if p.globalPrinter == nil {
-			stdOuts := printz.NewStandardOutputs()
-			bufferedOuts := printz.NewBufferedOutputs(stdOuts)
-			prtr := printz.New(bufferedOuts)
-			p.globalPrinter = prtr
+	/*
+		if suite == "" {
+			if p.globalPrinter == nil {
+				stdOuts := printz.NewStandardOutputs()
+				bufferedOuts := printz.NewBufferedOutputs(stdOuts)
+				prtr := printz.New(bufferedOuts)
+				p.globalPrinter = prtr
+			}
+			return p.globalPrinter
 		}
-		return p.globalPrinter
-	}
+	*/
 
 	// Select the printer by suite
-	var sprtr suitePrinters
+	var sprtr *suitePrinters
 	var ok bool
 	if sprtr, ok = p.suitesPrinters[suite]; !ok {
 		sprtr = newSuitePrinters(suite)
+		p.suitesPrinters[suite] = sprtr
+		sprtr.outW = p.outW
+		sprtr.errW = p.errW
 	}
 
 	var prtr printz.Printer
@@ -245,6 +253,33 @@ func (p *asyncPrinters) printer(suite string, seq int) printz.Printer {
 	return prtr
 }
 
+func (p *asyncPrinters) flush(suite string, once bool) (err error) {
+	p.Lock()
+	defer p.Unlock()
+
+	// logger.Debug("flushing global printer")
+	// p.printer("", 0).Flush()
+
+	// Must flush a suite only once
+	var suitePrinters *suitePrinters
+	var ok bool
+	if suitePrinters, ok = p.suitesPrinters[suite]; ok {
+		delete(p.suitesPrinters, suite)
+	} else {
+		// If suitePrinters not in map, nothing to flush
+		err = fmt.Errorf("no: [%s] suite to flush", suite)
+		return
+	}
+
+	for done, err := suitePrinters.flush(); !once && !done; {
+		if err != nil {
+			return err
+		}
+		time.Sleep(FlushPeriod)
+	}
+	return
+}
+
 func (p *asyncPrinters) testEnded(suite string, seq int) {
 	if sp, ok := p.suitesPrinters[suite]; ok {
 		sp.testEnded(seq)
@@ -254,32 +289,6 @@ func (p *asyncPrinters) testEnded(suite string, seq int) {
 func (p *asyncPrinters) recordedSuites() (suites []string) {
 	for suite, _ := range p.suitesPrinters {
 		suites = append(suites, suite)
-	}
-	return
-}
-
-func (p *asyncPrinters) flush(suite string, once bool) (err error) {
-	p.Lock()
-	defer p.Unlock()
-
-	// logger.Debug("flushing global printer")
-	// p.printer("", 0).Flush()
-
-	// Must flush a suite only once
-	var suitePrinters suitePrinters
-	var ok bool
-	if suitePrinters, ok = p.suitesPrinters[suite]; ok {
-		delete(p.suitesPrinters, suite)
-	} else {
-		// If suitePrinters not in map, nothing to flush
-		return
-	}
-
-	for done, err := suitePrinters.flush(); !once && !done; {
-		if err != nil {
-			return err
-		}
-		time.Sleep(FlushPeriod)
 	}
 	return
 }
@@ -300,7 +309,7 @@ func (p *asyncPrinters) flushAll(once bool) (err error) {
 
 type asyncDisplay struct {
 	token, isolation   string
-	printers           asyncPrinters
+	printers           *asyncPrinters
 	stdPrinter         printz.Printer
 	clearAnsiFormatter inout.Formatter
 	outFormatter       inout.Formatter
@@ -703,7 +712,7 @@ func NewAsync(token, isolation string) *asyncDisplay {
 		errFormatter:       inout.PrefixFormatter{Prefix: fmt.Sprintf("%serr%s>", reportColor, resetColor)},
 		verbose:            model.DefaultVerboseLevel,
 		quiet:              false,
-		printers:           newAsyncPrinters(p),
+		printers:           newAsyncPrinters(nil, nil),
 	}
 	return d
 }

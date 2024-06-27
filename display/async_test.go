@@ -126,9 +126,7 @@ func TestSuitePrinters_testPrint(t *testing.T) {
 func TestAsyncPrinters_globalPrint(t *testing.T) {
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
-	outs := printz.NewOutputs(outW, errW)
-	prtr := printz.New(outs)
-	aps := newAsyncPrinters(prtr)
+	aps := newAsyncPrinters(outW, errW)
 
 	p := aps.printer("", 0)
 	outW.Reset()
@@ -137,27 +135,29 @@ func TestAsyncPrinters_globalPrint(t *testing.T) {
 	p.Out(expectedOut)
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
+	assert.Len(t, aps.recordedSuites(), 1)
+	assert.Contains(t, aps.recordedSuites(), "")
 
 	err := aps.flush("foo", true)
-	require.NoError(t, err)
+	assert.Error(t, err)
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
+	assert.Len(t, aps.recordedSuites(), 1)
+	assert.Contains(t, aps.recordedSuites(), "")
 
-	//return
 	outW.Reset()
 	errW.Reset()
 	err = aps.flush("", true)
 	require.NoError(t, err)
 	assert.Equal(t, expectedOut, outW.String())
 	assert.Empty(t, errW.String())
+	assert.Len(t, aps.recordedSuites(), 0)
 }
 
 func TestAsyncPrinters_testPrint(t *testing.T) {
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
-	outs := printz.NewOutputs(outW, errW)
-	prtr := printz.New(outs)
-	aps := newAsyncPrinters(prtr)
+	aps := newAsyncPrinters(outW, errW)
 
 	suite1 := "suite1"
 	suite2 := "suite2"
@@ -174,14 +174,12 @@ func TestAsyncPrinters_testPrint(t *testing.T) {
 	assert.Empty(t, errW.String())
 
 	err := aps.flush("", true)
-	require.NoError(t, err)
+	assert.Error(t, err)
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	return
-
 	err = aps.flush("", true)
-	require.NoError(t, err)
+	assert.Error(t, err)
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
@@ -193,7 +191,7 @@ func TestAsyncPrinters_testPrint(t *testing.T) {
 	outW.Reset()
 	errW.Reset()
 	err = aps.flush(suite1, true)
-	require.NoError(t, err)
+	assert.Error(t, err)
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
@@ -207,21 +205,21 @@ func TestAsyncPrinters_testPrint(t *testing.T) {
 	outW.Reset()
 	errW.Reset()
 	err = aps.flush(suite2, true)
-	require.NoError(t, err)
+	assert.Error(t, err)
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
 	outW.Reset()
 	errW.Reset()
 	err = aps.flush(suite1, true)
-	require.NoError(t, err)
+	assert.Error(t, err)
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
 }
 
 func TestUsage(t *testing.T) {
-	t.Skip()
+	//t.Skip()
 	d := NewAsync("foo", "bar")
 	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
