@@ -32,7 +32,7 @@ var (
 type Displayer interface {
 	Global(facade.GlobalContext)
 	Suite(facade.SuiteContext)
-	TestTitle(facade.TestContext, uint16)
+	TestTitle(facade.TestContext)
 	TestOutcome(facade.TestContext, model.TestOutcome)
 	//AssertionResult(model.AssertionResult)
 	ReportSuite(model.SuiteOutcome)
@@ -71,7 +71,7 @@ func (d basicDisplay) Suite(ctx facade.SuiteContext) {
 	}
 }
 
-func (d basicDisplay) TestTitle(ctx facade.TestContext, seq uint16) {
+func (d basicDisplay) TestTitle(ctx facade.TestContext) {
 	if ctx.Config.Verbose.Get() == model.SHOW_REPORTS_ONLY {
 		return
 	}
@@ -83,6 +83,7 @@ func (d basicDisplay) TestTitle(ctx facade.TestContext, seq uint16) {
 	qualifiedName := testQualifiedName(ctx, testColor)
 	qualifiedName = format.TruncateRight(qualifiedName, maxTestNameLength)
 
+	seq := ctx.Seq
 	title := fmt.Sprintf("[%05d] Test %s #%02d... ", timecode, qualifiedName, seq)
 	title = format.PadRight(title, maxTestNameLength+23)
 
@@ -122,7 +123,7 @@ func (d basicDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutc
 		// Print back test title not printed yed
 		clone := ctx
 		clone.Config.Verbose.Set(model.SHOW_PASSED)
-		d.TestTitle(clone, outcome.Seq)
+		d.TestTitle(clone)
 	}
 
 	switch outcome.Outcome {

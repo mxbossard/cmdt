@@ -191,7 +191,7 @@ func PerformTest(testDef model.TestDefinition) (exitCode int16, err error) {
 	ctx := facade.NewTestContext2(testDef)
 	seq := testDef.Seq
 
-	Dpl.TestTitle(ctx, seq)
+	Dpl.TestTitle(ctx)
 
 	if cfg.Ignore.Is(true) {
 		ctx.IncrementIgnoredCount()

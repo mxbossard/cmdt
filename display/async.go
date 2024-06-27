@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	FlushFrequency    = 1 * time.Millisecond
+	FlushPeriod       = 1 * time.Millisecond
 	NoActivityTimeout = 30 * time.Second
 )
 
@@ -85,6 +85,15 @@ func newFileReaders(outFile, errFile string) (io.Reader, io.Reader, error) {
 		return nil, nil, err
 	}
 	return outW, errW, nil
+}
+
+func newSuitePrinters(suite string) suitePrinters {
+	return suitePrinters{
+		suite:     suite,
+		tests:     make(map[int]printz.Printer),
+		startTime: time.Now(),
+		cursor:    1,
+	}
 }
 
 type suitePrinters struct {
@@ -159,7 +168,9 @@ func (p *suitePrinters) flush() (done bool, err error) {
 	if !p.inited {
 		// flush suite printer on init
 		logger.Debug("flushing suite printer", "suite", p.suite)
-		p.main.Flush()
+		if p.main != nil {
+			p.main.Flush()
+		}
 		p.inited = true
 	}
 
@@ -172,10 +183,13 @@ func (p *suitePrinters) flush() (done bool, err error) {
 	if p.cursor <= p.ended {
 		// current printer is done
 		p.cursor++
+		p.startTime = time.Now()
+	}
+
+	if p.main != nil {
 		// flush suite printer
 		logger.Debug("flushing suite printer", "suite", p.suite)
 		p.main.Flush()
-		p.startTime = time.Now()
 	}
 
 	if p.cursor >= len(p.tests) {
@@ -183,6 +197,14 @@ func (p *suitePrinters) flush() (done bool, err error) {
 		done = true
 	}
 	return
+}
+
+func newAsyncPrinters(global printz.Printer) asyncPrinters {
+	return asyncPrinters{
+		Mutex:          &sync.Mutex{},
+		globalPrinter:  global,
+		suitesPrinters: make(map[string]suitePrinters),
+	}
 }
 
 type asyncPrinters struct {
@@ -207,10 +229,7 @@ func (p *asyncPrinters) printer(suite string, seq int) printz.Printer {
 	var sprtr suitePrinters
 	var ok bool
 	if sprtr, ok = p.suitesPrinters[suite]; !ok {
-		sprtr = suitePrinters{
-			suite: suite,
-			tests: make(map[int]printz.Printer),
-		}
+		sprtr = newSuitePrinters(suite)
 	}
 
 	var prtr printz.Printer
@@ -239,10 +258,12 @@ func (p *asyncPrinters) recordedSuites() (suites []string) {
 	return
 }
 
-func (p *asyncPrinters) flush(suite string) (err error) {
+func (p *asyncPrinters) flush(suite string, once bool) (err error) {
 	p.Lock()
-	logger.Debug("flushing global printer")
-	p.printer("", 0).Flush()
+	defer p.Unlock()
+
+	// logger.Debug("flushing global printer")
+	// p.printer("", 0).Flush()
 
 	// Must flush a suite only once
 	var suitePrinters suitePrinters
@@ -253,23 +274,22 @@ func (p *asyncPrinters) flush(suite string) (err error) {
 		// If suitePrinters not in map, nothing to flush
 		return
 	}
-	p.Unlock()
 
-	for done, err := suitePrinters.flush(); !done; {
+	for done, err := suitePrinters.flush(); !once && !done; {
 		if err != nil {
 			return err
 		}
-		time.Sleep(FlushFrequency * time.Millisecond)
+		time.Sleep(FlushPeriod)
 	}
 	return
 }
 
-func (p *asyncPrinters) flushAll() (err error) {
+func (p *asyncPrinters) flushAll(once bool) (err error) {
 	// Current implem need all suites printers to be registered before starting to flush.
 	p.printer("", 0).Flush()
 
 	for suite, _ := range p.suitesPrinters {
-		err = p.flush(suite)
+		err = p.flush(suite, once)
 		if err != nil {
 			return
 		}
@@ -309,13 +329,15 @@ func (d asyncDisplay) Suite(ctx facade.SuiteContext) {
 	}
 }
 
-func (d asyncDisplay) TestTitle(ctx facade.TestContext, seq uint16) {
+func (d asyncDisplay) TestTitle(ctx facade.TestContext) {
 	if d.quiet {
 		return
 	}
 	if ctx.Config.Verbose.Get() == model.SHOW_REPORTS_ONLY {
 		return
 	}
+
+	seq := ctx.Seq
 	maxTestNameLength := 70
 
 	cfg := ctx.Config
@@ -367,7 +389,7 @@ func (d asyncDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutc
 		// Print back test title not printed yed
 		clone := ctx
 		clone.Config.Verbose.Set(model.SHOW_PASSED)
-		d.TestTitle(clone, outcome.Seq)
+		d.TestTitle(clone)
 	}
 
 	printer := d.printers.printer(suite, int(outcome.Seq))
@@ -604,7 +626,7 @@ func (d *asyncDisplay) DisplayRecorded(suite string) error {
 		return err
 	}
 
-	err = d.printers.flush(suite)
+	err = d.printers.flush(suite, false)
 	if err != nil {
 		return err
 	}
@@ -671,16 +693,17 @@ func (d *asyncDisplay) EndDisplayAllRecorded() {
 }
 
 func NewAsync(token, isolation string) *asyncDisplay {
+	p := printz.NewStandard()
 	d := &asyncDisplay{
 		token:              token,
 		isolation:          isolation,
-		stdPrinter:         printz.NewStandard(),
+		stdPrinter:         p,
 		clearAnsiFormatter: inout.AnsiFormatter{AnsiFormat: ansi.Reset},
 		outFormatter:       inout.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", testColor, resetColor)},
 		errFormatter:       inout.PrefixFormatter{Prefix: fmt.Sprintf("%serr%s>", reportColor, resetColor)},
 		verbose:            model.DefaultVerboseLevel,
 		quiet:              false,
-		printers:           asyncPrinters{Mutex: &sync.Mutex{}},
+		printers:           newAsyncPrinters(p),
 	}
 	return d
 }
