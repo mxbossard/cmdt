@@ -163,6 +163,20 @@ func (d asyncDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutc
 
 }
 
+func (d asyncDisplay) TestStdout(ctx facade.TestContext, s string) {
+	if s != "" {
+		printer := d.printers.printer(ctx.Config.TestSuite.Get(), int(ctx.Seq))
+		printer.Err(d.outFormatter.Format(s))
+	}
+}
+
+func (d asyncDisplay) TestStderr(ctx facade.TestContext, s string) {
+	if s != "" {
+		printer := d.printers.printer(ctx.Config.TestSuite.Get(), int(ctx.Seq))
+		printer.Err(d.errFormatter.Format(s))
+	}
+}
+
 func (d asyncDisplay) assertionResult(printer printz.Printer, result model.AssertionResult) {
 	hlClr := reportColor
 	//log.Printf("failedResult: %v\n", result)
@@ -308,20 +322,6 @@ func (d asyncDisplay) TooMuchFailures(ctx facade.SuiteContext, testSuite string)
 	}
 	printer := d.printers.printer(testSuite, 0)
 	printer.ColoredErrf(warningColor, "Too much failure for [%s] test suite. Stop testing.\n", testSuite)
-}
-
-func (d asyncDisplay) Stdout(s string) {
-	if s != "" {
-		printer := d.printers.printer("", 0)
-		printer.Out(d.outFormatter.Format(s))
-	}
-}
-
-func (d asyncDisplay) Stderr(s string) {
-	if s != "" {
-		printer := d.printers.printer("", 0)
-		printer.Err(d.errFormatter.Format(s))
-	}
 }
 
 func (d asyncDisplay) Error(err error) {

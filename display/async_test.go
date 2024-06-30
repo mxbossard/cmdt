@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"mby.fr/cmdtest/facade"
 	"mby.fr/cmdtest/model"
+	"mby.fr/cmdtest/repo"
 	"mby.fr/utils/ansi"
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/printz"
@@ -18,7 +19,15 @@ import (
 
 func TestAsyncDisplay_Stdout(t *testing.T) {
 	//t.Skip()
-	d := NewAsync("foo", "bar1")
+	token := "foo"
+	isol := "bar1"
+	suite := "suite"
+	var err error
+
+	err = repo.ClearWorkDirectory(token, isol)
+	require.NoError(t, err)
+
+	d := NewAsync(token, isol)
 	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
@@ -30,28 +39,37 @@ func TestAsyncDisplay_Stdout(t *testing.T) {
 	// Writing async
 	outMsg := "stdout\n"
 	errMsg := "stderr\n"
-	d.Stdout(outMsg)
-	d.Stderr(errMsg)
+	ctx := facade.NewTestContext(token, isol, suite, 12, model.Config{}, uint32(42))
+	ctx.CmdExec = cmdz.Cmd("true")
+	d.TestStdout(ctx, outMsg)
+	d.TestStderr(ctx, errMsg)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	err := d.DisplayAllRecorded()
+	err = d.DisplayAllRecorded()
 	require.NoError(t, err)
 
-	assert.Equal(t, d.outFormatter.Format(outMsg), outW.String())
-	assert.Equal(t, d.errFormatter.Format(errMsg), errW.String())
+	assert.Empty(t, outW.String())
+	assert.Equal(t, d.outFormatter.Format(outMsg)+d.errFormatter.Format(errMsg), errW.String())
 }
 
 func TestAsyncDisplay_TestTitle(t *testing.T) {
 	//t.Skip()
-	d := NewAsync("foo", "bar2")
+	token := "foo"
+	isol := "bar2"
+	var err error
+
+	err = repo.ClearWorkDirectory(token, isol)
+	require.NoError(t, err)
+
+	d := NewAsync(token, isol)
 	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
 	d.stdPrinter = printz.New(printz.NewOutputs(outW, errW))
 
-	err := d.DisplayAllRecorded()
+	err = d.DisplayAllRecorded()
 	require.NoError(t, err)
 
 	assert.Empty(t, outW.String())
@@ -101,13 +119,13 @@ func displayTestTitle(d Displayer, token, isol string, suite int, seq int) {
 func displayTestTestOut(d Displayer, token, isol string, suite int, seq int) {
 	ctx := facade.NewTestContext(token, isol, fmt.Sprintf("suite-%d", suite), uint16(seq), model.Config{}, uint32(42))
 	ctx.CmdExec = cmdz.Cmd("true")
-	d.Stdout(fmt.Sprintf("suite-%d-%d-out\n", suite, seq))
+	d.TestStdout(ctx, fmt.Sprintf("suite-%d-%d-out\n", suite, seq))
 }
 
 func displayTestTestErr(d Displayer, token, isol string, suite int, seq int) {
 	ctx := facade.NewTestContext(token, isol, fmt.Sprintf("suite-%d", suite), uint16(seq), model.Config{}, uint32(42))
 	ctx.CmdExec = cmdz.Cmd("true")
-	d.Stderr(fmt.Sprintf("suite-%d-%d-err\n", suite, seq))
+	d.TestStderr(ctx, fmt.Sprintf("suite-%d-%d-err\n", suite, seq))
 }
 
 func globalInitPattern(token string) string {
@@ -138,6 +156,11 @@ func TestAsyncDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 	//t.Skip()
 	token := "foo"
 	isol := "bar3"
+	var err error
+
+	err = repo.ClearWorkDirectory(token, isol)
+	require.NoError(t, err)
+
 	d := NewAsync(token, isol)
 	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
@@ -215,7 +238,7 @@ func TestAsyncDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	err := d.DisplayAllRecorded()
+	err = d.DisplayAllRecorded()
 	require.NoError(t, err)
 
 	assert.Empty(t, ansi.Unformat(outW.String()))
@@ -260,6 +283,11 @@ func TestAsyncDisplayUsage_AsyncSuitesSerialTests(t *testing.T) {
 	t.Skip()
 	token := "foo"
 	isol := "bar4"
+
+	var err error
+	err = repo.ClearWorkDirectory(token, isol)
+	require.NoError(t, err)
+
 	d := NewAsync(token, isol)
 	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
@@ -347,7 +375,7 @@ func TestAsyncDisplayUsage_AsyncSuitesSerialTests(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	err := d.DisplayAllRecorded()
+	err = d.DisplayAllRecorded()
 	require.NoError(t, err)
 
 	assert.Empty(t, ansi.Unformat(outW.String()))
@@ -391,6 +419,11 @@ func TestAsyncDisplayUsage_AsyncSuitesAsyncTests(t *testing.T) {
 	t.Skip()
 	token := "foo"
 	isol := "bar5"
+
+	var err error
+	err = repo.ClearWorkDirectory(token, isol)
+	require.NoError(t, err)
+
 	d := NewAsync(token, isol)
 	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
@@ -479,7 +512,7 @@ func TestAsyncDisplayUsage_AsyncSuitesAsyncTests(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	err := d.DisplayAllRecorded()
+	err = d.DisplayAllRecorded()
 	require.NoError(t, err)
 
 	assert.Empty(t, ansi.Unformat(outW.String()))

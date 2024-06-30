@@ -34,13 +34,12 @@ type Displayer interface {
 	Suite(facade.SuiteContext)
 	TestTitle(facade.TestContext)
 	TestOutcome(facade.TestContext, model.TestOutcome)
-	//AssertionResult(model.AssertionResult)
+	TestStdout(facade.TestContext, string)
+	TestStderr(facade.TestContext, string)
 	ReportSuite(model.SuiteOutcome)
 	ReportSuites([]model.SuiteOutcome)
 	ReportAllFooter(facade.GlobalContext)
 	TooMuchFailures(facade.SuiteContext, string)
-	Stdout(string)
-	Stderr(string)
 	Error(error)
 	Flush() error
 	Quiet(bool)
@@ -169,6 +168,18 @@ func (d basicDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutc
 		d.printer.Errf("\n")
 	}
 
+}
+
+func (d basicDisplay) TestStdout(ctx facade.TestContext, s string) {
+	if s != "" {
+		d.notQuietPrinter.Err(d.outFormatter.Format(s))
+	}
+}
+
+func (d basicDisplay) TestStderr(ctx facade.TestContext, s string) {
+	if s != "" {
+		d.notQuietPrinter.Err(d.errFormatter.Format(s))
+	}
 }
 
 func (d basicDisplay) assertionResult(result model.AssertionResult) {
@@ -305,18 +316,6 @@ func (d basicDisplay) TooMuchFailures(ctx facade.SuiteContext, testSuite string)
 	}
 	defer d.Flush()
 	d.printer.ColoredErrf(warningColor, "Too much failure for [%s] test suite. Stop testing.\n", testSuite)
-}
-
-func (d basicDisplay) Stdout(s string) {
-	if s != "" {
-		d.notQuietPrinter.Err(d.outFormatter.Format(s))
-	}
-}
-
-func (d basicDisplay) Stderr(s string) {
-	if s != "" {
-		d.notQuietPrinter.Err(d.errFormatter.Format(s))
-	}
 }
 
 func (d basicDisplay) Error(err error) {

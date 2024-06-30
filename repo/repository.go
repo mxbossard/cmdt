@@ -126,6 +126,20 @@ func forgeWorkDirectoryPath(token, isol string) (tempDirPath string, err error) 
 	return
 }
 
+func ClearWorkDirectory(token, isol string) (err error) {
+	dir, err := forgeWorkDirectoryPath(token, isol)
+	if err != nil {
+		return
+	}
+	if _, err := os.Stat(dir); err == nil {
+		err = os.RemoveAll(dir)
+		if err != nil {
+			return err
+		}
+	}
+	return
+}
+
 func initWorkspaceIfNot(testSuite, token, isol string) (err error) {
 	defer func() {
 		if err != nil {

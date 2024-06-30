@@ -52,7 +52,13 @@ May need to split actions in half : init by cmdt ; processing by daemon => cmdt 
 Or simpler may display testTitle on queueing the test ?
 */
 
-func clearFileWriters(outFile, errFile string) error {
+func clearFileWriters(token, isol, suite string) error {
+	outFile, errFile, err := repo.DaemonSuiteReportFilepathes(suite, token, isol)
+	if err != nil {
+		panic(err)
+	}
+	logger.Info("removing recorder files", "outFile", outFile, "errFile", errFile)
+
 	if _, err := os.Stat(outFile); err == nil {
 		err = os.Remove(outFile)
 		if err != nil {
@@ -82,7 +88,7 @@ func (w keepClosedFileWriter) Write(b []byte) (int, error) {
 }
 
 func newFileWriters(outFile, errFile string) (io.Writer, io.Writer, error) {
-	return keepClosedFileWriter{outFile}, keepClosedFileWriter{errFile}, nil
+	//return keepClosedFileWriter{outFile}, keepClosedFileWriter{errFile}, nil
 	outW, err := os.OpenFile(outFile, os.O_WRONLY+os.O_APPEND+os.O_CREATE, 0644)
 	if err != nil {
 		return nil, nil, err
@@ -107,11 +113,7 @@ func newFileReaders(outFile, errFile string) (io.Reader, io.Reader, error) {
 }
 
 func newSuitePrinters(token, isol, suite string) *suitePrinters {
-	stdout, stderr, err := repo.DaemonSuiteReportFilepathes(suite, token, isol)
-	if err != nil {
-		panic(err)
-	}
-	err = clearFileWriters(stdout, stderr)
+	err := clearFileWriters(token, isol, suite)
 	if err != nil {
 		panic(err)
 	}

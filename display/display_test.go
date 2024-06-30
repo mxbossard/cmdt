@@ -30,8 +30,10 @@ func TestDisplay_Stdout(t *testing.T) {
 	// Writing async
 	outMsg := "stdout\n"
 	errMsg := "stderr\n"
-	d.Stdout(outMsg)
-	d.Stderr(errMsg)
+	ctx := facade.NewTestContext("token", "isol", "suite", 12, model.Config{}, uint32(42))
+	ctx.CmdExec = cmdz.Cmd("true")
+	d.TestStdout(ctx, outMsg)
+	d.TestStderr(ctx, errMsg)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
