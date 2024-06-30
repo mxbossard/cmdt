@@ -355,7 +355,7 @@ func (d *asyncDisplay) DisplayRecorded(suite string) error {
 		"errFile", stderrFile,
 		"err", func() string { s, _ := filez.ReadString(stderrFile); return s })
 
-	err = d.printers.flush(suite, false)
+	err = d.printers.flush(suite, true)
 	if err != nil {
 		return err
 	}

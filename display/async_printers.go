@@ -68,11 +68,11 @@ func clearFileWriters(outFile, errFile string) error {
 	return nil
 }
 
-type keepCloseFileWriter struct {
+type keepClosedFileWriter struct {
 	filepath string
 }
 
-func (w keepCloseFileWriter) Write(b []byte) (int, error) {
+func (w keepClosedFileWriter) Write(b []byte) (int, error) {
 	f, err := os.OpenFile(w.filepath, os.O_WRONLY+os.O_APPEND+os.O_CREATE, 0644)
 	if err != nil {
 		return 0, err
@@ -82,7 +82,7 @@ func (w keepCloseFileWriter) Write(b []byte) (int, error) {
 }
 
 func newFileWriters(outFile, errFile string) (io.Writer, io.Writer, error) {
-	return keepCloseFileWriter{outFile}, keepCloseFileWriter{errFile}, nil
+	return keepClosedFileWriter{outFile}, keepClosedFileWriter{errFile}, nil
 	outW, err := os.OpenFile(outFile, os.O_WRONLY+os.O_APPEND+os.O_CREATE, 0644)
 	if err != nil {
 		return nil, nil, err

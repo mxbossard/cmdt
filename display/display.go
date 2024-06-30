@@ -309,7 +309,7 @@ func (d basicDisplay) TooMuchFailures(ctx facade.SuiteContext, testSuite string)
 
 func (d basicDisplay) Stdout(s string) {
 	if s != "" {
-		d.notQuietPrinter.Out(d.outFormatter.Format(s))
+		d.notQuietPrinter.Err(d.outFormatter.Format(s))
 	}
 }
 
