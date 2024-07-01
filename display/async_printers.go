@@ -132,12 +132,13 @@ type suitePrinters struct {
 	inited             bool
 	suite, token, isol string
 	outW, errW         io.Writer
-	main               printz.Printer
+	//main               printz.Printer
 	tests              map[int]printz.Printer
-	cursor, ended      int
+	cursor, ended, max int
 	startTime          time.Time
 }
 
+/*
 func (p *suitePrinters) suitePrinter() (printz.Printer, error) {
 	if p.main == nil {
 		if p.outW == nil {
@@ -160,8 +161,10 @@ func (p *suitePrinters) suitePrinter() (printz.Printer, error) {
 	p.startTime = time.Now()
 	return p.main, nil
 }
+*/
 
 func (p *suitePrinters) testPrinter(seq int) (printz.Printer, error) {
+	p.max = max(p.max, seq)
 	printer, ok := p.tests[seq]
 	if !ok {
 		if p.outW == nil {
@@ -200,23 +203,26 @@ func (p *suitePrinters) flush() (done bool, err error) {
 		err = fmt.Errorf("timeout flushing async display after %s", NoActivityTimeout)
 	}
 
-	if !p.inited {
-		// flush suite printer on init
-		logger.Debug("flushing suite printer", "suite", p.suite)
-		if p.main != nil {
-			p.main.Flush()
+	/*
+		if !p.inited {
+			// flush suite printer on init
+			logger.Debug("flushing suite printer", "suite", p.suite)
+			if p.main != nil {
+				//p.main.Err("flush>0")
+				p.main.Flush()
+			}
+			p.inited = true
 		}
-		p.inited = true
-	}
+	*/
 
 	//prtr := p.tests[p.cursor]
-	for _, prtr := range p.tests {
-		if prtr != nil {
+	for i := 0; i <= p.max; i++ {
+		if prtr, ok := p.tests[i]; ok && prtr != nil {
 			// flush cursor test printer
 			logger.Debug("flushing test printer", "suite", p.suite, "seq", p.cursor)
+			//prtr.Err("flush>1")
 			prtr.Flush()
 		}
-
 	}
 
 	if p.cursor <= p.ended {
@@ -225,11 +231,14 @@ func (p *suitePrinters) flush() (done bool, err error) {
 		p.startTime = time.Now()
 	}
 
-	if p.main != nil {
-		// flush suite printer
-		logger.Debug("flushing suite printer", "suite", p.suite)
-		p.main.Flush()
-	}
+	/*
+		if p.main != nil {
+			// flush suite printer
+			logger.Debug("flushing suite printer", "suite", p.suite)
+			//p.main.Err("flush>2")
+			p.main.Flush()
+		}
+	*/
 
 	if p.cursor >= len(p.tests) {
 		// All printers are done
@@ -256,6 +265,7 @@ type asyncPrinters struct {
 
 	token, isol string
 	//globalPrinter  printz.Printer
+	suites         []string
 	suitesPrinters map[string]*suitePrinters
 	//currentSuite   string
 	outW, errW io.Writer
@@ -279,6 +289,7 @@ func (p *asyncPrinters) printer(suite string, seq int) printz.Printer {
 	var ok bool
 	if sprtr, ok = p.suitesPrinters[suite]; !ok {
 		sprtr = newSuitePrinters(p.token, p.isol, suite)
+		p.suites = append(p.suites, suite)
 		p.suitesPrinters[suite] = sprtr
 		sprtr.outW = p.outW
 		sprtr.errW = p.errW
@@ -288,7 +299,8 @@ func (p *asyncPrinters) printer(suite string, seq int) printz.Printer {
 	var prtr printz.Printer
 	var err error
 	if seq == 0 {
-		prtr, err = sprtr.suitePrinter()
+		//prtr, err = sprtr.suitePrinter()
+		prtr, err = sprtr.testPrinter(seq)
 	} else {
 		prtr, err = sprtr.testPrinter(seq)
 	}
@@ -334,7 +346,7 @@ func (p *asyncPrinters) testEnded(suite string, seq int) {
 }
 
 func (p *asyncPrinters) recordedSuites() (suites []string) {
-	for suite, _ := range p.suitesPrinters {
+	for _, suite := range p.suites {
 		suites = append(suites, suite)
 	}
 	logger.Debug("listed recorded suites", "suites", suites)
@@ -346,9 +358,11 @@ func (p *asyncPrinters) flushAll(once bool) (err error) {
 	p.printer("", 0).Flush()
 
 	for suite, _ := range p.suitesPrinters {
-		err = p.flush(suite, once)
-		if err != nil {
-			return
+		if suite != "" {
+			err = p.flush(suite, once)
+			if err != nil {
+				return
+			}
 		}
 	}
 

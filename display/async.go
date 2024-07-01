@@ -47,8 +47,9 @@ func (d asyncDisplay) Suite(ctx facade.SuiteContext) {
 		return
 	}
 	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
-		printer := d.printers.printer(ctx.Config.TestSuite.Get(), 0)
-		printer.ColoredErrf(messageColor, "## Test suite [%s] (token: %s)\n", ctx.Config.TestSuite.Get(), ctx.Token)
+		suite := ctx.Config.TestSuite.Get()
+		printer := d.printers.printer(suite, 0)
+		printer.ColoredErrf(messageColor, "## Test suite [%s] (token: %s)\n", suite, ctx.Token)
 	}
 }
 
@@ -61,15 +62,14 @@ func (d asyncDisplay) TestTitle(ctx facade.TestContext) {
 	}
 
 	seq := ctx.Seq
-	maxTestNameLength := 70
 
 	cfg := ctx.Config
 	timecode := int(time.Since(cfg.SuiteStartTime.Get()).Milliseconds())
 	qualifiedName := testQualifiedName(ctx, testColor)
-	qualifiedName = format.TruncateRight(qualifiedName, maxTestNameLength)
+	qualifiedName = format.TruncateRight(qualifiedName, MaxTestNameLength)
 
 	title := fmt.Sprintf("[%05d] Test %s #%02d... ", timecode, qualifiedName, seq)
-	title = format.PadRight(title, maxTestNameLength+23)
+	title = format.PadRight(title, MaxTestNameLength+23)
 
 	printer := d.printers.printer(cfg.TestSuite.Get(), int(seq))
 
@@ -252,7 +252,8 @@ func (d asyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 	// 	d.printer.ColoredErrf(messageColor, "Reporting [%s] test suite (%s) ...\n", testSuite, ctx.Token)
 	// }
 
-	printer := d.stdPrinter // Do not print async
+	//printer := d.stdPrinter // Do not print async
+	printer := d.printers.printer(testSuite, 99)
 
 	ignoredMessage := ""
 	if ignoredCount > 0 {
@@ -381,19 +382,15 @@ func (d *asyncDisplay) DisplayAllRecorded() (err error) {
 	p := logger.PerfTimer()
 	defer p.End()
 
-	err = d.DisplayRecorded("")
-	if err != nil {
-		return
-	}
-
-	recordedSuites := d.printers.recordedSuites()
-	for _, suite := range recordedSuites {
-		err = d.DisplayRecorded(suite)
+	/*
+		err = d.DisplayRecorded("")
 		if err != nil {
 			return
 		}
-
-		err = d.DisplayRecorded("")
+	*/
+	recordedSuites := d.printers.recordedSuites()
+	for _, suite := range recordedSuites {
+		err = d.DisplayRecorded(suite)
 		if err != nil {
 			return
 		}

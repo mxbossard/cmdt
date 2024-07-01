@@ -16,6 +16,7 @@ import (
 
 const (
 	MinReportSuiteLabelPadding = 20
+	MaxTestNameLength          = 70
 )
 
 var (
@@ -75,16 +76,15 @@ func (d basicDisplay) TestTitle(ctx facade.TestContext) {
 		return
 	}
 	defer d.Flush()
-	maxTestNameLength := 70
 
 	cfg := ctx.Config
 	timecode := int(time.Since(cfg.SuiteStartTime.Get()).Milliseconds())
 	qualifiedName := testQualifiedName(ctx, testColor)
-	qualifiedName = format.TruncateRight(qualifiedName, maxTestNameLength)
+	qualifiedName = format.TruncateRight(qualifiedName, MaxTestNameLength)
 
 	seq := ctx.Seq
 	title := fmt.Sprintf("[%05d] Test %s #%02d... ", timecode, qualifiedName, seq)
-	title = format.PadRight(title, maxTestNameLength+23)
+	title = format.PadRight(title, MaxTestNameLength+23)
 
 	if ctx.Config.Verbose.Get() > model.SHOW_FAILED_OUTS && ctx.Config.Ignore.Is(true) {
 		if ctx.Config.Verbose.Get() >= model.SHOW_FAILED_OUTS {

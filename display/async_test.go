@@ -106,11 +106,17 @@ func displayReport(d Displayer, suite int) {
 }
 
 func displayTestTitle(d Displayer, token, isol string, suite int, seq int) {
-	ctx := facade.NewTestContext(token, isol, fmt.Sprintf("suite-%d", suite), uint16(seq), model.Config{}, uint32(42))
+	testSuite := fmt.Sprintf("suite-%d", suite)
+	ctx := facade.NewTestContext(token, isol, testSuite, uint16(seq), model.Config{}, uint32(42))
 	ctx.CmdExec = cmdz.Cmd("true")
 	outcome := model.TestOutcome{
 		Outcome:  model.PASSED,
 		Duration: 3 * time.Millisecond,
+		TestSignature: model.TestSignature{
+			TestSuite: testSuite,
+			TestName:  "",
+			Seq:       uint16(seq),
+		},
 	}
 	d.TestTitle(ctx)
 	d.TestOutcome(ctx, outcome)
@@ -162,6 +168,8 @@ func TestAsyncDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 	require.NoError(t, err)
 
 	d := NewAsync(token, isol)
+	d.SetVerbose(model.SHOW_ALL)
+
 	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
@@ -199,8 +207,6 @@ func TestAsyncDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 	// 321- Test suite3 #2 out>
 	// 322- Test suite3 #2 err>
 	// 370- Report suite3
-
-	d.SetVerbose(model.SHOW_ALL)
 
 	gctx := facade.NewGlobalContext(token, isol, model.Config{})
 	d.Global(gctx)
@@ -289,6 +295,8 @@ func TestAsyncDisplayUsage_AsyncSuitesSerialTests(t *testing.T) {
 	require.NoError(t, err)
 
 	d := NewAsync(token, isol)
+	d.SetVerbose(model.SHOW_ALL)
+
 	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
@@ -425,6 +433,8 @@ func TestAsyncDisplayUsage_AsyncSuitesAsyncTests(t *testing.T) {
 	require.NoError(t, err)
 
 	d := NewAsync(token, isol)
+	d.SetVerbose(model.SHOW_ALL)
+
 	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
