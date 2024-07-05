@@ -285,8 +285,88 @@ func TestAsyncDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 
 }
 
+func TestStartDisplayAllRecorded(t *testing.T) {
+	//t.Skip()
+	token := "foo"
+	isol := "bar3"
+	var err error
+
+	err = repo.ClearWorkDirectory(token, isol)
+	require.NoError(t, err)
+
+	d := NewAsync(token, isol)
+	d.SetVerbose(model.SHOW_ALL)
+
+	// Replace stdPrinter std outputs by 2 string builders
+	outW := &strings.Builder{}
+	errW := &strings.Builder{}
+	d.stdPrinter = printz.New(printz.NewOutputs(outW, errW))
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	// Scénario: Writing async on 3 suites with test ran serial
+	// 000- Start with Global
+	// 100- Init suite1
+	// 110- Test suite1 #1
+	// 111- Test suite1 #1 out>
+	// 112- Test suite1 #1 err>
+	// 120- Test suite1 #2
+	// 121- Test suite1 #2 out>
+	// 122- Test suite1 #2 err>
+	// 130- Test suite1 #3
+	// 131- Test suite1 #3 out>
+	// 132- Test suite1 #3 err>
+	// 170- Report suite1
+
+	gctx := facade.NewGlobalContext(token, isol, model.Config{})
+	d.Global(gctx)
+
+	// Start 3 tests async/unordered
+	displaySuite(d, token, isol, 1) // 100- Init suite1
+	displayTestTitle(d, token, isol, 1, 1)
+	displayTestTitle(d, token, isol, 1, 3)
+	displayTestTitle(d, token, isol, 1, 2)
+
+	d.StartDisplayAllRecorded()
+
+	// Simulate outputs sent disordered
+	displayTestTestOut(d, token, isol, 1, 1)
+	displayTestTestErr(d, token, isol, 1, 1)
+
+	displayTestTestOut(d, token, isol, 1, 3)
+	displayTestTestErr(d, token, isol, 1, 3)
+
+	displayTestTestOut(d, token, isol, 1, 2)
+	displayTestTestErr(d, token, isol, 1, 2)
+
+	displayReport(d, 1)
+
+	err = d.WaitDisplayRecorded()
+	require.NoError(t, err)
+
+	assert.Empty(t, ansi.Unformat(outW.String()))
+	// Expect scénario to be oredred test1, test2, test3
+	scenarioRegexp := regexp.MustCompile("^" +
+		globalInitPattern(token) +
+		suiteInitRegexp(token, 1) +
+		testTitleRegexp(1, 1) +
+		testStdoutRegexp(1, 1) +
+		testStderrRegexp(1, 1) +
+		testTitleRegexp(1, 2) +
+		testStdoutRegexp(1, 2) +
+		testStderrRegexp(1, 2) +
+		testTitleRegexp(1, 3) +
+		testStdoutRegexp(1, 3) +
+		testStderrRegexp(1, 3) +
+		reportSuitePattern(1) +
+		"$")
+	assert.Regexp(t, scenarioRegexp, ansi.Unformat(errW.String()))
+
+}
+
 func TestAsyncDisplayUsage_AsyncSuitesSerialTests(t *testing.T) {
-	t.Skip()
+	//t.Skip()
 	token := "foo"
 	isol := "bar4"
 
@@ -424,7 +504,7 @@ func TestAsyncDisplayUsage_AsyncSuitesSerialTests(t *testing.T) {
 }
 
 func TestAsyncDisplayUsage_AsyncSuitesAsyncTests(t *testing.T) {
-	t.Skip()
+	//t.Skip()
 	token := "foo"
 	isol := "bar5"
 

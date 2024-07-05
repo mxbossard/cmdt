@@ -385,7 +385,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				asyncDpl.StartDisplayAllRecorded()
 				// Daemon must be off or No test remaining in suite queue
 				globalCtx.Repo.WaitAllEmpty(globalCtx.Config.SuiteTimeout.GetOr(defaultGlobalTimeout)) // FIXME: bad timeout
-				asyncDpl.EndDisplayAllRecorded()
+				asyncDpl.StopDisplayAllRecorded()
 				exitCode, err = ReportAllTestSuites(globalCtx)
 			} else {
 				// Delegate report all processing to daemon
@@ -439,7 +439,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				Dpl.Quiet(suiteCtx.Config.Quiet.Is(true))
 				asyncDpl.StartDisplayRecorded(testSuite)
 				suiteCtx.Repo.WaitEmptyQueue(testSuite, suiteCtx.Config.SuiteTimeout.Get())
-				asyncDpl.EndDisplayRecorded(testSuite)
+				asyncDpl.StopDisplayRecorded(testSuite)
 				//exitCode, err = ReportTestSuite(suiteCtx)
 				exitCode, err = ProcessReportDef(def)
 				suiteCtx.NoErrorOrFatal(err)

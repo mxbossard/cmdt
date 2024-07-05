@@ -30,6 +30,7 @@ type asyncDisplay struct {
 	errFormatter       inout.Formatter
 	verbose            model.VerboseLevel
 	quiet              bool
+	done               chan error
 }
 
 func (d asyncDisplay) Global(ctx facade.GlobalContext) {
@@ -399,24 +400,33 @@ func (d *asyncDisplay) DisplayAllRecorded() (err error) {
 }
 
 func (d *asyncDisplay) StartDisplayRecorded(suite string) {
+	d.done = make(chan error, 1)
 	// Launch suitepPrinters flush async
 	go func() {
-		d.DisplayRecorded(suite)
+		err := d.DisplayRecorded(suite)
+		d.done <- err
 	}()
 }
 
 func (d *asyncDisplay) StartDisplayAllRecorded() {
+	d.done = make(chan error, 1)
 	// Launch suitepPrinters flush async
 	go func() {
-		d.DisplayAllRecorded()
+		err := d.DisplayAllRecorded()
+		d.done <- err
 	}()
 }
 
-func (d *asyncDisplay) EndDisplayRecorded(suite string) {
+func (d *asyncDisplay) WaitDisplayRecorded() (err error) {
+	err = <-d.done
+	return
+}
+
+func (d *asyncDisplay) StopDisplayRecorded(suite string) {
 	// Something to do ?
 }
 
-func (d *asyncDisplay) EndDisplayAllRecorded() {
+func (d *asyncDisplay) StopDisplayAllRecorded() {
 	// Something to do ?
 }
 
