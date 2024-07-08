@@ -3,6 +3,7 @@ package display
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -117,7 +118,6 @@ func (d asyncDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutc
 	}
 
 	printer := d.printers.printer(suite, int(outcome.Seq))
-	defer d.printers.testEnded(suite, int(outcome.Seq))
 
 	switch outcome.Outcome {
 	case model.PASSED:
@@ -176,6 +176,13 @@ func (d asyncDisplay) TestStderr(ctx facade.TestContext, s string) {
 		printer := d.printers.printer(ctx.Config.TestSuite.Get(), int(ctx.Seq))
 		printer.Err(d.errFormatter.Format(s))
 	}
+}
+
+func (d asyncDisplay) EndTest(ctx facade.TestContext) {
+	// report end of test to suite printer
+	suite := ctx.Config.TestSuite.Get()
+	seq := int(ctx.Seq)
+	d.printers.testEnded(suite, seq)
 }
 
 func (d asyncDisplay) assertionResult(printer printz.Printer, result model.AssertionResult) {
@@ -281,6 +288,11 @@ func (d asyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 	if tooMuchCount > 0 {
 		printer.ColoredErrf(warningColor, "Too much failures (%d tests not executed)\n", tooMuchCount)
 	}
+
+	err := closeSuite(d.token, d.isolation, testSuite)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (d asyncDisplay) ReportSuite(outcome model.SuiteOutcome) {
@@ -346,7 +358,7 @@ func (d *asyncDisplay) DisplayRecorded(suite string) error {
 	p := logger.PerfTimer("suite", suite)
 	defer p.End()
 
-	stdoutFile, stderrFile, err := repo.DaemonSuiteReportFilepathes(suite, d.token, d.isolation)
+	stdoutFile, stderrFile, doneFile, err := repo.DaemonSuiteReportFilepathes(suite, d.token, d.isolation)
 	if err != nil {
 		return err
 	}
@@ -357,25 +369,35 @@ func (d *asyncDisplay) DisplayRecorded(suite string) error {
 		"errFile", stderrFile,
 		"err", func() string { s, _ := filez.ReadString(stderrFile); return s })
 
-	err = d.printers.flush(suite, true)
-	if err != nil {
-		return err
-	}
+	start := time.Now()
+	var done bool
+	for !done && time.Since(start) < 300*time.Millisecond {
+		err = d.printers.flush(suite, true)
+		if err != nil {
+			return err
+		}
 
-	outR, errR, err := newFileReaders(stdoutFile, stderrFile)
-	if err != nil {
-		return err
-	}
+		outR, errR, err := newFileReaders(stdoutFile, stderrFile)
+		if err != nil {
+			return err
+		}
 
-	_, err = io.Copy(d.stdPrinter.Outputs().Out(), outR)
-	if err != nil {
-		return err
+		_, err = io.Copy(d.stdPrinter.Outputs().Out(), outR)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(d.stdPrinter.Outputs().Err(), errR)
+		if err != nil {
+			return err
+		}
+		d.stdPrinter.Outputs().Flush()
+
+		if _, err := os.Stat(doneFile); err == nil {
+			done = true
+		} else {
+			time.Sleep(100 * time.Millisecond)
+		}
 	}
-	_, err = io.Copy(d.stdPrinter.Outputs().Err(), errR)
-	if err != nil {
-		return err
-	}
-	d.stdPrinter.Outputs().Flush()
 	return nil
 }
 

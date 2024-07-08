@@ -52,6 +52,7 @@ const (
 	TooMuchSequenceFilename = "tooMuch-seq.txt"
 	StdoutFilename          = "stdout.log"
 	StderrFilename          = "stderr.log"
+	DoneFilename            = "done"
 	ReportFilename          = "report.log"
 
 	MessageColor = ansi.HiPurple

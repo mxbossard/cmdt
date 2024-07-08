@@ -53,11 +53,11 @@ Or simpler may display testTitle on queueing the test ?
 */
 
 func clearFileWriters(token, isol, suite string) error {
-	outFile, errFile, err := repo.DaemonSuiteReportFilepathes(suite, token, isol)
+	outFile, errFile, doneFile, err := repo.DaemonSuiteReportFilepathes(suite, token, isol)
 	if err != nil {
 		panic(err)
 	}
-	logger.Info("removing recorder files", "outFile", outFile, "errFile", errFile)
+	logger.Info("removing recorder files", "outFile", outFile, "errFile", errFile, "doneFile", doneFile)
 
 	if _, err := os.Stat(outFile); err == nil {
 		err = os.Remove(outFile)
@@ -71,7 +71,26 @@ func clearFileWriters(token, isol, suite string) error {
 			return err
 		}
 	}
+	if _, err := os.Stat(doneFile); err == nil {
+		err = os.Remove(doneFile)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+func closeSuite(token, isol, suite string) error {
+	_, _, doneFile, err := repo.DaemonSuiteReportFilepathes(suite, token, isol)
+	if err != nil {
+		return err
+	}
+	f, err := os.Create(doneFile)
+	if err != nil {
+		return err
+	}
+	err = f.Close()
+	return err
 }
 
 type keepClosedFileWriter struct {
@@ -168,7 +187,7 @@ func (p *suitePrinters) testPrinter(seq int) (printz.Printer, error) {
 	printer, ok := p.tests[seq]
 	if !ok {
 		if p.outW == nil {
-			stdout, stderr, err := repo.DaemonSuiteReportFilepathes(p.suite, p.token, p.isol)
+			stdout, stderr, _, err := repo.DaemonSuiteReportFilepathes(p.suite, p.token, p.isol)
 			if err != nil {
 				return nil, err
 			}

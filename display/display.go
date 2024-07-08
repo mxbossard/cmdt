@@ -37,6 +37,7 @@ type Displayer interface {
 	TestOutcome(facade.TestContext, model.TestOutcome)
 	TestStdout(facade.TestContext, string)
 	TestStderr(facade.TestContext, string)
+	EndTest(facade.TestContext)
 	ReportSuite(model.SuiteOutcome)
 	ReportSuites([]model.SuiteOutcome)
 	ReportAllFooter(facade.GlobalContext)
@@ -180,6 +181,10 @@ func (d basicDisplay) TestStderr(ctx facade.TestContext, s string) {
 	if s != "" {
 		d.notQuietPrinter.Err(d.errFormatter.Format(s))
 	}
+}
+
+func (d basicDisplay) EndTest(facade.TestContext) {
+	// nothing to do
 }
 
 func (d basicDisplay) assertionResult(result model.AssertionResult) {
