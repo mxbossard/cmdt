@@ -2,7 +2,6 @@ package display
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"strings"
 	"time"
@@ -299,6 +298,7 @@ func (d asyncDisplay) ReportSuite(outcome model.SuiteOutcome) {
 	if d.quiet {
 		return
 	}
+
 	d.reportSuite(outcome, MinReportSuiteLabelPadding)
 }
 
@@ -371,6 +371,7 @@ func (d *asyncDisplay) DisplayRecorded(suite string) error {
 
 	start := time.Now()
 	var done bool
+	var outRead, errRead int64
 	for !done && time.Since(start) < 300*time.Millisecond {
 		err = d.printers.flush(suite, true)
 		if err != nil {
@@ -381,15 +382,27 @@ func (d *asyncDisplay) DisplayRecorded(suite string) error {
 		if err != nil {
 			return err
 		}
+		defer func() {
+			outR.Close()
+			errR.Close()
+		}()
 
-		_, err = io.Copy(d.stdPrinter.Outputs().Out(), outR)
+		buffer := make([]byte, 1024)
+		outR.Seek(outRead, 0)
+		errR.Seek(errRead, 0)
+
+		n, err := filez.Copy(outR, d.stdPrinter.Outputs().Out(), buffer)
 		if err != nil {
 			return err
 		}
-		_, err = io.Copy(d.stdPrinter.Outputs().Err(), errR)
+		outRead += n
+
+		n, err = filez.Copy(errR, d.stdPrinter.Outputs().Err(), buffer)
 		if err != nil {
 			return err
 		}
+		errRead += n
+
 		d.stdPrinter.Outputs().Flush()
 
 		if _, err := os.Stat(doneFile); err == nil {

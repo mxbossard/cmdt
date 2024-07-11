@@ -17,7 +17,7 @@ import (
 	"mby.fr/utils/printz"
 )
 
-func TestAsyncDisplay_Stdout(t *testing.T) {
+func TestAsyncDisplay_TestStdout(t *testing.T) {
 	//t.Skip()
 	token := "foo"
 	isol := "bar1"
@@ -46,6 +46,15 @@ func TestAsyncDisplay_Stdout(t *testing.T) {
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
+
+	err = d.DisplayRecorded(suite)
+	require.NoError(t, err)
+
+	assert.Empty(t, outW.String())
+	assert.Equal(t, d.outFormatter.Format(outMsg)+d.errFormatter.Format(errMsg), errW.String())
+
+	outW.Reset()
+	errW.Reset()
 
 	err = d.DisplayAllRecorded()
 	require.NoError(t, err)
@@ -162,6 +171,255 @@ func testStderrRegexp(suite, seq int) string {
 
 func reportSuitePattern(suite int) string {
 	return fmt.Sprintf(`Successfuly ran  \[ suite-%d\s* \] test suite in    [\d.]+ s \(\s*\d+ success\)\s*\n`, suite)
+}
+
+func TestDisplayRecorded(t *testing.T) {
+	//t.Skip()
+	token := "foo"
+	isol := "bar3"
+	var err error
+
+	err = repo.ClearWorkDirectory(token, isol)
+	require.NoError(t, err)
+
+	d := NewAsync(token, isol)
+	d.SetVerbose(model.SHOW_ALL)
+
+	// Replace stdPrinter std outputs by 2 string builders
+	outW := &strings.Builder{}
+	errW := &strings.Builder{}
+	d.stdPrinter = printz.New(printz.NewOutputs(outW, errW))
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	// Scénario: Writing on 3 suites in sync with test ran serial
+	// 100- Init suite1
+	// 110- Test suite1 #1
+	// 111- Test suite1 #1 out>
+	// 112- Test suite1 #1 err>
+	// 120- Test suite1 #2
+	// 121- Test suite1 #2 out>
+	// 122- Test suite1 #2 err>
+	// 130- Test suite1 #4
+	// 131- Test suite1 #4 out>
+	// 132- Test suite1 #4 err>
+	// 170- Report suite1
+
+	// Start 3 tests async/unordered
+	displaySuite(d, token, isol, 1) // 100- Init suite1
+
+	// Simulate outputs sent disordered
+	displayTestTitle(d, token, isol, 1, 1)
+	displayTestOut(d, token, isol, 1, 1)
+	displayTestErr(d, token, isol, 1, 1)
+	displayEndTest(d, token, isol, 1, 1)
+
+	displayTestTitle(d, token, isol, 1, 4)
+	displayTestOut(d, token, isol, 1, 4)
+	displayTestErr(d, token, isol, 1, 4)
+	displayEndTest(d, token, isol, 1, 4)
+
+	displayTestTitle(d, token, isol, 1, 2)
+	displayTestOut(d, token, isol, 1, 2)
+	displayTestErr(d, token, isol, 1, 2)
+	displayEndTest(d, token, isol, 1, 2)
+
+	displayReport(d, 1)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	err = d.DisplayRecorded("suite-1")
+	require.NoError(t, err)
+
+	assert.Empty(t, ansi.Unformat(outW.String()))
+	// Expect scénario to be oredred test1, test2, test3
+	scenarioRegexp := regexp.MustCompile("^" +
+		suiteInitRegexp(token, 1) +
+		testTitleRegexp(1, 1) +
+		testStdoutRegexp(1, 1) +
+		testStderrRegexp(1, 1) +
+		testTitleRegexp(1, 2) +
+		testStdoutRegexp(1, 2) +
+		testStderrRegexp(1, 2) +
+		testTitleRegexp(1, 4) +
+		testStdoutRegexp(1, 4) +
+		testStderrRegexp(1, 4) +
+		reportSuitePattern(1) +
+		"$")
+	assert.Regexp(t, scenarioRegexp, ansi.Unformat(errW.String()))
+
+}
+
+func TestDisplayAllRecorded(t *testing.T) {
+	//t.Skip()
+	token := "foo"
+	isol := "bar3"
+	var err error
+
+	err = repo.ClearWorkDirectory(token, isol)
+	require.NoError(t, err)
+
+	d := NewAsync(token, isol)
+	d.SetVerbose(model.SHOW_ALL)
+
+	// Replace stdPrinter std outputs by 2 string builders
+	outW := &strings.Builder{}
+	errW := &strings.Builder{}
+	d.stdPrinter = printz.New(printz.NewOutputs(outW, errW))
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	// Scénario: Writing on 3 suites in sync with test ran serial
+	// 000- Start with Global
+	// 100- Init suite1
+	// 110- Test suite1 #1
+	// 111- Test suite1 #1 out>
+	// 112- Test suite1 #1 err>
+	// 120- Test suite1 #2
+	// 121- Test suite1 #2 out>
+	// 122- Test suite1 #2 err>
+	// 130- Test suite1 #4
+	// 131- Test suite1 #4 out>
+	// 132- Test suite1 #4 err>
+	// 170- Report suite1
+
+	gctx := facade.NewGlobalContext(token, isol, model.Config{})
+	d.Global(gctx)
+
+	// Start 3 tests async/unordered
+	displaySuite(d, token, isol, 1) // 100- Init suite1
+
+	// Simulate outputs sent disordered
+	displayTestTitle(d, token, isol, 1, 1)
+	displayTestOut(d, token, isol, 1, 1)
+	displayTestErr(d, token, isol, 1, 1)
+	displayEndTest(d, token, isol, 1, 1)
+
+	displayTestTitle(d, token, isol, 1, 4)
+	displayTestOut(d, token, isol, 1, 4)
+	displayTestErr(d, token, isol, 1, 4)
+	displayEndTest(d, token, isol, 1, 4)
+
+	displayTestTitle(d, token, isol, 1, 2)
+	displayTestOut(d, token, isol, 1, 2)
+	displayTestErr(d, token, isol, 1, 2)
+	displayEndTest(d, token, isol, 1, 2)
+
+	displayReport(d, 1)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	err = d.DisplayAllRecorded()
+	require.NoError(t, err)
+
+	assert.Empty(t, ansi.Unformat(outW.String()))
+	// Expect scénario to be oredred test1, test2, test3
+	scenarioRegexp := regexp.MustCompile("^" +
+		globalInitPattern(token) +
+		suiteInitRegexp(token, 1) +
+		testTitleRegexp(1, 1) +
+		testStdoutRegexp(1, 1) +
+		testStderrRegexp(1, 1) +
+		testTitleRegexp(1, 2) +
+		testStdoutRegexp(1, 2) +
+		testStderrRegexp(1, 2) +
+		testTitleRegexp(1, 4) +
+		testStdoutRegexp(1, 4) +
+		testStderrRegexp(1, 4) +
+		reportSuitePattern(1) +
+		"$")
+	assert.Regexp(t, scenarioRegexp, ansi.Unformat(errW.String()))
+
+}
+
+func TestWaitDisplayRecorded(t *testing.T) {
+	//t.Skip()
+	token := "foo"
+	isol := "bar3"
+	var err error
+
+	err = repo.ClearWorkDirectory(token, isol)
+	require.NoError(t, err)
+
+	d := NewAsync(token, isol)
+	d.SetVerbose(model.SHOW_ALL)
+
+	// Replace stdPrinter std outputs by 2 string builders
+	outW := &strings.Builder{}
+	errW := &strings.Builder{}
+	d.stdPrinter = printz.New(printz.NewOutputs(outW, errW))
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	// Scénario: Writing async on 3 suites with test ran serial
+	// 000- Start with Global
+	// 100- Init suite1
+	// 110- Test suite1 #1
+	// 111- Test suite1 #1 out>
+	// 112- Test suite1 #1 err>
+	// 120- Test suite1 #2
+	// 121- Test suite1 #2 out>
+	// 122- Test suite1 #2 err>
+	// 130- Test suite1 #4
+	// 131- Test suite1 #4 out>
+	// 132- Test suite1 #4 err>
+	// 170- Report suite1
+
+	gctx := facade.NewGlobalContext(token, isol, model.Config{})
+	d.Global(gctx)
+
+	// Start 3 tests async/unordered
+	displaySuite(d, token, isol, 1) // 100- Init suite1
+	displayTestTitle(d, token, isol, 1, 1)
+	displayTestTitle(d, token, isol, 1, 4)
+	displayTestTitle(d, token, isol, 1, 2)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	d.StartDisplayAllRecorded()
+
+	// Simulate outputs sent disordered
+	displayTestOut(d, token, isol, 1, 1)
+	displayTestErr(d, token, isol, 1, 1)
+	displayEndTest(d, token, isol, 1, 1)
+
+	displayTestOut(d, token, isol, 1, 4)
+	displayTestErr(d, token, isol, 1, 4)
+	displayEndTest(d, token, isol, 1, 4)
+
+	displayTestOut(d, token, isol, 1, 2)
+	displayTestErr(d, token, isol, 1, 2)
+	displayEndTest(d, token, isol, 1, 2)
+
+	displayReport(d, 1)
+
+	err = d.WaitDisplayRecorded()
+	require.NoError(t, err)
+
+	assert.Empty(t, ansi.Unformat(outW.String()))
+	// Expect scénario to be oredred test1, test2, test3
+	scenarioRegexp := regexp.MustCompile("^" +
+		globalInitPattern(token) +
+		suiteInitRegexp(token, 1) +
+		testTitleRegexp(1, 1) +
+		testStdoutRegexp(1, 1) +
+		testStderrRegexp(1, 1) +
+		testTitleRegexp(1, 2) +
+		testStdoutRegexp(1, 2) +
+		testStderrRegexp(1, 2) +
+		testTitleRegexp(1, 4) +
+		testStdoutRegexp(1, 4) +
+		testStderrRegexp(1, 4) +
+		reportSuitePattern(1) +
+		"$")
+	assert.Regexp(t, scenarioRegexp, ansi.Unformat(errW.String()))
+
 }
 
 func TestAsyncDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
@@ -293,89 +551,6 @@ func TestAsyncDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 		testStdoutRegexp(3, 2) +
 		testStderrRegexp(3, 2) +
 		reportSuitePattern(3) +
-		"$")
-	assert.Regexp(t, scenarioRegexp, ansi.Unformat(errW.String()))
-
-}
-
-func TestStartDisplayAllRecorded(t *testing.T) {
-	//t.Skip()
-	token := "foo"
-	isol := "bar3"
-	var err error
-
-	err = repo.ClearWorkDirectory(token, isol)
-	require.NoError(t, err)
-
-	d := NewAsync(token, isol)
-	d.SetVerbose(model.SHOW_ALL)
-
-	// Replace stdPrinter std outputs by 2 string builders
-	outW := &strings.Builder{}
-	errW := &strings.Builder{}
-	d.stdPrinter = printz.New(printz.NewOutputs(outW, errW))
-
-	assert.Empty(t, outW.String())
-	assert.Empty(t, errW.String())
-
-	// Scénario: Writing async on 3 suites with test ran serial
-	// 000- Start with Global
-	// 100- Init suite1
-	// 110- Test suite1 #1
-	// 111- Test suite1 #1 out>
-	// 112- Test suite1 #1 err>
-	// 120- Test suite1 #2
-	// 121- Test suite1 #2 out>
-	// 122- Test suite1 #2 err>
-	// 130- Test suite1 #3
-	// 131- Test suite1 #3 out>
-	// 132- Test suite1 #3 err>
-	// 170- Report suite1
-
-	gctx := facade.NewGlobalContext(token, isol, model.Config{})
-	d.Global(gctx)
-
-	// Start 3 tests async/unordered
-	displaySuite(d, token, isol, 1) // 100- Init suite1
-	displayTestTitle(d, token, isol, 1, 1)
-	displayTestTitle(d, token, isol, 1, 3)
-	displayTestTitle(d, token, isol, 1, 2)
-
-	d.StartDisplayAllRecorded()
-
-	// Simulate outputs sent disordered
-	displayTestOut(d, token, isol, 1, 1)
-	displayTestErr(d, token, isol, 1, 1)
-	displayEndTest(d, token, isol, 1, 1)
-
-	displayTestOut(d, token, isol, 1, 3)
-	displayTestErr(d, token, isol, 1, 3)
-	displayEndTest(d, token, isol, 1, 3)
-
-	displayTestOut(d, token, isol, 1, 2)
-	displayTestErr(d, token, isol, 1, 2)
-	displayEndTest(d, token, isol, 1, 2)
-
-	displayReport(d, 1)
-
-	err = d.WaitDisplayRecorded()
-	require.NoError(t, err)
-
-	assert.Empty(t, ansi.Unformat(outW.String()))
-	// Expect scénario to be oredred test1, test2, test3
-	scenarioRegexp := regexp.MustCompile("^" +
-		globalInitPattern(token) +
-		suiteInitRegexp(token, 1) +
-		testTitleRegexp(1, 1) +
-		testStdoutRegexp(1, 1) +
-		testStderrRegexp(1, 1) +
-		testTitleRegexp(1, 2) +
-		testStdoutRegexp(1, 2) +
-		testStderrRegexp(1, 2) +
-		testTitleRegexp(1, 3) +
-		testStdoutRegexp(1, 3) +
-		testStderrRegexp(1, 3) +
-		reportSuitePattern(1) +
 		"$")
 	assert.Regexp(t, scenarioRegexp, ansi.Unformat(errW.String()))
 

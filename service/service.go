@@ -150,13 +150,10 @@ func reportTestSuite(ctx facade.SuiteContext) (suiteOutcome model.SuiteOutcome, 
 		return
 	}
 
-	//logger.Info("Reporting suite", "testCount", testCount, "ctx", ctx)
-
 	suiteOutcome, err = ctx.Repo.LoadSuiteOutcome(testSuite)
 	if err != nil {
 		return
 	}
-	//dpl.ReportSuite(suiteOutcome)
 
 	if suiteOutcome.FailedCount == 0 && suiteOutcome.ErroredCount == 0 {
 		exitCode = 0
@@ -190,6 +187,8 @@ func PerformTest(testDef model.TestDefinition) (exitCode int16, err error) {
 	cfg := testDef.Config
 	ctx := facade.NewTestContext2(testDef)
 	seq := testDef.Seq
+
+	defer Dpl.EndTest(ctx)
 
 	Dpl.TestTitle(ctx)
 
@@ -243,6 +242,7 @@ func PerformTest(testDef model.TestDefinition) (exitCode int16, err error) {
 	} else {
 		exitCode = 0
 	}
+
 	return
 }
 

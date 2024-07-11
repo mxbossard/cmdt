@@ -119,7 +119,7 @@ func newFileWriters(outFile, errFile string) (io.Writer, io.Writer, error) {
 	return outW, errW, nil
 }
 
-func newFileReaders(outFile, errFile string) (io.Reader, io.Reader, error) {
+func newFileReaders(outFile, errFile string) (*os.File, *os.File, error) {
 	outW, err := os.OpenFile(outFile, os.O_RDONLY+os.O_CREATE, 0644)
 	if err != nil {
 		return nil, nil, err
