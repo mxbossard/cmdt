@@ -298,6 +298,8 @@ $cmdtIn @test=failing_rule_missusage/ @fail @-- $cmdt1 @report @success
 $cmdtIn @test=failing_rule_missusage/ @fail @-- $cmdt1 @report @exit=0
 $cmdtIn @test=failing_rule_missusage/ @fail @stderr:donotexist @-- $cmdt1 true @donotexist
 $cmdtIn @test=failing_rule_missusage/ @fail @stderr:donotexist @-- $cmdt1 true @donotexist
+$cmdtIn @test=failing_rule_missusage/ @fail @stderr:"can't use rule: [@async]" @-- $cmdt1 @async=false true
+$cmdtIn @test=failing_rule_missusage/ @fail @stderr:"can't use rule: [@ignore]" @-- $cmdt1 @report=foo @ignore
 
 
 >&2 echo "## Test config"
@@ -444,6 +446,7 @@ $cmdtIn @test="interlaced/" @fail @stderr:"2 success" @stderr:"1 failure" @stder
 
 >&2 echo "## Mutually exclusive rules"
 merExpectedMsgRule="@stderr~/mutually exclusives/"
+actionExpectedMsgRule="@stderr:you can't use rule: "
 # Actions are mutually exclusives
 #eval $( $cmdtIn @init=mutually_exclusive_rules @exportToken )
 $cmdtIn @init=mutually_exclusive_rules
@@ -458,7 +461,7 @@ $cmdtIn @test=mutually_exclusive_rules/ @fail "$merExpectedMsgRule" @-- $cmdt1 @
 # Assertions are only accepted on test actions
 for action in @global @init @report; do
 	for assertion in @success @fail @exit=0 @cmd=true @stdout= @stderr= @exists=foo; do
-		$cmdtIn @test=mutually_exclusive_rules/ @fail "$merExpectedMsgRule" @-- $cmdt1 "$action" "$assertion"
+		$cmdtIn @test=mutually_exclusive_rules/ @fail "$actionExpectedMsgRule" @-- $cmdt1 "$action" "$assertion"
 	done
 done
 
@@ -469,7 +472,7 @@ for action in @test @report; do
 		cmd="true"
 	fi
 	for assertion in @fork=5; do
-		$cmdtIn @test=mutually_exclusive_rules/ @fail "$merExpectedMsgRule" @-- $cmdt1 "$action" "$assertion" $cmd
+		$cmdtIn @test=mutually_exclusive_rules/ @fail "$actionExpectedMsgRule" @-- $cmdt1 "$action" "$assertion" $cmd
 	done
 
 done
@@ -477,7 +480,7 @@ done
 # Test config are only accepted on global init and test actions
 for action in @report; do
 	for assertion in @quiet @keepStdout @keepStderr @keepOutputs @stopOnFailure @ignore @timeout=1s @runCount=2 @parallel=3; do
-		$cmdtIn @test=mutually_exclusive_rules/ @fail "$merExpectedMsgRule" @-- $cmdt1 "$action" "$assertion"
+		$cmdtIn @test=mutually_exclusive_rules/ @fail "$actionExpectedMsgRule" @-- $cmdt1 "$action" "$assertion"
 	done
 done
 
@@ -488,7 +491,7 @@ $cmdtIn @init=test_flow
 $cmdtIn @test=test_flow/ @-- $cmdt1 @init=main
 $cmdtIn @test=test_flow/ @stderr:"#01" @stderr:PASSED @-- $cmdt1 @fail false
 $cmdtIn @test=test_flow/ @stderr:"#02" @stderr:PASSED @-- $cmdt1 true
-$cmdtIn @test=test_flow/ @fail @stderr:"mutually exclusive" @-- $cmdt1 "@test" "@fork=5" # Should error because of bad param
+$cmdtIn @test=test_flow/ @fail @stderr:"you can't use rule:" @-- $cmdt1 "@test" "@fork=5" # Should error because of bad param
 $cmdtIn @test=test_flow/ @stderr:"#04" @stderr:ERROR @-- $cmdt1 doNotExists @stderr:"not executed" # Should error because of not executable
 $cmdtIn @test=test_flow/ @stderr:"#05" @stderr:PASSED @-- $cmdt1 true
 $cmdtIn @test=test_flow/ @fail @stderr:"3 success" @stderr:"2 error" @-- $cmdt1 @report=main

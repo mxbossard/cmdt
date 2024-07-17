@@ -87,31 +87,86 @@ var (
 )
 
 var (
-	Actions = []RuleDefinition{ruleDef("global", ""), ruleDef("init", "", "="), ruleDef("test", "", "="),
-		ruleDef("report", "", "="), ruleDef("usage", "")}
+	Actions = []RuleDefinition{
+		ruleDef("global", ""),
+		ruleDef("init", "", "="),
+		ruleDef("test", "", "="),
+		ruleDef("report", "", "="),
+		ruleDef("usage", ""),
+	}
+
 	// Global config available to global
-	GlobalConfigs = []RuleDefinition{ruleDef("fork", "="), ruleDef("suiteTimeout", "="), ruleDef("prefix", "=")}
+	GlobalConfigs = []RuleDefinition{
+		ruleDef("fork", "="),
+		ruleDef("suiteTimeout", "="),
+		//ruleDef("prefix", "="),
+	}
+
 	// Suite config available to suite
-	SuiteConfigs = append(GlobalConfigs, []RuleDefinition{
-		ruleDef("exportToken", ""), ruleDef("printToken", "")}...)
+	SuiteConfigs = []RuleDefinition{
+		ruleDef("exportToken", ""),
+		ruleDef("printToken", ""),
+		ruleDef("fork", "="),
+		ruleDef("suiteTimeout", "="),
+	}
+
 	// Test config available at all levels (global, suite and test)
-	TestConfigs = []RuleDefinition{ruleDef("before", "="), ruleDef("after", "="), ruleDef("ignore", "", "="),
-		ruleDef("stopOnFailure", "", "="), ruleDef("keepStdout", "", "="), ruleDef("keepStderr", "", "="),
-		ruleDef("keepOutputs", "", "="), ruleDef("quiet", "", "="), ruleDef("timeout", "="),
-		ruleDef("parallel", "="), ruleDef("runCount", "="), ruleDef("mock", "=", ":"),
-		ruleDef("container", "", "="), ruleDef("dirtyContainer", "=")}
+	TestConfigs = []RuleDefinition{
+		ruleDef("before", "="),
+		ruleDef("after", "="),
+		ruleDef("ignore", "", "="),
+		ruleDef("stopOnFailure", "", "="),
+		ruleDef("keepStdout", "", "="),
+		ruleDef("keepStderr", "", "="),
+		ruleDef("keepOutputs", "", "="),
+		ruleDef("quiet", "", "="),
+		ruleDef("timeout", "="),
+		ruleDef("parallel", "="),
+		ruleDef("runCount", "="),
+		ruleDef("mock", "=", ":"),
+		ruleDef("container", "", "="),
+		ruleDef("dirtyContainer", "="),
+	}
+
+	ReportConfigs = []RuleDefinition{
+		ruleDef("keep", "", "="),
+	}
+
+	SyncConfigs = []RuleDefinition{
+		ruleDef("async", "", "="),
+		ruleDef("wait", "", "="),
+	}
+
 	// Config of test flow (init -> test -> report)
-	FlowConfigs = []RuleDefinition{ruleDef("token", "="), ruleDef("isol", "="), ruleDef("verbose", "", "="),
-		ruleDef("debug", "", "="), ruleDef("failuresLimit", "="), ruleDef("async", "", "="), ruleDef("wait", "", "="),
-		ruleDef("keep", "", "="), ruleDef("help", "")}
-	Assertions = []RuleDefinition{ruleDef("success", ""), ruleDef("fail", ""), ruleDef("exit", "="),
-		ruleDef("cmd", "="), ruleDef("exists", "="),
+	FlowConfigs = []RuleDefinition{
+		ruleDef("token", "="),
+		ruleDef("isol", "="),
+		ruleDef("prefix", "="),
+		ruleDef("verbose", "", "="),
+		ruleDef("debug", "", "="),
+		ruleDef("failuresLimit", "="),
+		ruleDef("help", ""),
+	}
+
+	Assertions = []RuleDefinition{
+		ruleDef("success", ""),
+		ruleDef("fail", ""),
+		ruleDef("exit", "="),
+		ruleDef("cmd", "="),
+		ruleDef("exists", "="),
 		ruleDef("stdout", "=", ":", "~", "!=", "!:", "!~", "@=", "@:"),
-		ruleDef("stderr", "=", ":", "~", "!=", "!:", "!~", "@=", "@:")}
+		ruleDef("stderr", "=", ":", "~", "!=", "!:", "!~", "@=", "@:"),
+	}
+
+	// Rules which can contains spaces and be concatenated with next arg
 	Concatenables = []RuleDefinition{
-		ruleDef("init", "="), ruleDef("test", "="), ruleDef("report", "="),
-		ruleDef("before", "="), ruleDef("after", "="),
-		ruleDef("cmd", "="), ruleDef("exists", "="),
+		ruleDef("init", "="),
+		ruleDef("test", "="),
+		ruleDef("report", "="),
+		ruleDef("before", "="),
+		ruleDef("after", "="),
+		ruleDef("cmd", "="),
+		ruleDef("exists", "="),
 		ruleDef("stdout", "=", ":", "~", "!=", "!:", "!~", "@=", "@:"),
 		ruleDef("stderr", "=", ":", "~", "!=", "!:", "!~", "@=", "@:"),
 	}

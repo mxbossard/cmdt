@@ -456,12 +456,8 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 		return
 	}
 
-	var isAction, isTestConf, isSuiteConf, isFlowConf bool
+	var isAction, isSuiteConf, isSyncConf, isTestConf, isReportConf, isFlowConf bool
 	isAction, err = model.IsRuleOfKind(model.Actions, rule)
-	if err != nil {
-		return
-	}
-	isTestConf, err = model.IsRuleOfKind(model.TestConfigs, rule)
 	if err != nil {
 		return
 	}
@@ -469,11 +465,23 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 	if err != nil {
 		return
 	}
+	isSyncConf, err = model.IsRuleOfKind(model.SyncConfigs, rule)
+	if err != nil {
+		return
+	}
+	isTestConf, err = model.IsRuleOfKind(model.TestConfigs, rule)
+	if err != nil {
+		return
+	}
+	isReportConf, err = model.IsRuleOfKind(model.ReportConfigs, rule)
+	if err != nil {
+		return
+	}
 	isFlowConf, err = model.IsRuleOfKind(model.FlowConfigs, rule)
 	if err != nil {
 		return
 	}
-	ok = isAction || isTestConf || isSuiteConf || isFlowConf
+	ok = isAction || isSuiteConf || isSyncConf || isTestConf || isReportConf || isFlowConf
 	if !ok {
 		return
 	}
@@ -991,6 +999,11 @@ func ParseArgs(rulePrefix string, args []string) (cfg model.Config, assertions [
 		cfg.Async.Set(false)
 	}
 
+	agg2 := ValidateActionRules(cfg.Action.Get(), rules...)
+	if agg2.GotError() {
+		agg.AddAll(agg2)
+	}
+
 	err = ValidateMutualyExclusiveRules(rules...)
 	if err != nil {
 		agg.Add(err)
@@ -1041,6 +1054,48 @@ func ruleKeys(ruleDefs ...[]model.RuleDefinition) (r []model.RuleKey) {
 	return
 }
 
+func ValidateActionRules(action model.Action, rules ...model.Rule) (agg errorz.Aggregated) {
+	var authorizedRules []model.RuleDefinition
+	switch action {
+	case model.UsageAction:
+	case model.GlobalAction:
+		authorizedRules = model.GlobalConfigs
+		authorizedRules = append(authorizedRules, model.SuiteConfigs...)
+		authorizedRules = append(authorizedRules, model.TestConfigs...)
+		authorizedRules = append(authorizedRules, model.FlowConfigs...)
+		authorizedRules = append(authorizedRules, model.SyncConfigs...)
+	case model.InitAction:
+		authorizedRules = model.SuiteConfigs
+		authorizedRules = append(authorizedRules, model.TestConfigs...)
+		authorizedRules = append(authorizedRules, model.FlowConfigs...)
+		authorizedRules = append(authorizedRules, model.SyncConfigs...)
+	case model.TestAction:
+		authorizedRules = model.TestConfigs
+		authorizedRules = append(authorizedRules, model.FlowConfigs...)
+		authorizedRules = append(authorizedRules, model.Assertions...)
+	case model.ReportAction:
+		authorizedRules = model.ReportConfigs
+		authorizedRules = append(authorizedRules, model.FlowConfigs...)
+		authorizedRules = append(authorizedRules, model.SyncConfigs...)
+	}
+
+	actionRulesKeys := ruleKeys(model.Actions)
+	authorizedRulesKeys := ruleKeys(authorizedRules)
+	for _, r := range rules {
+		ruleKey := ruleKey(r.Name)
+		logger.Trace("checking action rules", "ruleKey", ruleKey, "actionRulesKeys", actionRulesKeys)
+		if collections.Contains[model.RuleKey](&actionRulesKeys, ruleKey) {
+			continue
+		}
+		logger.Trace("checking authorized rules", "ruleKey", ruleKey, "authorizedRulesKeys", authorizedRulesKeys)
+		if !collections.Contains[model.RuleKey](&authorizedRulesKeys, ruleKey) {
+			agg.Add(fmt.Errorf("you can't use rule: [%s%s] with action: [%s]", r.Prefix, r.Name, action))
+		}
+	}
+
+	return
+}
+
 // ValidateOnceOnlyDefinedRule => verify rules which cannot be defined multiple times are not defined twice or more
 func ValidateOnceOnlyDefinedRule(rules ...model.Rule) (err error) {
 	multiDefinedRules := []model.RuleKey{
@@ -1075,10 +1130,10 @@ func ValidateMutualyExclusiveRules(rules ...model.Rule) (err error) {
 	}
 
 	exlusiveRules := MutualyExclusiveRules
-	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(model.RuleKey{"global", "all"}, ruleKeys(model.Assertions)...)...)
-	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(model.RuleKey{"init", "all"}, ruleKeys(model.Assertions)...)...)
-	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(model.RuleKey{"report", "all"}, ruleKeys(model.Assertions, model.TestConfigs, model.SuiteConfigs)...)...)
-	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(model.RuleKey{"test", "all"}, model.RuleKey{"suiteTimeout", "all"}, model.RuleKey{"fork", "all"})...)
+	//exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(model.RuleKey{"global", "all"}, ruleKeys(model.Assertions)...)...)
+	//exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(model.RuleKey{"init", "all"}, ruleKeys(model.Assertions)...)...)
+	//exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(model.RuleKey{"report", "all"}, ruleKeys(model.Assertions, model.TestConfigs, model.SuiteConfigs)...)...)
+	//exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(model.RuleKey{"test", "all"}, model.RuleKey{"suiteTimeout", "all"}, model.RuleKey{"fork", "all"})...)
 	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("keepOutputs"), ruleKey("keepStdout"), ruleKey("keepStderr"))...)
 	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("stdout", "="), ruleKey("stdout", "~"), ruleKey("stdout", "!~"), ruleKey("stdout", "!="), ruleKey("stdout", ":"), ruleKey("stdout", "!:"), ruleKey("stdout", "@:"))...)
 	exlusiveRules = append(exlusiveRules, buildMutualyExclusiveCouples(ruleKey("stderr", "="), ruleKey("stderr", "~"), ruleKey("stderr", "!~"), ruleKey("stderr", "!="), ruleKey("stderr", ":"), ruleKey("stderr", "!:"), ruleKey("stderr", "@:"))...)
