@@ -994,10 +994,10 @@ func ParseArgs(rulePrefix string, args []string) (cfg model.Config, assertions [
 		cfg.Wait.Set(true)
 	}
 
-	if cfg.Wait.Is(true) && !cfg.Wait.IsDefault() {
-		// Force Async false if Wait is true not by default
-		cfg.Async.Set(false)
-	}
+	// if cfg.Wait.Is(true) && !cfg.Wait.IsDefault() {
+	// 	// Force Async false if Wait is true not by default
+	// 	cfg.Async.Set(false)
+	// }
 
 	agg2 := ValidateActionRules(cfg.Action.Get(), rules...)
 	if agg2.GotError() {

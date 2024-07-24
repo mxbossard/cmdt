@@ -232,11 +232,14 @@ Features:
 
 */
 
+var logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
+
 func init() {
 	zlog.ColoredConfig()
 	zlog.SetPart("cmdt")
 	zlog.SetLogLevelThreshold0IsFatal(int(model.StartDebugLevel))
 	zlog.SetTruncatedArgsLength(64)
+	zlog.SetDefaultAppendingFileOutput(model.DefaultDebugLogFilepath)
 }
 
 func RecoverExiting() {
@@ -251,6 +254,8 @@ func main() {
 	//fmt.Printf("Args: %v", os.Args)
 
 	daemon.TakeOver()
+
+	logger.Warn("cmdt started", "pid", os.Getpid(), "args", os.Args[1:])
 
 	//model.LoggerLevel.Set(slog.Level(8 - model.StartDebugLevel*4))
 

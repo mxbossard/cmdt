@@ -42,18 +42,21 @@ const (
 
 	NamePattern = "[a-zA-Z][^/]*[a-zA-Z0-9]"
 
-	TempDirPrefix           = "cmdtest"
-	ContextFilename         = "context.yaml"
-	TestSequenceFilename    = "test-seq.txt"
-	PassedSequenceFilename  = "passed-seq.txt"
-	FailedSequenceFilename  = "failed-seq.txt"
-	IgnoredSequenceFilename = "ignored-seq.txt"
-	ErroredSequenceFilename = "errored-seq.txt"
-	TooMuchSequenceFilename = "tooMuch-seq.txt"
-	StdoutFilename          = "stdout.log"
-	StderrFilename          = "stderr.log"
-	DoneFilename            = "done"
-	ReportFilename          = "report.log"
+	TempDirPrefix                 = "cmdtest"
+	ContextFilename               = "context.yaml"
+	TestSequenceFilename          = "test-seq.txt"
+	PassedSequenceFilename        = "passed-seq.txt"
+	FailedSequenceFilename        = "failed-seq.txt"
+	IgnoredSequenceFilename       = "ignored-seq.txt"
+	ErroredSequenceFilename       = "errored-seq.txt"
+	TooMuchSequenceFilename       = "tooMuch-seq.txt"
+	StdoutFilename                = "stdout.log"
+	StderrFilename                = "stderr.log"
+	DoneFilename                  = "done"
+	FlushedFilename               = "flushed"
+	ReportFilename                = "report.log"
+	DefaultDebugLogFilepath       = "/tmp/cmdt.log"
+	DefaultDebugDaemonLogFilepath = "/tmp/daemon.log"
 
 	MessageColor = ansi.HiPurple
 	TestColor    = ansi.HiCyan

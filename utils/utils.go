@@ -202,7 +202,7 @@ func ForgeContextualToken(token string) (string, error) {
 			err = fmt.Errorf("cannot hash workspace dir: %w", err)
 			return "", err
 		}
-		logger.Trace("token signature", "workDirPath", "token", token, workDirPath, "ppidStr", ppidStr)
+		logger.Trace("token signature", "workDirPath", workDirPath, "token", token, "ppidStr", ppidStr)
 		//log.Printf("contextual token: %s base on workDirPath: %s and ppid: %s\n", token, workDirPath, ppid)
 	}
 

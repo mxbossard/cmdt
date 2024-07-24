@@ -47,7 +47,9 @@ func TestAsyncDisplay_TestStdout(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	err = d.DisplayRecorded(suite)
+	err = d.AsyncFlush(suite, 100*time.Millisecond)
+	require.NoError(t, err)
+	err = d.BlockTail(suite, 100*time.Millisecond)
 	require.NoError(t, err)
 
 	assert.Empty(t, outW.String())
@@ -56,7 +58,9 @@ func TestAsyncDisplay_TestStdout(t *testing.T) {
 	outW.Reset()
 	errW.Reset()
 
-	err = d.DisplayAllRecorded()
+	err = d.AsyncFlushAll(100 * time.Millisecond)
+	require.NoError(t, err)
+	err = d.BlockTailAll(100 * time.Millisecond)
 	require.NoError(t, err)
 
 	assert.Empty(t, outW.String())
@@ -78,7 +82,9 @@ func TestAsyncDisplay_TestTitle(t *testing.T) {
 	errW := &strings.Builder{}
 	d.stdPrinter = printz.New(printz.NewOutputs(outW, errW))
 
-	err = d.DisplayAllRecorded()
+	err = d.AsyncFlushAll(100 * time.Millisecond)
+	require.NoError(t, err)
+	err = d.BlockTailAll(100 * time.Millisecond)
 	require.NoError(t, err)
 
 	assert.Empty(t, outW.String())
@@ -89,7 +95,9 @@ func TestAsyncDisplay_TestTitle(t *testing.T) {
 
 	d.TestTitle(ctx)
 
-	err = d.DisplayAllRecorded()
+	err = d.AsyncFlushAll(100 * time.Millisecond)
+	require.NoError(t, err)
+	err = d.BlockTailAll(100 * time.Millisecond)
 	require.NoError(t, err)
 
 	assert.Empty(t, outW.String())
@@ -173,7 +181,7 @@ func reportSuitePattern(suite int) string {
 	return fmt.Sprintf(`Successfuly ran  \[ suite-%d\s* \] test suite in    [\d.]+ s \(\s*\d+ success\)\s*\n`, suite)
 }
 
-func TestDisplayRecorded(t *testing.T) {
+func TestBlockTail(t *testing.T) {
 	//t.Skip()
 	token := "foo"
 	isol := "bar3"
@@ -230,7 +238,10 @@ func TestDisplayRecorded(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	err = d.DisplayRecorded("suite-1")
+	require.NoError(t, err)
+	err = d.AsyncFlush("suite-1", 100*time.Millisecond)
+	require.NoError(t, err)
+	err = d.BlockTail("suite-1", 100*time.Millisecond)
 	require.NoError(t, err)
 
 	assert.Empty(t, ansi.Unformat(outW.String()))
@@ -252,7 +263,7 @@ func TestDisplayRecorded(t *testing.T) {
 
 }
 
-func TestDisplayAllRecorded(t *testing.T) {
+func TestBlockTailAll(t *testing.T) {
 	//t.Skip()
 	token := "foo"
 	isol := "bar3"
@@ -313,7 +324,9 @@ func TestDisplayAllRecorded(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	err = d.DisplayAllRecorded()
+	err = d.AsyncFlushAll(100 * time.Millisecond)
+	require.NoError(t, err)
+	err = d.BlockTailAll(100 * time.Millisecond)
 	require.NoError(t, err)
 
 	assert.Empty(t, ansi.Unformat(outW.String()))
@@ -336,7 +349,7 @@ func TestDisplayAllRecorded(t *testing.T) {
 
 }
 
-func TestWaitDisplayRecorded(t *testing.T) {
+func TestAsyncFlushAllThenDisplayThenBlockTailAll(t *testing.T) {
 	//t.Skip()
 	token := "foo"
 	isol := "bar3"
@@ -370,6 +383,10 @@ func TestWaitDisplayRecorded(t *testing.T) {
 	// 132- Test suite1 #4 err>
 	// 170- Report suite1
 
+	// Clear files on suite init
+	err = clearFileWriters(token, isol, "")
+	require.NoError(t, err)
+
 	gctx := facade.NewGlobalContext(token, isol, model.Config{})
 	d.Global(gctx)
 
@@ -382,7 +399,8 @@ func TestWaitDisplayRecorded(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	d.StartDisplayAllRecorded()
+	err = d.AsyncFlushAll(1000 * time.Millisecond)
+	require.NoError(t, err)
 
 	// Simulate outputs sent disordered
 	displayTestOut(d, token, isol, 1, 1)
@@ -399,7 +417,7 @@ func TestWaitDisplayRecorded(t *testing.T) {
 
 	displayReport(d, 1)
 
-	err = d.WaitDisplayRecorded()
+	err = d.BlockTailAll(100 * time.Millisecond)
 	require.NoError(t, err)
 
 	assert.Empty(t, ansi.Unformat(outW.String()))
@@ -515,7 +533,9 @@ func TestAsyncDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	err = d.DisplayAllRecorded()
+	err = d.AsyncFlushAll(100 * time.Millisecond)
+	require.NoError(t, err)
+	err = d.BlockTailAll(100 * time.Millisecond)
 	require.NoError(t, err)
 
 	assert.Empty(t, ansi.Unformat(outW.String()))
@@ -661,7 +681,9 @@ func TestAsyncDisplayUsage_AsyncSuitesSerialTests(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	err = d.DisplayAllRecorded()
+	err = d.AsyncFlushAll(100 * time.Millisecond)
+	require.NoError(t, err)
+	err = d.BlockTailAll(100 * time.Millisecond)
 	require.NoError(t, err)
 
 	assert.Empty(t, ansi.Unformat(outW.String()))
@@ -807,7 +829,9 @@ func TestAsyncDisplayUsage_AsyncSuitesAsyncTests(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	err = d.DisplayAllRecorded()
+	err = d.AsyncFlushAll(100 * time.Millisecond)
+	require.NoError(t, err)
+	err = d.BlockTailAll(100 * time.Millisecond)
 	require.NoError(t, err)
 
 	assert.Empty(t, ansi.Unformat(outW.String()))

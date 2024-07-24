@@ -429,7 +429,7 @@ func testDirectoryPath(testSuite, token, isol string, seq uint16) (testDir strin
 	return
 }
 
-func DaemonSuiteReportFilepathes(testSuite, token, isol string) (outPath, errPath, donePath string, err error) {
+func DaemonSuiteReportFilepathes(testSuite, token, isol string) (outPath, errPath, donePath, flushedPath string, err error) {
 	suitePath, err := testSuiteDirectoryPath(testSuite, token, isol)
 	if err != nil {
 		return
@@ -438,6 +438,7 @@ func DaemonSuiteReportFilepathes(testSuite, token, isol string) (outPath, errPat
 	outPath = filepath.Join(suitePath, model.StdoutFilename)
 	errPath = filepath.Join(suitePath, model.StderrFilename)
 	donePath = filepath.Join(suitePath, model.DoneFilename)
+	flushedPath = filepath.Join(suitePath, model.FlushedFilename)
 	return
 }
 

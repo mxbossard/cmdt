@@ -53,11 +53,11 @@ Or simpler may display testTitle on queueing the test ?
 */
 
 func clearFileWriters(token, isol, suite string) error {
-	outFile, errFile, doneFile, err := repo.DaemonSuiteReportFilepathes(suite, token, isol)
+	outFile, errFile, doneFile, flushedFile, err := repo.DaemonSuiteReportFilepathes(suite, token, isol)
 	if err != nil {
 		panic(err)
 	}
-	logger.Info("removing recorder files", "outFile", outFile, "errFile", errFile, "doneFile", doneFile)
+	logger.Info("removing recorder files", "outFile", outFile, "errFile", errFile, "doneFile", doneFile, "flushedFile", flushedFile)
 
 	if _, err := os.Stat(outFile); err == nil {
 		err = os.Remove(outFile)
@@ -77,11 +77,17 @@ func clearFileWriters(token, isol, suite string) error {
 			return err
 		}
 	}
+	if _, err := os.Stat(flushedFile); err == nil {
+		err = os.Remove(flushedFile)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
 func closeSuite(token, isol, suite string) error {
-	_, _, doneFile, err := repo.DaemonSuiteReportFilepathes(suite, token, isol)
+	_, _, doneFile, _, err := repo.DaemonSuiteReportFilepathes(suite, token, isol)
 	if err != nil {
 		return err
 	}
@@ -187,7 +193,7 @@ func (p *suitePrinters) testPrinter(seq int) (printz.Printer, error) {
 	printer, ok := p.tests[seq]
 	if !ok {
 		if p.outW == nil {
-			stdout, stderr, _, err := repo.DaemonSuiteReportFilepathes(p.suite, p.token, p.isol)
+			stdout, stderr, _, _, err := repo.DaemonSuiteReportFilepathes(p.suite, p.token, p.isol)
 			if err != nil {
 				return nil, err
 			}
@@ -344,7 +350,7 @@ func (p *asyncPrinters) flush(suite string, once bool) (err error) {
 		logger.Debug("removed suitePrinters", "suite", suite)
 	} else {
 		// If suitePrinters not in map, nothing to flush
-		logger.Debug("nothing to flush", "suite", suite)
+		logger.Trace("nothing to flush", "suite", suite)
 		//err = fmt.Errorf("no: [%s] suite to flush", suite)
 		return
 	}

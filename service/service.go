@@ -367,8 +367,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		defaultGlobalTimeout := 5 * time.Minute
 
 		// For now enforce async false on report
-		inputConfig.Async.Set(false)
-		asyncDpl := display.NewAsync(token, isolation)
+		//inputConfig.Async.Set(false)
 
 		if inputConfig.ReportAll.Is(true) {
 			// Reporting All test suite
@@ -376,20 +375,26 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				errorz.Fatal(agg)
 			}
 			globalCtx := facade.NewGlobalContext(token, isolation, inputConfig)
-			asyncDpl.SetVerbose(globalCtx.Config.Verbose.Get())
-			if globalCtx.Config.Async.Is(false) {
-				// Process report all without daemon
-				logger.Trace("Forged context", "ctx", globalCtx)
-				logger.Info("executing report all in sync (not queueing report)")
-				asyncDpl.Quiet(globalCtx.Config.Quiet.Is(true))
-				asyncDpl.StartDisplayAllRecorded()
-				// Daemon must be off or No test remaining in suite queue
-				globalCtx.Repo.WaitAllEmpty(globalCtx.Config.SuiteTimeout.GetOr(defaultGlobalTimeout)) // FIXME: bad timeout
-				asyncDpl.StopDisplayAllRecorded()
-				exitCode, err = ReportAllTestSuites(globalCtx)
-			} else {
+			Dpl.SetVerbose(globalCtx.Config.Verbose.Get())
+
+			//asyncDpl := display.NewAsync(token, isolation)
+			// if globalCtx.Config.Async.Is(true) {
+			// 	// Switch display to async one
+			// 	Dpl = asyncDpl
+			// }
+
+			// if globalCtx.Config.Async.Is(false) {
+			// Process report all without daemon
+			logger.Trace("Forged context", "ctx", globalCtx)
+			// logger.Info("executing report all in sync (not queueing report)")
+			Dpl.Quiet(globalCtx.Config.Quiet.Is(true))
+
+			// }
+
+			if globalCtx.Config.Async.Is(true) {
 				// Delegate report all processing to daemon
-				logger.Info("executing report all async (queueing report)")
+				//logger.Info("executing report all on async display")
+				logger.Info("executing report all (queueing report)")
 				def := model.ReportDefinition{
 					Token:     token,
 					Isolation: isolation,
@@ -402,20 +407,33 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 					errorz.Fatal(err)
 				}
 
-				if globalCtx.Config.Wait.Is(true) {
-					wait = func() int16 {
-						// FIXME: bad timeout
-						exitCode, err := globalCtx.Repo.WaitOperationDone(&op, globalCtx.Config.SuiteTimeout.GetOr(defaultGlobalTimeout))
-						if err != nil {
-							panic(err)
-						}
-						return exitCode
+				asyncDpl := display.NewAsync(token, isolation)
+				//asyncDpl.StartDisplayAllRecorded(globalCtx.Config.SuiteTimeout.Get())
+				asyncDpl.BlockTailAll(globalCtx.Config.SuiteTimeout.Get())
+
+				// // Daemon must be off or No test remaining in suite queue
+				// globalCtx.Repo.WaitAllEmpty(globalCtx.Config.SuiteTimeout.GetOr(defaultGlobalTimeout)) // FIXME: bad timeout
+				// asyncDpl.WaitDisplayRecorded()
+
+				// always wait
+				// if globalCtx.Config.Wait.Is(true) {
+				wait = func() int16 {
+					// FIXME: bad timeout
+					exitCode, err := globalCtx.Repo.WaitOperationDone(&op, globalCtx.Config.SuiteTimeout.GetOr(defaultGlobalTimeout))
+					if err != nil {
+						panic(err)
 					}
-				} else {
-					exitCode = 0
+					//asyncDpl.StopDisplayAllRecorded()
+					return exitCode
 				}
+				// } else {
+				// 	exitCode = 0
+				// }
+
 				daemonIsol = globalCtx.Isolation
 				daemonToken = globalCtx.Token
+			} else {
+				exitCode, err = ReportAllTestSuites(globalCtx)
 			}
 		} else {
 			// Reporting One test suite
@@ -432,19 +450,21 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			}
 			op := model.ReportOperation(testSuite, true, def) // FIXME should not block if test can be run simultaneously
 
-			if suiteCtx.Config.Async.Is(false) {
-				// Process report without daemon
-				logger.Trace("Forged context", "ctx", suiteCtx)
-				logger.Info("executing report in sync (not queueing report)", "suite", testSuite)
-				Dpl.Quiet(suiteCtx.Config.Quiet.Is(true))
-				asyncDpl.StartDisplayRecorded(testSuite)
-				suiteCtx.Repo.WaitEmptyQueue(testSuite, suiteCtx.Config.SuiteTimeout.Get())
-				asyncDpl.StopDisplayRecorded(testSuite)
-				//exitCode, err = ReportTestSuite(suiteCtx)
-				exitCode, err = ProcessReportDef(def)
-				suiteCtx.NoErrorOrFatal(err)
-				suiteCtx.Repo.Done(&op)
-			} else {
+			//asyncDpl := display.NewAsync(token, isolation)
+			// if suiteCtx.Config.Async.Is(true) {
+			// 	// Switch display to async one
+			// 	Dpl = asyncDpl
+			// }
+
+			// if suiteCtx.Config.Async.Is(false) {
+			// Process report without daemon
+			logger.Trace("Forged context", "ctx", suiteCtx)
+			Dpl.Quiet(suiteCtx.Config.Quiet.Is(true))
+			// }
+
+			if suiteCtx.Config.Async.Is(true) {
+				//logger.Info("executing report on async display", "suite", testSuite)
+
 				// Delegate report processing to daemon
 				logger.Info("executing report async (queueing report)", "suite", testSuite)
 				def := model.ReportDefinition{
@@ -461,7 +481,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 					wait = func() int16 {
 						// FIXME: bad timeout
 						p := logger.QualifiedPerfTimer("waiting report done ...", "suite", testSuite)
-						exitCode, err := suiteCtx.Repo.WaitOperationDone(&op, suiteCtx.Config.SuiteTimeout.Get())
+						exitCode, err = suiteCtx.Repo.WaitOperationDone(&op, suiteCtx.Config.SuiteTimeout.Get())
 						if err != nil {
 							panic(err)
 						}
@@ -471,9 +491,22 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				} else {
 					exitCode = 0
 				}
+
+				asyncDpl := display.NewAsync(token, isolation)
+				//asyncDpl.StartDisplayRecorded(testSuite, suiteCtx.Config.SuiteTimeout.Get())
+				asyncDpl.BlockTail(testSuite, suiteCtx.Config.SuiteTimeout.Get())
+				//suiteCtx.Repo.WaitEmptyQueue(testSuite, suiteCtx.Config.SuiteTimeout.Get())
+				//asyncDpl.WaitDisplayRecorded()
+
 				daemonIsol = suiteCtx.Isolation
 				daemonToken = suiteCtx.Token
+			} else {
+				//exitCode, err = ReportTestSuite(suiteCtx)
+				exitCode, err = ProcessReportDef(def)
+				suiteCtx.NoErrorOrFatal(err)
+				suiteCtx.Repo.Done(&op)
 			}
+
 		}
 	case model.TestAction:
 		testSuite := inputConfig.TestSuite.Get()

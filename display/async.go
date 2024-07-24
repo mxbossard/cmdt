@@ -17,11 +17,16 @@ import (
 	"mby.fr/utils/zlog"
 )
 
+const (
+	RecordedFileFlushPeriod = 20 * time.Millisecond
+	RecordedFileTailPeriod  = 20 * time.Millisecond
+)
+
 var (
 	logger = zlog.New()
 )
 
-type asyncDisplay struct {
+type AsyncDisplay struct {
 	token, isolation   string
 	printers           *asyncPrinters
 	stdPrinter         printz.Printer
@@ -33,28 +38,38 @@ type asyncDisplay struct {
 	done               chan error
 }
 
-func (d asyncDisplay) Global(ctx facade.GlobalContext) {
+func (d AsyncDisplay) Global(ctx facade.GlobalContext) {
 	if d.quiet {
 		return
 	}
+
 	if ctx.Config.Verbose.Get() >= model.SHOW_FAILED_OUTS {
 		printer := d.printers.printer("", 0)
 		printer.ColoredErrf(messageColor, "## New config (token: %s)\n", ctx.Token)
 	}
 }
 
-func (d asyncDisplay) Suite(ctx facade.SuiteContext) {
+func (d AsyncDisplay) Suite(ctx facade.SuiteContext) {
 	if d.quiet {
 		return
 	}
+
+	suite := ctx.Config.TestSuite.Get()
+
+	// Clear files on suite init
+	err := clearFileWriters(d.token, d.isolation, suite)
+	if err != nil {
+		panic(err)
+	}
+
 	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
-		suite := ctx.Config.TestSuite.Get()
+
 		printer := d.printers.printer(suite, 0)
 		printer.ColoredErrf(messageColor, "## Test suite [%s] (token: %s)\n", suite, ctx.Token)
 	}
 }
 
-func (d asyncDisplay) TestTitle(ctx facade.TestContext) {
+func (d AsyncDisplay) TestTitle(ctx facade.TestContext) {
 	if d.quiet {
 		return
 	}
@@ -96,7 +111,7 @@ func (d asyncDisplay) TestTitle(ctx facade.TestContext) {
 	*/
 }
 
-func (d asyncDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutcome) {
+func (d AsyncDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutcome) {
 	if d.quiet {
 		return
 	}
@@ -163,28 +178,28 @@ func (d asyncDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutc
 
 }
 
-func (d asyncDisplay) TestStdout(ctx facade.TestContext, s string) {
+func (d AsyncDisplay) TestStdout(ctx facade.TestContext, s string) {
 	if s != "" {
 		printer := d.printers.printer(ctx.Config.TestSuite.Get(), int(ctx.Seq))
 		printer.Err(d.outFormatter.Format(s))
 	}
 }
 
-func (d asyncDisplay) TestStderr(ctx facade.TestContext, s string) {
+func (d AsyncDisplay) TestStderr(ctx facade.TestContext, s string) {
 	if s != "" {
 		printer := d.printers.printer(ctx.Config.TestSuite.Get(), int(ctx.Seq))
 		printer.Err(d.errFormatter.Format(s))
 	}
 }
 
-func (d asyncDisplay) EndTest(ctx facade.TestContext) {
+func (d AsyncDisplay) EndTest(ctx facade.TestContext) {
 	// report end of test to suite printer
 	suite := ctx.Config.TestSuite.Get()
 	seq := int(ctx.Seq)
 	d.printers.testEnded(suite, seq)
 }
 
-func (d asyncDisplay) assertionResult(printer printz.Printer, result model.AssertionResult) {
+func (d AsyncDisplay) assertionResult(printer printz.Printer, result model.AssertionResult) {
 	hlClr := reportColor
 	//log.Printf("failedResult: %v\n", result)
 	assertPrefix := result.Rule.Prefix
@@ -243,7 +258,7 @@ func (d asyncDisplay) assertionResult(printer printz.Printer, result model.Asser
 	}
 }
 
-func (d asyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
+func (d AsyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 	testCount := outcome.TestCount
 	ignoredCount := outcome.IgnoredCount
 	failedCount := outcome.FailedCount
@@ -294,7 +309,7 @@ func (d asyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 	}
 }
 
-func (d asyncDisplay) ReportSuite(outcome model.SuiteOutcome) {
+func (d AsyncDisplay) ReportSuite(outcome model.SuiteOutcome) {
 	if d.quiet {
 		return
 	}
@@ -302,7 +317,7 @@ func (d asyncDisplay) ReportSuite(outcome model.SuiteOutcome) {
 	d.reportSuite(outcome, MinReportSuiteLabelPadding)
 }
 
-func (d asyncDisplay) ReportSuites(outcomes []model.SuiteOutcome) {
+func (d AsyncDisplay) ReportSuites(outcomes []model.SuiteOutcome) {
 	if d.quiet {
 		return
 	}
@@ -317,7 +332,7 @@ func (d asyncDisplay) ReportSuites(outcomes []model.SuiteOutcome) {
 	}
 }
 
-func (d asyncDisplay) ReportAllFooter(globalCtx facade.GlobalContext) {
+func (d AsyncDisplay) ReportAllFooter(globalCtx facade.GlobalContext) {
 	if d.quiet {
 		return
 	}
@@ -327,7 +342,7 @@ func (d asyncDisplay) ReportAllFooter(globalCtx facade.GlobalContext) {
 	printer.ColoredErrf(messageColor, "Global duration time: %s\n", globalDuration)
 }
 
-func (d asyncDisplay) TooMuchFailures(ctx facade.SuiteContext, testSuite string) {
+func (d AsyncDisplay) TooMuchFailures(ctx facade.SuiteContext, testSuite string) {
 	if d.quiet {
 		return
 	}
@@ -338,27 +353,27 @@ func (d asyncDisplay) TooMuchFailures(ctx facade.SuiteContext, testSuite string)
 	printer.ColoredErrf(warningColor, "Too much failure for [%s] test suite. Stop testing.\n", testSuite)
 }
 
-func (d asyncDisplay) Error(err error) {
+func (d AsyncDisplay) Error(err error) {
 
 }
 
-func (d asyncDisplay) Flush() error {
+func (d AsyncDisplay) Flush() error {
 	return nil
 }
 
-func (d *asyncDisplay) Quiet(quiet bool) {
+func (d *AsyncDisplay) Quiet(quiet bool) {
 	d.quiet = quiet
 }
 
-func (d *asyncDisplay) SetVerbose(level model.VerboseLevel) {
+func (d *AsyncDisplay) SetVerbose(level model.VerboseLevel) {
 	d.verbose = level
 }
 
-func (d *asyncDisplay) DisplayRecorded(suite string) error {
+func (d *AsyncDisplay) DisplayRecorded0(suite string, timeout time.Duration) error {
 	p := logger.PerfTimer("suite", suite)
 	defer p.End()
 
-	stdoutFile, stderrFile, doneFile, err := repo.DaemonSuiteReportFilepathes(suite, d.token, d.isolation)
+	stdoutFile, stderrFile, doneFile, _, err := repo.DaemonSuiteReportFilepathes(suite, d.token, d.isolation)
 	if err != nil {
 		return err
 	}
@@ -372,7 +387,7 @@ func (d *asyncDisplay) DisplayRecorded(suite string) error {
 	start := time.Now()
 	var done bool
 	var outRead, errRead int64
-	for !done && time.Since(start) < 300*time.Millisecond {
+	for !done && time.Since(start) < timeout {
 		err = d.printers.flush(suite, true)
 		if err != nil {
 			return err
@@ -408,13 +423,150 @@ func (d *asyncDisplay) DisplayRecorded(suite string) error {
 		if _, err := os.Stat(doneFile); err == nil {
 			done = true
 		} else {
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(RecordedFileFlushPeriod)
 		}
 	}
 	return nil
 }
 
-func (d *asyncDisplay) DisplayAllRecorded() (err error) {
+func (d *AsyncDisplay) AsyncFlush(suite string, timeout time.Duration) error {
+	// Launch goroutine wich will continuously flush suite async display
+	p := logger.PerfTimer("suite", suite)
+	defer p.End()
+
+	stdoutFile, stderrFile, doneFile, flushedFile, err := repo.DaemonSuiteReportFilepathes(suite, d.token, d.isolation)
+	if err != nil {
+		return err
+	}
+
+	logger.Debug("flushing recorded outs", "suite", suite,
+		"outFile", stdoutFile,
+		"out", func() string { s, _ := filez.ReadString(stdoutFile); return s },
+		"errFile", stderrFile,
+		"err", func() string { s, _ := filez.ReadString(stderrFile); return s })
+
+	start := time.Now()
+	var done bool
+	go func() {
+		for !done {
+			if time.Since(start) > timeout {
+				logger.Warn("timeout flushing", "suite", suite)
+				break
+			}
+			if _, err := os.Stat(doneFile); err == nil {
+				done = true
+				logger.Debug("done flushing", "suite", suite)
+			} else {
+				time.Sleep(RecordedFileFlushPeriod)
+			}
+			err = d.printers.flush(suite, true)
+			if err != nil {
+				panic(err)
+			}
+		}
+		f, err := os.Create(flushedFile)
+		if err != nil {
+			panic(err)
+		}
+		err = f.Close()
+		if err != nil {
+			panic(err)
+		}
+	}()
+	return nil
+}
+
+func (d *AsyncDisplay) BlockTail(suite string, timeout time.Duration) error {
+	// Tail suite async display until end
+	p := logger.PerfTimer("suite", suite)
+	defer p.End()
+
+	stdoutFile, stderrFile, _, flushedFile, err := repo.DaemonSuiteReportFilepathes(suite, d.token, d.isolation)
+	if err != nil {
+		return err
+	}
+
+	logger.Debug("tailing recorded outs", "suite", suite,
+		"outFile", stdoutFile,
+		"out", func() string { s, _ := filez.ReadString(stdoutFile); return s },
+		"errFile", stderrFile,
+		"err", func() string { s, _ := filez.ReadString(stderrFile); return s })
+
+	outR, errR, err := newFileReaders(stdoutFile, stderrFile)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		outR.Close()
+		errR.Close()
+	}()
+
+	start := time.Now()
+	var done bool
+	var outRead, errRead int64
+	for !done {
+		if time.Since(start) > timeout {
+			logger.Warn("timeout tailing", "suite", suite)
+			break
+		}
+		if _, err := os.Stat(flushedFile); err == nil {
+			done = true
+			logger.Debug("reached end of files", "suite", suite)
+		} else {
+			time.Sleep(RecordedFileTailPeriod)
+		}
+
+		buffer := make([]byte, 1024)
+		outR.Seek(outRead, 0)
+		errR.Seek(errRead, 0)
+
+		n, err := filez.Copy(outR, d.stdPrinter.Outputs().Out(), buffer)
+		if err != nil {
+			return err
+		}
+		outRead += n
+
+		n, err = filez.Copy(errR, d.stdPrinter.Outputs().Err(), buffer)
+		if err != nil {
+			return err
+		}
+		errRead += n
+
+		d.stdPrinter.Outputs().Flush()
+	}
+	return nil
+
+}
+
+func (d *AsyncDisplay) AsyncFlushAll(timeout time.Duration) error {
+	p := logger.PerfTimer()
+	defer p.End()
+	recordedSuites := d.printers.recordedSuites()
+	for _, suite := range recordedSuites {
+		// FIXME: bad timeout, should use suite timeout
+		err := d.AsyncFlush(suite, timeout)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (d *AsyncDisplay) BlockTailAll(timeout time.Duration) error {
+	p := logger.PerfTimer()
+	recordedSuites := d.printers.recordedSuites()
+	defer p.End("recordedSuites", recordedSuites)
+	for _, suite := range recordedSuites {
+		// FIXME: bad timeout, should use suite timeout
+		err := d.BlockTail(suite, timeout)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (d *AsyncDisplay) DisplayAllRecorded0(timeout time.Duration) (err error) {
 	p := logger.PerfTimer()
 	defer p.End()
 
@@ -426,7 +578,7 @@ func (d *asyncDisplay) DisplayAllRecorded() (err error) {
 	*/
 	recordedSuites := d.printers.recordedSuites()
 	for _, suite := range recordedSuites {
-		err = d.DisplayRecorded(suite)
+		err = d.DisplayRecorded0(suite, timeout)
 		if err != nil {
 			return
 		}
@@ -434,40 +586,45 @@ func (d *asyncDisplay) DisplayAllRecorded() (err error) {
 	return
 }
 
-func (d *asyncDisplay) StartDisplayRecorded(suite string) {
+func (d *AsyncDisplay) StartDisplayRecorded0(suite string, timeout time.Duration) {
+	logger.Debug("StartDisplayRecorded", "suite", suite)
 	d.done = make(chan error, 1)
 	// Launch suitepPrinters flush async
 	go func() {
-		err := d.DisplayRecorded(suite)
+		err := d.DisplayRecorded0(suite, timeout)
 		d.done <- err
 	}()
 }
 
-func (d *asyncDisplay) StartDisplayAllRecorded() {
+func (d *AsyncDisplay) StartDisplayAllRecorded0(timeout time.Duration) {
+	logger.Debug("StartDisplayAllRecorded")
 	d.done = make(chan error, 1)
 	// Launch suitepPrinters flush async
 	go func() {
-		err := d.DisplayAllRecorded()
+		err := d.DisplayAllRecorded0(timeout)
 		d.done <- err
 	}()
 }
 
-func (d *asyncDisplay) WaitDisplayRecorded() (err error) {
+func (d *AsyncDisplay) WaitDisplayRecorded0() (err error) {
+	logger.Debug("WaitDisplayRecorded")
+	p := logger.PerfTimer()
+	defer p.End()
 	err = <-d.done
 	return
 }
 
-func (d *asyncDisplay) StopDisplayRecorded(suite string) {
+func (d *AsyncDisplay) StopDisplayRecorded0(suite string) {
 	// Something to do ?
 }
 
-func (d *asyncDisplay) StopDisplayAllRecorded() {
+func (d *AsyncDisplay) StopDisplayAllRecorded0() {
 	// Something to do ?
 }
 
-func NewAsync(token, isolation string) *asyncDisplay {
+func NewAsync(token, isolation string) *AsyncDisplay {
 	p := printz.NewStandard()
-	d := &asyncDisplay{
+	d := &AsyncDisplay{
 		token:              token,
 		isolation:          isolation,
 		stdPrinter:         p,

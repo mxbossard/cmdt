@@ -60,16 +60,17 @@ Ideas:
 type daemon struct {
 	token, isolation string
 	repo             repo.Repo
+	display          *display.AsyncDisplay
 }
 
 func (d daemon) run() {
-	logger.Info("daemon: starting ...", "token", d.token)
+	logger.Info("daemon: starting ...", "token", d.token, "isolation", d.isolation)
 	startTime := time.Now()
 	debugTime := time.Now()
 	lastUnqueue := time.Now()
 
-	dpl := display.NewAsync(d.token, d.isolation)
-	service.Dpl = dpl
+	d.display = display.NewAsync(d.token, d.isolation)
+	service.Dpl = d.display
 
 	for {
 		if time.Since(debugTime) > time.Second {
@@ -152,6 +153,8 @@ func (d daemon) performTest(testDef model.TestDefinition) (exitCode int16) {
 func (d daemon) report(def model.ReportDefinition) (exitCode int16, err error) {
 	perf := logger.PerfTimer()
 	defer perf.End()
+	//d.display.DisplayRecorded(def.TestSuite, def.Config.Timeout.Get())
+	d.display.AsyncFlush(def.TestSuite, def.Config.Timeout.Get())
 	exitCode, err = service.ProcessReportDef(def)
 	return
 }
@@ -159,6 +162,8 @@ func (d daemon) report(def model.ReportDefinition) (exitCode int16, err error) {
 func (d daemon) reportAll(def model.ReportDefinition) (exitCode int16) {
 	perf := logger.PerfTimer()
 	defer perf.End()
+	//d.display.DisplayAllRecorded(def.Config.Timeout.Get())
+	d.display.AsyncFlushAll(def.Config.Timeout.Get())
 	exitCode = service.ProcessReportAllDef(def)
 	return
 }
@@ -191,8 +196,8 @@ func (d daemon) ClearPid() {
 }
 
 func TakeOver() {
-	//model.LoggerLevel.Set(slog.LevelDebug)
-	model.LoggerLevel.Set(slog.LevelInfo)
+	defaultLogLevel := slog.LevelDebug
+	model.LoggerLevel.Set(defaultLogLevel)
 
 	//logger.Warn("daemon: should I take over ?", "args", os.Args)
 	if len(os.Args) > 1 && os.Args[1] == "@_daemon" {
@@ -205,6 +210,7 @@ func TakeOver() {
 
 	zlog.ColoredConfig()
 	zlog.SetPart("daemon")
+	zlog.SetDefaultAppendingFileOutput(model.DefaultDebugDaemonLogFilepath)
 	token := os.Args[2]
 	isolation := os.Args[3]
 	debugLevel, err := strconv.Atoi(os.Args[4])
@@ -212,6 +218,8 @@ func TakeOver() {
 		panic("bad debug level")
 	}
 	zlog.SetLogLevelThreshold(slog.Level(debugLevel))
+
+	logger.Warn("daemon started", "pid", os.Getpid(), "token", token, "isolation", isolation, "debugLevel", debugLevel, "args", os.Args[1:])
 
 	repo := repo.New(token, isolation)
 	d := daemon{token: token, isolation: isolation, repo: &repo}
@@ -266,7 +274,7 @@ func TakeOver() {
 		logger = slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 	*/
 
-	logger.Info("daemon taking over", "pid", os.Getpid(), "cmd", os.Args)
+	logger.Info("daemon taking over", "pid", os.Getpid())
 
 	// Run daemon
 	d.run()
