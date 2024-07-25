@@ -57,7 +57,7 @@ func clearFileWriters(token, isol, suite string) error {
 	if err != nil {
 		panic(err)
 	}
-	logger.Info("removing recorder files", "outFile", outFile, "errFile", errFile, "doneFile", doneFile, "flushedFile", flushedFile)
+	logger.Info("removing recorder files", "token", token, "isol", isol, "suite", suite, "outFile", outFile, "errFile", errFile, "doneFile", doneFile, "flushedFile", flushedFile)
 
 	if _, err := os.Stat(outFile); err == nil {
 		err = os.Remove(outFile)
@@ -368,6 +368,10 @@ func (p *asyncPrinters) testEnded(suite string, seq int) {
 	if sp, ok := p.suitesPrinters[suite]; ok {
 		sp.testEnded(seq)
 	}
+}
+
+func (p *asyncPrinters) clear(suite string) {
+	delete(p.suitesPrinters, suite)
 }
 
 func (p *asyncPrinters) recordedSuites() (suites []string) {

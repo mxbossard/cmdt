@@ -19,7 +19,7 @@ import (
 
 func TestAsyncDisplay_TestStdout(t *testing.T) {
 	//t.Skip()
-	token := "foo"
+	token := "foo1"
 	isol := "bar1"
 	suite := "suite"
 	var err error
@@ -69,7 +69,7 @@ func TestAsyncDisplay_TestStdout(t *testing.T) {
 
 func TestAsyncDisplay_TestTitle(t *testing.T) {
 	//t.Skip()
-	token := "foo"
+	token := "foo2"
 	isol := "bar2"
 	var err error
 
@@ -183,8 +183,8 @@ func reportSuitePattern(suite int) string {
 
 func TestBlockTail(t *testing.T) {
 	//t.Skip()
-	token := "foo"
-	isol := "bar3"
+	token := "foo10"
+	isol := "bar10"
 	var err error
 
 	err = repo.ClearWorkDirectory(token, isol)
@@ -245,6 +245,187 @@ func TestBlockTail(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Empty(t, ansi.Unformat(outW.String()))
+	// Expect scénario to be oredred test1, test2, test4
+	scenarioRegexp := regexp.MustCompile("^" +
+		suiteInitRegexp(token, 1) +
+		testTitleRegexp(1, 1) +
+		testStdoutRegexp(1, 1) +
+		testStderrRegexp(1, 1) +
+		testTitleRegexp(1, 2) +
+		testStdoutRegexp(1, 2) +
+		testStderrRegexp(1, 2) +
+		testTitleRegexp(1, 4) +
+		testStdoutRegexp(1, 4) +
+		testStderrRegexp(1, 4) +
+		reportSuitePattern(1) +
+		"$")
+	assert.Regexp(t, scenarioRegexp, ansi.Unformat(errW.String()))
+
+}
+
+func TestBlockTail_Twice(t *testing.T) {
+	//t.Skip()
+	token := "foo12"
+	isol := "bar12"
+	var err error
+
+	err = repo.ClearWorkDirectory(token, isol)
+	require.NoError(t, err)
+
+	d := NewAsync(token, isol)
+	d.SetVerbose(model.SHOW_ALL)
+
+	// Replace stdPrinter std outputs by 2 string builders
+	outW := &strings.Builder{}
+	errW := &strings.Builder{}
+	d.stdPrinter = printz.New(printz.NewOutputs(outW, errW))
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	// Scénario: Writing on 3 suites in sync with test ran serial
+	// 100- Init suite1
+	// 110- Test suite1 #1
+	// 111- Test suite1 #1 out>
+	// 112- Test suite1 #1 err>
+	// 120- Test suite1 #2
+	// 121- Test suite1 #2 out>
+	// 122- Test suite1 #2 err>
+	// 130- Test suite1 #4
+	// 131- Test suite1 #4 out>
+	// 132- Test suite1 #4 err>
+	// 170- Report suite1
+
+	// Start 3 tests async/unordered
+	displaySuite(d, token, isol, 1) // 100- Init suite1
+
+	displayTestTitle(d, token, isol, 1, 1)
+	displayTestOut(d, token, isol, 1, 1)
+	displayTestErr(d, token, isol, 1, 1)
+	displayEndTest(d, token, isol, 1, 1)
+
+	displayReport(d, 1)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	require.NoError(t, err)
+	err = d.AsyncFlush("suite-1", 100*time.Millisecond)
+	require.NoError(t, err)
+	err = d.BlockTail("suite-1", 100*time.Millisecond)
+	require.NoError(t, err)
+
+	assert.Empty(t, ansi.Unformat(outW.String()))
+	// Expect scénario to be test1
+	scenarioRegexp := regexp.MustCompile("^" +
+		suiteInitRegexp(token, 1) +
+		testTitleRegexp(1, 1) +
+		testStdoutRegexp(1, 1) +
+		testStderrRegexp(1, 1) +
+		reportSuitePattern(1) +
+		"$")
+	assert.Regexp(t, scenarioRegexp, ansi.Unformat(errW.String()))
+
+	outW.Reset()
+	errW.Reset()
+
+	// Start 3 tests async/unordered
+	displaySuite(d, token, isol, 1) // 100- Init suite1
+
+	displayTestTitle(d, token, isol, 1, 2)
+	displayTestOut(d, token, isol, 1, 2)
+	displayTestErr(d, token, isol, 1, 2)
+	displayEndTest(d, token, isol, 1, 2)
+
+	displayReport(d, 1)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	require.NoError(t, err)
+	err = d.AsyncFlush("suite-1", 100*time.Millisecond)
+	require.NoError(t, err)
+	err = d.BlockTail("suite-1", 100*time.Millisecond)
+	require.NoError(t, err)
+
+	// Expect scénario to be test2
+	scenarioRegexp = regexp.MustCompile("^" +
+		suiteInitRegexp(token, 1) +
+		testTitleRegexp(1, 2) +
+		testStdoutRegexp(1, 2) +
+		testStderrRegexp(1, 2) +
+		reportSuitePattern(1) +
+		"$")
+	assert.Regexp(t, scenarioRegexp, ansi.Unformat(errW.String()))
+
+}
+
+func TestAsyncFlushThenDisplayThenBlockTail(t *testing.T) {
+	//t.Skip()
+	token := "foo20"
+	isol := "bar20"
+	var err error
+
+	err = repo.ClearWorkDirectory(token, isol)
+	require.NoError(t, err)
+
+	d := NewAsync(token, isol)
+	d.SetVerbose(model.SHOW_ALL)
+
+	// Replace stdPrinter std outputs by 2 string builders
+	outW := &strings.Builder{}
+	errW := &strings.Builder{}
+	d.stdPrinter = printz.New(printz.NewOutputs(outW, errW))
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	// Scénario: Writing on 3 suites in sync with test ran serial
+	// 100- Init suite1
+	// 110- Test suite1 #1
+	// 111- Test suite1 #1 out>
+	// 112- Test suite1 #1 err>
+	// 120- Test suite1 #2
+	// 121- Test suite1 #2 out>
+	// 122- Test suite1 #2 err>
+	// 130- Test suite1 #4
+	// 131- Test suite1 #4 out>
+	// 132- Test suite1 #4 err>
+	// 170- Report suite1
+
+	//d.Clear("suite-1")
+
+	// Start 3 tests async/unordered
+	displaySuite(d, token, isol, 1) // 100- Init suite1
+
+	// Simulate outputs sent disordered
+	displayTestTitle(d, token, isol, 1, 1)
+	displayTestOut(d, token, isol, 1, 1)
+	displayTestErr(d, token, isol, 1, 1)
+	displayEndTest(d, token, isol, 1, 1)
+
+	err = d.AsyncFlush("suite-1", 100*time.Millisecond)
+	require.NoError(t, err)
+
+	displayTestTitle(d, token, isol, 1, 4)
+	displayTestOut(d, token, isol, 1, 4)
+	displayTestErr(d, token, isol, 1, 4)
+	displayEndTest(d, token, isol, 1, 4)
+
+	displayTestTitle(d, token, isol, 1, 2)
+	displayTestOut(d, token, isol, 1, 2)
+	displayTestErr(d, token, isol, 1, 2)
+	displayEndTest(d, token, isol, 1, 2)
+
+	displayReport(d, 1)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	err = d.BlockTail("suite-1", 100*time.Millisecond)
+	require.NoError(t, err)
+
+	assert.Empty(t, ansi.Unformat(outW.String()))
 	// Expect scénario to be oredred test1, test2, test3
 	scenarioRegexp := regexp.MustCompile("^" +
 		suiteInitRegexp(token, 1) +
@@ -265,8 +446,8 @@ func TestBlockTail(t *testing.T) {
 
 func TestBlockTailAll(t *testing.T) {
 	//t.Skip()
-	token := "foo"
-	isol := "bar3"
+	token := "foo30"
+	isol := "bar30"
 	var err error
 
 	err = repo.ClearWorkDirectory(token, isol)
@@ -351,8 +532,8 @@ func TestBlockTailAll(t *testing.T) {
 
 func TestAsyncFlushAllThenDisplayThenBlockTailAll(t *testing.T) {
 	//t.Skip()
-	token := "foo"
-	isol := "bar3"
+	token := "foo40"
+	isol := "bar40"
 	var err error
 
 	err = repo.ClearWorkDirectory(token, isol)
@@ -442,8 +623,8 @@ func TestAsyncFlushAllThenDisplayThenBlockTailAll(t *testing.T) {
 
 func TestAsyncDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 	//t.Skip()
-	token := "foo"
-	isol := "bar3"
+	token := "foo50"
+	isol := "bar50"
 	var err error
 
 	err = repo.ClearWorkDirectory(token, isol)
@@ -578,8 +759,8 @@ func TestAsyncDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 
 func TestAsyncDisplayUsage_AsyncSuitesSerialTests(t *testing.T) {
 	//t.Skip()
-	token := "foo"
-	isol := "bar4"
+	token := "foo60"
+	isol := "bar60"
 
 	var err error
 	err = repo.ClearWorkDirectory(token, isol)
@@ -725,8 +906,8 @@ func TestAsyncDisplayUsage_AsyncSuitesSerialTests(t *testing.T) {
 
 func TestAsyncDisplayUsage_AsyncSuitesAsyncTests(t *testing.T) {
 	//t.Skip()
-	token := "foo"
-	isol := "bar5"
+	token := "foo70"
+	isol := "bar70"
 
 	var err error
 	err = repo.ClearWorkDirectory(token, isol)

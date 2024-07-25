@@ -56,12 +56,6 @@ func (d AsyncDisplay) Suite(ctx facade.SuiteContext) {
 
 	suite := ctx.Config.TestSuite.Get()
 
-	// Clear files on suite init
-	err := clearFileWriters(d.token, d.isolation, suite)
-	if err != nil {
-		panic(err)
-	}
-
 	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
 
 		printer := d.printers.printer(suite, 0)
@@ -429,6 +423,13 @@ func (d *AsyncDisplay) DisplayRecorded0(suite string, timeout time.Duration) err
 	return nil
 }
 
+func (d *AsyncDisplay) Clear(suite string) error {
+	// Clear files on suite init
+	d.printers.clear(suite)
+	err := clearFileWriters(d.token, d.isolation, suite)
+	return err
+}
+
 func (d *AsyncDisplay) AsyncFlush(suite string, timeout time.Duration) error {
 	// Launch goroutine wich will continuously flush suite async display
 	p := logger.PerfTimer("suite", suite)
@@ -492,15 +493,6 @@ func (d *AsyncDisplay) BlockTail(suite string, timeout time.Duration) error {
 		"errFile", stderrFile,
 		"err", func() string { s, _ := filez.ReadString(stderrFile); return s })
 
-	outR, errR, err := newFileReaders(stdoutFile, stderrFile)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		outR.Close()
-		errR.Close()
-	}()
-
 	start := time.Now()
 	var done bool
 	var outRead, errRead int64
@@ -517,6 +509,16 @@ func (d *AsyncDisplay) BlockTail(suite string, timeout time.Duration) error {
 		}
 
 		buffer := make([]byte, 1024)
+
+		outR, errR, err := newFileReaders(stdoutFile, stderrFile)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			outR.Close()
+			errR.Close()
+		}()
+
 		outR.Seek(outRead, 0)
 		errR.Seek(errRead, 0)
 
@@ -532,6 +534,8 @@ func (d *AsyncDisplay) BlockTail(suite string, timeout time.Duration) error {
 		}
 		errRead += n
 
+		outR.Close()
+		errR.Close()
 		d.stdPrinter.Outputs().Flush()
 	}
 	return nil

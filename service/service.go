@@ -54,6 +54,11 @@ func InitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	exitCode = 0
 	cfg := ctx.Config
 
+	if cfg.Async.Is(true) {
+		asyncDpl := display.NewAsync(cfg.Token.Get(), cfg.Isol.Get())
+		asyncDpl.Clear(cfg.TestSuite.Get())
+	}
+
 	var token string
 	if cfg.PrintToken.Is(true) {
 		token, err = utils.ForgeUuid()
@@ -358,7 +363,9 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		logger.Trace("Forged context", "ctx", suiteCtx)
 		logger.Info("Processing init action", "token", token)
 		Dpl.Quiet(suiteCtx.Config.Quiet.Is(true))
+
 		exitCode, err = InitTestSuite(suiteCtx)
+
 	case model.ReportAction:
 		// Report can be async (run by daemon) or not
 		// Report can wait (for termination) or not
@@ -409,6 +416,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 
 				asyncDpl := display.NewAsync(token, isolation)
 				//asyncDpl.StartDisplayAllRecorded(globalCtx.Config.SuiteTimeout.Get())
+
 				asyncDpl.BlockTailAll(globalCtx.Config.SuiteTimeout.Get())
 
 				// // Daemon must be off or No test remaining in suite queue
