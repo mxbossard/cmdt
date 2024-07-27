@@ -163,6 +163,49 @@ func TestParseArgs(t *testing.T) {
 	assert.Equal(t, "foo", cfg.TestName.Get())
 	assert.Len(t, assertions, 1)
 
+	// Use prefix in rule value
+	cfg, assertions, agg = ParseArgs("@", []string{"@fail", "@stderr:@foo", "false"})
+	require.NoError(t, agg.Return())
+	assert.Equal(t, []string{"false"}, cfg.CmdAndArgs)
+	assert.Len(t, assertions, 2)
+	assert.Equal(t, "fail", assertions[0].Name)
+	assert.Equal(t, "stderr", assertions[1].Name)
+	assert.Equal(t, "@foo", assertions[1].Expected)
+
+}
+
+func TestParseArgsStopper(t *testing.T) {
+	var cfg model.Config
+	var assertions []model.Assertion
+	var agg errorz.Aggregated
+
+	// args after stopper should not interpreted and treated as command
+	cfg, assertions, agg = ParseArgs("@", []string{"@--", "foo", "bar", "baz"})
+	require.NoError(t, agg.Return())
+	assert.Equal(t, []string{"foo", "bar", "baz"}, cfg.CmdAndArgs)
+	assert.Len(t, assertions, 1)
+	assert.Equal(t, "success", assertions[0].Name)
+
+	cfg, assertions, agg = ParseArgs("@", []string{"@fail", "@--", "foo", "bar", "baz"})
+	require.NoError(t, agg.Return())
+	assert.Equal(t, []string{"foo", "bar", "baz"}, cfg.CmdAndArgs)
+	assert.Len(t, assertions, 1)
+	assert.Equal(t, "fail", assertions[0].Name)
+
+	cfg, assertions, agg = ParseArgs("@", []string{"@--", "foo", "bar", "baz", "@fail"})
+	require.NoError(t, agg.Return())
+	assert.Equal(t, []string{"foo", "bar", "baz", "@fail"}, cfg.CmdAndArgs)
+	assert.Len(t, assertions, 1)
+	assert.Equal(t, "success", assertions[0].Name)
+
+	cfg, assertions, agg = ParseArgs("@", []string{"@fail", "@--", "foo", "bar", "baz", "@notExists"})
+	require.NoError(t, agg.Return())
+	assert.Equal(t, []string{"foo", "bar", "baz", "@notExists"}, cfg.CmdAndArgs)
+	assert.Len(t, assertions, 1)
+	assert.Equal(t, "fail", assertions[0].Name)
+
+	_, _, agg = ParseArgs("@", []string{"@fail", "@notExists", "@--", "foo", "bar", "baz"})
+	require.Error(t, agg.Return())
 }
 
 func buildRule(name, op string) (r model.Rule) {

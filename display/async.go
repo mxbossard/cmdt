@@ -26,6 +26,10 @@ var (
 	logger = zlog.New()
 )
 
+func testDisplayerKey(ctx facade.TestContext) string {
+	return fmt.Sprintf("%s//%d", ctx.Config.TestSuite, ctx.Seq)
+}
+
 type AsyncDisplay struct {
 	token, isolation   string
 	printers           *asyncPrinters
@@ -36,6 +40,7 @@ type AsyncDisplay struct {
 	verbose            model.VerboseLevel
 	quiet              bool
 	done               chan error
+	openedTests        map[string]testDisplayer
 }
 
 func (d AsyncDisplay) Global(ctx facade.GlobalContext) {
@@ -47,6 +52,11 @@ func (d AsyncDisplay) Global(ctx facade.GlobalContext) {
 		printer := d.printers.printer("", 0)
 		printer.ColoredErrf(messageColor, "## New config (token: %s)\n", ctx.Token)
 	}
+}
+
+func (d AsyncDisplay) Fatal(v ...any) {
+	fmt.Fprintln(os.Stderr, v...)
+	os.Exit(1)
 }
 
 func (d AsyncDisplay) Suite(ctx facade.SuiteContext) {
@@ -63,7 +73,33 @@ func (d AsyncDisplay) Suite(ctx facade.SuiteContext) {
 	}
 }
 
+func (d AsyncDisplay) OpenTest(ctx facade.TestContext) testDisplayer {
+	seq := ctx.Seq
+	cfg := ctx.Config
+	printer := d.printers.printer(cfg.TestSuite.Get(), int(seq))
+	bufPrinter := printz.Buffered(printer)
+	bufNotQuietPrinter := printz.Buffered(printer)
+	td := basicTestDisplayer{
+		dpl:                &d,
+		ctx:                ctx,
+		printer:            printer,
+		bufPrinter:         bufPrinter,
+		bufNotQuietPrinter: bufNotQuietPrinter,
+		outFormatter:       d.outFormatter,
+		errFormatter:       d.errFormatter,
+	}
+	key := testDisplayerKey(ctx)
+	d.openedTests[key] = &td
+	logger.Debug("opened test", "openedTests", d.openedTests)
+	return &td
+}
+
 func (d AsyncDisplay) TestTitle(ctx facade.TestContext) {
+	key := testDisplayerKey(ctx)
+	d.openedTests[key].Title(ctx)
+}
+
+func (d AsyncDisplay) TestTitle0(ctx facade.TestContext) {
 	if d.quiet {
 		return
 	}
@@ -106,6 +142,11 @@ func (d AsyncDisplay) TestTitle(ctx facade.TestContext) {
 }
 
 func (d AsyncDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutcome) {
+	key := testDisplayerKey(ctx)
+	d.openedTests[key].Outcome(outcome)
+}
+
+func (d AsyncDisplay) TestOutcome0(ctx facade.TestContext, outcome model.TestOutcome) {
 	if d.quiet {
 		return
 	}
@@ -173,6 +214,11 @@ func (d AsyncDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutc
 }
 
 func (d AsyncDisplay) TestStdout(ctx facade.TestContext, s string) {
+	key := testDisplayerKey(ctx)
+	d.openedTests[key].Stdout(s)
+}
+
+func (d AsyncDisplay) TestStdout0(ctx facade.TestContext, s string) {
 	if s != "" {
 		printer := d.printers.printer(ctx.Config.TestSuite.Get(), int(ctx.Seq))
 		printer.Err(d.outFormatter.Format(s))
@@ -180,17 +226,26 @@ func (d AsyncDisplay) TestStdout(ctx facade.TestContext, s string) {
 }
 
 func (d AsyncDisplay) TestStderr(ctx facade.TestContext, s string) {
+	key := testDisplayerKey(ctx)
+	d.openedTests[key].Stderr(s)
+}
+
+func (d AsyncDisplay) TestStderr0(ctx facade.TestContext, s string) {
 	if s != "" {
 		printer := d.printers.printer(ctx.Config.TestSuite.Get(), int(ctx.Seq))
 		printer.Err(d.errFormatter.Format(s))
 	}
 }
 
-func (d AsyncDisplay) EndTest(ctx facade.TestContext) {
+func (d AsyncDisplay) CloseTest(ctx facade.TestContext) {
 	// report end of test to suite printer
 	suite := ctx.Config.TestSuite.Get()
 	seq := int(ctx.Seq)
 	d.printers.testEnded(suite, seq)
+
+	key := testDisplayerKey(ctx)
+	d.openedTests[key].Close()
+	delete(d.openedTests, key)
 }
 
 func (d AsyncDisplay) assertionResult(printer printz.Printer, result model.AssertionResult) {
@@ -269,7 +324,7 @@ func (d AsyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 	// }
 
 	//printer := d.stdPrinter // Do not print async
-	printer := d.printers.printer(testSuite, 99)
+	printer := d.printers.printer(testSuite, -1)
 
 	ignoredMessage := ""
 	if ignoredCount > 0 {
@@ -347,11 +402,40 @@ func (d AsyncDisplay) TooMuchFailures(ctx facade.SuiteContext, testSuite string)
 	printer.ColoredErrf(warningColor, "Too much failure for [%s] test suite. Stop testing.\n", testSuite)
 }
 
-func (d AsyncDisplay) Error(err error) {
+func (d AsyncDisplay) Errors(errors ...error) {
+	//  An Error cannot be Fatal
+	printer := printz.NewStandard()
+	for _, err := range errors {
+		printer.ColoredErrf(errorColor, "ERROR: %s\n", err)
+	}
+}
 
+func (d AsyncDisplay) GlobalErrors(ctx facade.GlobalContext, errors ...error) {
+	p := d.printers.printer("", 0)
+	for _, err := range errors {
+		p.ColoredErrf(errorColor, "ERROR: %s\n", err)
+	}
+}
+
+func (d AsyncDisplay) SuiteErrors(ctx facade.SuiteContext, errors ...error) {
+	suite := ctx.Config.TestSuite.Get()
+	p := d.printers.printer(suite, 0)
+	for _, err := range errors {
+		p.ColoredErrf(errorColor, "ERROR: %s\n", err)
+	}
+}
+
+func (d AsyncDisplay) TestErrors(ctx facade.TestContext, errors ...error) {
+	key := testDisplayerKey(ctx)
+	if td, ok := d.openedTests[key]; ok {
+		td.Errors(errors...)
+	} else {
+		d.SuiteErrors(ctx.SuiteContext, errors...)
+	}
 }
 
 func (d AsyncDisplay) Flush() error {
+	// TODO ?
 	return nil
 }
 
@@ -449,6 +533,9 @@ func (d *AsyncDisplay) AsyncFlush(suite string, timeout time.Duration) error {
 	start := time.Now()
 	var done bool
 	go func() {
+		// Clear suite after flush to ensure only one flush
+		defer d.printers.clear(suite)
+
 		for !done {
 			if time.Since(start) > timeout {
 				logger.Warn("timeout flushing", "suite", suite)
@@ -628,6 +715,7 @@ func (d *AsyncDisplay) StopDisplayAllRecorded0() {
 
 func NewAsync(token, isolation string) *AsyncDisplay {
 	p := printz.NewStandard()
+	openedTests := make(map[string]testDisplayer, 0)
 	d := &AsyncDisplay{
 		token:              token,
 		isolation:          isolation,
@@ -638,6 +726,7 @@ func NewAsync(token, isolation string) *AsyncDisplay {
 		verbose:            model.DefaultVerboseLevel,
 		quiet:              false,
 		printers:           newAsyncPrinters(token, isolation, nil, nil),
+		openedTests:        openedTests,
 	}
 	return d
 }

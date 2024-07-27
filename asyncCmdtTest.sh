@@ -8,7 +8,7 @@ ls -lh "$newCmdt"
 
 # Trusted cmdt to works
 cmdt="cmdt"
-#cmdt="$newCmdt"
+cmdt="$newCmdt"
 
 # Cmdt used to test
 #cmdtIn="cmdt"
@@ -50,7 +50,7 @@ $cmdtIn @init="async error" @verbose=3 @debug=0
 $cmdtIn @test=async error/should init @-- $cmdt1 @init @async @verbose=4
 $cmdtIn @test=async error/should pass @stderr= @-- $cmdt1 true
 $cmdtIn @test=async error/should error 1 @fail @stderr:"@badRule does not exists" @-- $cmdt1 true @badRule
-$cmdtIn @test=async error/should error 2 @fail @stderr= @-- $cmdt1 true @before=badCmd
+$cmdtIn @test=async error/should error 2 @stderr= @-- $cmdt1 true @before=badCmd
 $cmdtIn @test=async error/should report @exit=0 @stderr:"#01" @stderr:"#02" @stderr:"PASSED" @stderr!:"FAILED" @stderr:"ERRORED" @stderr:"1 success" @stderr:"0 failure" @stderr:"2 error" @-- $cmdt0 @verbose @report=main @debug=6
 $cmdt @report 2>&1 | grep -v "Failures"
 

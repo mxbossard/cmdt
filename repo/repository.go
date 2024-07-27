@@ -128,6 +128,7 @@ func forgeWorkDirectoryPath(token, isol string) (tempDirPath string, err error) 
 
 func ClearWorkDirectory(token, isol string) (err error) {
 	dir, err := forgeWorkDirectoryPath(token, isol)
+	logger.Debug("ClearWorkDirectory()", "dir", dir, "token", token, "isolation", isol)
 	if err != nil {
 		return
 	}

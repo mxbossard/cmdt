@@ -19,9 +19,10 @@ import (
 )
 
 var (
-	Dpl    display.Displayer
 	logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 )
+
+var Dpl display.Displayer
 
 func init() {
 	Dpl = display.New()
@@ -77,9 +78,7 @@ func InitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	}
 
 	err = ctx.InitSuite()
-	if err != nil {
-		ctx.NoErrorOrFatal(err)
-	}
+	ProcessSuiteError(ctx, err)
 
 	Dpl.Suite(ctx)
 	return
@@ -190,16 +189,15 @@ func ProcessReportDef(def model.ReportDefinition) (exitCode int16, err error) {
 func PerformTest(testDef model.TestDefinition) (exitCode int16, err error) {
 	exitCode = 1
 	cfg := testDef.Config
-	ctx := facade.NewTestContext2(testDef)
+	ctx, err := facade.NewTestContext2(testDef)
+	ProcessTestError(ctx, err)
 	seq := testDef.Seq
-
-	defer Dpl.EndTest(ctx)
 
 	Dpl.TestTitle(ctx)
 
 	if cfg.Ignore.Is(true) {
 		ctx.IncrementIgnoredCount()
-		oc := ctx.IgnoredTestOutcome(seq)
+		oc := ctx.IgnoredTestOutcome()
 		ctx.Repo.SaveTestOutcome(oc)
 		Dpl.TestOutcome(ctx, oc)
 		exitCode = 0
@@ -207,7 +205,7 @@ func PerformTest(testDef model.TestDefinition) (exitCode int16, err error) {
 	}
 
 	err = ctx.ConfigMocking()
-	ctx.NoErrorOrFatal(err)
+	ProcessTestError(ctx, err)
 
 	for _, before := range cfg.Before {
 		cmdBefore := cmdz.Cmd(before...)
@@ -226,7 +224,8 @@ func PerformTest(testDef model.TestDefinition) (exitCode int16, err error) {
 		err = agg.Return()
 		return
 	}
-	outcome := ctx.AssertCmdExecBlocking(seq, assertions)
+	outcome, err := ctx.AssertCmdExecBlocking(seq, assertions)
+	ProcessTestError(ctx, err)
 
 	Dpl.TestOutcome(ctx, outcome)
 
@@ -255,7 +254,12 @@ func ProcessTestDef(testDef model.TestDefinition) (exitCode int16) {
 	//token := testDef.Token
 	testSuite := testDef.TestSuite
 	testCfg := testDef.Config
-	testCtx := facade.NewTestContext2(testDef)
+	testCtx, err := facade.NewTestContext2(testDef)
+
+	Dpl.OpenTest(testCtx)
+	defer Dpl.CloseTest(testCtx)
+
+	ProcessTestError(testCtx, err)
 
 	tooMuchFailures := testCtx.ProcessTooMuchFailures()
 
@@ -268,34 +272,33 @@ func ProcessTestDef(testDef model.TestDefinition) (exitCode int16) {
 		return
 	}
 
-	var err error
 	if !utils.IsWithinContainer() && (testCfg.ContainerDisabled.Is(true) || testCfg.ContainerImage.IsEmpty()) && len(testCfg.RootMocks) > 0 {
 		err = fmt.Errorf("cannot mock absolute path outside a container")
-		testCtx.NoErrorOrFatal(err)
+		ProcessTestError(testCtx, err)
 	}
 
 	Dpl.Quiet(testCfg.Quiet.Is(true))
 	if testCfg.ContainerDisabled.Is(true) || testCfg.ContainerImage.IsEmpty() {
 		logger.Debug("Performing test outside container", "image", testCfg.ContainerImage, "containerDisabled", testCfg.ContainerDisabled, "testConfig", testCfg)
 		exitCode, err = PerformTest(testDef)
-		testCtx.NoErrorOrFatal(err)
+		ProcessTestError(testCtx, err)
 	} else {
 		logger.Info("Performing test inside container", "image", testCfg.ContainerImage, "containeriId", testCfg.ContainerId, "testConfig", testCfg)
 		var ctId string
 		ctId, exitCode, err = PerformTestInContainer(testCtx)
-		testCtx.NoErrorOrFatal(err)
+		ProcessTestError(testCtx, err)
 		if testCfg.ContainerScope.Is(model.GLOBAL_SCOPE) {
 			globalCfg, err2 := testCtx.Repo.GetGlobalConfig()
-			testCtx.NoErrorOrFatal(err2)
+			ProcessTestError(testCtx, err2)
 			globalCfg.ContainerId.Set(ctId)
 			err2 = testCtx.Repo.SaveGlobalConfig(globalCfg)
-			testCtx.NoErrorOrFatal(err2)
+			ProcessTestError(testCtx, err2)
 		} else if testCfg.ContainerScope.Is(model.SUITE_SCOPE) {
 			suiteCfg, err2 := testCtx.Repo.GetSuiteConfig(testSuite, true)
-			testCtx.NoErrorOrFatal(err2)
+			ProcessTestError(testCtx, err2)
 			suiteCfg.ContainerId.Set(ctId)
 			err2 = testCtx.Repo.SaveSuiteConfig(suiteCfg)
-			testCtx.NoErrorOrFatal(err2)
+			ProcessTestError(testCtx, err2)
 		}
 		//testCtx.NoErrorOrFatal(err)
 	}
@@ -349,7 +352,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			errorz.Fatal(agg)
 		}
 		globalCtx := facade.NewGlobalContext(token, isolation, inputConfig)
-		globalCtx.NoErrorOrFatal(agg.Return())
+		ProcessGlobalError(globalCtx, agg.Return())
 		Dpl.SetVerbose(globalCtx.Config.Verbose.Get())
 		logger.Trace("Forged context", "ctx", globalCtx)
 		logger.Info("Processing global action", "token", token)
@@ -358,7 +361,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 	case model.InitAction:
 		testSuite := inputConfig.TestSuite.Get()
 		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig)
-		suiteCtx.NoErrorOrFatal(agg.Return())
+		ProcessSuiteError(suiteCtx, agg.Return())
 		Dpl.SetVerbose(suiteCtx.Config.Verbose.Get())
 		logger.Trace("Forged context", "ctx", suiteCtx)
 		logger.Info("Processing init action", "token", token)
@@ -447,7 +450,8 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			// Reporting One test suite
 			testSuite := inputConfig.TestSuite.Get()
 			suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig)
-			suiteCtx.NoErrorOrFatal(agg.Return())
+			ProcessSuiteError(suiteCtx, agg.Return())
+
 			Dpl.SetVerbose(suiteCtx.Config.Verbose.Get())
 
 			def := model.ReportDefinition{
@@ -483,7 +487,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				}
 				op := model.ReportOperation(testSuite, true, def) // FIXME should not block if test can be run simultaneously
 				err = suiteCtx.Repo.QueueOperation(&op)
-				suiteCtx.NoErrorOrFatal(err)
+				ProcessSuiteError(suiteCtx, err)
 
 				if suiteCtx.Config.Wait.Is(true) {
 					wait = func() int16 {
@@ -511,7 +515,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			} else {
 				//exitCode, err = ReportTestSuite(suiteCtx)
 				exitCode, err = ProcessReportDef(def)
-				suiteCtx.NoErrorOrFatal(err)
+				ProcessSuiteError(suiteCtx, err)
 				suiteCtx.Repo.Done(&op)
 			}
 
@@ -519,11 +523,12 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 	case model.TestAction:
 		testSuite := inputConfig.TestSuite.Get()
 		ppid := uint32(utils.ReadEnvPpid())
-		testCtx := facade.NewTestContext(token, isolation, testSuite, 0, inputConfig, ppid)
+		testCtx, err := facade.NewTestContext(token, isolation, testSuite, 0, inputConfig, ppid)
+		ProcessTestError(testCtx, err)
 		testCtx.IncrementTestCount()
 		Dpl.SetVerbose(testCtx.Config.Verbose.Get())
 		seq := testCtx.Seq
-		testCtx.NoErrorOrFatal(agg.Return())
+		ProcessTestError(testCtx, agg.Return())
 		testCfg := testCtx.Config
 		token = testCtx.Token
 		logger.Trace("Forged context", "ctx", testCtx)
@@ -554,7 +559,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			logger.Info("executing test async (queueing test)", "suite", testSuite, "seq", seq)
 			testOp := model.TestOperation(testSuite, seq, true, testDef) // FIXME should not block if test can be run simultaneously
 			err = testCtx.Repo.QueueOperation(&testOp)
-			testCtx.NoErrorOrFatal(err)
+			ProcessTestError(testCtx, err)
 
 			if testCfg.Wait.Is(true) {
 				wait = func() int16 {
@@ -581,4 +586,39 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		errorz.Fatal(inputConfig.TestSuite, inputConfig.Token, err)
 	}
 	return
+}
+
+func ProcessGlobalError(ctx facade.GlobalContext, err error) {
+	if err != nil {
+		ctx.Config.TestSuite.IfPresent(func(testSuite string) error {
+			ctx.Repo.UpdateLastTestTime(testSuite)
+			//Dpl.Error(err)
+			return nil
+		})
+		//Dpl.Error(err)
+	}
+}
+
+func ProcessSuiteError(ctx facade.SuiteContext, err error) {
+	if err != nil {
+		ctx.Config.TestSuite.IfPresent(func(testSuite string) error {
+			ctx.IncrementErroredCount()
+			return nil
+		})
+	}
+	ProcessGlobalError(ctx.GlobalContext, err)
+}
+
+func ProcessTestError(ctx facade.TestContext, err error) {
+	if err != nil {
+		outcome := model.NewTestOutcome2(ctx.Config, ctx.Seq)
+		outcome.Outcome = model.ERRORED
+		outcome.Err = err
+		err2 := ctx.Repo.SaveTestOutcome(outcome)
+		if err2 != nil {
+			logger.Error("unable to save errored test outcome", "error", err2)
+		}
+	}
+	ProcessSuiteError(ctx.SuiteContext, err)
+	Dpl.TestErrors(ctx, err)
 }

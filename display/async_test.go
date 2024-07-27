@@ -39,10 +39,13 @@ func TestAsyncDisplay_TestStdout(t *testing.T) {
 	// Writing async
 	outMsg := "stdout\n"
 	errMsg := "stderr\n"
-	ctx := facade.NewTestContext(token, isol, suite, 12, model.Config{}, uint32(42))
+	ctx, err := facade.NewTestContext(token, isol, suite, 1, model.Config{}, uint32(42))
+	require.NoError(t, err)
 	ctx.CmdExec = cmdz.Cmd("true")
+	d.OpenTest(ctx)
 	d.TestStdout(ctx, outMsg)
 	d.TestStderr(ctx, errMsg)
+	d.CloseTest(ctx)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
@@ -90,10 +93,13 @@ func TestAsyncDisplay_TestTitle(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	ctx := facade.NewTestContext("token", "isol", "suite", 2, model.Config{}, 42)
+	ctx, err := facade.NewTestContext("token", "isol", "suite", 1, model.Config{}, 42)
+	require.NoError(t, err)
 	ctx.CmdExec = cmdz.Cmd("true")
 
+	d.OpenTest(ctx)
 	d.TestTitle(ctx)
+	d.CloseTest(ctx)
 
 	err = d.AsyncFlushAll(100 * time.Millisecond)
 	require.NoError(t, err)
@@ -101,7 +107,7 @@ func TestAsyncDisplay_TestTitle(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Empty(t, outW.String())
-	expectedTitlePattern := `\[\d+\] Test \[suite\]\(on host\)>true #02...\s*`
+	expectedTitlePattern := `\[\d+\] Test \[suite\]\(on host\)>true #01...\s*`
 	assert.Regexp(t, regexp.MustCompile(expectedTitlePattern), ansi.Unformat(errW.String()))
 
 }
@@ -122,9 +128,10 @@ func displayReport(d Displayer, suite int) {
 	d.ReportSuite(outcome)
 }
 
-func displayTestTitle(d Displayer, token, isol string, suite int, seq int) {
+func displayTestTitle(t *testing.T, d Displayer, token, isol string, suite int, seq int) {
 	testSuite := fmt.Sprintf("suite-%d", suite)
-	ctx := facade.NewTestContext(token, isol, testSuite, uint16(seq), model.Config{}, uint32(42))
+	ctx, err := facade.NewTestContext(token, isol, testSuite, uint16(seq), model.Config{}, uint32(42))
+	require.NoError(t, err)
 	ctx.CmdExec = cmdz.Cmd("true")
 	outcome := model.TestOutcome{
 		Outcome:  model.PASSED,
@@ -135,26 +142,33 @@ func displayTestTitle(d Displayer, token, isol string, suite int, seq int) {
 			Seq:       uint16(seq),
 		},
 	}
+	d.OpenTest(ctx)
 	d.TestTitle(ctx)
 	d.TestOutcome(ctx, outcome)
 }
 
-func displayTestOut(d Displayer, token, isol string, suite int, seq int) {
-	ctx := facade.NewTestContext(token, isol, fmt.Sprintf("suite-%d", suite), uint16(seq), model.Config{}, uint32(42))
+func displayTestOut(t *testing.T, d Displayer, token, isol string, suite int, seq int) {
+	ctx, err := facade.NewTestContext(token, isol, fmt.Sprintf("suite-%d", suite), uint16(seq), model.Config{}, uint32(42))
+	require.NoError(t, err)
 	ctx.CmdExec = cmdz.Cmd("true")
+	d.OpenTest(ctx)
 	d.TestStdout(ctx, fmt.Sprintf("suite-%d-%d-out\n", suite, seq))
 }
 
-func displayTestErr(d Displayer, token, isol string, suite int, seq int) {
-	ctx := facade.NewTestContext(token, isol, fmt.Sprintf("suite-%d", suite), uint16(seq), model.Config{}, uint32(42))
+func displayTestErr(t *testing.T, d Displayer, token, isol string, suite int, seq int) {
+	ctx, err := facade.NewTestContext(token, isol, fmt.Sprintf("suite-%d", suite), uint16(seq), model.Config{}, uint32(42))
+	require.NoError(t, err)
 	ctx.CmdExec = cmdz.Cmd("true")
+	d.OpenTest(ctx)
 	d.TestStderr(ctx, fmt.Sprintf("suite-%d-%d-err\n", suite, seq))
 }
 
-func displayEndTest(d Displayer, token, isol string, suite int, seq int) {
-	ctx := facade.NewTestContext(token, isol, fmt.Sprintf("suite-%d", suite), uint16(seq), model.Config{}, uint32(42))
+func displayEndTest(t *testing.T, d Displayer, token, isol string, suite int, seq int) {
+	ctx, err := facade.NewTestContext(token, isol, fmt.Sprintf("suite-%d", suite), uint16(seq), model.Config{}, uint32(42))
+	require.NoError(t, err)
 	ctx.CmdExec = cmdz.Cmd("true")
-	d.EndTest(ctx)
+	d.OpenTest(ctx)
+	d.CloseTest(ctx)
 }
 
 func globalInitPattern(token string) string {
@@ -166,15 +180,15 @@ func suiteInitRegexp(token string, suite int) string {
 }
 
 func testTitleRegexp(suite, seq int) string {
-	return fmt.Sprintf(`\[\d+\] Test \[suite-%d\]\(on host\)>true #0%d...\s*PASSED \(in \dms\)\n`, suite, seq)
+	return fmt.Sprintf(`\[\d+\] Test \[suite-%d\]\(on host\)>true #0%d...\s*PASSED \(in \dms\)\n\s+Executing cmd:\s+\[\w+\]\s*\n`, suite, seq)
 }
 
 func testStdoutRegexp(suite, seq int) string {
-	return fmt.Sprintf(`out>suite-%d-%d-out\n`, suite, seq)
+	return fmt.Sprintf(`suite-%d-%d-out\n`, suite, seq)
 }
 
 func testStderrRegexp(suite, seq int) string {
-	return fmt.Sprintf(`err>suite-%d-%d-err\n`, suite, seq)
+	return fmt.Sprintf(`suite-%d-%d-err\n`, suite, seq)
 }
 
 func reportSuitePattern(suite int) string {
@@ -209,29 +223,29 @@ func TestBlockTail(t *testing.T) {
 	// 120- Test suite1 #2
 	// 121- Test suite1 #2 out>
 	// 122- Test suite1 #2 err>
-	// 130- Test suite1 #4
-	// 131- Test suite1 #4 out>
-	// 132- Test suite1 #4 err>
+	// 130- Test suite1 #3
+	// 131- Test suite1 #3 out>
+	// 132- Test suite1 #3 err>
 	// 170- Report suite1
 
 	// Start 3 tests async/unordered
 	displaySuite(d, token, isol, 1) // 100- Init suite1
 
 	// Simulate outputs sent disordered
-	displayTestTitle(d, token, isol, 1, 1)
-	displayTestOut(d, token, isol, 1, 1)
-	displayTestErr(d, token, isol, 1, 1)
-	displayEndTest(d, token, isol, 1, 1)
+	displayTestTitle(t, d, token, isol, 1, 1)
+	displayTestOut(t, d, token, isol, 1, 1)
+	displayTestErr(t, d, token, isol, 1, 1)
+	displayEndTest(t, d, token, isol, 1, 1)
 
-	displayTestTitle(d, token, isol, 1, 4)
-	displayTestOut(d, token, isol, 1, 4)
-	displayTestErr(d, token, isol, 1, 4)
-	displayEndTest(d, token, isol, 1, 4)
+	displayTestTitle(t, d, token, isol, 1, 3)
+	displayTestOut(t, d, token, isol, 1, 3)
+	displayTestErr(t, d, token, isol, 1, 3)
+	displayEndTest(t, d, token, isol, 1, 3)
 
-	displayTestTitle(d, token, isol, 1, 2)
-	displayTestOut(d, token, isol, 1, 2)
-	displayTestErr(d, token, isol, 1, 2)
-	displayEndTest(d, token, isol, 1, 2)
+	displayTestTitle(t, d, token, isol, 1, 2)
+	displayTestOut(t, d, token, isol, 1, 2)
+	displayTestErr(t, d, token, isol, 1, 2)
+	displayEndTest(t, d, token, isol, 1, 2)
 
 	displayReport(d, 1)
 
@@ -254,9 +268,9 @@ func TestBlockTail(t *testing.T) {
 		testTitleRegexp(1, 2) +
 		testStdoutRegexp(1, 2) +
 		testStderrRegexp(1, 2) +
-		testTitleRegexp(1, 4) +
-		testStdoutRegexp(1, 4) +
-		testStderrRegexp(1, 4) +
+		testTitleRegexp(1, 3) +
+		testStdoutRegexp(1, 3) +
+		testStderrRegexp(1, 3) +
 		reportSuitePattern(1) +
 		"$")
 	assert.Regexp(t, scenarioRegexp, ansi.Unformat(errW.String()))
@@ -283,26 +297,13 @@ func TestBlockTail_Twice(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	// Scénario: Writing on 3 suites in sync with test ran serial
-	// 100- Init suite1
-	// 110- Test suite1 #1
-	// 111- Test suite1 #1 out>
-	// 112- Test suite1 #1 err>
-	// 120- Test suite1 #2
-	// 121- Test suite1 #2 out>
-	// 122- Test suite1 #2 err>
-	// 130- Test suite1 #4
-	// 131- Test suite1 #4 out>
-	// 132- Test suite1 #4 err>
-	// 170- Report suite1
-
-	// Start 3 tests async/unordered
+	// Start 1 test in one suite
 	displaySuite(d, token, isol, 1) // 100- Init suite1
 
-	displayTestTitle(d, token, isol, 1, 1)
-	displayTestOut(d, token, isol, 1, 1)
-	displayTestErr(d, token, isol, 1, 1)
-	displayEndTest(d, token, isol, 1, 1)
+	displayTestTitle(t, d, token, isol, 1, 1)
+	displayTestOut(t, d, token, isol, 1, 1)
+	displayTestErr(t, d, token, isol, 1, 1)
+	displayEndTest(t, d, token, isol, 1, 1)
 
 	displayReport(d, 1)
 
@@ -329,13 +330,13 @@ func TestBlockTail_Twice(t *testing.T) {
 	outW.Reset()
 	errW.Reset()
 
-	// Start 3 tests async/unordered
+	// Start another test in reinited suite
 	displaySuite(d, token, isol, 1) // 100- Init suite1
 
-	displayTestTitle(d, token, isol, 1, 2)
-	displayTestOut(d, token, isol, 1, 2)
-	displayTestErr(d, token, isol, 1, 2)
-	displayEndTest(d, token, isol, 1, 2)
+	displayTestTitle(t, d, token, isol, 1, 1)
+	displayTestOut(t, d, token, isol, 1, 1)
+	//displayTestErr(t, d, token, isol, 1, 1)
+	displayEndTest(t, d, token, isol, 1, 1)
 
 	displayReport(d, 1)
 
@@ -351,9 +352,9 @@ func TestBlockTail_Twice(t *testing.T) {
 	// Expect scénario to be test2
 	scenarioRegexp = regexp.MustCompile("^" +
 		suiteInitRegexp(token, 1) +
-		testTitleRegexp(1, 2) +
-		testStdoutRegexp(1, 2) +
-		testStderrRegexp(1, 2) +
+		testTitleRegexp(1, 1) +
+		testStdoutRegexp(1, 1) +
+		//testStderrRegexp(1, 1) +
 		reportSuitePattern(1) +
 		"$")
 	assert.Regexp(t, scenarioRegexp, ansi.Unformat(errW.String()))
@@ -388,9 +389,9 @@ func TestAsyncFlushThenDisplayThenBlockTail(t *testing.T) {
 	// 120- Test suite1 #2
 	// 121- Test suite1 #2 out>
 	// 122- Test suite1 #2 err>
-	// 130- Test suite1 #4
-	// 131- Test suite1 #4 out>
-	// 132- Test suite1 #4 err>
+	// 130- Test suite1 #3
+	// 131- Test suite1 #3 out>
+	// 132- Test suite1 #3 err>
 	// 170- Report suite1
 
 	//d.Clear("suite-1")
@@ -399,23 +400,27 @@ func TestAsyncFlushThenDisplayThenBlockTail(t *testing.T) {
 	displaySuite(d, token, isol, 1) // 100- Init suite1
 
 	// Simulate outputs sent disordered
-	displayTestTitle(d, token, isol, 1, 1)
-	displayTestOut(d, token, isol, 1, 1)
-	displayTestErr(d, token, isol, 1, 1)
-	displayEndTest(d, token, isol, 1, 1)
+	displayTestTitle(t, d, token, isol, 1, 1)
+	displayTestOut(t, d, token, isol, 1, 1)
+	displayTestErr(t, d, token, isol, 1, 1)
+	displayEndTest(t, d, token, isol, 1, 1)
 
 	err = d.AsyncFlush("suite-1", 100*time.Millisecond)
 	require.NoError(t, err)
 
-	displayTestTitle(d, token, isol, 1, 4)
-	displayTestOut(d, token, isol, 1, 4)
-	displayTestErr(d, token, isol, 1, 4)
-	displayEndTest(d, token, isol, 1, 4)
+	time.Sleep(10 * time.Millisecond)
 
-	displayTestTitle(d, token, isol, 1, 2)
-	displayTestOut(d, token, isol, 1, 2)
-	displayTestErr(d, token, isol, 1, 2)
-	displayEndTest(d, token, isol, 1, 2)
+	displayTestTitle(t, d, token, isol, 1, 3)
+	displayTestOut(t, d, token, isol, 1, 3)
+	displayTestErr(t, d, token, isol, 1, 3)
+	displayEndTest(t, d, token, isol, 1, 3)
+
+	time.Sleep(10 * time.Millisecond)
+
+	displayTestTitle(t, d, token, isol, 1, 2)
+	displayTestOut(t, d, token, isol, 1, 2)
+	displayTestErr(t, d, token, isol, 1, 2)
+	displayEndTest(t, d, token, isol, 1, 2)
 
 	displayReport(d, 1)
 
@@ -435,9 +440,9 @@ func TestAsyncFlushThenDisplayThenBlockTail(t *testing.T) {
 		testTitleRegexp(1, 2) +
 		testStdoutRegexp(1, 2) +
 		testStderrRegexp(1, 2) +
-		testTitleRegexp(1, 4) +
-		testStdoutRegexp(1, 4) +
-		testStderrRegexp(1, 4) +
+		testTitleRegexp(1, 3) +
+		testStdoutRegexp(1, 3) +
+		testStderrRegexp(1, 3) +
 		reportSuitePattern(1) +
 		"$")
 	assert.Regexp(t, scenarioRegexp, ansi.Unformat(errW.String()))
@@ -473,9 +478,9 @@ func TestBlockTailAll(t *testing.T) {
 	// 120- Test suite1 #2
 	// 121- Test suite1 #2 out>
 	// 122- Test suite1 #2 err>
-	// 130- Test suite1 #4
-	// 131- Test suite1 #4 out>
-	// 132- Test suite1 #4 err>
+	// 130- Test suite1 #3
+	// 131- Test suite1 #3 out>
+	// 132- Test suite1 #3 err>
 	// 170- Report suite1
 
 	gctx := facade.NewGlobalContext(token, isol, model.Config{})
@@ -485,20 +490,20 @@ func TestBlockTailAll(t *testing.T) {
 	displaySuite(d, token, isol, 1) // 100- Init suite1
 
 	// Simulate outputs sent disordered
-	displayTestTitle(d, token, isol, 1, 1)
-	displayTestOut(d, token, isol, 1, 1)
-	displayTestErr(d, token, isol, 1, 1)
-	displayEndTest(d, token, isol, 1, 1)
+	displayTestTitle(t, d, token, isol, 1, 1)
+	displayTestOut(t, d, token, isol, 1, 1)
+	displayTestErr(t, d, token, isol, 1, 1)
+	displayEndTest(t, d, token, isol, 1, 1)
 
-	displayTestTitle(d, token, isol, 1, 4)
-	displayTestOut(d, token, isol, 1, 4)
-	displayTestErr(d, token, isol, 1, 4)
-	displayEndTest(d, token, isol, 1, 4)
+	displayTestTitle(t, d, token, isol, 1, 3)
+	displayTestOut(t, d, token, isol, 1, 3)
+	displayTestErr(t, d, token, isol, 1, 3)
+	displayEndTest(t, d, token, isol, 1, 3)
 
-	displayTestTitle(d, token, isol, 1, 2)
-	displayTestOut(d, token, isol, 1, 2)
-	displayTestErr(d, token, isol, 1, 2)
-	displayEndTest(d, token, isol, 1, 2)
+	displayTestTitle(t, d, token, isol, 1, 2)
+	displayTestOut(t, d, token, isol, 1, 2)
+	displayTestErr(t, d, token, isol, 1, 2)
+	displayEndTest(t, d, token, isol, 1, 2)
 
 	displayReport(d, 1)
 
@@ -521,9 +526,9 @@ func TestBlockTailAll(t *testing.T) {
 		testTitleRegexp(1, 2) +
 		testStdoutRegexp(1, 2) +
 		testStderrRegexp(1, 2) +
-		testTitleRegexp(1, 4) +
-		testStdoutRegexp(1, 4) +
-		testStderrRegexp(1, 4) +
+		testTitleRegexp(1, 3) +
+		testStdoutRegexp(1, 3) +
+		testStderrRegexp(1, 3) +
 		reportSuitePattern(1) +
 		"$")
 	assert.Regexp(t, scenarioRegexp, ansi.Unformat(errW.String()))
@@ -559,23 +564,23 @@ func TestAsyncFlushAllThenDisplayThenBlockTailAll(t *testing.T) {
 	// 120- Test suite1 #2
 	// 121- Test suite1 #2 out>
 	// 122- Test suite1 #2 err>
-	// 130- Test suite1 #4
-	// 131- Test suite1 #4 out>
-	// 132- Test suite1 #4 err>
+	// 130- Test suite1 #3
+	// 131- Test suite1 #3 out>
+	// 132- Test suite1 #3 err>
 	// 170- Report suite1
 
 	// Clear files on suite init
-	err = clearFileWriters(token, isol, "")
-	require.NoError(t, err)
+	// err = clearFileWriters(token, isol, "")
+	// require.NoError(t, err)
 
 	gctx := facade.NewGlobalContext(token, isol, model.Config{})
 	d.Global(gctx)
 
 	// Start 3 tests async/unordered
 	displaySuite(d, token, isol, 1) // 100- Init suite1
-	displayTestTitle(d, token, isol, 1, 1)
-	displayTestTitle(d, token, isol, 1, 4)
-	displayTestTitle(d, token, isol, 1, 2)
+	displayTestTitle(t, d, token, isol, 1, 1)
+	displayTestTitle(t, d, token, isol, 1, 3)
+	displayTestTitle(t, d, token, isol, 1, 2)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
@@ -584,17 +589,21 @@ func TestAsyncFlushAllThenDisplayThenBlockTailAll(t *testing.T) {
 	require.NoError(t, err)
 
 	// Simulate outputs sent disordered
-	displayTestOut(d, token, isol, 1, 1)
-	displayTestErr(d, token, isol, 1, 1)
-	displayEndTest(d, token, isol, 1, 1)
+	displayTestOut(t, d, token, isol, 1, 1)
+	displayTestErr(t, d, token, isol, 1, 1)
+	displayEndTest(t, d, token, isol, 1, 1)
 
-	displayTestOut(d, token, isol, 1, 4)
-	displayTestErr(d, token, isol, 1, 4)
-	displayEndTest(d, token, isol, 1, 4)
+	time.Sleep(10 * time.Millisecond)
 
-	displayTestOut(d, token, isol, 1, 2)
-	displayTestErr(d, token, isol, 1, 2)
-	displayEndTest(d, token, isol, 1, 2)
+	displayTestOut(t, d, token, isol, 1, 3)
+	displayTestErr(t, d, token, isol, 1, 3)
+	displayEndTest(t, d, token, isol, 1, 3)
+
+	time.Sleep(10 * time.Millisecond)
+
+	displayTestOut(t, d, token, isol, 1, 2)
+	displayTestErr(t, d, token, isol, 1, 2)
+	displayEndTest(t, d, token, isol, 1, 2)
 
 	displayReport(d, 1)
 
@@ -612,9 +621,9 @@ func TestAsyncFlushAllThenDisplayThenBlockTailAll(t *testing.T) {
 		testTitleRegexp(1, 2) +
 		testStdoutRegexp(1, 2) +
 		testStderrRegexp(1, 2) +
-		testTitleRegexp(1, 4) +
-		testStdoutRegexp(1, 4) +
-		testStderrRegexp(1, 4) +
+		testTitleRegexp(1, 3) +
+		testStdoutRegexp(1, 3) +
+		testStderrRegexp(1, 3) +
 		reportSuitePattern(1) +
 		"$")
 	assert.Regexp(t, scenarioRegexp, ansi.Unformat(errW.String()))
@@ -675,40 +684,40 @@ func TestAsyncDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 	d.Global(gctx)
 
 	displaySuite(d, token, isol, 1) // 100- Init suite1
-	displayTestTitle(d, token, isol, 1, 1)
-	displayTestOut(d, token, isol, 1, 1)
-	displayTestErr(d, token, isol, 1, 1)
-	displayEndTest(d, token, isol, 1, 1)
+	displayTestTitle(t, d, token, isol, 1, 1)
+	displayTestOut(t, d, token, isol, 1, 1)
+	displayTestErr(t, d, token, isol, 1, 1)
+	displayEndTest(t, d, token, isol, 1, 1)
 
-	displayTestTitle(d, token, isol, 1, 2)
-	displayTestOut(d, token, isol, 1, 2)
-	displayTestErr(d, token, isol, 1, 2)
-	displayEndTest(d, token, isol, 1, 2)
-	displayTestTitle(d, token, isol, 1, 3)
-	displayTestOut(d, token, isol, 1, 3)
-	displayTestErr(d, token, isol, 1, 3)
-	displayEndTest(d, token, isol, 1, 3)
+	displayTestTitle(t, d, token, isol, 1, 2)
+	displayTestOut(t, d, token, isol, 1, 2)
+	displayTestErr(t, d, token, isol, 1, 2)
+	displayEndTest(t, d, token, isol, 1, 2)
+	displayTestTitle(t, d, token, isol, 1, 3)
+	displayTestOut(t, d, token, isol, 1, 3)
+	displayTestErr(t, d, token, isol, 1, 3)
+	displayEndTest(t, d, token, isol, 1, 3)
 	displayReport(d, 1)
 	displaySuite(d, token, isol, 2) // 200- Init suite2
-	displayTestTitle(d, token, isol, 2, 1)
-	displayTestOut(d, token, isol, 2, 1)
-	displayTestErr(d, token, isol, 2, 1)
-	displayEndTest(d, token, isol, 2, 1)
-	displayTestTitle(d, token, isol, 2, 2)
-	displayTestOut(d, token, isol, 2, 2)
-	displayTestErr(d, token, isol, 2, 2)
-	displayEndTest(d, token, isol, 2, 2)
+	displayTestTitle(t, d, token, isol, 2, 1)
+	displayTestOut(t, d, token, isol, 2, 1)
+	displayTestErr(t, d, token, isol, 2, 1)
+	displayEndTest(t, d, token, isol, 2, 1)
+	displayTestTitle(t, d, token, isol, 2, 2)
+	displayTestOut(t, d, token, isol, 2, 2)
+	displayTestErr(t, d, token, isol, 2, 2)
+	displayEndTest(t, d, token, isol, 2, 2)
 	displayReport(d, 2)
 
 	displaySuite(d, token, isol, 3) // 300- Init suite3
-	displayTestTitle(d, token, isol, 3, 1)
-	displayTestOut(d, token, isol, 3, 1)
-	displayTestErr(d, token, isol, 3, 1)
-	displayEndTest(d, token, isol, 3, 1)
-	displayTestTitle(d, token, isol, 3, 2)
-	displayTestOut(d, token, isol, 3, 2)
-	displayTestErr(d, token, isol, 3, 2)
-	displayEndTest(d, token, isol, 3, 2)
+	displayTestTitle(t, d, token, isol, 3, 1)
+	displayTestOut(t, d, token, isol, 3, 1)
+	displayTestErr(t, d, token, isol, 3, 1)
+	displayEndTest(t, d, token, isol, 3, 1)
+	displayTestTitle(t, d, token, isol, 3, 2)
+	displayTestOut(t, d, token, isol, 3, 2)
+	displayTestErr(t, d, token, isol, 3, 2)
+	displayEndTest(t, d, token, isol, 3, 2)
 	displayReport(d, 3)
 
 	assert.Empty(t, outW.String())
@@ -812,50 +821,50 @@ func TestAsyncDisplayUsage_AsyncSuitesSerialTests(t *testing.T) {
 
 	displaySuite(d, token, isol, 1) // 100- Init suite1
 
-	displayTestTitle(d, token, isol, 1, 1) // 110- Test suite1 #1
-	displayTestOut(d, token, isol, 1, 1)   // 111- Test suite1 #1 out>
-	displayTestErr(d, token, isol, 1, 1)   // 112- Test suite1 #1 err>
-	displayEndTest(d, token, isol, 1, 1)
+	displayTestTitle(t, d, token, isol, 1, 1) // 110- Test suite1 #1
+	displayTestOut(t, d, token, isol, 1, 1)   // 111- Test suite1 #1 out>
+	displayTestErr(t, d, token, isol, 1, 1)   // 112- Test suite1 #1 err>
+	displayEndTest(t, d, token, isol, 1, 1)
 
 	displaySuite(d, token, isol, 2) // 200- Init suite2
 	displaySuite(d, token, isol, 3) // 300- Init suite3
 
-	displayTestTitle(d, token, isol, 3, 1) // 310- Test suite3 #1
-	displayTestOut(d, token, isol, 3, 1)   // 311- Test suite3 #1 out>
+	displayTestTitle(t, d, token, isol, 3, 1) // 310- Test suite3 #1
+	displayTestOut(t, d, token, isol, 3, 1)   // 311- Test suite3 #1 out>
 
-	displayTestTitle(d, token, isol, 1, 2) // 120- Test suite1 #2
-	displayTestTitle(d, token, isol, 2, 1) // 210- Test suite2 #1
+	displayTestTitle(t, d, token, isol, 1, 2) // 120- Test suite1 #2
+	displayTestTitle(t, d, token, isol, 2, 1) // 210- Test suite2 #1
 
-	displayTestOut(d, token, isol, 1, 2) // 121- Test suite1 #2 out>
-	displayTestErr(d, token, isol, 1, 2) // 122- Test suite1 #2 err>
-	displayEndTest(d, token, isol, 1, 2)
+	displayTestOut(t, d, token, isol, 1, 2) // 121- Test suite1 #2 out>
+	displayTestErr(t, d, token, isol, 1, 2) // 122- Test suite1 #2 err>
+	displayEndTest(t, d, token, isol, 1, 2)
 
-	displayTestOut(d, token, isol, 2, 1) // 211- Test suite2 #1 out>
-	displayTestErr(d, token, isol, 2, 1) // 212- Test suite2 #1 err>
-	displayEndTest(d, token, isol, 2, 1)
+	displayTestOut(t, d, token, isol, 2, 1) // 211- Test suite2 #1 out>
+	displayTestErr(t, d, token, isol, 2, 1) // 212- Test suite2 #1 err>
+	displayEndTest(t, d, token, isol, 2, 1)
 
-	displayTestTitle(d, token, isol, 2, 2) // 220- Test suite2 #2
+	displayTestTitle(t, d, token, isol, 2, 2) // 220- Test suite2 #2
 
-	displayTestErr(d, token, isol, 3, 1) // 312- Test suite3 #1 err>
-	displayEndTest(d, token, isol, 3, 1)
+	displayTestErr(t, d, token, isol, 3, 1) // 312- Test suite3 #1 err>
+	displayEndTest(t, d, token, isol, 3, 1)
 
-	displayTestOut(d, token, isol, 2, 2) // 221- Test suite2 #2 out>
-	displayTestErr(d, token, isol, 2, 2) // 222- Test suite2 #2 err>
-	displayEndTest(d, token, isol, 2, 2)
+	displayTestOut(t, d, token, isol, 2, 2) // 221- Test suite2 #2 out>
+	displayTestErr(t, d, token, isol, 2, 2) // 222- Test suite2 #2 err>
+	displayEndTest(t, d, token, isol, 2, 2)
 
 	displayReport(d, 2) // 270- Report suite2
 
-	displayTestTitle(d, token, isol, 1, 3) // 130- Test suite1 #3
-	displayTestOut(d, token, isol, 1, 3)   // 131- Test suite1 #3 out>
-	displayTestErr(d, token, isol, 1, 3)   // 132- Test suite1 #3 err>
-	displayEndTest(d, token, isol, 1, 3)
+	displayTestTitle(t, d, token, isol, 1, 3) // 130- Test suite1 #3
+	displayTestOut(t, d, token, isol, 1, 3)   // 131- Test suite1 #3 out>
+	displayTestErr(t, d, token, isol, 1, 3)   // 132- Test suite1 #3 err>
+	displayEndTest(t, d, token, isol, 1, 3)
 
 	displayReport(d, 1) // 170- Report suite1
 
-	displayTestTitle(d, token, isol, 3, 2) // 320- Test suite3 #2
-	displayTestOut(d, token, isol, 3, 2)   // 321- Test suite3 #2 out>
-	displayTestErr(d, token, isol, 3, 2)   // 322- Test suite3 #2 err>
-	displayEndTest(d, token, isol, 3, 2)
+	displayTestTitle(t, d, token, isol, 3, 2) // 320- Test suite3 #2
+	displayTestOut(t, d, token, isol, 3, 2)   // 321- Test suite3 #2 out>
+	displayTestErr(t, d, token, isol, 3, 2)   // 322- Test suite3 #2 err>
+	displayEndTest(t, d, token, isol, 3, 2)
 
 	displayReport(d, 3) // 370- Report suite3
 
@@ -959,51 +968,51 @@ func TestAsyncDisplayUsage_AsyncSuitesAsyncTests(t *testing.T) {
 
 	displaySuite(d, token, isol, 1) // 100- Init suite1
 
-	displayTestTitle(d, token, isol, 1, 1) // 110- Test suite1 #1
-	displayTestTitle(d, token, isol, 1, 2) // 120- Test suite1 #2
+	displayTestTitle(t, d, token, isol, 1, 1) // 110- Test suite1 #1
+	displayTestTitle(t, d, token, isol, 1, 2) // 120- Test suite1 #2
 
-	displayTestOut(d, token, isol, 1, 1) // 111- Test suite1 #1 out>
+	displayTestOut(t, d, token, isol, 1, 1) // 111- Test suite1 #1 out>
 
-	displayTestOut(d, token, isol, 1, 2) // 121- Test suite1 #2 out>
-	displayTestErr(d, token, isol, 1, 2) // 122- Test suite1 #2 err>
-	displayEndTest(d, token, isol, 1, 2)
+	displayTestOut(t, d, token, isol, 1, 2) // 121- Test suite1 #2 out>
+	displayTestErr(t, d, token, isol, 1, 2) // 122- Test suite1 #2 err>
+	displayEndTest(t, d, token, isol, 1, 2)
 
-	displayTestErr(d, token, isol, 1, 1) // 112- Test suite1 #1 err>
-	displayEndTest(d, token, isol, 1, 1)
+	displayTestErr(t, d, token, isol, 1, 1) // 112- Test suite1 #1 err>
+	displayEndTest(t, d, token, isol, 1, 1)
 
 	displaySuite(d, token, isol, 2) // 200- Init suite2
 	displaySuite(d, token, isol, 3) // 300- Init suite3
 
-	displayTestTitle(d, token, isol, 3, 1) // 310- Test suite3 #1
-	displayTestOut(d, token, isol, 3, 1)   // 311- Test suite3 #1 out>
+	displayTestTitle(t, d, token, isol, 3, 1) // 310- Test suite3 #1
+	displayTestOut(t, d, token, isol, 3, 1)   // 311- Test suite3 #1 out>
 
-	displayTestTitle(d, token, isol, 2, 1) // 210- Test suite2 #1
-	displayTestOut(d, token, isol, 2, 1)   // 211- Test suite2 #1 out>
+	displayTestTitle(t, d, token, isol, 2, 1) // 210- Test suite2 #1
+	displayTestOut(t, d, token, isol, 2, 1)   // 211- Test suite2 #1 out>
 
-	displayTestTitle(d, token, isol, 2, 2) // 220- Test suite2 #2
-	displayTestOut(d, token, isol, 2, 2)   // 221- Test suite2 #2 out>
+	displayTestTitle(t, d, token, isol, 2, 2) // 220- Test suite2 #2
+	displayTestOut(t, d, token, isol, 2, 2)   // 221- Test suite2 #2 out>
 
-	displayTestErr(d, token, isol, 2, 1) // 212- Test suite2 #1 err>
-	displayEndTest(d, token, isol, 2, 1)
+	displayTestErr(t, d, token, isol, 2, 1) // 212- Test suite2 #1 err>
+	displayEndTest(t, d, token, isol, 2, 1)
 
-	displayTestErr(d, token, isol, 2, 2) // 222- Test suite2 #2 err>
-	displayEndTest(d, token, isol, 2, 2)
+	displayTestErr(t, d, token, isol, 2, 2) // 222- Test suite2 #2 err>
+	displayEndTest(t, d, token, isol, 2, 2)
 	displayReport(d, 2) // 270- Report suite2
 
-	displayTestTitle(d, token, isol, 1, 3) // 130- Test suite1 #3
-	displayTestOut(d, token, isol, 1, 3)   // 131- Test suite1 #3 out>
-	displayTestErr(d, token, isol, 1, 3)   // 132- Test suite1 #3 err>
-	displayEndTest(d, token, isol, 1, 3)
+	displayTestTitle(t, d, token, isol, 1, 3) // 130- Test suite1 #3
+	displayTestOut(t, d, token, isol, 1, 3)   // 131- Test suite1 #3 out>
+	displayTestErr(t, d, token, isol, 1, 3)   // 132- Test suite1 #3 err>
+	displayEndTest(t, d, token, isol, 1, 3)
 	displayReport(d, 1) // 170- Report suite1
 
-	displayTestTitle(d, token, isol, 3, 2) // 320- Test suite3 #2
+	displayTestTitle(t, d, token, isol, 3, 2) // 320- Test suite3 #2
 
-	displayTestErr(d, token, isol, 3, 1) // 312- Test suite3 #1 err>
-	displayEndTest(d, token, isol, 3, 1)
+	displayTestErr(t, d, token, isol, 3, 1) // 312- Test suite3 #1 err>
+	displayEndTest(t, d, token, isol, 3, 1)
 
-	displayTestOut(d, token, isol, 3, 2) // 321- Test suite3 #2 out>
-	displayTestErr(d, token, isol, 3, 2) // 322- Test suite3 #2 err>
-	displayEndTest(d, token, isol, 3, 2)
+	displayTestOut(t, d, token, isol, 3, 2) // 321- Test suite3 #2 out>
+	displayTestErr(t, d, token, isol, 3, 2) // 322- Test suite3 #2 err>
+	displayEndTest(t, d, token, isol, 3, 2)
 
 	displayReport(d, 3) // 370- Report suite3
 

@@ -7,6 +7,7 @@ const (
 	FAILED  = Outcome("FAILED")
 	ERRORED = Outcome("ERRORED")
 	IGNORED = Outcome("IGNORED")
+	UNKNOWN = Outcome("UNKNOWN")
 	TIMEOUT = Outcome("TIMEOUT")
 )
 

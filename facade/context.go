@@ -64,20 +64,20 @@ func NewSuiteContext(token, isolation, testSuite string, initless bool, action m
 	return suiteCtx
 }
 
-func NewTestContext(token, isolation, testSuite string, seq uint16, inputCfg model.Config, ppid uint32) TestContext {
+func NewTestContext(token, isolation, testSuite string, seq uint16, inputCfg model.Config, ppid uint32) (testCtx TestContext, err error) {
 	suiteCtx := NewSuiteContext(token, isolation, testSuite, true, model.TestAction, model.Config{})
 	mergedCfg := suiteCtx.Config
 	mergedCfg.Merge(inputCfg)
 
-	testCtx := TestContext{
+	testCtx = TestContext{
 		SuiteContext: suiteCtx,
 	}
 	testCtx.Config = mergedCfg
 	testCtx.Suite = suiteCtx
 	testCtx.Seq = seq
-	err := testCtx.initExecuter(ppid)
+	err = testCtx.initExecuter(ppid)
 	if err != nil {
-		testCtx.NoErrorOrFatal(err)
+		return
 	}
 
 	if ok, ctId := utils.ReadEnvValue(model.EnvContainerIdKey); ok {
@@ -86,10 +86,10 @@ func NewTestContext(token, isolation, testSuite string, seq uint16, inputCfg mod
 		_, testCtx.ContainerImage = utils.ReadEnvValue(model.EnvContainerImageKey)
 	}
 
-	return testCtx
+	return
 }
 
-func NewTestContext2(testDef model.TestDefinition) (ctx TestContext) {
+func NewTestContext2(testDef model.TestDefinition) (TestContext, error) {
 	return NewTestContext(testDef.Token, testDef.Isolation, testDef.TestSuite, testDef.Seq, testDef.Config, testDef.Ppid)
 }
 
@@ -108,11 +108,15 @@ func (c GlobalContext) MergeConfig(newCfg model.Config) {
 func (c GlobalContext) Save() error {
 	return c.Repo.SaveGlobalConfig(c.Config)
 }
-func (c GlobalContext) Fatal(v ...any) {
-	fmt.Fprintln(os.Stderr, v...)
-	os.Exit(1)
-}
 
+/*
+	func (c GlobalContext) Fatal(v ...any) {
+		fmt.Fprintln(os.Stderr, v...)
+		os.Exit(1)
+	}
+*/
+
+/*
 func (c GlobalContext) NoErrorOrFatal(err error) {
 	if err != nil {
 		c.Config.TestSuite.IfPresent(func(testSuite string) error {
@@ -123,6 +127,7 @@ func (c GlobalContext) NoErrorOrFatal(err error) {
 		c.Fatal(err)
 	}
 }
+*/
 
 type SuiteContext struct {
 	GlobalContext
@@ -174,15 +179,20 @@ func (c SuiteContext) SuiteErrorf(format string, v ...any) error {
 	return fmt.Errorf(format, v...)
 }
 
+/*
 func (c SuiteContext) Fatal(v ...any) {
 	c.IncrementErroredCount()
 	c.GlobalContext.Fatal(v...)
 }
+*/
 
+/*
 func (c SuiteContext) Fatalf(format string, v ...any) {
 	c.Fatal(fmt.Sprintf(format, v...))
 }
+*/
 
+/*
 func (c SuiteContext) NoErrorOrFatal(err error) {
 	if err != nil {
 		c.Config.TestSuite.IfPresent(func(testSuite string) error {
@@ -193,6 +203,7 @@ func (c SuiteContext) NoErrorOrFatal(err error) {
 		c.Fatal(err)
 	}
 }
+*/
 
 type TestContext struct {
 	SuiteContext
@@ -225,6 +236,7 @@ func (c *TestContext) IncrementTestCount() (n uint16) {
 	return n
 }
 
+/*
 func (c TestContext) NoErrorOrFatal(err error) {
 	if err != nil {
 		outcome := model.NewTestOutcome2(c.Config, c.Seq)
@@ -237,6 +249,7 @@ func (c TestContext) NoErrorOrFatal(err error) {
 	}
 	c.SuiteContext.NoErrorOrFatal(err)
 }
+*/
 
 func (c TestContext) ProcessTooMuchFailures() (n uint16) {
 	cfg := c.Config
@@ -285,13 +298,28 @@ func (c TestContext) initTestOutcome(seq uint16) (outcome model.TestOutcome) {
 	return
 }
 
-func (c TestContext) IgnoredTestOutcome(seq uint16) (outcome model.TestOutcome) {
-	outcome = c.initTestOutcome(seq)
+func (c TestContext) IgnoredTestOutcome() (outcome model.TestOutcome) {
+	outcome = c.initTestOutcome(c.Seq)
 	outcome.Outcome = model.IGNORED
 	return
 }
 
-func (c TestContext) AssertCmdExecBlocking(seq uint16, assertions []model.Assertion) (outcome model.TestOutcome) {
+func (c TestContext) ErroredTestOutcome(errors ...error) (outcome model.TestOutcome) {
+	outcome = c.initTestOutcome(c.Seq)
+	outcome.Outcome = model.ERRORED
+	if len(errors) > 0 {
+		outcome.Err = errors[0]
+	}
+	return
+}
+
+func (c TestContext) UnknownTestOutcome() (outcome model.TestOutcome) {
+	outcome = c.initTestOutcome(c.Seq)
+	outcome.Outcome = model.UNKNOWN
+	return
+}
+
+func (c TestContext) AssertCmdExecBlocking(seq uint16, assertions []model.Assertion) (outcome model.TestOutcome, err error) {
 	testSuite := c.Config.TestSuite.Get()
 	exitCode, err := c.CmdExec.BlockRun()
 
@@ -338,7 +366,6 @@ func (c TestContext) AssertCmdExecBlocking(seq uint16, assertions []model.Assert
 	}
 
 	err = c.Repo.SaveTestOutcome(outcome)
-	c.NoErrorOrFatal(err)
 
 	return
 }

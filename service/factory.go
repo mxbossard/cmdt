@@ -857,7 +857,7 @@ func ParseArgs(rulePrefix string, args []string) (cfg model.Config, assertions [
 	ruleParsingStopperPresent := false
 	for _, arg := range args {
 		prefix = ReplacingPrefix(prefix, arg)
-		ruleParsingStopper := prefix + "--"
+		ruleParsingStopper := prefix + model.RuleParsingStopper
 		if arg == ruleParsingStopper {
 			ruleParsingStopperPresent = true
 			break
@@ -872,7 +872,7 @@ func ParseArgs(rulePrefix string, args []string) (cfg model.Config, assertions [
 		var buffer string
 		for p, arg := range args {
 			prefix = ReplacingPrefix(prefix, arg)
-			ruleParsingStopper := prefix + "--"
+			ruleParsingStopper := prefix + model.RuleParsingStopper
 			if arg == ruleParsingStopper {
 				if buffer != "" {
 					concatenatedArgs = append(concatenatedArgs, buffer)
