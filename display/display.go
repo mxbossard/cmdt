@@ -91,7 +91,7 @@ func (d *basicTestDisplayer) Title(ctx facade.TestContext) {
 	if ctx.Config.Verbose.Get() == model.SHOW_REPORTS_ONLY {
 		return
 	}
-	defer d.dpl.Flush()
+	defer d.flush()
 
 	cfg := ctx.Config
 	timecode := int(time.Since(cfg.SuiteStartTime.Get()).Milliseconds())
@@ -124,16 +124,17 @@ func (d *basicTestDisplayer) Title(ctx facade.TestContext) {
 	*/
 }
 
-func (d basicTestDisplayer) Outcome(outcome model.TestOutcome) {
+func (d *basicTestDisplayer) Outcome(outcome model.TestOutcome) {
 	d.opened = false
 	if d.ctx.Config.Verbose.Get() == model.SHOW_REPORTS_ONLY {
 		return
 	}
+	defer d.flush()
+
 	// FIXME get outcome from ctx
 	cfg := d.ctx.Config
 	verbose := cfg.Verbose.Get()
 	testDuration := outcome.Duration
-	defer d.dpl.Flush()
 
 	if verbose < model.SHOW_PASSED && outcome.Outcome != model.PASSED && outcome.Outcome != model.IGNORED {
 		// Print back test title not printed yet
@@ -188,7 +189,7 @@ func (d basicTestDisplayer) Outcome(outcome model.TestOutcome) {
 }
 
 func (d basicTestDisplayer) assertionResult(result model.AssertionResult) {
-	defer d.dpl.Flush()
+	defer d.flush()
 	hlClr := reportColor
 	//log.Printf("failedResult: %v\n", result)
 	assertPrefix := result.Rule.Prefix
@@ -249,25 +250,30 @@ func (d basicTestDisplayer) assertionResult(result model.AssertionResult) {
 
 // Write on stdout
 func (d basicTestDisplayer) Stdout(s string) {
+	defer d.flush()
 	if s != "" {
 		d.bufNotQuietPrinter.Out(s)
 	}
-	if !d.opened {
-		d.bufNotQuietPrinter.Flush()
-	}
+	// if !d.opened {
+	// 	d.bufNotQuietPrinter.Flush()
+	// 	d.dpl.Flush()
+	// }
 }
 
 // Write on stderr
 func (d basicTestDisplayer) Stderr(s string) {
+	defer d.flush()
 	if s != "" {
 		d.bufNotQuietPrinter.Err(s)
 	}
-	if !d.opened {
-		d.bufNotQuietPrinter.Flush()
-	}
+	// if !d.opened {
+	// 	d.bufNotQuietPrinter.Flush()
+	// 	d.dpl.Flush()
+	// }
 }
 
 func (d *basicTestDisplayer) Errors(errors ...error) {
+	defer d.flush()
 	// Delay error display when test is closed
 
 	d.errors = append(d.errors, errors...)
@@ -282,7 +288,16 @@ func (d *basicTestDisplayer) Errors(errors ...error) {
 	}
 }
 
+func (d basicTestDisplayer) flush() {
+	d.printer.Flush()
+	if !d.opened {
+		d.bufNotQuietPrinter.Flush()
+	}
+	d.dpl.Flush()
+}
+
 func (d basicTestDisplayer) Close() {
+	defer d.flush()
 	// Close properly test display.
 	// Display messages buffered while test was opened
 	// Display errors
@@ -299,13 +314,15 @@ func (d basicTestDisplayer) Close() {
 		}
 		d.Outcome(to)
 
-		d.printer.Flush()
+		// d.printer.Flush()
 
 		// display buffered stdout & stderr
-		d.bufNotQuietPrinter.Flush()
+		// d.bufNotQuietPrinter.Flush()
 
 		// display errors
 		d.Errors()
+
+		// d.dpl.Flush()
 	}
 
 }

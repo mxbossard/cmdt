@@ -134,7 +134,7 @@ func displayTestTitle(t *testing.T, d Displayer, token, isol string, suite int, 
 	require.NoError(t, err)
 	ctx.CmdExec = cmdz.Cmd("true")
 	outcome := model.TestOutcome{
-		Outcome:  model.PASSED,
+		Outcome:  model.FAILED,
 		Duration: 3 * time.Millisecond,
 		TestSignature: model.TestSignature{
 			TestSuite: testSuite,
@@ -180,7 +180,7 @@ func suiteInitRegexp(token string, suite int) string {
 }
 
 func testTitleRegexp(suite, seq int) string {
-	return fmt.Sprintf(`\[\d+\] Test \[suite-%d\]\(on host\)>true #0%d...\s*PASSED \(in \dms\)\n\s+Executing cmd:\s+\[\w+\]\s*\n`, suite, seq)
+	return fmt.Sprintf(`\[\d+\] Test \[suite-%d\]\(on host\)>true #0%d...\s*FAILED \(in \dms\)\n\s+Executing cmd:\s+\[\w+\]\s*\n`, suite, seq)
 }
 
 func testStdoutRegexp(suite, seq int) string {

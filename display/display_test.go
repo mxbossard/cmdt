@@ -30,17 +30,29 @@ func TestDisplay_Stdout(t *testing.T) {
 	assert.Empty(t, errW.String())
 
 	// Writing async
-	outMsg := "stdout\n"
-	errMsg := "stderr\n"
+	outMsg := "stdout"
+	errMsg := "stderr"
 	ctx, err := facade.NewTestContext("token", "isol", "suite", 12, model.Config{}, uint32(42))
 	require.NoError(t, err)
 	ctx.CmdExec = cmdz.Cmd("true")
 	d.OpenTest(ctx)
 	d.TestStdout(ctx, "beforeOut\n")
 	d.TestStderr(ctx, "beforeErr\n")
+	// Before stdout & stderr should be printed
+	assert.Equal(t, "beforeOut\n", ansi.Unformat(outW.String()))
+	assert.Equal(t, "beforeErr\n", ansi.Unformat(errW.String()))
+
 	d.TestTitle(ctx)
+	// Title should be printed
+	assert.Equal(t, "beforeOut\n", ansi.Unformat(outW.String()))
+	assert.Regexp(t, `beforeErr\n\[\d+\] Test \[suite\]\(on host\)>true #12...\s*`, ansi.Unformat(errW.String()))
+
 	d.TestStdout(ctx, outMsg)
 	d.TestStderr(ctx, errMsg)
+	// stdout & stderr should not be printed until outcome printed
+	assert.Equal(t, "beforeOut\n", ansi.Unformat(outW.String()))
+	assert.Regexp(t, `beforeErr\n\[\d+\] Test \[suite\]\(on host\)>true #12...\s*`, ansi.Unformat(errW.String()))
+
 	to := model.TestOutcome{
 		TestSignature: model.TestSignature{TestSuite: "suite", Seq: 12},
 		Duration:      3 * time.Millisecond,
@@ -50,8 +62,12 @@ func TestDisplay_Stdout(t *testing.T) {
 
 	// assert.Empty(t, outW.String())
 	// assert.Empty(t, errW.String())
-	assert.Equal(t, "beforeOut\n", ansi.Unformat(outW.String()))
-	assert.Equal(t, "beforeErr\n", ansi.Unformat(errW.String()))
+	// assert.Equal(t, "beforeOut\n", ansi.Unformat(outW.String()))
+	// assert.Equal(t, "beforeErr\n", ansi.Unformat(errW.String()))
+
+	assert.Equal(t, "beforeOut\n"+outMsg, ansi.Unformat(outW.String()))
+	assert.Regexp(t, `beforeErr\n\[\d+\] Test \[suite\]\(on host\)>true #12\.\.\.\s+FAILED \(in 3ms\)\s*\n`+
+		`\s+Executing cmd:\s+\[true\]\s*\n`+errMsg, ansi.Unformat(errW.String()))
 
 	d.CloseTest(ctx)
 
@@ -64,8 +80,9 @@ func TestDisplay_Stdout(t *testing.T) {
 	// assert.Equal(t, d.errFormatter.Format(errMsg), errW.String())
 
 	assert.Equal(t, "beforeOut\n"+outMsg, ansi.Unformat(outW.String()))
-	assert.Regexp(t, `beforeErr\n\[\d+\] Test \[suite\]\(on host\)>true #12\s+FAILED (in 3 ms)\n`+
-		`\s+Executing cmd:\s+ \[true\]\s*\n`+errMsg, ansi.Unformat(errW.String()))
+	assert.Regexp(t, `beforeErr\n\[\d+\] Test \[suite\]\(on host\)>true #12\.\.\.\s+FAILED \(in 3ms\)\s*\n`+
+		`\s+Executing cmd:\s+\[true\]\s*\n`+errMsg, ansi.Unformat(errW.String()))
+
 }
 
 func TestDisplay_Errors(t *testing.T) {

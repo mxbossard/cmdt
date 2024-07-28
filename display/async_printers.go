@@ -264,6 +264,11 @@ func (p *suitePrinters) flush() (done bool, err error) {
 		if _, ok := p.closed[i]; i > 0 && !ok {
 			// if printer not closed stop flushing
 			break
+		} else {
+			if prtr, ok := p.tests[0]; ok && prtr != nil {
+				// Flush printer 0
+				prtr.Flush()
+			}
 		}
 	}
 
