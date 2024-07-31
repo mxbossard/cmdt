@@ -222,6 +222,117 @@ func TestSuitePrinters_testFlushOrder(t *testing.T) {
 	assert.Empty(t, errW.String())
 }
 
+func TestSuitePrinters_testFlushOrder_2(t *testing.T) {
+	outW := &strings.Builder{}
+	errW := &strings.Builder{}
+	sps := newSuitePrinters("token", "isol", "suiteC")
+	sps.outW = outW
+	sps.errW = errW
+
+	// Test flush before printer creation
+	done, err := sps.flush()
+	require.NoError(t, err)
+	assert.True(t, done)
+
+	// Expect nothing flushed
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	sp, err := sps.testPrinter(0)
+	require.NoError(t, err)
+
+	tp1, err := sps.testPrinter(1)
+	require.NoError(t, err)
+
+	tp2, err := sps.testPrinter(2)
+	require.NoError(t, err)
+
+	tp2.Out("tp2_1")
+	sp.Out("suite_1")
+	tp1.Out("tp1_1")
+	sp.Out("suite_2")
+
+	done, err = sps.flush()
+	require.NoError(t, err)
+	assert.False(t, done)
+	assert.Equal(t, "suite_1"+"suite_2"+"tp1_1", outW.String())
+	assert.Equal(t, "", errW.String())
+}
+
+func TestSuitePrinters_testFlushOrder_3(t *testing.T) {
+	outW := &strings.Builder{}
+	errW := &strings.Builder{}
+	sps := newSuitePrinters("token", "isol", "suiteD")
+	sps.outW = outW
+	sps.errW = errW
+
+	// Test flush before printer creation
+	done, err := sps.flush()
+	require.NoError(t, err)
+	assert.True(t, done)
+
+	// Expect nothing flushed
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	sp, err := sps.testPrinter(0)
+	require.NoError(t, err)
+
+	tp1, err := sps.testPrinter(1)
+	require.NoError(t, err)
+
+	tp2, err := sps.testPrinter(2)
+	require.NoError(t, err)
+
+	tp2.Out("tp2_1")
+	sp.Out("suite_1")
+
+	done, err = sps.flush()
+	require.NoError(t, err)
+	assert.False(t, done)
+	assert.Equal(t, "suite_1", outW.String())
+	assert.Equal(t, "", errW.String())
+
+	sp.Out("suite_2")
+	tp1.Out("tp1_1")
+
+	// Expect tp2 not flushed because tp1 not closed
+	done, err = sps.flush()
+	require.NoError(t, err)
+	assert.False(t, done)
+	assert.Equal(t, "suite_1"+"tp1_1", outW.String())
+	assert.Equal(t, "", errW.String())
+
+	tp1.Out("tp1_2")
+	sp.Out("suite_3")
+	tp1.Out("tp1_3")
+
+	// Expect sp not flushed because tp1 not closed
+	done, err = sps.flush()
+	require.NoError(t, err)
+	assert.False(t, done)
+	assert.Equal(t, "suite_1"+"tp1_1"+"tp1_2"+"tp1_3", outW.String())
+	assert.Equal(t, "", errW.String())
+
+	sps.testEnded(1)
+
+	// Expect sp & tp2 to be flushed
+	done, err = sps.flush()
+	require.NoError(t, err)
+	assert.False(t, done)
+	assert.Equal(t, "suite_1"+"tp1_1"+"tp1_2"+"tp1_3"+"suite_2"+"suite_3"+"tp2_1", outW.String())
+	assert.Equal(t, "", errW.String())
+
+	sps.testEnded(2)
+
+	// Expect flush to be done
+	done, err = sps.flush()
+	require.NoError(t, err)
+	assert.True(t, done)
+	assert.Equal(t, "suite_1"+"tp1_1"+"tp1_2"+"tp1_3"+"suite_2"+"suite_3"+"tp2_1", outW.String())
+	assert.Equal(t, "", errW.String())
+}
+
 func TestAsyncPrinters_globalPrint(t *testing.T) {
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}

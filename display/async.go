@@ -79,19 +79,24 @@ func (d AsyncDisplay) OpenTest(ctx facade.TestContext) testDisplayer {
 	printer := d.printers.printer(cfg.TestSuite.Get(), int(seq))
 	bufPrinter := printz.Buffered(printer)
 	bufNotQuietPrinter := printz.Buffered(printer)
-	td := basicTestDisplayer{
-		dpl:                &d,
-		ctx:                ctx,
-		printer:            printer,
-		bufPrinter:         bufPrinter,
-		bufNotQuietPrinter: bufNotQuietPrinter,
-		outFormatter:       d.outFormatter,
-		errFormatter:       d.errFormatter,
-	}
+
 	key := testDisplayerKey(ctx)
-	d.openedTests[key] = &td
-	logger.Debug("opened test", "openedTests", d.openedTests)
-	return &td
+	if td, ok := d.openedTests[key]; ok {
+		return td
+	} else {
+		td = &basicTestDisplayer{
+			dpl:                &d,
+			ctx:                ctx,
+			printer:            printer,
+			bufPrinter:         bufPrinter,
+			bufNotQuietPrinter: bufNotQuietPrinter,
+			outFormatter:       d.outFormatter,
+			errFormatter:       d.errFormatter,
+		}
+		d.openedTests[key] = td
+		logger.Debug("opened test", "openedTests", d.openedTests)
+		return td
+	}
 }
 
 func (d AsyncDisplay) TestTitle(ctx facade.TestContext) {

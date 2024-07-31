@@ -178,8 +178,9 @@ func (p *suitePrinters) testPrinter(seq int) (printz.Printer, error) {
 			}
 			logger.Debug("initialized new test file recorder", "suite", p.suite, "stdout", stdout, "stderr", stderr)
 		}
-		bufferedOuts := printz.NewBufferedOutputs(printz.NewOutputs(p.outW, p.errW))
-		printer = printz.New(bufferedOuts)
+		outs := printz.NewOutputs(p.outW, p.errW)
+		//bufferedOuts := printz.NewBufferedOutputs(outs)
+		printer = printz.New(outs)
 		p.tests[seq] = printer
 		// p.testsBuffer[seq] = bufferedOuts
 		logger.Debug("created new test printer", "suite", p.suite, "seq", seq)
@@ -258,20 +259,28 @@ func (p *suitePrinters) flush() (done bool, err error) {
 		} else if i > 0 {
 			// Next printer not available yet
 			logger.Debug("test printer not available yet", "suite", p.suite, "seq", i)
+			if prtr, ok := p.tests[0]; ok && prtr != nil {
+				// Flush printer 0
+				logger.Debug("flushing suite printer", "suite", p.suite)
+				prtr.Flush()
+			}
 			break
 		}
 
 		if _, ok := p.closed[i]; i > 0 && !ok {
 			// if printer not closed stop flushing
+			logger.Debug("printer not closed", "suite", p.suite, "i", i)
 			break
 		} else {
 			if prtr, ok := p.tests[0]; ok && prtr != nil {
 				// Flush printer 0
+				logger.Debug("flushing suite printer", "suite", p.suite)
 				prtr.Flush()
 			}
 		}
 	}
 
+	p.cursor = lastFlushed
 	if _, ok := p.closed[lastFlushed]; lastFlushed != 0 && ok {
 		// current printer is done
 		p.cursor = lastFlushed + 1

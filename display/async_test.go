@@ -55,19 +55,20 @@ func TestAsyncDisplay_TestStdout(t *testing.T) {
 	err = d.BlockTail(suite, 100*time.Millisecond)
 	require.NoError(t, err)
 
-	assert.Empty(t, outW.String())
-	assert.Equal(t, d.outFormatter.Format(outMsg)+d.errFormatter.Format(errMsg), errW.String())
+	assert.Equal(t, outMsg, outW.String())
+	assert.Equal(t, errMsg, errW.String())
 
 	outW.Reset()
 	errW.Reset()
 
+	// FIXME: why AsyncFlushAll should re flush already flushed suite ?
 	err = d.AsyncFlushAll(100 * time.Millisecond)
 	require.NoError(t, err)
 	err = d.BlockTailAll(100 * time.Millisecond)
 	require.NoError(t, err)
 
-	assert.Empty(t, outW.String())
-	assert.Equal(t, d.outFormatter.Format(outMsg)+d.errFormatter.Format(errMsg), errW.String())
+	assert.Equal(t, outMsg, outW.String())
+	assert.Equal(t, errMsg, errW.String())
 }
 
 func TestAsyncDisplay_TestTitle(t *testing.T) {
@@ -258,22 +259,24 @@ func TestBlockTail(t *testing.T) {
 	err = d.BlockTail("suite-1", 100*time.Millisecond)
 	require.NoError(t, err)
 
-	assert.Empty(t, ansi.Unformat(outW.String()))
+	outScenarioRegexp := regexp.MustCompile("^" +
+		testStdoutRegexp(1, 1) +
+		testStdoutRegexp(1, 2) +
+		testStdoutRegexp(1, 3) +
+		"$")
+	assert.Regexp(t, outScenarioRegexp, ansi.Unformat(outW.String()))
 	// Expect scénario to be oredred test1, test2, test4
-	scenarioRegexp := regexp.MustCompile("^" +
+	errScenarioRegexp := regexp.MustCompile("^" +
 		suiteInitRegexp(token, 1) +
 		testTitleRegexp(1, 1) +
-		testStdoutRegexp(1, 1) +
 		testStderrRegexp(1, 1) +
 		testTitleRegexp(1, 2) +
-		testStdoutRegexp(1, 2) +
 		testStderrRegexp(1, 2) +
 		testTitleRegexp(1, 3) +
-		testStdoutRegexp(1, 3) +
 		testStderrRegexp(1, 3) +
 		reportSuitePattern(1) +
 		"$")
-	assert.Regexp(t, scenarioRegexp, ansi.Unformat(errW.String()))
+	assert.Regexp(t, errScenarioRegexp, ansi.Unformat(errW.String()))
 
 }
 
