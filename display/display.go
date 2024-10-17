@@ -3,7 +3,6 @@ package display
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -20,18 +19,18 @@ const (
 	MaxTestNameLength          = 70
 )
 
-var (
-	messageColor = ansi.HiPurple
-	testColor    = ansi.HiCyan
-	successColor = ansi.BoldGreen
-	failureColor = ansi.BoldRed
-	reportColor  = ansi.Yellow
-	warningColor = ansi.BoldHiYellow
-	errorColor   = ansi.Red
-	resetColor   = ansi.Reset
+const (
+	MessageColor = ansi.HiPurple
+	TestColor    = ansi.HiCyan
+	SuccessColor = ansi.BoldGreen
+	FailureColor = ansi.BoldRed
+	ReportColor  = ansi.Yellow
+	WarningColor = ansi.BoldHiYellow
+	ErrorColor   = ansi.Red
+	ResetColor   = ansi.Reset
 )
 
-type testDisplayer interface {
+type TestDisplayer interface {
 	Title(facade.TestContext)
 	Outcome(model.TestOutcome)
 	Stdout(string)
@@ -44,7 +43,7 @@ type Displayer interface {
 	Global(facade.GlobalContext)
 	Suite(facade.SuiteContext)
 
-	OpenTest(facade.TestContext) testDisplayer
+	OpenTest(facade.TestContext) TestDisplayer
 	TestTitle(facade.TestContext)
 	TestOutcome(facade.TestContext, model.TestOutcome)
 	TestStdout(facade.TestContext, string)
@@ -95,7 +94,7 @@ func (d *basicTestDisplayer) Title(ctx facade.TestContext) {
 
 	cfg := ctx.Config
 	timecode := int(time.Since(cfg.SuiteStartTime.Get()).Milliseconds())
-	qualifiedName := testQualifiedName(ctx, testColor)
+	qualifiedName := TestQualifiedName(ctx, TestColor)
 	qualifiedName = format.TruncateRight(qualifiedName, MaxTestNameLength)
 
 	seq := ctx.Seq
@@ -104,13 +103,13 @@ func (d *basicTestDisplayer) Title(ctx facade.TestContext) {
 
 	if ctx.Config.Verbose.Get() > model.SHOW_FAILED_OUTS && ctx.Config.Ignore.Is(true) {
 		if ctx.Config.Verbose.Get() >= model.SHOW_FAILED_OUTS {
-			d.printer.ColoredErrf(warningColor, title)
+			d.printer.ColoredErrf(WarningColor, title)
 		}
 		return
 	}
 
 	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
-		d.printer.ColoredErrf(testColor, title)
+		d.printer.ColoredErrf(TestColor, title)
 	}
 
 	/*
@@ -146,28 +145,28 @@ func (d *basicTestDisplayer) Outcome(outcome model.TestOutcome) {
 	switch outcome.Outcome {
 	case model.PASSED:
 		if verbose >= model.SHOW_PASSED {
-			d.printer.ColoredErrf(successColor, "PASSED")
+			d.printer.ColoredErrf(SuccessColor, "PASSED")
 			d.printer.Errf(" (in %s)\n", testDuration)
 		}
 	case model.FAILED:
-		d.printer.ColoredErrf(failureColor, "FAILED")
+		d.printer.ColoredErrf(FailureColor, "FAILED")
 		d.printer.Errf(" (in %s)\n", testDuration)
 	case model.TIMEOUT:
-		d.printer.ColoredErrf(failureColor, "TIMEOUT")
+		d.printer.ColoredErrf(FailureColor, "TIMEOUT")
 		d.printer.Errf(" (after %s)\n", d.ctx.Config.Timeout.Get())
 	case model.ERRORED:
-		d.printer.ColoredErrf(warningColor, "ERRORED")
+		d.printer.ColoredErrf(WarningColor, "ERRORED")
 		d.printer.Errf(" (not executed)\n")
 	case model.IGNORED:
 		if verbose > model.SHOW_FAILED_OUTS {
-			d.printer.ColoredErrf(warningColor, "IGNORED")
+			d.printer.ColoredErrf(WarningColor, "IGNORED")
 			d.printer.Err("\n")
 		}
 	default:
 	}
 
 	if verbose >= model.SHOW_FAILED_ONLY && outcome.Outcome != model.PASSED && outcome.Outcome != model.IGNORED || verbose >= model.SHOW_PASSED_OUTS {
-		d.printer.Errf("\tExecuting cmd: \t\t[%s]\n", cmdTitle(d.ctx))
+		d.printer.Errf("\tExecuting cmd: \t\t[%s]\n", CmdTitle(d.ctx))
 	}
 
 	if outcome.Err != nil {
@@ -190,7 +189,7 @@ func (d *basicTestDisplayer) Outcome(outcome model.TestOutcome) {
 
 func (d basicTestDisplayer) assertionResult(result model.AssertionResult) {
 	defer d.flush()
-	hlClr := reportColor
+	hlClr := ReportColor
 	//log.Printf("failedResult: %v\n", result)
 	assertPrefix := result.Rule.Prefix
 	assertName := result.Rule.Name
@@ -199,13 +198,13 @@ func (d basicTestDisplayer) assertionResult(result model.AssertionResult) {
 	got := result.Value
 
 	if result.ErrMessage != "" {
-		d.printer.ColoredErrf(errorColor, result.ErrMessage+"\n")
+		d.printer.ColoredErrf(ErrorColor, result.ErrMessage+"\n")
 	}
 
-	assertLabel := format.Sprintf(testColor, "%s%s", assertPrefix, assertName)
+	assertLabel := format.Sprintf(TestColor, "%s%s", assertPrefix, assertName)
 
 	if assertName == "success" || assertName == "fail" {
-		d.printer.Errf("\t%sExpected%s %s\n", hlClr, resetColor, assertLabel)
+		d.printer.Errf("\t%sExpected%s %s\n", hlClr, ResetColor, assertLabel)
 		//d.Stdout(cmd.StdoutRecord())
 		//d.Stderr(cmd.StderrRecord())
 		/*
@@ -215,10 +214,10 @@ func (d basicTestDisplayer) assertionResult(result model.AssertionResult) {
 		*/
 		return
 	} else if assertName == "cmd" {
-		d.printer.Errf("\t%sExpected%s %s=%s to succeed\n", hlClr, resetColor, assertLabel, expected)
+		d.printer.Errf("\t%sExpected%s %s=%s to succeed\n", hlClr, ResetColor, assertLabel, expected)
 		return
 	} else if assertName == "exists" {
-		d.printer.Errf("\t%sExpected%s file %s=%s file to exists\n", hlClr, resetColor, assertLabel, expected)
+		d.printer.Errf("\t%sExpected%s file %s=%s file to exists\n", hlClr, ResetColor, assertLabel, expected)
 		return
 	}
 
@@ -233,15 +232,15 @@ func (d basicTestDisplayer) assertionResult(result model.AssertionResult) {
 		}
 
 		if assertOp == "=" || assertOp == "@=" {
-			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto be%s: \t\t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, stringifiedGot)
+			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto be%s: \t\t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, assertLabel, hlClr, ResetColor, expected, hlClr, ResetColor, stringifiedGot)
 		} else if assertOp == ":" || assertOp == "@:" {
-			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto contains%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, stringifiedGot)
+			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto contains%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, assertLabel, hlClr, ResetColor, expected, hlClr, ResetColor, stringifiedGot)
 		} else if assertOp == "!:" {
-			d.printer.Errf("\t%sExpected%s %s \n\t\t%snot to contains%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, stringifiedGot)
+			d.printer.Errf("\t%sExpected%s %s \n\t\t%snot to contains%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, assertLabel, hlClr, ResetColor, expected, hlClr, ResetColor, stringifiedGot)
 		} else if assertOp == "~" {
-			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto match%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, stringifiedGot)
+			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto match%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, assertLabel, hlClr, ResetColor, expected, hlClr, ResetColor, stringifiedGot)
 		} else if assertOp == "!~" {
-			d.printer.Errf("\t%sExpected%s %s \n\t\t%snot to match%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, stringifiedGot)
+			d.printer.Errf("\t%sExpected%s %s \n\t\t%snot to match%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, assertLabel, hlClr, ResetColor, expected, hlClr, ResetColor, stringifiedGot)
 		}
 	} else {
 		d.printer.Errf("assertion %s%s%s failed\n", assertLabel, assertOp, expected)
@@ -280,7 +279,7 @@ func (d *basicTestDisplayer) Errors(errors ...error) {
 	if !d.opened {
 		// Display errors
 		for _, err := range d.errors {
-			d.bufNotQuietPrinter.ColoredErrf(errorColor, "ERROR: %s", err)
+			d.bufNotQuietPrinter.ColoredErrf(ErrorColor, "ERROR: %s", err)
 		}
 		d.bufNotQuietPrinter.Flush()
 		// Clear errors list
@@ -327,6 +326,22 @@ func (d basicTestDisplayer) Close() {
 
 }
 
+func NewTestDisplayer(d Displayer, ctx facade.TestContext, printer, notQuietPrinter printz.Printer, outFormatter, errFormatter inout.Formatter) *basicTestDisplayer {
+	bufPrinter := printz.Buffered(printer)
+	bufNotQuietPrinter := printz.Buffered(notQuietPrinter)
+	td := &basicTestDisplayer{
+		dpl:                d,
+		ctx:                ctx,
+		printer:            printer,
+		bufPrinter:         bufPrinter,
+		bufNotQuietPrinter: bufNotQuietPrinter,
+		outFormatter:       outFormatter,
+		errFormatter:       errFormatter,
+	}
+
+	return td
+}
+
 type basicDisplay struct {
 	printer            printz.Printer
 	notQuietPrinter    printz.Printer
@@ -341,18 +356,18 @@ func (d basicDisplay) Global(ctx facade.GlobalContext) {
 	defer d.Flush()
 	// Do nothing ?
 	if ctx.Config.Verbose.Get() >= model.SHOW_FAILED_OUTS {
-		d.printer.ColoredErrf(messageColor, "## New config (token: %s)\n", ctx.Token)
+		d.printer.ColoredErrf(MessageColor, "## New config (token: %s)\n", ctx.Token)
 	}
 }
 
 func (d basicDisplay) Suite(ctx facade.SuiteContext) {
 	defer d.Flush()
 	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
-		d.printer.ColoredErrf(messageColor, "## Test suite [%s] (token: %s)\n", ctx.Config.TestSuite.Get(), ctx.Token)
+		d.printer.ColoredErrf(MessageColor, "## Test suite [%s] (token: %s)\n", ctx.Config.TestSuite.Get(), ctx.Token)
 	}
 }
 
-func (d *basicDisplay) OpenTest(ctx facade.TestContext) testDisplayer {
+func (d *basicDisplay) OpenTest(ctx facade.TestContext) TestDisplayer {
 	if d.openedTest != nil {
 		// Close the current open test
 		d.CloseTest(d.openedTest.ctx)
@@ -387,7 +402,7 @@ func (d basicDisplay) TestTitle0(ctx facade.TestContext) {
 
 	cfg := ctx.Config
 	timecode := int(time.Since(cfg.SuiteStartTime.Get()).Milliseconds())
-	qualifiedName := testQualifiedName(ctx, testColor)
+	qualifiedName := TestQualifiedName(ctx, TestColor)
 	qualifiedName = format.TruncateRight(qualifiedName, MaxTestNameLength)
 
 	seq := ctx.Seq
@@ -396,13 +411,13 @@ func (d basicDisplay) TestTitle0(ctx facade.TestContext) {
 
 	if ctx.Config.Verbose.Get() > model.SHOW_FAILED_OUTS && ctx.Config.Ignore.Is(true) {
 		if ctx.Config.Verbose.Get() >= model.SHOW_FAILED_OUTS {
-			d.printer.ColoredErrf(warningColor, title)
+			d.printer.ColoredErrf(WarningColor, title)
 		}
 		return
 	}
 
 	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
-		d.printer.ColoredErrf(testColor, title)
+		d.printer.ColoredErrf(TestColor, title)
 	}
 
 	/*
@@ -440,28 +455,28 @@ func (d basicDisplay) TestOutcome0(ctx facade.TestContext, outcome model.TestOut
 	switch outcome.Outcome {
 	case model.PASSED:
 		if verbose >= model.SHOW_PASSED {
-			d.printer.ColoredErrf(successColor, "PASSED")
+			d.printer.ColoredErrf(SuccessColor, "PASSED")
 			d.printer.Errf(" (in %s)\n", testDuration)
 		}
 	case model.FAILED:
-		d.printer.ColoredErrf(failureColor, "FAILED")
+		d.printer.ColoredErrf(FailureColor, "FAILED")
 		d.printer.Errf(" (in %s)\n", testDuration)
 	case model.TIMEOUT:
-		d.printer.ColoredErrf(failureColor, "TIMEOUT")
+		d.printer.ColoredErrf(FailureColor, "TIMEOUT")
 		d.printer.Errf(" (after %s)\n", ctx.Config.Timeout.Get())
 	case model.ERRORED:
-		d.printer.ColoredErrf(warningColor, "ERRORED")
+		d.printer.ColoredErrf(WarningColor, "ERRORED")
 		d.printer.Errf(" (not executed)\n")
 	case model.IGNORED:
 		if verbose > model.SHOW_FAILED_OUTS {
-			d.printer.ColoredErrf(warningColor, "IGNORED")
+			d.printer.ColoredErrf(WarningColor, "IGNORED")
 			d.printer.Err("\n")
 		}
 	default:
 	}
 
 	if verbose >= model.SHOW_FAILED_ONLY && outcome.Outcome != model.PASSED && outcome.Outcome != model.IGNORED || verbose >= model.SHOW_PASSED_OUTS {
-		d.printer.Errf("\tExecuting cmd: \t\t[%s]\n", cmdTitle(ctx))
+		d.printer.Errf("\tExecuting cmd: \t\t[%s]\n", CmdTitle(ctx))
 	}
 
 	if outcome.Err != nil {
@@ -513,7 +528,7 @@ func (d *basicDisplay) CloseTest(ctx facade.TestContext) {
 
 func (d basicDisplay) assertionResult(result model.AssertionResult) {
 	defer d.Flush()
-	hlClr := reportColor
+	hlClr := ReportColor
 	//log.Printf("failedResult: %v\n", result)
 	assertPrefix := result.Rule.Prefix
 	assertName := result.Rule.Name
@@ -522,13 +537,13 @@ func (d basicDisplay) assertionResult(result model.AssertionResult) {
 	got := result.Value
 
 	if result.ErrMessage != "" {
-		d.printer.ColoredErrf(errorColor, result.ErrMessage+"\n")
+		d.printer.ColoredErrf(ErrorColor, result.ErrMessage+"\n")
 	}
 
-	assertLabel := format.Sprintf(testColor, "%s%s", assertPrefix, assertName)
+	assertLabel := format.Sprintf(TestColor, "%s%s", assertPrefix, assertName)
 
 	if assertName == "success" || assertName == "fail" {
-		d.printer.Errf("\t%sExpected%s %s\n", hlClr, resetColor, assertLabel)
+		d.printer.Errf("\t%sExpected%s %s\n", hlClr, ResetColor, assertLabel)
 		//d.Stdout(cmd.StdoutRecord())
 		//d.Stderr(cmd.StderrRecord())
 		/*
@@ -538,10 +553,10 @@ func (d basicDisplay) assertionResult(result model.AssertionResult) {
 		*/
 		return
 	} else if assertName == "cmd" {
-		d.printer.Errf("\t%sExpected%s %s=%s to succeed\n", hlClr, resetColor, assertLabel, expected)
+		d.printer.Errf("\t%sExpected%s %s=%s to succeed\n", hlClr, ResetColor, assertLabel, expected)
 		return
 	} else if assertName == "exists" {
-		d.printer.Errf("\t%sExpected%s file %s=%s file to exists\n", hlClr, resetColor, assertLabel, expected)
+		d.printer.Errf("\t%sExpected%s file %s=%s file to exists\n", hlClr, ResetColor, assertLabel, expected)
 		return
 	}
 
@@ -556,15 +571,15 @@ func (d basicDisplay) assertionResult(result model.AssertionResult) {
 		}
 
 		if assertOp == "=" || assertOp == "@=" {
-			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto be%s: \t\t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, stringifiedGot)
+			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto be%s: \t\t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, assertLabel, hlClr, ResetColor, expected, hlClr, ResetColor, stringifiedGot)
 		} else if assertOp == ":" || assertOp == "@:" {
-			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto contains%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, stringifiedGot)
+			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto contains%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, assertLabel, hlClr, ResetColor, expected, hlClr, ResetColor, stringifiedGot)
 		} else if assertOp == "!:" {
-			d.printer.Errf("\t%sExpected%s %s \n\t\t%snot to contains%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, stringifiedGot)
+			d.printer.Errf("\t%sExpected%s %s \n\t\t%snot to contains%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, assertLabel, hlClr, ResetColor, expected, hlClr, ResetColor, stringifiedGot)
 		} else if assertOp == "~" {
-			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto match%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, stringifiedGot)
+			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto match%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, assertLabel, hlClr, ResetColor, expected, hlClr, ResetColor, stringifiedGot)
 		} else if assertOp == "!~" {
-			d.printer.Errf("\t%sExpected%s %s \n\t\t%snot to match%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, stringifiedGot)
+			d.printer.Errf("\t%sExpected%s %s \n\t\t%snot to match%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, assertLabel, hlClr, ResetColor, expected, hlClr, ResetColor, stringifiedGot)
 		}
 	} else {
 		d.printer.Errf("assertion %s%s%s failed\n", assertLabel, assertOp, expected)
@@ -581,7 +596,7 @@ func (d basicDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 	tooMuchCount := outcome.TooMuchCount
 
 	testSuite := outcome.TestSuite
-	testSuiteLabel := format.New(testColor, testSuite)
+	testSuiteLabel := format.New(TestColor, testSuite)
 	testSuiteLabel.LeftPad = padding
 
 	// if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
@@ -595,23 +610,23 @@ func (d basicDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 	duration := outcome.Duration
 	fmtDuration := NormalizeDurationInSec(duration)
 	if failedCount == 0 && errorCount == 0 {
-		d.printer.ColoredErrf(successColor, "Successfuly ran  [ %s ] test suite in %10s (%3d success)", testSuiteLabel, fmtDuration, passedCount)
-		d.printer.ColoredErrf(warningColor, "%s", ignoredMessage)
+		d.printer.ColoredErrf(SuccessColor, "Successfuly ran  [ %s ] test suite in %10s (%3d success)", testSuiteLabel, fmtDuration, passedCount)
+		d.printer.ColoredErrf(WarningColor, "%s", ignoredMessage)
 		d.printer.Errf("\n")
 	} else {
-		d.printer.ColoredErrf(failureColor, "Failures running [ %s ] test suite in %10s (%3d success, %3d failures, %3d errors on %3d tests)", testSuiteLabel, fmtDuration, passedCount, failedCount, errorCount, testCount)
-		d.printer.ColoredErrf(warningColor, "%s", ignoredMessage)
+		d.printer.ColoredErrf(FailureColor, "Failures running [ %s ] test suite in %10s (%3d success, %3d failures, %3d errors on %3d tests)", testSuiteLabel, fmtDuration, passedCount, failedCount, errorCount, testCount)
+		d.printer.ColoredErrf(WarningColor, "%s", ignoredMessage)
 		d.printer.Errf("\n")
 		for _, report := range outcome.FailureReports {
 			report = strings.TrimSpace(report)
 			if report != "" {
 				//report = format.PadRight(report, 60)
-				d.printer.ColoredErrf(reportColor, "%s\n", report)
+				d.printer.ColoredErrf(ReportColor, "%s\n", report)
 			}
 		}
 	}
 	if tooMuchCount > 0 {
-		d.printer.ColoredErrf(warningColor, "Too much failures (%d tests not executed)\n", tooMuchCount)
+		d.printer.ColoredErrf(WarningColor, "Too much failures (%d tests not executed)\n", tooMuchCount)
 	}
 }
 
@@ -636,7 +651,7 @@ func (d basicDisplay) ReportAllFooter(globalCtx facade.GlobalContext) {
 
 	globalStartTime := globalCtx.Config.GlobalStartTime.Get()
 	globalDuration := model.NormalizeDurationInSec(time.Since(globalStartTime))
-	d.printer.ColoredErrf(messageColor, "Global duration time: %s\n", globalDuration)
+	d.printer.ColoredErrf(MessageColor, "Global duration time: %s\n", globalDuration)
 }
 
 func (d basicDisplay) TooMuchFailures(ctx facade.SuiteContext, testSuite string) {
@@ -644,7 +659,7 @@ func (d basicDisplay) TooMuchFailures(ctx facade.SuiteContext, testSuite string)
 		return
 	}
 	defer d.Flush()
-	d.printer.ColoredErrf(warningColor, "Too much failure for [%s] test suite. Stop testing.\n", testSuite)
+	d.printer.ColoredErrf(WarningColor, "Too much failure for [%s] test suite. Stop testing.\n", testSuite)
 }
 
 func (d basicDisplay) Errors(errors ...error) {
@@ -701,46 +716,10 @@ func New() *basicDisplay {
 	d := &basicDisplay{
 		notQuietPrinter:    printz.NewStandard(),
 		clearAnsiFormatter: inout.AnsiFormatter{AnsiFormat: ansi.Reset},
-		outFormatter:       inout.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", testColor, resetColor)},
-		errFormatter:       inout.PrefixFormatter{Prefix: fmt.Sprintf("%serr%s>", reportColor, resetColor)},
+		outFormatter:       inout.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", TestColor, ResetColor)},
+		errFormatter:       inout.PrefixFormatter{Prefix: fmt.Sprintf("%serr%s>", ReportColor, ResetColor)},
 		verbose:            model.DefaultVerboseLevel,
 	}
 	d.printer = d.notQuietPrinter
 	return d
-}
-
-func NormalizeDurationInSec(d time.Duration) (duration string) {
-	duration = fmt.Sprintf("%.3f s", float32(d.Milliseconds())/1000)
-	return
-}
-
-func testQualifiedName(ctx facade.TestContext, color ansi.Color) (name string) {
-	cfg := ctx.Config
-	var testName string
-	if cfg.TestName.IsPresent() && !cfg.TestName.Is("") {
-		testName = cfg.TestName.Get()
-	} else {
-		testName = cmdTitle(ctx)
-	}
-
-	containerLabel := printz.NewAnsi(testColor, "on host")
-	if ctx.ContainerImage != "" {
-		containerLabel = printz.NewAnsi(warningColor, ctx.ContainerImage)
-	}
-
-	name = printz.SColoredPrintf(color, "[%s](%s)>%s", cfg.TestSuite.Get(), containerLabel, testName)
-	return
-}
-
-func cmdTitle(ctx facade.TestContext) string {
-	cmd := ctx.CmdExec
-	cmdNameParts := strings.Split(cmd.String(), " ")
-	shortenedCmd := filepath.Base(cmdNameParts[0])
-	shortenCmdNameParts := cmdNameParts
-	shortenCmdNameParts[0] = shortenedCmd
-	cmdName := strings.Join(shortenCmdNameParts, " ")
-	//testName = fmt.Sprintf("cmd: <|%s|>", cmdName)
-	//testName := fmt.Sprintf("[%s]", cmdName)
-	testName := cmdName
-	return testName
 }

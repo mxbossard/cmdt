@@ -4,6 +4,6 @@ type daemon struct {
 	*basicDisplay
 }
 
-func NewDaemon() (d daemon) {
+func newDaemon() (d daemon) {
 	return
 }

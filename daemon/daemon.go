@@ -12,7 +12,7 @@ import (
 
 	"github.com/gofrs/flock"
 
-	"mby.fr/cmdtest/display"
+	"mby.fr/cmdtest/asyncdisplay"
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/repo"
 	"mby.fr/cmdtest/service"
@@ -60,7 +60,7 @@ Ideas:
 type daemon struct {
 	token, isolation string
 	repo             repo.Repo
-	display          *display.AsyncDisplay
+	display          *asyncdisplay.AsyncDisplay
 }
 
 func (d daemon) run() {
@@ -69,7 +69,7 @@ func (d daemon) run() {
 	debugTime := time.Now()
 	lastUnqueue := time.Now()
 
-	d.display = display.NewAsync(d.token, d.isolation)
+	d.display = asyncdisplay.New(d.token, d.isolation)
 	service.Dpl = d.display
 
 	for {

@@ -1,4 +1,4 @@
-package display
+package asyncdisplay
 
 import (
 	"fmt"
@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"mby.fr/cmdtest/repo"
+	"mby.fr/utils/inout"
 	"mby.fr/utils/printz"
 )
 
@@ -178,7 +179,14 @@ func (p *suitePrinters) testPrinter(seq int) (printz.Printer, error) {
 			}
 			logger.Debug("initialized new test file recorder", "suite", p.suite, "stdout", stdout, "stderr", stderr)
 		}
-		outs := printz.NewOutputs(p.outW, p.errW)
+		debOut := inout.CallbackWriter{
+			Nested: p.outW,
+			Callback: func(b []byte) {
+				logger.Debug("test printer writing on out", "suite", p.suite, "seq", seq, "printed", string(b))
+			},
+		}
+		outs := printz.NewOutputs(&debOut, p.errW)
+		//outs := printz.NewOutputs(p.outW, p.errW)
 		//bufferedOuts := printz.NewBufferedOutputs(outs)
 		printer = printz.New(outs)
 		p.tests[seq] = printer

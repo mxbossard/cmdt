@@ -166,74 +166,74 @@ func TestDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 	gctx := facade.NewGlobalContext(token, isol, model.Config{})
 	d.Global(gctx)
 
-	displaySuite(d, token, isol, 1) // 100- Init suite1
-	displayTestTitle(t, d, token, isol, 1, 1)
-	displayTestOut(t, d, token, isol, 1, 1)
-	displayTestErr(t, d, token, isol, 1, 1)
+	DisplaySuite(d, token, isol, 1) // 100- Init suite1
+	DisplayTestTitle(t, d, token, isol, 1, 1)
+	DisplayTestOut(t, d, token, isol, 1, 1)
+	DisplayTestErr(t, d, token, isol, 1, 1)
 
-	displayTestTitle(t, d, token, isol, 1, 2)
-	displayTestOut(t, d, token, isol, 1, 2)
-	displayTestErr(t, d, token, isol, 1, 2)
-	displayTestTitle(t, d, token, isol, 1, 3)
-	displayTestOut(t, d, token, isol, 1, 3)
-	displayTestErr(t, d, token, isol, 1, 3)
-	displayReport(d, 1)
-	displaySuite(d, token, isol, 2) // 200- Init suite2
-	displayTestTitle(t, d, token, isol, 2, 1)
-	displayTestOut(t, d, token, isol, 2, 1)
-	displayTestErr(t, d, token, isol, 2, 1)
-	displayTestTitle(t, d, token, isol, 2, 2)
-	displayTestOut(t, d, token, isol, 2, 2)
-	displayTestErr(t, d, token, isol, 2, 2)
-	displayReport(d, 2)
+	DisplayTestTitle(t, d, token, isol, 1, 2)
+	DisplayTestOut(t, d, token, isol, 1, 2)
+	DisplayTestErr(t, d, token, isol, 1, 2)
+	DisplayTestTitle(t, d, token, isol, 1, 3)
+	DisplayTestOut(t, d, token, isol, 1, 3)
+	DisplayTestErr(t, d, token, isol, 1, 3)
+	DisplayReport(d, 1)
+	DisplaySuite(d, token, isol, 2) // 200- Init suite2
+	DisplayTestTitle(t, d, token, isol, 2, 1)
+	DisplayTestOut(t, d, token, isol, 2, 1)
+	DisplayTestErr(t, d, token, isol, 2, 1)
+	DisplayTestTitle(t, d, token, isol, 2, 2)
+	DisplayTestOut(t, d, token, isol, 2, 2)
+	DisplayTestErr(t, d, token, isol, 2, 2)
+	DisplayReport(d, 2)
 
-	displaySuite(d, token, isol, 3) // 300- Init suite3
-	displayTestTitle(t, d, token, isol, 3, 1)
-	displayTestOut(t, d, token, isol, 3, 1)
-	displayTestErr(t, d, token, isol, 3, 1)
-	displayTestTitle(t, d, token, isol, 3, 2)
-	displayTestOut(t, d, token, isol, 3, 2)
-	displayTestErr(t, d, token, isol, 3, 2)
-	displayReport(d, 3)
+	DisplaySuite(d, token, isol, 3) // 300- Init suite3
+	DisplayTestTitle(t, d, token, isol, 3, 1)
+	DisplayTestOut(t, d, token, isol, 3, 1)
+	DisplayTestErr(t, d, token, isol, 3, 1)
+	DisplayTestTitle(t, d, token, isol, 3, 2)
+	DisplayTestOut(t, d, token, isol, 3, 2)
+	DisplayTestErr(t, d, token, isol, 3, 2)
+	DisplayReport(d, 3)
 
 	outScenarioRegexp := regexp.MustCompile("^" +
-		testStdoutRegexp(1, 1) +
-		testStdoutRegexp(1, 2) +
-		testStdoutRegexp(1, 3) +
+		TestStdoutRegexp(1, 1) +
+		TestStdoutRegexp(1, 2) +
+		TestStdoutRegexp(1, 3) +
 
-		testStdoutRegexp(2, 1) +
-		testStdoutRegexp(2, 2) +
+		TestStdoutRegexp(2, 1) +
+		TestStdoutRegexp(2, 2) +
 
-		testStdoutRegexp(3, 1) +
-		testStdoutRegexp(3, 2) +
+		TestStdoutRegexp(3, 1) +
+		TestStdoutRegexp(3, 2) +
 		"$")
 	// assert.Empty(t, ansi.Unformat(outW.String()))
 	assert.Regexp(t, outScenarioRegexp, ansi.Unformat(outW.String()))
 
 	errScenarioRegexp := regexp.MustCompile("^" +
-		globalInitPattern(token) +
-		suiteInitRegexp(token, 1) +
-		testTitleRegexp(1, 1) +
-		testStderrRegexp(1, 1) +
-		testTitleRegexp(1, 2) +
-		testStderrRegexp(1, 2) +
-		testTitleRegexp(1, 3) +
-		testStderrRegexp(1, 3) +
-		reportSuitePattern(1) +
+		GlobalInitPattern(token) +
+		SuiteInitRegexp(token, 1) +
+		TestTitleRegexp(1, 1) +
+		TestStderrRegexp(1, 1) +
+		TestTitleRegexp(1, 2) +
+		TestStderrRegexp(1, 2) +
+		TestTitleRegexp(1, 3) +
+		TestStderrRegexp(1, 3) +
+		ReportSuitePattern(1) +
 
-		suiteInitRegexp(token, 2) +
-		testTitleRegexp(2, 1) +
-		testStderrRegexp(2, 1) +
-		testTitleRegexp(2, 2) +
-		testStderrRegexp(2, 2) +
-		reportSuitePattern(2) +
+		SuiteInitRegexp(token, 2) +
+		TestTitleRegexp(2, 1) +
+		TestStderrRegexp(2, 1) +
+		TestTitleRegexp(2, 2) +
+		TestStderrRegexp(2, 2) +
+		ReportSuitePattern(2) +
 
-		suiteInitRegexp(token, 3) +
-		testTitleRegexp(3, 1) +
-		testStderrRegexp(3, 1) +
-		testTitleRegexp(3, 2) +
-		testStderrRegexp(3, 2) +
-		reportSuitePattern(3) +
+		SuiteInitRegexp(token, 3) +
+		TestTitleRegexp(3, 1) +
+		TestStderrRegexp(3, 1) +
+		TestTitleRegexp(3, 2) +
+		TestStderrRegexp(3, 2) +
+		ReportSuitePattern(3) +
 		"$")
 	assert.Regexp(t, errScenarioRegexp, ansi.Unformat(errW.String()))
 

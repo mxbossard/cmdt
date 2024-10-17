@@ -1,4 +1,4 @@
-package display
+package asyncdisplay
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"mby.fr/cmdtest/display"
 	"mby.fr/cmdtest/facade"
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/repo"
@@ -40,7 +41,7 @@ type AsyncDisplay struct {
 	verbose            model.VerboseLevel
 	quiet              bool
 	done               chan error
-	openedTests        map[string]testDisplayer
+	openedTests        map[string]display.TestDisplayer
 }
 
 func (d AsyncDisplay) Global(ctx facade.GlobalContext) {
@@ -50,7 +51,7 @@ func (d AsyncDisplay) Global(ctx facade.GlobalContext) {
 
 	if ctx.Config.Verbose.Get() >= model.SHOW_FAILED_OUTS {
 		printer := d.printers.printer("", 0)
-		printer.ColoredErrf(messageColor, "## New config (token: %s)\n", ctx.Token)
+		printer.ColoredErrf(display.MessageColor, "## New config (token: %s)\n", ctx.Token)
 	}
 }
 
@@ -69,30 +70,20 @@ func (d AsyncDisplay) Suite(ctx facade.SuiteContext) {
 	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
 
 		printer := d.printers.printer(suite, 0)
-		printer.ColoredErrf(messageColor, "## Test suite [%s] (token: %s)\n", suite, ctx.Token)
+		printer.ColoredErrf(display.MessageColor, "## Test suite [%s] (token: %s)\n", suite, ctx.Token)
 	}
 }
 
-func (d AsyncDisplay) OpenTest(ctx facade.TestContext) testDisplayer {
+func (d AsyncDisplay) OpenTest(ctx facade.TestContext) display.TestDisplayer {
 	seq := ctx.Seq
 	cfg := ctx.Config
 	printer := d.printers.printer(cfg.TestSuite.Get(), int(seq))
-	bufPrinter := printz.Buffered(printer)
-	bufNotQuietPrinter := printz.Buffered(printer)
 
 	key := testDisplayerKey(ctx)
 	if td, ok := d.openedTests[key]; ok {
 		return td
 	} else {
-		td = &basicTestDisplayer{
-			dpl:                &d,
-			ctx:                ctx,
-			printer:            printer,
-			bufPrinter:         bufPrinter,
-			bufNotQuietPrinter: bufNotQuietPrinter,
-			outFormatter:       d.outFormatter,
-			errFormatter:       d.errFormatter,
-		}
+		td = display.NewTestDisplayer(&d, ctx, printer, printer, d.outFormatter, d.errFormatter)
 		d.openedTests[key] = td
 		logger.Debug("opened test", "openedTests", d.openedTests)
 		return td
@@ -116,23 +107,23 @@ func (d AsyncDisplay) TestTitle0(ctx facade.TestContext) {
 
 	cfg := ctx.Config
 	timecode := int(time.Since(cfg.SuiteStartTime.Get()).Milliseconds())
-	qualifiedName := testQualifiedName(ctx, testColor)
-	qualifiedName = format.TruncateRight(qualifiedName, MaxTestNameLength)
+	qualifiedName := display.TestQualifiedName(ctx, display.TestColor)
+	qualifiedName = format.TruncateRight(qualifiedName, display.MaxTestNameLength)
 
 	title := fmt.Sprintf("[%05d] Test %s #%02d... ", timecode, qualifiedName, seq)
-	title = format.PadRight(title, MaxTestNameLength+23)
+	title = format.PadRight(title, display.MaxTestNameLength+23)
 
 	printer := d.printers.printer(cfg.TestSuite.Get(), int(seq))
 
 	if ctx.Config.Verbose.Get() > model.SHOW_FAILED_OUTS && ctx.Config.Ignore.Is(true) {
 		if ctx.Config.Verbose.Get() >= model.SHOW_FAILED_OUTS {
-			printer.ColoredErrf(warningColor, title)
+			printer.ColoredErrf(display.WarningColor, title)
 		}
 		return
 	}
 
 	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
-		printer.ColoredErrf(testColor, title)
+		printer.ColoredErrf(display.TestColor, title)
 	}
 
 	/*
@@ -176,28 +167,28 @@ func (d AsyncDisplay) TestOutcome0(ctx facade.TestContext, outcome model.TestOut
 	switch outcome.Outcome {
 	case model.PASSED:
 		if verbose >= model.SHOW_PASSED {
-			printer.ColoredErrf(successColor, "PASSED")
+			printer.ColoredErrf(display.SuccessColor, "PASSED")
 			printer.Errf(" (in %s)\n", testDuration)
 		}
 	case model.FAILED:
-		printer.ColoredErrf(failureColor, "FAILED")
+		printer.ColoredErrf(display.FailureColor, "FAILED")
 		printer.Errf(" (in %s)\n", testDuration)
 	case model.TIMEOUT:
-		printer.ColoredErrf(failureColor, "TIMEOUT")
+		printer.ColoredErrf(display.FailureColor, "TIMEOUT")
 		printer.Errf(" (after %s)\n", ctx.Config.Timeout.Get())
 	case model.ERRORED:
-		printer.ColoredErrf(warningColor, "ERRORED")
+		printer.ColoredErrf(display.WarningColor, "ERRORED")
 		printer.Errf(" (not executed)\n")
 	case model.IGNORED:
 		if verbose > model.SHOW_FAILED_OUTS {
-			printer.ColoredErrf(warningColor, "IGNORED")
+			printer.ColoredErrf(display.WarningColor, "IGNORED")
 			printer.Err("\n")
 		}
 	default:
 	}
 
 	if verbose >= model.SHOW_FAILED_ONLY && outcome.Outcome != model.PASSED && outcome.Outcome != model.IGNORED || verbose >= model.SHOW_PASSED_OUTS {
-		printer.Errf("\tExecuting cmd: \t\t[%s]\n", cmdTitle(ctx))
+		printer.Errf("\tExecuting cmd: \t\t[%s]\n", display.CmdTitle(ctx))
 	}
 
 	if outcome.Err != nil {
@@ -254,7 +245,7 @@ func (d AsyncDisplay) CloseTest(ctx facade.TestContext) {
 }
 
 func (d AsyncDisplay) assertionResult(printer printz.Printer, result model.AssertionResult) {
-	hlClr := reportColor
+	hlClr := display.ReportColor
 	//log.Printf("failedResult: %v\n", result)
 	assertPrefix := result.Rule.Prefix
 	assertName := result.Rule.Name
@@ -263,13 +254,13 @@ func (d AsyncDisplay) assertionResult(printer printz.Printer, result model.Asser
 	got := result.Value
 
 	if result.ErrMessage != "" {
-		printer.ColoredErrf(errorColor, result.ErrMessage+"\n")
+		printer.ColoredErrf(display.ErrorColor, result.ErrMessage+"\n")
 	}
 
-	assertLabel := format.Sprintf(testColor, "%s%s", assertPrefix, assertName)
+	assertLabel := format.Sprintf(display.TestColor, "%s%s", assertPrefix, assertName)
 
 	if assertName == "success" || assertName == "fail" {
-		printer.Errf("\t%sExpected%s %s\n", hlClr, resetColor, assertLabel)
+		printer.Errf("\t%sExpected%s %s\n", hlClr, display.ResetColor, assertLabel)
 		//d.Stdout(cmd.StdoutRecord())
 		//d.Stderr(cmd.StderrRecord())
 		/*
@@ -279,10 +270,10 @@ func (d AsyncDisplay) assertionResult(printer printz.Printer, result model.Asser
 		*/
 		return
 	} else if assertName == "cmd" {
-		printer.Errf("\t%sExpected%s %s=%s to succeed\n", hlClr, resetColor, assertLabel, expected)
+		printer.Errf("\t%sExpected%s %s=%s to succeed\n", hlClr, display.ResetColor, assertLabel, expected)
 		return
 	} else if assertName == "exists" {
-		printer.Errf("\t%sExpected%s file %s=%s file to exists\n", hlClr, resetColor, assertLabel, expected)
+		printer.Errf("\t%sExpected%s file %s=%s file to exists\n", hlClr, display.ResetColor, assertLabel, expected)
 		return
 	}
 
@@ -297,15 +288,15 @@ func (d AsyncDisplay) assertionResult(printer printz.Printer, result model.Asser
 		}
 
 		if assertOp == "=" || assertOp == "@=" {
-			printer.Errf("\t%sExpected%s %s \n\t\t%sto be%s: \t\t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, stringifiedGot)
+			printer.Errf("\t%sExpected%s %s \n\t\t%sto be%s: \t\t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, display.ResetColor, assertLabel, hlClr, display.ResetColor, expected, hlClr, display.ResetColor, stringifiedGot)
 		} else if assertOp == ":" || assertOp == "@:" {
-			printer.Errf("\t%sExpected%s %s \n\t\t%sto contains%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, stringifiedGot)
+			printer.Errf("\t%sExpected%s %s \n\t\t%sto contains%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, display.ResetColor, assertLabel, hlClr, display.ResetColor, expected, hlClr, display.ResetColor, stringifiedGot)
 		} else if assertOp == "!:" {
-			printer.Errf("\t%sExpected%s %s \n\t\t%snot to contains%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, stringifiedGot)
+			printer.Errf("\t%sExpected%s %s \n\t\t%snot to contains%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, display.ResetColor, assertLabel, hlClr, display.ResetColor, expected, hlClr, display.ResetColor, stringifiedGot)
 		} else if assertOp == "~" {
-			printer.Errf("\t%sExpected%s %s \n\t\t%sto match%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, stringifiedGot)
+			printer.Errf("\t%sExpected%s %s \n\t\t%sto match%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, display.ResetColor, assertLabel, hlClr, display.ResetColor, expected, hlClr, display.ResetColor, stringifiedGot)
 		} else if assertOp == "!~" {
-			printer.Errf("\t%sExpected%s %s \n\t\t%snot to match%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, resetColor, assertLabel, hlClr, resetColor, expected, hlClr, resetColor, stringifiedGot)
+			printer.Errf("\t%sExpected%s %s \n\t\t%snot to match%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, display.ResetColor, assertLabel, hlClr, display.ResetColor, expected, hlClr, display.ResetColor, stringifiedGot)
 		}
 	} else {
 		printer.Errf("assertion %s%s%s failed\n", assertLabel, assertOp, expected)
@@ -321,7 +312,7 @@ func (d AsyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 	tooMuchCount := outcome.TooMuchCount
 
 	testSuite := outcome.TestSuite
-	testSuiteLabel := format.New(testColor, testSuite)
+	testSuiteLabel := format.New(display.TestColor, testSuite)
 	testSuiteLabel.LeftPad = padding
 
 	// if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
@@ -336,25 +327,25 @@ func (d AsyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 		ignoredMessage = fmt.Sprintf(" (%d ignored)", ignoredCount)
 	}
 	duration := outcome.Duration
-	fmtDuration := NormalizeDurationInSec(duration)
+	fmtDuration := display.NormalizeDurationInSec(duration)
 	if failedCount == 0 && errorCount == 0 {
-		printer.ColoredErrf(successColor, "Successfuly ran  [ %s ] test suite in %10s (%3d success)", testSuiteLabel, fmtDuration, passedCount)
-		printer.ColoredErrf(warningColor, "%s", ignoredMessage)
+		printer.ColoredErrf(display.SuccessColor, "Successfuly ran  [ %s ] test suite in %10s (%3d success)", testSuiteLabel, fmtDuration, passedCount)
+		printer.ColoredErrf(display.WarningColor, "%s", ignoredMessage)
 		printer.Errf("\n")
 	} else {
-		printer.ColoredErrf(failureColor, "Failures running [ %s ] test suite in %10s (%3d success, %3d failures, %3d errors on %3d tests)", testSuiteLabel, fmtDuration, passedCount, failedCount, errorCount, testCount)
-		printer.ColoredErrf(warningColor, "%s", ignoredMessage)
+		printer.ColoredErrf(display.FailureColor, "Failures running [ %s ] test suite in %10s (%3d success, %3d failures, %3d errors on %3d tests)", testSuiteLabel, fmtDuration, passedCount, failedCount, errorCount, testCount)
+		printer.ColoredErrf(display.WarningColor, "%s", ignoredMessage)
 		printer.Errf("\n")
 		for _, report := range outcome.FailureReports {
 			report = strings.TrimSpace(report)
 			if report != "" {
 				//report = format.PadRight(report, 60)
-				printer.ColoredErrf(reportColor, "%s\n", report)
+				printer.ColoredErrf(display.ReportColor, "%s\n", report)
 			}
 		}
 	}
 	if tooMuchCount > 0 {
-		printer.ColoredErrf(warningColor, "Too much failures (%d tests not executed)\n", tooMuchCount)
+		printer.ColoredErrf(display.WarningColor, "Too much failures (%d tests not executed)\n", tooMuchCount)
 	}
 
 	err := closeSuite(d.token, d.isolation, testSuite)
@@ -368,7 +359,7 @@ func (d AsyncDisplay) ReportSuite(outcome model.SuiteOutcome) {
 		return
 	}
 
-	d.reportSuite(outcome, MinReportSuiteLabelPadding)
+	d.reportSuite(outcome, display.MinReportSuiteLabelPadding)
 }
 
 func (d AsyncDisplay) ReportSuites(outcomes []model.SuiteOutcome) {
@@ -382,7 +373,7 @@ func (d AsyncDisplay) ReportSuites(outcomes []model.SuiteOutcome) {
 		}
 	}
 	for _, outcome := range outcomes {
-		d.reportSuite(outcome, max(MinReportSuiteLabelPadding, maxSuiteNameSize))
+		d.reportSuite(outcome, max(display.MinReportSuiteLabelPadding, maxSuiteNameSize))
 	}
 }
 
@@ -393,7 +384,7 @@ func (d AsyncDisplay) ReportAllFooter(globalCtx facade.GlobalContext) {
 	printer := d.stdPrinter // Do not print async
 	globalStartTime := globalCtx.Config.GlobalStartTime.Get()
 	globalDuration := model.NormalizeDurationInSec(time.Since(globalStartTime))
-	printer.ColoredErrf(messageColor, "Global duration time: %s\n", globalDuration)
+	printer.ColoredErrf(display.MessageColor, "Global duration time: %s\n", globalDuration)
 }
 
 func (d AsyncDisplay) TooMuchFailures(ctx facade.SuiteContext, testSuite string) {
@@ -404,21 +395,21 @@ func (d AsyncDisplay) TooMuchFailures(ctx facade.SuiteContext, testSuite string)
 		return
 	}
 	printer := d.printers.printer(testSuite, 0)
-	printer.ColoredErrf(warningColor, "Too much failure for [%s] test suite. Stop testing.\n", testSuite)
+	printer.ColoredErrf(display.WarningColor, "Too much failure for [%s] test suite. Stop testing.\n", testSuite)
 }
 
 func (d AsyncDisplay) Errors(errors ...error) {
 	//  An Error cannot be Fatal
 	printer := printz.NewStandard()
 	for _, err := range errors {
-		printer.ColoredErrf(errorColor, "ERROR: %s\n", err)
+		printer.ColoredErrf(display.ErrorColor, "ERROR: %s\n", err)
 	}
 }
 
 func (d AsyncDisplay) GlobalErrors(ctx facade.GlobalContext, errors ...error) {
 	p := d.printers.printer("", 0)
 	for _, err := range errors {
-		p.ColoredErrf(errorColor, "ERROR: %s\n", err)
+		p.ColoredErrf(display.ErrorColor, "ERROR: %s\n", err)
 	}
 }
 
@@ -426,7 +417,7 @@ func (d AsyncDisplay) SuiteErrors(ctx facade.SuiteContext, errors ...error) {
 	suite := ctx.Config.TestSuite.Get()
 	p := d.printers.printer(suite, 0)
 	for _, err := range errors {
-		p.ColoredErrf(errorColor, "ERROR: %s\n", err)
+		p.ColoredErrf(display.ErrorColor, "ERROR: %s\n", err)
 	}
 }
 
@@ -718,16 +709,16 @@ func (d *AsyncDisplay) StopDisplayAllRecorded0() {
 	// Something to do ?
 }
 
-func NewAsync(token, isolation string) *AsyncDisplay {
+func New(token, isolation string) *AsyncDisplay {
 	p := printz.NewStandard()
-	openedTests := make(map[string]testDisplayer, 0)
+	openedTests := make(map[string]display.TestDisplayer, 0)
 	d := &AsyncDisplay{
 		token:              token,
 		isolation:          isolation,
 		stdPrinter:         p,
 		clearAnsiFormatter: inout.AnsiFormatter{AnsiFormat: ansi.Reset},
-		outFormatter:       inout.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", testColor, resetColor)},
-		errFormatter:       inout.PrefixFormatter{Prefix: fmt.Sprintf("%serr%s>", reportColor, resetColor)},
+		outFormatter:       inout.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", display.TestColor, display.ResetColor)},
+		errFormatter:       inout.PrefixFormatter{Prefix: fmt.Sprintf("%serr%s>", display.ReportColor, display.ResetColor)},
 		verbose:            model.DefaultVerboseLevel,
 		quiet:              false,
 		printers:           newAsyncPrinters(token, isolation, nil, nil),

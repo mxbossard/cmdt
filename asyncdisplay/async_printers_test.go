@@ -1,4 +1,4 @@
-package display
+package asyncdisplay
 
 import (
 	"os"
@@ -426,4 +426,47 @@ func TestAsyncPrinters_testPrint(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
+}
+
+func TestAsyncPrinters_testFlushOrder(t *testing.T) {
+	outW := &strings.Builder{}
+	errW := &strings.Builder{}
+	aps := newAsyncPrinters("token", "isol", outW, errW)
+
+	suite1 := "suite1"
+	suite2 := "suite2"
+
+	p1 := aps.printer(suite1, 1)
+	p3 := aps.printer(suite1, 3)
+	p4 := aps.printer(suite1, 4)
+	p1.Out("test1\n")
+	aps.testEnded(suite1, 1)
+	p3.Out("test3\n")
+	p4.Out("test4\n")
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+	aps.testEnded(suite1, 4)
+	aps.testEnded(suite1, 3)
+
+	p2 := aps.printer(suite1, 2)
+	p2.Out("test2\n")
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+	aps.testEnded(suite1, 2)
+
+	aps.flush(suite2, false)
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	aps.flush(suite2, true)
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	aps.flush(suite1, true)
+	aps.flush(suite1, true)
+	aps.flush(suite1, true)
+	aps.flush(suite1, true)
+	assert.NotEmpty(t, outW.String())
+	assert.Equal(t, "test1\ntest2\ntest3\ntest4\n", outW.String())
+	assert.Empty(t, errW.String())
 }

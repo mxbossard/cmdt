@@ -56,7 +56,7 @@ func InitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	cfg := ctx.Config
 
 	if cfg.Async.Is(true) {
-		asyncDpl := display.NewAsync(cfg.Token.Get(), cfg.Isol.Get())
+		asyncDpl := asyncdisplay.NewAsync(cfg.Token.Get(), cfg.Isol.Get())
 		asyncDpl.Clear(cfg.TestSuite.Get())
 	}
 
