@@ -1,6 +1,7 @@
 package asyncdisplay
 
 import (
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -15,8 +16,18 @@ import (
 	"mby.fr/cmdtest/repo"
 	"mby.fr/utils/ansi"
 	"mby.fr/utils/cmdz"
+	"mby.fr/utils/filez"
 	"mby.fr/utils/printz"
+	"mby.fr/utils/zlog"
 )
+
+func TestMain(m *testing.M) {
+	// test context initialization here
+	zlog.ColoredConfig()
+	zlog.SetLogLevelThreshold(zlog.LevelPerf)
+	zlog.PerfTimerStartAsTrace(false)
+	os.Exit(m.Run())
+}
 
 func TestAsyncDisplay_TestStdout(t *testing.T) {
 	//t.Skip()
@@ -134,65 +145,92 @@ func TestBlockTail(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
+	stdoutFile, stderrFile, doneFile, flushedFile, err := repo.DaemonSuiteReportFilepathes("suite-101", token, isol)
+	require.NoError(t, err)
+
+	assert.NoFileExists(t, stdoutFile)
+	assert.NoFileExists(t, stderrFile)
+	assert.NoFileExists(t, doneFile)
+	assert.NoFileExists(t, flushedFile)
+
 	// Scénario: Writing on 3 suites in sync with test ran serial
-	// 100- Init suite1
-	// 110- Test suite1 #1
-	// 111- Test suite1 #1 out>
-	// 112- Test suite1 #1 err>
-	// 120- Test suite1 #2
-	// 121- Test suite1 #2 out>
-	// 122- Test suite1 #2 err>
-	// 130- Test suite1 #3
-	// 131- Test suite1 #3 out>
-	// 132- Test suite1 #3 err>
-	// 170- Report suite1
+	// 100- Init suite101
+	// 110- Test suite101 #1
+	// 111- Test suite101 #1 out>
+	// 112- Test suite101 #1 err>
+	// 120- Test suite101 #2
+	// 121- Test suite101 #2 out>
+	// 122- Test suite101 #2 err>
+	// 130- Test suite101 #3
+	// 131- Test suite101 #3 out>
+	// 132- Test suite101 #3 err>
+	// 170- Report suite101
 
 	// Start 3 tests async/unordered
-	display.DisplaySuite(d, token, isol, 1) // 100- Init suite1
+	display.DisplaySuite(d, token, isol, 101) // 100- Init suite1
 
 	// Simulate outputs sent disordered
-	display.DisplayTestTitle(t, d, token, isol, 1, 1)
-	display.DisplayTestOut(t, d, token, isol, 1, 1)
-	display.DisplayTestErr(t, d, token, isol, 1, 1)
-	display.DisplayEndTest(t, d, token, isol, 1, 1)
+	display.DisplayTestTitle(t, d, token, isol, 101, 1)
+	display.DisplayTestOut(t, d, token, isol, 101, 1)
+	display.DisplayTestErr(t, d, token, isol, 101, 1)
+	display.DisplayEndTest(t, d, token, isol, 101, 1)
 
-	display.DisplayTestTitle(t, d, token, isol, 1, 3)
-	display.DisplayTestOut(t, d, token, isol, 1, 3)
-	display.DisplayTestErr(t, d, token, isol, 1, 3)
-	display.DisplayEndTest(t, d, token, isol, 1, 3)
+	display.DisplayTestTitle(t, d, token, isol, 101, 3)
+	display.DisplayTestOut(t, d, token, isol, 101, 3)
+	display.DisplayTestErr(t, d, token, isol, 101, 3)
+	display.DisplayEndTest(t, d, token, isol, 101, 3)
 
-	display.DisplayTestTitle(t, d, token, isol, 1, 2)
-	display.DisplayTestOut(t, d, token, isol, 1, 2)
-	display.DisplayTestErr(t, d, token, isol, 1, 2)
-	display.DisplayEndTest(t, d, token, isol, 1, 2)
+	display.DisplayTestTitle(t, d, token, isol, 101, 2)
+	display.DisplayTestOut(t, d, token, isol, 101, 2)
+	display.DisplayTestErr(t, d, token, isol, 101, 2)
+	display.DisplayEndTest(t, d, token, isol, 101, 2)
 
-	display.DisplayReport(d, 1)
+	display.DisplayReport(d, 101)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
+	assert.NoFileExists(t, stdoutFile)
+	assert.NoFileExists(t, stderrFile)
+	assert.NoFileExists(t, doneFile)
+	assert.NoFileExists(t, flushedFile)
+
+	err = d.AsyncFlush("suite-101", 100*time.Millisecond)
 	require.NoError(t, err)
-	err = d.AsyncFlush("suite-1", 100*time.Millisecond)
+
+	stdoutContent, err := filez.ReadString(stdoutFile)
 	require.NoError(t, err)
-	err = d.BlockTail("suite-1", 100*time.Millisecond)
+	assert.Empty(t, stdoutContent)
+
+	stderrContent, err := filez.ReadString(stderrFile)
+	require.NoError(t, err)
+	assert.Empty(t, stderrContent)
+
+	assert.NoFileExists(t, doneFile)
+	assert.NoFileExists(t, flushedFile)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	err = d.BlockTail("suite-101", 100*time.Millisecond)
 	require.NoError(t, err)
 
 	outScenarioRegexp := regexp.MustCompile("^" +
-		display.TestStdoutRegexp(1, 1) +
-		display.TestStdoutRegexp(1, 2) +
-		display.TestStdoutRegexp(1, 3) +
+		display.TestStdoutRegexp(101, 1) +
+		display.TestStdoutRegexp(101, 2) +
+		display.TestStdoutRegexp(101, 3) +
 		"$")
 	assert.Regexp(t, outScenarioRegexp, ansi.Unformat(outW.String()))
 	// Expect scénario to be oredred test1, test2, test4
 	errScenarioRegexp := regexp.MustCompile("^" +
-		display.SuiteInitRegexp(token, 1) +
-		display.TestTitleRegexp(1, 1) +
-		display.TestStderrRegexp(1, 1) +
-		display.TestTitleRegexp(1, 2) +
-		display.TestStderrRegexp(1, 2) +
-		display.TestTitleRegexp(1, 3) +
-		display.TestStderrRegexp(1, 3) +
-		display.ReportSuitePattern(1) +
+		display.SuiteInitRegexp(token, 101) +
+		display.TestTitleRegexp(101, 1) +
+		display.TestStderrRegexp(101, 1) +
+		display.TestTitleRegexp(101, 2) +
+		display.TestStderrRegexp(101, 2) +
+		display.TestTitleRegexp(101, 3) +
+		display.TestStderrRegexp(101, 3) +
+		display.ReportSuitePattern(101) +
 		"$")
 	assert.Regexp(t, errScenarioRegexp, ansi.Unformat(errW.String()))
 

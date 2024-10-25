@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"mby.fr/cmdtest/asyncdisplay"
 	"mby.fr/cmdtest/display"
 	"mby.fr/cmdtest/facade"
 	"mby.fr/cmdtest/model"
@@ -56,7 +57,7 @@ func InitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	cfg := ctx.Config
 
 	if cfg.Async.Is(true) {
-		asyncDpl := asyncdisplay.NewAsync(cfg.Token.Get(), cfg.Isol.Get())
+		asyncDpl := asyncdisplay.New(cfg.Token.Get(), cfg.Isol.Get())
 		asyncDpl.Clear(cfg.TestSuite.Get())
 	}
 
@@ -417,7 +418,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 					errorz.Fatal(err)
 				}
 
-				asyncDpl := display.NewAsync(token, isolation)
+				asyncDpl := asyncdisplay.New(token, isolation)
 				//asyncDpl.StartDisplayAllRecorded(globalCtx.Config.SuiteTimeout.Get())
 
 				asyncDpl.BlockTailAll(globalCtx.Config.SuiteTimeout.Get())
@@ -504,7 +505,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 					exitCode = 0
 				}
 
-				asyncDpl := display.NewAsync(token, isolation)
+				asyncDpl := asyncdisplay.New(token, isolation)
 				//asyncDpl.StartDisplayRecorded(testSuite, suiteCtx.Config.SuiteTimeout.Get())
 				asyncDpl.BlockTail(testSuite, suiteCtx.Config.SuiteTimeout.Get())
 				//suiteCtx.Repo.WaitEmptyQueue(testSuite, suiteCtx.Config.SuiteTimeout.Get())

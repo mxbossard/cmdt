@@ -522,9 +522,9 @@ func (d *AsyncDisplay) AsyncFlush(suite string, timeout time.Duration) error {
 
 	logger.Debug("flushing recorded outs", "suite", suite,
 		"outFile", stdoutFile,
-		"out", func() string { s, _ := filez.ReadString(stdoutFile); return s },
+		"out", func() string { s, _ := filez.ReadString(stdoutFile); return s }(),
 		"errFile", stderrFile,
-		"err", func() string { s, _ := filez.ReadString(stderrFile); return s })
+		"err", func() string { s, _ := filez.ReadString(stderrFile); return s }())
 
 	start := time.Now()
 	var done bool
@@ -572,9 +572,9 @@ func (d *AsyncDisplay) BlockTail(suite string, timeout time.Duration) error {
 
 	logger.Debug("tailing recorded outs", "suite", suite,
 		"outFile", stdoutFile,
-		"out", func() string { s, _ := filez.ReadString(stdoutFile); return s },
+		"out", func() string { s, _ := filez.ReadString(stdoutFile); return s }(),
 		"errFile", stderrFile,
-		"err", func() string { s, _ := filez.ReadString(stderrFile); return s })
+		"err", func() string { s, _ := filez.ReadString(stderrFile); return s }())
 
 	start := time.Now()
 	var done bool
@@ -725,4 +725,17 @@ func New(token, isolation string) *AsyncDisplay {
 		openedTests:        openedTests,
 	}
 	return d
+}
+
+func closeSuite(token, isol, suite string) error {
+	_, _, doneFile, _, err := repo.DaemonSuiteReportFilepathes(suite, token, isol)
+	if err != nil {
+		return err
+	}
+	f, err := os.Create(doneFile)
+	if err != nil {
+		return err
+	}
+	err = f.Close()
+	return err
 }
