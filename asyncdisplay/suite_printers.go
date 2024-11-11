@@ -45,16 +45,18 @@ func clearFileWriters(token, isol, suite string) error {
 	return nil
 }
 
-func newSuitePrinters(token, isol, suite string) *suitePrinters {
+func newSuitePrinters(token, isol, suite string) *suitePrinters { //, outW, errW io.Writer
 	err := clearFileWriters(token, isol, suite)
 	if err != nil {
 		panic(err)
 	}
 
 	return &suitePrinters{
-		token:     token,
-		isol:      isol,
-		suite:     suite,
+		token: token,
+		isol:  isol,
+		suite: suite,
+		// outW:      outW,
+		// errW:      errW,
 		tests:     make(map[int]printz.Printer),
 		closed:    make(map[int]bool),
 		startTime: time.Now(),

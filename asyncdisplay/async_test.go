@@ -169,11 +169,49 @@ func TestBlockTail(t *testing.T) {
 	// Start 3 tests async/unordered
 	display.DisplaySuite(d, token, isol, 101) // 100- Init suite1
 
+	assert.FileExists(t, stdoutFile)
+	assert.FileExists(t, stderrFile)
+	assert.NoFileExists(t, doneFile)
+	assert.NoFileExists(t, flushedFile)
+	assert.Empty(t, func() string { s, _ := filez.ReadString(stdoutFile); return s }())
+	assert.Empty(t, func() string { s, _ := filez.ReadString(stderrFile); return s }())
+
 	// Simulate outputs sent disordered
 	display.DisplayTestTitle(t, d, token, isol, 101, 1)
+
+	assert.FileExists(t, stdoutFile)
+	assert.FileExists(t, stderrFile)
+	assert.NoFileExists(t, doneFile)
+	assert.NoFileExists(t, flushedFile)
+	assert.Empty(t, func() string { s, _ := filez.ReadString(stdoutFile); return s }())
+	assert.Empty(t, func() string { s, _ := filez.ReadString(stderrFile); return s }())
+
 	display.DisplayTestOut(t, d, token, isol, 101, 1)
+
+	assert.FileExists(t, stdoutFile)
+	assert.FileExists(t, stderrFile)
+	assert.NoFileExists(t, doneFile)
+	assert.NoFileExists(t, flushedFile)
+	assert.Empty(t, func() string { s, _ := filez.ReadString(stdoutFile); return s }())
+	assert.Empty(t, func() string { s, _ := filez.ReadString(stderrFile); return s }())
+
 	display.DisplayTestErr(t, d, token, isol, 101, 1)
+
+	assert.FileExists(t, stdoutFile)
+	assert.FileExists(t, stderrFile)
+	assert.NoFileExists(t, doneFile)
+	assert.NoFileExists(t, flushedFile)
+	assert.Empty(t, func() string { s, _ := filez.ReadString(stdoutFile); return s }())
+	assert.Empty(t, func() string { s, _ := filez.ReadString(stderrFile); return s }())
+
 	display.DisplayEndTest(t, d, token, isol, 101, 1)
+
+	assert.FileExists(t, stdoutFile)
+	assert.FileExists(t, stderrFile)
+	assert.NoFileExists(t, doneFile)
+	assert.NoFileExists(t, flushedFile)
+	assert.Empty(t, func() string { s, _ := filez.ReadString(stdoutFile); return s }())
+	assert.Empty(t, func() string { s, _ := filez.ReadString(stderrFile); return s }())
 
 	display.DisplayTestTitle(t, d, token, isol, 101, 3)
 	display.DisplayTestOut(t, d, token, isol, 101, 3)
