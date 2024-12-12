@@ -1,4 +1,4 @@
-package asyncdisplay
+package asyncdisplay_old
 
 import (
 	"fmt"
@@ -15,7 +15,6 @@ import (
 	"mby.fr/utils/format"
 	"mby.fr/utils/inout"
 	"mby.fr/utils/printz"
-	"mby.fr/utils/screen"
 	"mby.fr/utils/zlog"
 )
 
@@ -33,21 +32,16 @@ func testDisplayerKey(ctx facade.TestContext) string {
 }
 
 type AsyncDisplay struct {
-	token, isolation string
-	verbose          model.VerboseLevel
-	quiet            bool
-	done             chan error
-
-	screen screen.Screen
-
-	/*
-		printers           *asyncPrinters
-		stdPrinter         printz.Printer
-		clearAnsiFormatter inout.Formatter
-		outFormatter       inout.Formatter
-		errFormatter       inout.Formatter
-		openedTests        map[string]display.TestDisplayer
-	*/
+	token, isolation   string
+	printers           *asyncPrinters
+	stdPrinter         printz.Printer
+	clearAnsiFormatter inout.Formatter
+	outFormatter       inout.Formatter
+	errFormatter       inout.Formatter
+	verbose            model.VerboseLevel
+	quiet              bool
+	done               chan error
+	openedTests        map[string]display.TestDisplayer
 }
 
 func (d AsyncDisplay) Global(ctx facade.GlobalContext) {

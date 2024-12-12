@@ -16,6 +16,7 @@ import (
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/repo"
 	"mby.fr/cmdtest/service"
+	"mby.fr/utils/display"
 	"mby.fr/utils/filez"
 	"mby.fr/utils/zlog"
 )
@@ -60,7 +61,7 @@ Ideas:
 type daemon struct {
 	token, isolation string
 	repo             repo.Repo
-	display          *asyncdisplay.AsyncDisplay
+	display          *display.AsyncDisplay
 }
 
 func (d daemon) run() {
