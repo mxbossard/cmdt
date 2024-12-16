@@ -38,7 +38,7 @@ type AsyncDisplay struct {
 	quiet            bool
 	done             chan error
 
-	screen screen.Screen
+	screen screen.Sink
 
 	/*
 		printers           *asyncPrinters
