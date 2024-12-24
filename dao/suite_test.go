@@ -71,7 +71,7 @@ func TestSerializeConfig_Then_DeserializeConfig(t *testing.T) {
 }
 
 func TestFindGlobalConfig_Empty(t *testing.T) {
-	dirpath := filez.MkTempDir("", "")
+	dirpath := filez.MkdirTempOrPanic("")
 	defer os.RemoveAll(dirpath)
 	dao := initSuiteDao(t, dirpath)
 
@@ -81,7 +81,7 @@ func TestFindGlobalConfig_Empty(t *testing.T) {
 }
 
 func TestFindGlobalConfig_SaveAndGet(t *testing.T) {
-	dirpath := filez.MkTempDir("", "")
+	dirpath := filez.MkdirTempOrPanic("")
 	defer os.RemoveAll(dirpath)
 	dao := initSuiteDao(t, dirpath)
 
@@ -101,7 +101,7 @@ func TestFindGlobalConfig_SaveAndGet(t *testing.T) {
 }
 
 func TestFindSuiteConfig_Empty(t *testing.T) {
-	dirpath := filez.MkTempDir("", "")
+	dirpath := filez.MkdirTempOrPanic("")
 	defer os.RemoveAll(dirpath)
 	dao := initSuiteDao(t, dirpath)
 
@@ -112,7 +112,7 @@ func TestFindSuiteConfig_Empty(t *testing.T) {
 }
 
 func TestFindSuiteConfig_SaveAndGet(t *testing.T) {
-	dirpath := filez.MkTempDir("", "")
+	dirpath := filez.MkdirTempOrPanic("")
 	defer os.RemoveAll(dirpath)
 	dao := initSuiteDao(t, dirpath)
 
@@ -133,7 +133,7 @@ func TestFindSuiteConfig_SaveAndGet(t *testing.T) {
 }
 
 func TestNextSeq(t *testing.T) {
-	dirpath := filez.MkTempDir("", "")
+	dirpath := filez.MkdirTempOrPanic("")
 	defer os.RemoveAll(dirpath)
 	dao := initSuiteDao(t, dirpath)
 
@@ -174,7 +174,7 @@ func TestNextSeq(t *testing.T) {
 }
 
 func TestUpdateEndTime(t *testing.T) {
-	dirpath := filez.MkTempDir("", "")
+	dirpath := filez.MkdirTempOrPanic("")
 	defer os.RemoveAll(dirpath)
 	dao := initSuiteDao(t, dirpath)
 
@@ -200,7 +200,7 @@ func TestUpdateEndTime(t *testing.T) {
 }
 
 func TestUpdateOutcome(t *testing.T) {
-	dirpath := filez.MkTempDir("", "")
+	dirpath := filez.MkdirTempOrPanic("")
 	defer os.RemoveAll(dirpath)
 	dao := initSuiteDao(t, dirpath)
 
@@ -226,7 +226,7 @@ func TestUpdateOutcome(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	dirpath := filez.MkTempDir("", "")
+	dirpath := filez.MkdirTempOrPanic("")
 	defer os.RemoveAll(dirpath)
 	dao := initSuiteDao(t, dirpath)
 
@@ -251,7 +251,7 @@ func TestDelete(t *testing.T) {
 }
 
 func TestListPassedFailedErrored(t *testing.T) {
-	dirpath := filez.MkTempDir("", "")
+	dirpath := filez.MkdirTempOrPanic("")
 	defer os.RemoveAll(dirpath)
 	dao := initSuiteDao(t, dirpath)
 

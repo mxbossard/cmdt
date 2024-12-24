@@ -71,7 +71,7 @@ func results(res ...model.AssertionResult) (results []model.AssertionResult) {
 }
 
 func TestSaveTestOutcome(t *testing.T) {
-	dirpath := filez.MkTempDir("", "")
+	dirpath := filez.MkdirTempOrPanic("")
 	defer os.RemoveAll(dirpath)
 	dao := initTestDao(t, dirpath)
 	suiteDao := initSuiteDao(t, dirpath)
@@ -100,7 +100,7 @@ func TestSaveTestOutcome(t *testing.T) {
 }
 
 func TestGetSuiteOutcome(t *testing.T) {
-	dirpath := filez.MkTempDir("", "")
+	dirpath := filez.MkdirTempOrPanic("")
 	defer os.RemoveAll(dirpath)
 	dao := initTestDao(t, dirpath)
 	suiteDao := initSuiteDao(t, dirpath)
@@ -179,7 +179,7 @@ func TestGetSuiteOutcome(t *testing.T) {
 }
 
 func TestClearSuite(t *testing.T) {
-	dirpath := filez.MkTempDir("", "")
+	dirpath := filez.MkdirTempOrPanic("")
 	defer os.RemoveAll(dirpath)
 	dao := initTestDao(t, dirpath)
 	suiteDao := initSuiteDao(t, dirpath)

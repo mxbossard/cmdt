@@ -208,7 +208,7 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 	outcome.IgnoredCount = ignoredCount
 	outcome.Outcome = ocm
 	//outcome.FailureReports = failedAssertionsMessages
-	outcome.TestOutcomes = collections.MapOrderedValues(testOutcomeBySeq)
+	outcome.TestOutcomes = collections.OrderedValues(testOutcomeBySeq)
 
 	return
 }
