@@ -57,7 +57,7 @@ func InitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	cfg := ctx.Config
 
 	if cfg.Async.Is(true) {
-		asyncDpl := asyncdisplay.New(cfg.Token.Get(), cfg.Isol.Get())
+		asyncDpl := asyncdisplay.New(ctx.Repo.BackingFilepath())
 		asyncDpl.Clear(cfg.TestSuite.Get())
 	}
 
@@ -194,13 +194,14 @@ func PerformTest(testDef model.TestDefinition) (exitCode int16, err error) {
 	ProcessTestError(ctx, err)
 	seq := testDef.Seq
 
-	Dpl.TestTitle(ctx)
+	td := Dpl.OpenTest(ctx)
+	td.Title()
 
 	if cfg.Ignore.Is(true) {
 		ctx.IncrementIgnoredCount()
 		oc := ctx.IgnoredTestOutcome()
 		ctx.Repo.SaveTestOutcome(oc)
-		Dpl.TestOutcome(ctx, oc)
+		td.Outcome(oc)
 		exitCode = 0
 		return
 	}
@@ -228,7 +229,7 @@ func PerformTest(testDef model.TestDefinition) (exitCode int16, err error) {
 	outcome, err := ctx.AssertCmdExecBlocking(seq, assertions)
 	ProcessTestError(ctx, err)
 
-	Dpl.TestOutcome(ctx, outcome)
+	td.Outcome(outcome)
 
 	for _, after := range cfg.After {
 		cmdAfter := cmdz.Cmd(after...)
@@ -418,10 +419,13 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 					errorz.Fatal(err)
 				}
 
-				asyncDpl := asyncdisplay.New(token, isolation)
+				asyncDpl := asyncdisplay.New(globalCtx.Repo.BackingFilepath())
 				//asyncDpl.StartDisplayAllRecorded(globalCtx.Config.SuiteTimeout.Get())
 
-				asyncDpl.BlockTailAll(globalCtx.Config.SuiteTimeout.Get())
+				err = asyncDpl.ContinuousFlushAllBlocking(globalCtx.Config.SuiteTimeout.Get())
+				if err != nil {
+					errorz.Fatal(err)
+				}
 
 				// // Daemon must be off or No test remaining in suite queue
 				// globalCtx.Repo.WaitAllEmpty(globalCtx.Config.SuiteTimeout.GetOr(defaultGlobalTimeout)) // FIXME: bad timeout
@@ -505,9 +509,10 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 					exitCode = 0
 				}
 
-				asyncDpl := asyncdisplay.New(token, isolation)
+				asyncDpl := asyncdisplay.New(suiteCtx.Repo.BackingFilepath())
 				//asyncDpl.StartDisplayRecorded(testSuite, suiteCtx.Config.SuiteTimeout.Get())
-				asyncDpl.BlockTail(testSuite, suiteCtx.Config.SuiteTimeout.Get())
+				err = asyncDpl.ContinuousFlushBlocking(testSuite, suiteCtx.Config.SuiteTimeout.Get())
+				ProcessSuiteError(suiteCtx, err)
 				//suiteCtx.Repo.WaitEmptyQueue(testSuite, suiteCtx.Config.SuiteTimeout.Get())
 				//asyncDpl.WaitDisplayRecorded()
 

@@ -41,33 +41,33 @@ func DisplayTestTitle(t *testing.T, d Displayer, token, isol string, suite int, 
 			Seq:       uint16(seq),
 		},
 	}
-	d.OpenTest(ctx)
-	d.TestTitle(ctx)
-	d.TestOutcome(ctx, outcome)
+	td := d.OpenTest(ctx)
+	td.Title()
+	td.Outcome(outcome)
 }
 
 func DisplayTestOut(t *testing.T, d Displayer, token, isol string, suite int, seq int) {
 	ctx, err := facade.NewTestContext(token, isol, fmt.Sprintf("suite-%d", suite), uint16(seq), model.Config{}, uint32(42))
 	require.NoError(t, err)
 	ctx.CmdExec = cmdz.Cmd("true")
-	d.OpenTest(ctx)
-	d.TestStdout(ctx, fmt.Sprintf("suite-%d-%d-out\n", suite, seq))
+	td := d.OpenTest(ctx)
+	td.Stdout(fmt.Sprintf("suite-%d-%d-out\n", suite, seq))
 }
 
 func DisplayTestErr(t *testing.T, d Displayer, token, isol string, suite int, seq int) {
 	ctx, err := facade.NewTestContext(token, isol, fmt.Sprintf("suite-%d", suite), uint16(seq), model.Config{}, uint32(42))
 	require.NoError(t, err)
 	ctx.CmdExec = cmdz.Cmd("true")
-	d.OpenTest(ctx)
-	d.TestStderr(ctx, fmt.Sprintf("suite-%d-%d-err\n", suite, seq))
+	td := d.OpenTest(ctx)
+	td.Stderr(fmt.Sprintf("suite-%d-%d-err\n", suite, seq))
 }
 
 func DisplayEndTest(t *testing.T, d Displayer, token, isol string, suite int, seq int) {
 	ctx, err := facade.NewTestContext(token, isol, fmt.Sprintf("suite-%d", suite), uint16(seq), model.Config{}, uint32(42))
 	require.NoError(t, err)
 	ctx.CmdExec = cmdz.Cmd("true")
-	d.OpenTest(ctx)
-	d.CloseTest(ctx)
+	td := d.OpenTest(ctx)
+	td.Close()
 }
 
 func GlobalInitPattern(token string) string {

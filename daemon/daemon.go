@@ -16,8 +16,8 @@ import (
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/repo"
 	"mby.fr/cmdtest/service"
-	"mby.fr/utils/display"
 	"mby.fr/utils/filez"
+	_ "mby.fr/utils/screen"
 	"mby.fr/utils/zlog"
 )
 
@@ -61,7 +61,7 @@ Ideas:
 type daemon struct {
 	token, isolation string
 	repo             repo.Repo
-	display          *display.AsyncDisplay
+	display          *asyncdisplay.AsyncDisplay
 }
 
 func (d daemon) run() {
@@ -70,7 +70,7 @@ func (d daemon) run() {
 	debugTime := time.Now()
 	lastUnqueue := time.Now()
 
-	d.display = asyncdisplay.New(d.token, d.isolation)
+	d.display = asyncdisplay.New(d.repo.BackingFilepath())
 	service.Dpl = d.display
 
 	for {
@@ -155,7 +155,12 @@ func (d daemon) report(def model.ReportDefinition) (exitCode int16, err error) {
 	perf := logger.PerfTimer()
 	defer perf.End()
 	//d.display.DisplayRecorded(def.TestSuite, def.Config.Timeout.Get())
-	d.display.AsyncFlush(def.TestSuite, def.Config.Timeout.Get())
+	go func() {
+		err := d.display.ContinuousFlushBlocking(def.TestSuite, def.Config.Timeout.Get())
+		if err != nil {
+			panic(err)
+		}
+	}()
 	exitCode, err = service.ProcessReportDef(def)
 	return
 }
@@ -164,7 +169,12 @@ func (d daemon) reportAll(def model.ReportDefinition) (exitCode int16) {
 	perf := logger.PerfTimer()
 	defer perf.End()
 	//d.display.DisplayAllRecorded(def.Config.Timeout.Get())
-	d.display.AsyncFlushAll(def.Config.Timeout.Get())
+	go func() {
+		err := d.display.ContinuousFlushAllBlocking(def.Config.Timeout.Get())
+		if err != nil {
+			panic(err)
+		}
+	}()
 	exitCode = service.ProcessReportAllDef(def)
 	return
 }

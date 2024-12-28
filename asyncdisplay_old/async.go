@@ -92,7 +92,7 @@ func (d AsyncDisplay) OpenTest(ctx facade.TestContext) display.TestDisplayer {
 
 func (d AsyncDisplay) TestTitle(ctx facade.TestContext) {
 	key := testDisplayerKey(ctx)
-	d.openedTests[key].Title(ctx)
+	d.openedTests[key].Title()
 }
 
 func (d AsyncDisplay) TestTitle0(ctx facade.TestContext) {

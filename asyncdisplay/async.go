@@ -3,15 +3,14 @@ package asyncdisplay
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"mby.fr/cmdtest/display"
 	"mby.fr/cmdtest/facade"
 	"mby.fr/cmdtest/model"
-	"mby.fr/cmdtest/repo"
 	"mby.fr/utils/ansi"
-	"mby.fr/utils/filez"
 	"mby.fr/utils/format"
 	"mby.fr/utils/inout"
 	"mby.fr/utils/printz"
@@ -20,6 +19,7 @@ import (
 )
 
 const (
+	SuitePrinterName        = "__session__"
 	RecordedFileFlushPeriod = 20 * time.Millisecond
 	RecordedFileTailPeriod  = 20 * time.Millisecond
 )
@@ -33,12 +33,13 @@ func testDisplayerKey(ctx facade.TestContext) string {
 }
 
 type AsyncDisplay struct {
-	token, isolation string
-	verbose          model.VerboseLevel
-	quiet            bool
-	done             chan error
+	//token, isolation string
+	verbose model.VerboseLevel
+	quiet   bool
+	done    chan error
 
 	screen screen.Sink
+	tailer screen.Tailer
 
 	/*
 		printers           *asyncPrinters
@@ -48,6 +49,9 @@ type AsyncDisplay struct {
 		errFormatter       inout.Formatter
 		openedTests        map[string]display.TestDisplayer
 	*/
+	outFormatter   inout.Formatter
+	errFormatter   inout.Formatter
+	testDisplayers map[string]display.TestDisplayer
 }
 
 func (d AsyncDisplay) Global(ctx facade.GlobalContext) {
@@ -56,8 +60,10 @@ func (d AsyncDisplay) Global(ctx facade.GlobalContext) {
 	}
 
 	if ctx.Config.Verbose.Get() >= model.SHOW_FAILED_OUTS {
-		printer := d.printers.printer("", 0)
+		//printer := d.printers.printer("", 0)
+		printer := d.screen.NotifyPrinter()
 		printer.ColoredErrf(display.MessageColor, "## New config (token: %s)\n", ctx.Token)
+		printer.Flush()
 	}
 }
 
@@ -72,35 +78,75 @@ func (d AsyncDisplay) Suite(ctx facade.SuiteContext) {
 	}
 
 	suite := ctx.Config.TestSuite.Get()
+	session := d.screen.Session(suite, 0)
+	err := session.Start(*ctx.Config.SuiteTimeout.Value)
+	if err != nil {
+		panic(err)
+	}
 
 	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
-
-		printer := d.printers.printer(suite, 0)
+		//printer := d.printers.printer(suite, 0)
+		printer := session.Printer(SuitePrinterName, 0)
 		printer.ColoredErrf(display.MessageColor, "## Test suite [%s] (token: %s)\n", suite, ctx.Token)
+		printer.Flush()
+		session.ClosePrinter(SuitePrinterName)
 	}
 }
 
 func (d AsyncDisplay) OpenTest(ctx facade.TestContext) display.TestDisplayer {
-	seq := ctx.Seq
 	cfg := ctx.Config
-	printer := d.printers.printer(cfg.TestSuite.Get(), int(seq))
+	//printer := d.printers.printer(cfg.TestSuite.Get(), int(seq))
 
 	key := testDisplayerKey(ctx)
-	if td, ok := d.openedTests[key]; ok {
+	if td, ok := d.testDisplayers[key]; ok {
 		return td
 	} else {
-		td = display.NewTestDisplayer(&d, ctx, printer, printer, d.outFormatter, d.errFormatter)
-		d.openedTests[key] = td
-		logger.Debug("opened test", "openedTests", d.openedTests)
+		id := ctx.TestId()
+		seq := ctx.Seq
+		session := d.screen.Session(cfg.TestSuite.Get(), 0)
+		printer := session.Printer(id, int(seq))
+		td := display.NewTestDisplayer(&d, ctx, printer, printer, d.outFormatter, d.errFormatter)
+		d.testDisplayers[key] = td
+		logger.Debug("new test displayer", "openedTests", d.testDisplayers)
+		td.Open()
 		return td
 	}
 }
 
+func (d AsyncDisplay) CloseTest(ctx facade.TestContext) {
+	// report end of test to suite printer
+	/*
+		suite := ctx.Config.TestSuite.Get()
+		seq := int(ctx.Seq)
+		d.printers.testEnded(suite, seq)
+	*/
+
+	key := testDisplayerKey(ctx)
+	td, ok := d.testDisplayers[key]
+	if !ok {
+		//panic(fmt.Sprintf("Test: [%s] is not opened !", key))
+		return
+	}
+	defer delete(d.testDisplayers, key)
+
+	cfg := ctx.Config
+	suite := cfg.TestSuite.Get()
+	session := d.screen.Session(suite, 0)
+
+	// Close properly test display.
+	td.Close()
+	session.ClosePrinter(ctx.TestId())
+}
+
+// FIXME: vvv remove following functions in TestDisplayer vvv
+/*
 func (d AsyncDisplay) TestTitle(ctx facade.TestContext) {
 	key := testDisplayerKey(ctx)
 	d.openedTests[key].Title(ctx)
 }
+*/
 
+/*
 func (d AsyncDisplay) TestTitle0(ctx facade.TestContext) {
 	if d.quiet {
 		return
@@ -131,23 +177,27 @@ func (d AsyncDisplay) TestTitle0(ctx facade.TestContext) {
 	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
 		printer.ColoredErrf(display.TestColor, title)
 	}
-
-	/*
-		if ctx.Config.Verbose.Get() <= model.SHOW_PASSED {
-			d.printer.ColoredErrf(testColor, title)
-			if ctx.Config.KeepStdout.Is(true) || ctx.Config.KeepStderr.Is(true) {
-				// NewLine because we expect cmd outputs
-				//d.printer.Errf("\n")
-			}
+*/
+/*
+	if ctx.Config.Verbose.Get() <= model.SHOW_PASSED {
+		d.printer.ColoredErrf(testColor, title)
+		if ctx.Config.KeepStdout.Is(true) || ctx.Config.KeepStderr.Is(true) {
+			// NewLine because we expect cmd outputs
+			//d.printer.Errf("\n")
 		}
-	*/
-}
+	}
+*/
+/*
+}*/
 
+/*
 func (d AsyncDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutcome) {
 	key := testDisplayerKey(ctx)
 	d.openedTests[key].Outcome(outcome)
 }
+*/
 
+/*
 func (d AsyncDisplay) TestOutcome0(ctx facade.TestContext, outcome model.TestOutcome) {
 	if d.quiet {
 		return
@@ -214,41 +264,39 @@ func (d AsyncDisplay) TestOutcome0(ctx facade.TestContext, outcome model.TestOut
 	}
 
 }
+*/
 
+/*
 func (d AsyncDisplay) TestStdout(ctx facade.TestContext, s string) {
 	key := testDisplayerKey(ctx)
 	d.openedTests[key].Stdout(s)
 }
+*/
 
+/*
 func (d AsyncDisplay) TestStdout0(ctx facade.TestContext, s string) {
 	if s != "" {
 		printer := d.printers.printer(ctx.Config.TestSuite.Get(), int(ctx.Seq))
 		printer.Err(d.outFormatter.Format(s))
 	}
 }
+*/
 
+/*
 func (d AsyncDisplay) TestStderr(ctx facade.TestContext, s string) {
 	key := testDisplayerKey(ctx)
 	d.openedTests[key].Stderr(s)
 }
+*/
 
+/*
 func (d AsyncDisplay) TestStderr0(ctx facade.TestContext, s string) {
 	if s != "" {
 		printer := d.printers.printer(ctx.Config.TestSuite.Get(), int(ctx.Seq))
 		printer.Err(d.errFormatter.Format(s))
 	}
 }
-
-func (d AsyncDisplay) CloseTest(ctx facade.TestContext) {
-	// report end of test to suite printer
-	suite := ctx.Config.TestSuite.Get()
-	seq := int(ctx.Seq)
-	d.printers.testEnded(suite, seq)
-
-	key := testDisplayerKey(ctx)
-	d.openedTests[key].Close()
-	delete(d.openedTests, key)
-}
+*/
 
 func (d AsyncDisplay) assertionResult(printer printz.Printer, result model.AssertionResult) {
 	hlClr := display.ReportColor
@@ -326,7 +374,10 @@ func (d AsyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 	// }
 
 	//printer := d.stdPrinter // Do not print async
-	printer := d.printers.printer(testSuite, -1)
+	suite := outcome.TestSuite
+	session := d.screen.Session(suite, 0)
+	printer := session.Printer(SuitePrinterName, 0)
+	//printer := d.printers.printer(testSuite, -1)
 
 	ignoredMessage := ""
 	if ignoredCount > 0 {
@@ -354,10 +405,14 @@ func (d AsyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 		printer.ColoredErrf(display.WarningColor, "Too much failures (%d tests not executed)\n", tooMuchCount)
 	}
 
-	err := closeSuite(d.token, d.isolation, testSuite)
-	if err != nil {
-		panic(err)
-	}
+	session.End()
+
+	/*
+		err := closeSuite(d.token, d.isolation, testSuite)
+		if err != nil {
+			panic(err)
+		}
+	*/
 }
 
 func (d AsyncDisplay) ReportSuite(outcome model.SuiteOutcome) {
@@ -387,7 +442,8 @@ func (d AsyncDisplay) ReportAllFooter(globalCtx facade.GlobalContext) {
 	if d.quiet {
 		return
 	}
-	printer := d.stdPrinter // Do not print async
+	//printer := d.stdPrinter // Do not print async
+	printer := d.screen.NotifyPrinter()
 	globalStartTime := globalCtx.Config.GlobalStartTime.Get()
 	globalDuration := model.NormalizeDurationInSec(time.Since(globalStartTime))
 	printer.ColoredErrf(display.MessageColor, "Global duration time: %s\n", globalDuration)
@@ -400,36 +456,42 @@ func (d AsyncDisplay) TooMuchFailures(ctx facade.SuiteContext, testSuite string)
 	if ctx.Config.Verbose.Get() == model.SHOW_REPORTS_ONLY {
 		return
 	}
-	printer := d.printers.printer(testSuite, 0)
+	session := d.screen.Session(testSuite, 0)
+	printer := session.Printer(SuitePrinterName, 0)
+	//printer := d.printers.printer(testSuite, 0)
 	printer.ColoredErrf(display.WarningColor, "Too much failure for [%s] test suite. Stop testing.\n", testSuite)
 }
 
 func (d AsyncDisplay) Errors(errors ...error) {
 	//  An Error cannot be Fatal
-	printer := printz.NewStandard()
+	//printer := printz.NewStandard()
+	printer := d.screen.NotifyPrinter()
 	for _, err := range errors {
 		printer.ColoredErrf(display.ErrorColor, "ERROR: %s\n", err)
 	}
 }
 
 func (d AsyncDisplay) GlobalErrors(ctx facade.GlobalContext, errors ...error) {
-	p := d.printers.printer("", 0)
+	printer := d.screen.NotifyPrinter()
+	//printer := d.printers.printer("", 0)
 	for _, err := range errors {
-		p.ColoredErrf(display.ErrorColor, "ERROR: %s\n", err)
+		printer.ColoredErrf(display.ErrorColor, "ERROR: %s\n", err)
 	}
 }
 
 func (d AsyncDisplay) SuiteErrors(ctx facade.SuiteContext, errors ...error) {
-	suite := ctx.Config.TestSuite.Get()
-	p := d.printers.printer(suite, 0)
+	testSuite := ctx.Config.TestSuite.Get()
+	session := d.screen.Session(testSuite, 0)
+	printer := session.Printer(SuitePrinterName, 0)
+	//printer := d.printers.printer(suite, 0)
 	for _, err := range errors {
-		p.ColoredErrf(display.ErrorColor, "ERROR: %s\n", err)
+		printer.ColoredErrf(display.ErrorColor, "ERROR: %s\n", err)
 	}
 }
 
 func (d AsyncDisplay) TestErrors(ctx facade.TestContext, errors ...error) {
 	key := testDisplayerKey(ctx)
-	if td, ok := d.openedTests[key]; ok {
+	if td, ok := d.testDisplayers[key]; ok {
 		td.Errors(errors...)
 	} else {
 		d.SuiteErrors(ctx.SuiteContext, errors...)
@@ -449,6 +511,7 @@ func (d *AsyncDisplay) SetVerbose(level model.VerboseLevel) {
 	d.verbose = level
 }
 
+/*
 func (d *AsyncDisplay) DisplayRecorded0(suite string, timeout time.Duration) error {
 	p := logger.PerfTimer("suite", suite)
 	defer p.End()
@@ -508,14 +571,27 @@ func (d *AsyncDisplay) DisplayRecorded0(suite string, timeout time.Duration) err
 	}
 	return nil
 }
+*/
 
 func (d *AsyncDisplay) Clear(suite string) error {
+	// FIXME: do we need to clear screen suite tmp files ?
+
 	// Clear files on suite init
-	d.printers.clear(suite)
-	err := clearFileWriters(d.token, d.isolation, suite)
-	return err
+	//d.printers.clear(suite)
+	//err := clearFileWriters(d.token, d.isolation, suite)
+	//return err
+	return nil
 }
 
+func (d *AsyncDisplay) ContinuousFlushBlocking(suite string, timeout time.Duration) error {
+	return d.tailer.ContinuousFlushBlocking(suite, timeout)
+}
+
+func (d *AsyncDisplay) ContinuousFlushAllBlocking(timeout time.Duration) error {
+	return d.tailer.ContinuousFlushAllBlocking(timeout)
+}
+
+/*
 func (d *AsyncDisplay) AsyncFlush(suite string, timeout time.Duration) error {
 	// Launch goroutine wich will continuously flush suite async display
 	p := logger.PerfTimer("suite", suite)
@@ -658,17 +734,18 @@ func (d *AsyncDisplay) BlockTailAll(timeout time.Duration) error {
 	}
 	return nil
 }
+*/
 
+/*
 func (d *AsyncDisplay) DisplayAllRecorded0(timeout time.Duration) (err error) {
 	p := logger.PerfTimer()
 	defer p.End()
 
-	/*
-		err = d.DisplayRecorded("")
-		if err != nil {
-			return
-		}
-	*/
+	// err = d.DisplayRecorded("")
+	// if err != nil {
+	// 	return
+	// }
+
 	recordedSuites := d.printers.recordedSuites()
 	for _, suite := range recordedSuites {
 		err = d.DisplayRecorded0(suite, timeout)
@@ -714,25 +791,30 @@ func (d *AsyncDisplay) StopDisplayRecorded0(suite string) {
 func (d *AsyncDisplay) StopDisplayAllRecorded0() {
 	// Something to do ?
 }
+*/
 
-func New(token, isolation string) *AsyncDisplay {
-	p := printz.NewStandard()
+func New(tmpDir string) *AsyncDisplay {
+	outs := printz.NewStandardOutputs()
 	openedTests := make(map[string]display.TestDisplayer, 0)
+	zcreenTmpDir := filepath.Join(tmpDir, "zcreen")
 	d := &AsyncDisplay{
-		token:              token,
-		isolation:          isolation,
-		stdPrinter:         p,
-		clearAnsiFormatter: inout.AnsiFormatter{AnsiFormat: ansi.Reset},
-		outFormatter:       inout.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", display.TestColor, display.ResetColor)},
-		errFormatter:       inout.PrefixFormatter{Prefix: fmt.Sprintf("%serr%s>", display.ReportColor, display.ResetColor)},
-		verbose:            model.DefaultVerboseLevel,
-		quiet:              false,
-		printers:           newAsyncPrinters(token, isolation, nil, nil),
-		openedTests:        openedTests,
+		//token:     token,
+		//isolation: isolation,
+		//stdPrinter:         p,
+		//clearAnsiFormatter: inout.AnsiFormatter{AnsiFormat: ansi.Reset},
+		outFormatter: inout.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", display.TestColor, display.ResetColor)},
+		errFormatter: inout.PrefixFormatter{Prefix: fmt.Sprintf("%serr%s>", display.ReportColor, display.ResetColor)},
+		verbose:      model.DefaultVerboseLevel,
+		quiet:        false,
+		//printers:           newAsyncPrinters(token, isolation, nil, nil),
+		testDisplayers: openedTests,
+		screen:         screen.NewAsyncScreen(zcreenTmpDir),
+		tailer:         screen.NewAsyncScreenTailer(outs, zcreenTmpDir),
 	}
 	return d
 }
 
+/*
 func closeSuite(token, isol, suite string) error {
 	_, _, doneFile, _, err := repo.DaemonSuiteReportFilepathes(suite, token, isol)
 	if err != nil {
@@ -745,3 +827,4 @@ func closeSuite(token, isol, suite string) error {
 	err = f.Close()
 	return err
 }
+*/
