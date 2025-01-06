@@ -20,7 +20,11 @@ const (
 
 type Displayer interface {
 	Global(facade.GlobalContext)
-	Suite(facade.SuiteContext)
+
+	OpenSuite(facade.SuiteContext)
+	CloseSuite(facade.SuiteContext)
+
+	SuiteTitle(facade.SuiteContext)
 
 	OpenTest(facade.TestContext) TestDisplayer
 	CloseTest(facade.TestContext)
@@ -64,11 +68,19 @@ func (d basicDisplay) Global(ctx facade.GlobalContext) {
 	}
 }
 
-func (d basicDisplay) Suite(ctx facade.SuiteContext) {
+func (d basicDisplay) SuiteTitle(ctx facade.SuiteContext) {
 	defer d.Flush()
 	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
 		d.printer.ColoredErrf(MessageColor, "## Test suite [%s] (token: %s)\n", ctx.Config.TestSuite.Get(), ctx.Token)
 	}
+}
+
+func (d basicDisplay) OpenSuite(ctx facade.SuiteContext) {
+	// Nothing to do
+}
+
+func (d basicDisplay) CloseSuite(ctx facade.SuiteContext) {
+	// Nothing to do
 }
 
 func (d *basicDisplay) OpenTest(ctx facade.TestContext) TestDisplayer {

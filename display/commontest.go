@@ -13,7 +13,8 @@ import (
 
 func DisplaySuite(d Displayer, token, isol string, suite int) {
 	ctx := facade.NewSuiteContext(token, isol, fmt.Sprintf("suite-%d", suite), true, model.InitAction, model.Config{})
-	d.Suite(ctx)
+	d.OpenSuite(ctx)
+	d.SuiteTitle(ctx)
 }
 
 func DisplayReport(d Displayer, suite int) {

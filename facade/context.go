@@ -220,9 +220,8 @@ type TestContext struct {
 }
 
 func (c TestContext) TestId() (id string) {
-	// TODO
-	errorz.Fatal("not implemented yet")
-	return
+	//errorz.Fatal("not implemented yet")
+	return fmt.Sprintf("%s__%d", c.Suite.Config.TestSuite.Get(), c.Seq)
 }
 
 func (c *TestContext) IncrementTestCount() (n uint16) {

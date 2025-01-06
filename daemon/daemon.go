@@ -156,7 +156,7 @@ func (d daemon) report(def model.ReportDefinition) (exitCode int16, err error) {
 	defer perf.End()
 	//d.display.DisplayRecorded(def.TestSuite, def.Config.Timeout.Get())
 	go func() {
-		err := d.display.ContinuousFlushBlocking(def.TestSuite, def.Config.Timeout.Get())
+		err := d.display.TailBlocking(def.TestSuite, def.Config.Timeout.Get())
 		if err != nil {
 			panic(err)
 		}
@@ -170,7 +170,7 @@ func (d daemon) reportAll(def model.ReportDefinition) (exitCode int16) {
 	defer perf.End()
 	//d.display.DisplayAllRecorded(def.Config.Timeout.Get())
 	go func() {
-		err := d.display.ContinuousFlushAllBlocking(def.Config.Timeout.Get())
+		err := d.display.TailAllBlocking(def.Config.Timeout.Get())
 		if err != nil {
 			panic(err)
 		}

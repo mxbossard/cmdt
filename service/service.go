@@ -81,7 +81,8 @@ func InitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	err = ctx.InitSuite()
 	ProcessSuiteError(ctx, err)
 
-	Dpl.Suite(ctx)
+	Dpl.OpenSuite(ctx)
+	Dpl.SuiteTitle(ctx)
 	return
 }
 
@@ -422,7 +423,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				asyncDpl := asyncdisplay.New(globalCtx.Repo.BackingFilepath())
 				//asyncDpl.StartDisplayAllRecorded(globalCtx.Config.SuiteTimeout.Get())
 
-				err = asyncDpl.ContinuousFlushAllBlocking(globalCtx.Config.SuiteTimeout.Get())
+				err = asyncDpl.TailAllBlocking(globalCtx.Config.SuiteTimeout.Get())
 				if err != nil {
 					errorz.Fatal(err)
 				}
@@ -511,7 +512,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 
 				asyncDpl := asyncdisplay.New(suiteCtx.Repo.BackingFilepath())
 				//asyncDpl.StartDisplayRecorded(testSuite, suiteCtx.Config.SuiteTimeout.Get())
-				err = asyncDpl.ContinuousFlushBlocking(testSuite, suiteCtx.Config.SuiteTimeout.Get())
+				err = asyncDpl.TailBlocking(testSuite, suiteCtx.Config.SuiteTimeout.Get())
 				ProcessSuiteError(suiteCtx, err)
 				//suiteCtx.Repo.WaitEmptyQueue(testSuite, suiteCtx.Config.SuiteTimeout.Get())
 				//asyncDpl.WaitDisplayRecorded()
@@ -589,7 +590,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 	logger.Info("exiting", "exitCode", exitCode)
 
 	if err != nil {
-		errorz.Fatal(inputConfig.TestSuite, inputConfig.Token, err)
+		errorz.Fatal(inputConfig.TestSuite.Get(), inputConfig.Token, err)
 	}
 	return
 }

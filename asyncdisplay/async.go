@@ -29,14 +29,14 @@ var (
 )
 
 func testDisplayerKey(ctx facade.TestContext) string {
-	return fmt.Sprintf("%s//%d", ctx.Config.TestSuite, ctx.Seq)
+	return fmt.Sprintf("%s//%d", ctx.Config.TestSuite.Get(), ctx.Seq)
 }
 
 type AsyncDisplay struct {
 	//token, isolation string
 	verbose model.VerboseLevel
 	quiet   bool
-	done    chan error
+	//done    chan error
 
 	screen screen.Sink
 	tailer screen.Tailer
@@ -72,7 +72,7 @@ func (d AsyncDisplay) Fatal(v ...any) {
 	os.Exit(1)
 }
 
-func (d AsyncDisplay) Suite(ctx facade.SuiteContext) {
+func (d AsyncDisplay) OpenSuite(ctx facade.SuiteContext) {
 	if d.quiet {
 		return
 	}
@@ -83,7 +83,20 @@ func (d AsyncDisplay) Suite(ctx facade.SuiteContext) {
 	if err != nil {
 		panic(err)
 	}
+}
 
+func (d AsyncDisplay) CloseSuite(ctx facade.SuiteContext) {
+	suite := ctx.Config.TestSuite.Get()
+	session := d.screen.Session(suite, 0)
+	err := session.End()
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (d AsyncDisplay) SuiteTitle(ctx facade.SuiteContext) {
+	suite := ctx.Config.TestSuite.Get()
+	session := d.screen.Session(suite, 0)
 	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
 		//printer := d.printers.printer(suite, 0)
 		printer := session.Printer(SuitePrinterName, 0)
@@ -583,12 +596,30 @@ func (d *AsyncDisplay) Clear(suite string) error {
 	return nil
 }
 
-func (d *AsyncDisplay) ContinuousFlushBlocking(suite string, timeout time.Duration) error {
-	return d.tailer.ContinuousFlushBlocking(suite, timeout)
+func (d *AsyncDisplay) AsyncFlush(suite string, timeout time.Duration) {
+	go func() {
+		err := d.screen.FlushBlocking(suite, timeout)
+		if err != nil {
+			panic(err)
+		}
+	}()
 }
 
-func (d *AsyncDisplay) ContinuousFlushAllBlocking(timeout time.Duration) error {
-	return d.tailer.ContinuousFlushAllBlocking(timeout)
+func (d *AsyncDisplay) AsyncFlushAll(timeout time.Duration) {
+	go func() {
+		err := d.screen.FlushAllBlocking(timeout)
+		if err != nil {
+			panic(err)
+		}
+	}()
+}
+
+func (d *AsyncDisplay) TailBlocking(suite string, timeout time.Duration) error {
+	return d.tailer.TailBlocking(suite, timeout)
+}
+
+func (d *AsyncDisplay) TailAllBlocking(timeout time.Duration) error {
+	return d.tailer.TailAllBlocking(timeout)
 }
 
 /*
