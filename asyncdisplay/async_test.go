@@ -2,6 +2,7 @@ package asyncdisplay
 
 import (
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -48,7 +49,8 @@ func TestAsyncDisplay_TestStdout(t *testing.T) {
 	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
-	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), tmpDir)
+	zcreenTmpDir := filepath.Join(tmpDir, "zcreen")
+	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), zcreenTmpDir)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
@@ -107,13 +109,14 @@ func TestAsyncDisplay_TestTitle(t *testing.T) {
 	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
-	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), tmpDir)
+	zcreenTmpDir := filepath.Join(tmpDir, "zcreen")
+	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), zcreenTmpDir)
 
 	sctx := facade.NewSuiteContext(token, isol, suite, false, model.InitAction, model.Config{})
 	d.OpenSuite(sctx)
 
-	d.AsyncFlushAll(100 * time.Millisecond)
-	err = d.TailAllBlocking(100 * time.Millisecond)
+	d.AsyncFlushAll(20 * time.Millisecond)
+	err = d.TailAllBlocking(20 * time.Millisecond)
 	require.NoError(t, err)
 
 	assert.Empty(t, outW.String())
@@ -127,8 +130,8 @@ func TestAsyncDisplay_TestTitle(t *testing.T) {
 	td.Title()
 	td.Close()
 
-	d.AsyncFlushAll(100 * time.Millisecond)
-	err = d.TailAllBlocking(100 * time.Millisecond)
+	d.AsyncFlushAll(20 * time.Millisecond)
+	err = d.TailAllBlocking(20 * time.Millisecond)
 	require.NoError(t, err)
 
 	assert.Empty(t, outW.String())
@@ -156,7 +159,8 @@ func TestBlockTail(t *testing.T) {
 	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
-	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), tmpDir)
+	zcreenTmpDir := filepath.Join(tmpDir, "zcreen")
+	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), zcreenTmpDir)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
@@ -249,7 +253,7 @@ func TestBlockTail(t *testing.T) {
 	assert.NoFileExists(t, doneFile)
 	assert.NoFileExists(t, flushedFile)
 
-	d.AsyncFlush("suite-101", 100*time.Millisecond)
+	d.AsyncFlush("suite-101", 20*time.Millisecond)
 
 	stdoutContent, err := filez.ReadString(stdoutFile)
 	require.NoError(t, err)
@@ -265,7 +269,7 @@ func TestBlockTail(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	err = d.TailBlocking("suite-101", 100*time.Millisecond)
+	err = d.TailBlocking("suite-101", 20*time.Millisecond)
 	require.NoError(t, err)
 
 	outScenarioRegexp := regexp.MustCompile("^" +
@@ -308,7 +312,8 @@ func TestBlockTail_Twice(t *testing.T) {
 	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
-	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), tmpDir)
+	zcreenTmpDir := filepath.Join(tmpDir, "zcreen")
+	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), zcreenTmpDir)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
@@ -327,8 +332,8 @@ func TestBlockTail_Twice(t *testing.T) {
 	assert.Empty(t, errW.String())
 
 	require.NoError(t, err)
-	d.AsyncFlush("suite-1", 100*time.Millisecond)
-	err = d.TailBlocking("suite-1", 100*time.Millisecond)
+	d.AsyncFlush("suite-1", 20*time.Millisecond)
+	err = d.TailBlocking("suite-1", 20*time.Millisecond)
 	require.NoError(t, err)
 
 	assert.Empty(t, ansi.Unformat(outW.String()))
@@ -359,8 +364,8 @@ func TestBlockTail_Twice(t *testing.T) {
 	assert.Empty(t, errW.String())
 
 	require.NoError(t, err)
-	d.AsyncFlush("suite-1", 100*time.Millisecond)
-	err = d.TailBlocking("suite-1", 100*time.Millisecond)
+	d.AsyncFlush("suite-1", 20*time.Millisecond)
+	err = d.TailBlocking("suite-1", 20*time.Millisecond)
 	require.NoError(t, err)
 
 	// Expect scénario to be test2
@@ -394,7 +399,8 @@ func TestAsyncFlushThenDisplayThenBlockTail(t *testing.T) {
 	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
-	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), tmpDir)
+	zcreenTmpDir := filepath.Join(tmpDir, "zcreen")
+	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), zcreenTmpDir)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
@@ -423,7 +429,7 @@ func TestAsyncFlushThenDisplayThenBlockTail(t *testing.T) {
 	display.DisplayTestErr(t, d, token, isol, 1, 1)
 	display.DisplayEndTest(t, d, token, isol, 1, 1)
 
-	d.AsyncFlush("suite-1", 100*time.Millisecond)
+	d.AsyncFlush("suite-1", 20*time.Millisecond)
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -444,7 +450,7 @@ func TestAsyncFlushThenDisplayThenBlockTail(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	err = d.TailBlocking("suite-1", 100*time.Millisecond)
+	err = d.TailBlocking("suite-1", 20*time.Millisecond)
 	require.NoError(t, err)
 
 	assert.Empty(t, ansi.Unformat(outW.String()))
@@ -485,7 +491,8 @@ func TestBlockTailAll(t *testing.T) {
 	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
-	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), tmpDir)
+	zcreenTmpDir := filepath.Join(tmpDir, "zcreen")
+	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), zcreenTmpDir)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
@@ -531,8 +538,8 @@ func TestBlockTailAll(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	d.AsyncFlushAll(100 * time.Millisecond)
-	err = d.TailAllBlocking(100 * time.Millisecond)
+	d.AsyncFlushAll(20 * time.Millisecond)
+	err = d.TailAllBlocking(20 * time.Millisecond)
 	require.NoError(t, err)
 
 	assert.Empty(t, ansi.Unformat(outW.String()))
@@ -574,7 +581,8 @@ func TestAsyncFlushAllThenDisplayThenBlockTailAll(t *testing.T) {
 	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
-	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), tmpDir)
+	zcreenTmpDir := filepath.Join(tmpDir, "zcreen")
+	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), zcreenTmpDir)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
@@ -609,7 +617,7 @@ func TestAsyncFlushAllThenDisplayThenBlockTailAll(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	d.AsyncFlushAll(1000 * time.Millisecond)
+	d.AsyncFlushAll(50 * time.Millisecond)
 
 	// Simulate outputs sent disordered
 	display.DisplayTestOut(t, d, token, isol, 1, 1)
@@ -630,7 +638,7 @@ func TestAsyncFlushAllThenDisplayThenBlockTailAll(t *testing.T) {
 
 	display.DisplayReport(d, 1)
 
-	err = d.TailAllBlocking(100 * time.Millisecond)
+	err = d.TailAllBlocking(20 * time.Millisecond)
 	require.NoError(t, err)
 
 	assert.Empty(t, ansi.Unformat(outW.String()))
@@ -672,7 +680,8 @@ func TestAsyncDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
-	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), tmpDir)
+	zcreenTmpDir := filepath.Join(tmpDir, "zcreen")
+	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), zcreenTmpDir)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
@@ -750,8 +759,8 @@ func TestAsyncDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	d.AsyncFlushAll(100 * time.Millisecond)
-	err = d.TailAllBlocking(100 * time.Millisecond)
+	d.AsyncFlushAll(20 * time.Millisecond)
+	err = d.TailAllBlocking(20 * time.Millisecond)
 	require.NoError(t, err)
 
 	assert.Empty(t, ansi.Unformat(outW.String()))
@@ -811,7 +820,8 @@ func TestAsyncDisplayUsage_AsyncSuitesSerialTests(t *testing.T) {
 	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
-	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), tmpDir)
+	zcreenTmpDir := filepath.Join(tmpDir, "zcreen")
+	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), zcreenTmpDir)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
@@ -901,8 +911,8 @@ func TestAsyncDisplayUsage_AsyncSuitesSerialTests(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	d.AsyncFlushAll(100 * time.Millisecond)
-	err = d.TailAllBlocking(100 * time.Millisecond)
+	d.AsyncFlushAll(20 * time.Millisecond)
+	err = d.TailAllBlocking(20 * time.Millisecond)
 	require.NoError(t, err)
 
 	assert.Empty(t, ansi.Unformat(outW.String()))
@@ -961,7 +971,8 @@ func TestAsyncDisplayUsage_AsyncSuitesAsyncTests(t *testing.T) {
 	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
-	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), tmpDir)
+	zcreenTmpDir := filepath.Join(tmpDir, "zcreen")
+	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), zcreenTmpDir)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
@@ -1052,8 +1063,8 @@ func TestAsyncDisplayUsage_AsyncSuitesAsyncTests(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	d.AsyncFlushAll(100 * time.Millisecond)
-	err = d.TailAllBlocking(100 * time.Millisecond)
+	d.AsyncFlushAll(20 * time.Millisecond)
+	err = d.TailAllBlocking(20 * time.Millisecond)
 	require.NoError(t, err)
 
 	assert.Empty(t, ansi.Unformat(outW.String()))

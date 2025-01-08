@@ -274,7 +274,7 @@ func (d basicTestDisplayer) Flush() {
 	}
 }
 
-func (d basicTestDisplayer) Open() {
+func (d *basicTestDisplayer) Open() {
 	if d.outcomed {
 		panic(fmt.Sprintf("Test: [%s] already outcomed !", d.ctx.TestId()))
 	}
