@@ -222,6 +222,7 @@ func (d basicTestDisplayer) Stdout(s string) {
 	defer d.Flush()
 	if s != "" {
 		d.bufNotQuietPrinter.Out(s)
+		//d.bufPrinter.Out(s)
 	}
 	// if !d.opened {
 	// 	d.bufNotQuietPrinter.Flush()
@@ -234,6 +235,7 @@ func (d basicTestDisplayer) Stderr(s string) {
 	defer d.Flush()
 	if s != "" {
 		d.bufNotQuietPrinter.Err(s)
+		//d.bufPrinter.Err(s)
 	}
 	// if !d.opened {
 	// 	d.bufNotQuietPrinter.Flush()
@@ -262,12 +264,12 @@ func (d basicTestDisplayer) Flush() {
 	if err != nil {
 		panic(err)
 	}
-	if !d.opened {
-		err = d.bufNotQuietPrinter.Flush()
-		if err != nil {
-			panic(err)
-		}
+	//if !d.opened {
+	err = d.bufNotQuietPrinter.Flush()
+	if err != nil {
+		panic(err)
 	}
+	//}
 	err = d.dpl.Flush()
 	if err != nil {
 		panic(err)

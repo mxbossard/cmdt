@@ -63,11 +63,11 @@ func TestAsyncDisplay_TestStdout(t *testing.T) {
 	errMsg := "stderr\n"
 	ctx, err := facade.NewTestContext(token, isol, suite, 1, model.Config{}, uint32(42))
 	require.NoError(t, err)
+	ctx.Config.Verbose.Set(model.SHOW_ALL)
 	ctx.CmdExec = cmdz.Cmd("true")
 	td := d.OpenTest(ctx)
 	td.Stdout(outMsg)
 	td.Stderr(errMsg)
-	d.CloseTest(ctx)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
@@ -83,13 +83,13 @@ func TestAsyncDisplay_TestStdout(t *testing.T) {
 	outW.Reset()
 	errW.Reset()
 
-	// FIXME: why AsyncFlushAll should re flush already flushed suite ?
+	// why AsyncFlushAll should not re flush already flushed suites
 	d.AsyncFlushAll(20 * time.Millisecond)
 	err = d.TailAllBlocking(20 * time.Millisecond)
 	require.NoError(t, err)
 
-	assert.Equal(t, outMsg, outW.String())
-	assert.Equal(t, errMsg, errW.String())
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
 }
 
 func TestAsyncDisplay_TestTitle(t *testing.T) {
