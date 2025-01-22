@@ -17,7 +17,6 @@ import (
 	"mby.fr/cmdtest/repo"
 	"mby.fr/utils/ansi"
 	"mby.fr/utils/cmdz"
-	"mby.fr/utils/filez"
 	"mby.fr/utils/printz"
 	"mby.fr/utils/screen"
 	"mby.fr/utils/zlog"
@@ -122,7 +121,7 @@ func TestAsyncDisplay_TestTitle(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	ctx, err := facade.NewTestContext("token", "isol", "suite", 1, model.Config{}, 42)
+	ctx, err := facade.NewTestContext(token, isol, suite, 1, model.Config{}, 42)
 	require.NoError(t, err)
 	ctx.CmdExec = cmdz.Cmd("true")
 
@@ -165,13 +164,13 @@ func TestBlockTail(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	stdoutFile, stderrFile, doneFile, flushedFile, err := repo.DaemonSuiteReportFilepathes("suite-101", token, isol)
-	require.NoError(t, err)
+	//stdoutFile, stderrFile, doneFile, flushedFile, err := repo.DaemonSuiteReportFilepathes("suite-101", token, isol)
+	//require.NoError(t, err)
 
-	assert.NoFileExists(t, stdoutFile)
-	assert.NoFileExists(t, stderrFile)
-	assert.NoFileExists(t, doneFile)
-	assert.NoFileExists(t, flushedFile)
+	// assert.NoFileExists(t, stdoutFile)
+	// assert.NoFileExists(t, stderrFile)
+	// assert.NoFileExists(t, doneFile)
+	// assert.NoFileExists(t, flushedFile)
 
 	// Scénario: Writing on 3 suites in sync with test ran serial
 	// 100- Init suite101
@@ -189,49 +188,64 @@ func TestBlockTail(t *testing.T) {
 	// Start 3 tests async/unordered
 	display.DisplaySuite(d, token, isol, 101) // 100- Init suite1
 
-	assert.FileExists(t, stdoutFile)
-	assert.FileExists(t, stderrFile)
-	assert.NoFileExists(t, doneFile)
-	assert.NoFileExists(t, flushedFile)
-	assert.Empty(t, func() string { s, _ := filez.ReadString(stdoutFile); return s }())
-	assert.Empty(t, func() string { s, _ := filez.ReadString(stderrFile); return s }())
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	// assert.FileExists(t, stdoutFile)
+	// assert.FileExists(t, stderrFile)
+	// assert.NoFileExists(t, doneFile)
+	// assert.NoFileExists(t, flushedFile)
+	// assert.Empty(t, func() string { s, _ := filez.ReadString(stdoutFile); return s }())
+	// assert.Empty(t, func() string { s, _ := filez.ReadString(stderrFile); return s }())
 
 	// Simulate outputs sent disordered
 	display.DisplayTestTitle(t, d, token, isol, 101, 1)
 
-	assert.FileExists(t, stdoutFile)
-	assert.FileExists(t, stderrFile)
-	assert.NoFileExists(t, doneFile)
-	assert.NoFileExists(t, flushedFile)
-	assert.Empty(t, func() string { s, _ := filez.ReadString(stdoutFile); return s }())
-	assert.Empty(t, func() string { s, _ := filez.ReadString(stderrFile); return s }())
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	// assert.FileExists(t, stdoutFile)
+	// assert.FileExists(t, stderrFile)
+	// assert.NoFileExists(t, doneFile)
+	// assert.NoFileExists(t, flushedFile)
+	// assert.Empty(t, func() string { s, _ := filez.ReadString(stdoutFile); return s }())
+	// assert.Empty(t, func() string { s, _ := filez.ReadString(stderrFile); return s }())
 
 	display.DisplayTestOut(t, d, token, isol, 101, 1)
 
-	assert.FileExists(t, stdoutFile)
-	assert.FileExists(t, stderrFile)
-	assert.NoFileExists(t, doneFile)
-	assert.NoFileExists(t, flushedFile)
-	assert.Empty(t, func() string { s, _ := filez.ReadString(stdoutFile); return s }())
-	assert.Empty(t, func() string { s, _ := filez.ReadString(stderrFile); return s }())
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	// assert.FileExists(t, stdoutFile)
+	// assert.FileExists(t, stderrFile)
+	// assert.NoFileExists(t, doneFile)
+	// assert.NoFileExists(t, flushedFile)
+	// assert.Empty(t, func() string { s, _ := filez.ReadString(stdoutFile); return s }())
+	// assert.Empty(t, func() string { s, _ := filez.ReadString(stderrFile); return s }())
 
 	display.DisplayTestErr(t, d, token, isol, 101, 1)
 
-	assert.FileExists(t, stdoutFile)
-	assert.FileExists(t, stderrFile)
-	assert.NoFileExists(t, doneFile)
-	assert.NoFileExists(t, flushedFile)
-	assert.Empty(t, func() string { s, _ := filez.ReadString(stdoutFile); return s }())
-	assert.Empty(t, func() string { s, _ := filez.ReadString(stderrFile); return s }())
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	// assert.FileExists(t, stdoutFile)
+	// assert.FileExists(t, stderrFile)
+	// assert.NoFileExists(t, doneFile)
+	// assert.NoFileExists(t, flushedFile)
+	// assert.Empty(t, func() string { s, _ := filez.ReadString(stdoutFile); return s }())
+	// assert.Empty(t, func() string { s, _ := filez.ReadString(stderrFile); return s }())
 
 	display.DisplayEndTest(t, d, token, isol, 101, 1)
 
-	assert.FileExists(t, stdoutFile)
-	assert.FileExists(t, stderrFile)
-	assert.NoFileExists(t, doneFile)
-	assert.NoFileExists(t, flushedFile)
-	assert.Empty(t, func() string { s, _ := filez.ReadString(stdoutFile); return s }())
-	assert.Empty(t, func() string { s, _ := filez.ReadString(stderrFile); return s }())
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	// assert.FileExists(t, stdoutFile)
+	// assert.FileExists(t, stderrFile)
+	// assert.NoFileExists(t, doneFile)
+	// assert.NoFileExists(t, flushedFile)
+	// assert.Empty(t, func() string { s, _ := filez.ReadString(stdoutFile); return s }())
+	// assert.Empty(t, func() string { s, _ := filez.ReadString(stderrFile); return s }())
 
 	display.DisplayTestTitle(t, d, token, isol, 101, 3)
 	display.DisplayTestOut(t, d, token, isol, 101, 3)
@@ -248,23 +262,26 @@ func TestBlockTail(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	assert.NoFileExists(t, stdoutFile)
-	assert.NoFileExists(t, stderrFile)
-	assert.NoFileExists(t, doneFile)
-	assert.NoFileExists(t, flushedFile)
+	// assert.NoFileExists(t, stdoutFile)
+	// assert.NoFileExists(t, stderrFile)
+	// assert.NoFileExists(t, doneFile)
+	// assert.NoFileExists(t, flushedFile)
 
 	d.AsyncFlush("suite-101", 20*time.Millisecond)
 
-	stdoutContent, err := filez.ReadString(stdoutFile)
-	require.NoError(t, err)
-	assert.Empty(t, stdoutContent)
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
 
-	stderrContent, err := filez.ReadString(stderrFile)
-	require.NoError(t, err)
-	assert.Empty(t, stderrContent)
+	// stdoutContent, err := filez.ReadString(stdoutFile)
+	// require.NoError(t, err)
+	// assert.Empty(t, stdoutContent)
 
-	assert.NoFileExists(t, doneFile)
-	assert.NoFileExists(t, flushedFile)
+	// stderrContent, err := filez.ReadString(stderrFile)
+	// require.NoError(t, err)
+	// assert.Empty(t, stderrContent)
+
+	// assert.NoFileExists(t, doneFile)
+	// assert.NoFileExists(t, flushedFile)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())

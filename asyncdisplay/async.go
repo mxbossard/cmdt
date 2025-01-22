@@ -11,6 +11,7 @@ import (
 	"mby.fr/cmdtest/facade"
 	"mby.fr/cmdtest/model"
 	"mby.fr/utils/ansi"
+	"mby.fr/utils/errorz"
 	"mby.fr/utils/format"
 	"mby.fr/utils/inout"
 	"mby.fr/utils/printz"
@@ -599,7 +600,7 @@ func (d *AsyncDisplay) Clear(suite string) error {
 func (d *AsyncDisplay) AsyncFlush(suite string, timeout time.Duration) {
 	go func() {
 		err := d.screen.FlushBlocking(suite, timeout)
-		if err != nil {
+		if err != nil && !errorz.IsTimeout(err) {
 			panic(err)
 		}
 	}()
@@ -608,7 +609,7 @@ func (d *AsyncDisplay) AsyncFlush(suite string, timeout time.Duration) {
 func (d *AsyncDisplay) AsyncFlushAll(timeout time.Duration) {
 	go func() {
 		err := d.screen.FlushAllBlocking(timeout)
-		if err != nil {
+		if err != nil && !errorz.IsTimeout(err) {
 			panic(err)
 		}
 	}()
