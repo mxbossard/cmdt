@@ -20,7 +20,8 @@ import (
 )
 
 const (
-	SuitePrinterName        = "__session__"
+	SuiteBeginPrinterName   = "__sessionBEGIN__"
+	SuiteEndPrinterName     = "__sessionEND__"
 	RecordedFileFlushPeriod = 20 * time.Millisecond
 	RecordedFileTailPeriod  = 20 * time.Millisecond
 )
@@ -100,10 +101,10 @@ func (d AsyncDisplay) SuiteTitle(ctx facade.SuiteContext) {
 	session := d.screen.Session(suite, 0)
 	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
 		//printer := d.printers.printer(suite, 0)
-		printer := session.Printer(SuitePrinterName, 0)
+		printer := session.Printer(SuiteBeginPrinterName, 0)
 		printer.ColoredErrf(display.MessageColor, "## Test suite [%s] (token: %s)\n", suite, ctx.Token)
 		printer.Flush()
-		session.ClosePrinter(SuitePrinterName)
+		session.ClosePrinter(SuiteBeginPrinterName)
 	}
 }
 
@@ -390,8 +391,24 @@ func (d AsyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 	//printer := d.stdPrinter // Do not print async
 	suite := outcome.TestSuite
 	session := d.screen.Session(suite, 0)
-	printer := session.Printer(SuitePrinterName, 0)
+	// err := session.Flush()
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	printer := session.Printer(SuiteEndPrinterName, 9999)
 	//printer := d.printers.printer(testSuite, -1)
+
+	defer func() {
+		err := session.ClosePrinter(SuiteEndPrinterName)
+		if err != nil {
+			panic(err)
+		}
+		err = session.End()
+		if err != nil {
+			panic(err)
+		}
+	}()
 
 	ignoredMessage := ""
 	if ignoredCount > 0 {
@@ -418,8 +435,6 @@ func (d AsyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 	if tooMuchCount > 0 {
 		printer.ColoredErrf(display.WarningColor, "Too much failures (%d tests not executed)\n", tooMuchCount)
 	}
-
-	session.End()
 
 	/*
 		err := closeSuite(d.token, d.isolation, testSuite)
@@ -471,7 +486,7 @@ func (d AsyncDisplay) TooMuchFailures(ctx facade.SuiteContext, testSuite string)
 		return
 	}
 	session := d.screen.Session(testSuite, 0)
-	printer := session.Printer(SuitePrinterName, 0)
+	printer := session.Printer(SuiteEndPrinterName, 9999)
 	//printer := d.printers.printer(testSuite, 0)
 	printer.ColoredErrf(display.WarningColor, "Too much failure for [%s] test suite. Stop testing.\n", testSuite)
 }
@@ -496,7 +511,7 @@ func (d AsyncDisplay) GlobalErrors(ctx facade.GlobalContext, errors ...error) {
 func (d AsyncDisplay) SuiteErrors(ctx facade.SuiteContext, errors ...error) {
 	testSuite := ctx.Config.TestSuite.Get()
 	session := d.screen.Session(testSuite, 0)
-	printer := session.Printer(SuitePrinterName, 0)
+	printer := session.Printer(SuiteEndPrinterName, 9999)
 	//printer := d.printers.printer(suite, 0)
 	for _, err := range errors {
 		printer.ColoredErrf(display.ErrorColor, "ERROR: %s\n", err)

@@ -1,6 +1,7 @@
 package asyncdisplay
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -134,7 +135,7 @@ func TestAsyncDisplay_TestTitle(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Empty(t, outW.String())
-	expectedTitlePattern := `\[\d+\] Test \[suite\]\(on host\)>true #01...\s*`
+	expectedTitlePattern := fmt.Sprintf(`\[\d+\] Test \[%s\]\(on host\)>true #01...\s*`, suite)
 	assert.Regexp(t, regexp.MustCompile(expectedTitlePattern), ansi.Unformat(errW.String()))
 
 }
