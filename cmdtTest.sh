@@ -15,8 +15,8 @@ cmdt="cmdt"
 cmdtIn="$cmdt $@"
 
 # Tested cmdt
-cmdt0="$newCmdt @isol=tested"
-cmdt1="$newCmdt @isol=tested @verbose @failuresLimit=-1" # Default verbose show passed test + perform all test beyond failures limit
+cmdt0="$newCmdt @isol=tested @verbose @debug=5"
+cmdt1="$cmdt0 @failuresLimit=-1" # Default verbose show passed test + perform all test beyond failures limit
 
 die() {
 	>&2 echo "$1"

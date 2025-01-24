@@ -45,13 +45,13 @@ func TestDisplay_Stdout(t *testing.T) {
 	d.TestTitle(ctx)
 	// Title should be printed
 	assert.Equal(t, "beforeOut\n", ansi.Unformat(outW.String()))
-	assert.Regexp(t, `beforeErr\n\[\d+\] Test \[suite\]\(on host\)>true #12...\s*`, ansi.Unformat(errW.String()))
+	assert.Regexp(t, `beforeErr\n\[\d+\] Test \[suite\]\(on host\)>true #12...\s*$`, ansi.Unformat(errW.String()))
 
 	d.TestStdout(ctx, outMsg)
 	d.TestStderr(ctx, errMsg)
 	// stdout & stderr should not be printed until outcome printed
 	assert.Equal(t, "beforeOut\n", ansi.Unformat(outW.String()))
-	assert.Regexp(t, `beforeErr\n\[\d+\] Test \[suite\]\(on host\)>true #12...\s*`, ansi.Unformat(errW.String()))
+	assert.Regexp(t, `beforeErr\n\[\d+\] Test \[suite\]\(on host\)>true #12...\s*$`, ansi.Unformat(errW.String()))
 
 	to := model.TestOutcome{
 		TestSignature: model.TestSignature{TestSuite: "suite", Seq: 12},
@@ -167,33 +167,40 @@ func TestDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 	d.Global(gctx)
 
 	DisplaySuite(d, token, isol, 1) // 100- Init suite1
-	DisplayTestTitle(t, d, token, isol, 1, 1)
-	DisplayTestOut(t, d, token, isol, 1, 1)
-	DisplayTestErr(t, d, token, isol, 1, 1)
-
-	DisplayTestTitle(t, d, token, isol, 1, 2)
-	DisplayTestOut(t, d, token, isol, 1, 2)
-	DisplayTestErr(t, d, token, isol, 1, 2)
-	DisplayTestTitle(t, d, token, isol, 1, 3)
-	DisplayTestOut(t, d, token, isol, 1, 3)
-	DisplayTestErr(t, d, token, isol, 1, 3)
+	td := DisplayOpenTitleOutcomeTest(t, d, token, isol, 1, 1)
+	DisplayTestOut(t, td, 1, 1)
+	DisplayTestErr(t, td, 1, 1)
+	DisplayEndTest(t, td, 1, 1)
+	td = DisplayOpenTitleOutcomeTest(t, d, token, isol, 1, 2)
+	DisplayTestOut(t, td, 1, 2)
+	DisplayTestErr(t, td, 1, 2)
+	DisplayEndTest(t, td, 1, 2)
+	td = DisplayOpenTitleOutcomeTest(t, d, token, isol, 1, 3)
+	DisplayTestOut(t, td, 1, 3)
+	DisplayTestErr(t, td, 1, 3)
+	DisplayEndTest(t, td, 1, 3)
 	DisplayReport(d, 1)
+
 	DisplaySuite(d, token, isol, 2) // 200- Init suite2
-	DisplayTestTitle(t, d, token, isol, 2, 1)
-	DisplayTestOut(t, d, token, isol, 2, 1)
-	DisplayTestErr(t, d, token, isol, 2, 1)
-	DisplayTestTitle(t, d, token, isol, 2, 2)
-	DisplayTestOut(t, d, token, isol, 2, 2)
-	DisplayTestErr(t, d, token, isol, 2, 2)
+	td = DisplayOpenTitleOutcomeTest(t, d, token, isol, 2, 1)
+	DisplayTestOut(t, td, 2, 1)
+	DisplayTestErr(t, td, 2, 1)
+	DisplayEndTest(t, td, 2, 1)
+	td = DisplayOpenTitleOutcomeTest(t, d, token, isol, 2, 2)
+	DisplayTestOut(t, td, 2, 2)
+	DisplayTestErr(t, td, 2, 2)
+	DisplayEndTest(t, td, 2, 2)
 	DisplayReport(d, 2)
 
 	DisplaySuite(d, token, isol, 3) // 300- Init suite3
-	DisplayTestTitle(t, d, token, isol, 3, 1)
-	DisplayTestOut(t, d, token, isol, 3, 1)
-	DisplayTestErr(t, d, token, isol, 3, 1)
-	DisplayTestTitle(t, d, token, isol, 3, 2)
-	DisplayTestOut(t, d, token, isol, 3, 2)
-	DisplayTestErr(t, d, token, isol, 3, 2)
+	td = DisplayOpenTitleOutcomeTest(t, d, token, isol, 3, 1)
+	DisplayTestOut(t, td, 3, 1)
+	DisplayTestErr(t, td, 3, 1)
+	DisplayEndTest(t, td, 3, 1)
+	td = DisplayOpenTitleOutcomeTest(t, d, token, isol, 3, 2)
+	DisplayTestOut(t, td, 3, 2)
+	DisplayTestErr(t, td, 3, 2)
+	DisplayEndTest(t, td, 3, 2)
 	DisplayReport(d, 3)
 
 	outScenarioRegexp := regexp.MustCompile("^" +

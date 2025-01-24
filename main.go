@@ -238,6 +238,7 @@ func init() {
 	zlog.ColoredConfig()
 	zlog.SetPart("cmdt")
 	zlog.SetLogLevelThreshold0IsFatal(int(model.StartDebugLevel))
+	zlog.SetLogLevelThreshold0IsFatal(int(model.DEBUG))
 	zlog.SetTruncatedArgsLength(64)
 	zlog.SetDefaultAppendingFileOutput(model.DefaultDebugLogFilepath)
 }

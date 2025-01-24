@@ -91,25 +91,18 @@ func (d *basicDisplay) OpenTest(ctx facade.TestContext) TestDisplayer {
 
 	// bufPrinter := printz.New(d.printer.Outputs())
 	// bufNotQuietPrinter := printz.New(d.notQuietPrinter.Outputs())
-	bufPrinter := printz.Buffered(d.printer)
-	bufNotQuietPrinter := printz.Buffered(d.notQuietPrinter)
-	td := basicTestDisplayer{
-		dpl:                d,
-		ctx:                ctx,
-		printer:            d.printer,
-		bufPrinter:         bufPrinter,
-		bufNotQuietPrinter: bufNotQuietPrinter,
-		outFormatter:       d.outFormatter,
-		errFormatter:       d.errFormatter,
-	}
-	d.openedTest = &td
-	return &td
+	//bufPrinter := printz.Buffered(d.printer)
+	//bufNotQuietPrinter := printz.Buffered(d.notQuietPrinter)
+	td := NewTestDisplayer(d, ctx, d.printer, d.notQuietPrinter, d.outFormatter, d.errFormatter)
+	d.openedTest = td
+	return td
 }
 
 func (d basicDisplay) TestTitle(ctx facade.TestContext) {
 	d.openedTest.Title()
 }
 
+/*
 func (d basicDisplay) TestTitle0(ctx facade.TestContext) {
 	if ctx.Config.Verbose.Get() == model.SHOW_REPORTS_ONLY {
 		return
@@ -144,95 +137,98 @@ func (d basicDisplay) TestTitle0(ctx facade.TestContext) {
 				//d.printer.Errf("\n")
 			}
 		}
-	*/
-}
+*/
+// }
 
 func (d basicDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutcome) {
 	d.openedTest.Outcome(outcome)
 }
 
-func (d basicDisplay) TestOutcome0(ctx facade.TestContext, outcome model.TestOutcome) {
-	if ctx.Config.Verbose.Get() == model.SHOW_REPORTS_ONLY {
-		return
-	}
-	// FIXME get outcome from ctx
-	cfg := ctx.Config
-	verbose := cfg.Verbose.Get()
-	testDuration := outcome.Duration
-	defer d.Flush()
+/*
+	func (d basicDisplay) TestOutcome0(ctx facade.TestContext, outcome model.TestOutcome) {
+		if ctx.Config.Verbose.Get() == model.SHOW_REPORTS_ONLY {
+			return
+		}
+		// FIXME get outcome from ctx
+		cfg := ctx.Config
+		verbose := cfg.Verbose.Get()
+		testDuration := outcome.Duration
+		defer d.Flush()
 
-	if verbose < model.SHOW_PASSED && outcome.Outcome != model.PASSED && outcome.Outcome != model.IGNORED {
-		// Print back test title not printed yed
-		clone := ctx
-		clone.Config.Verbose.Set(model.SHOW_PASSED)
-		d.TestTitle(clone)
-	}
+		if verbose < model.SHOW_PASSED && outcome.Outcome != model.PASSED && outcome.Outcome != model.IGNORED {
+			// Print back test title not printed yed
+			clone := ctx
+			clone.Config.Verbose.Set(model.SHOW_PASSED)
+			d.TestTitle(clone)
+		}
 
-	switch outcome.Outcome {
-	case model.PASSED:
-		if verbose >= model.SHOW_PASSED {
-			d.printer.ColoredErrf(SuccessColor, "PASSED")
+		switch outcome.Outcome {
+		case model.PASSED:
+			if verbose >= model.SHOW_PASSED {
+				d.printer.ColoredErrf(SuccessColor, "PASSED")
+				d.printer.Errf(" (in %s)\n", testDuration)
+			}
+		case model.FAILED:
+			d.printer.ColoredErrf(FailureColor, "FAILED")
 			d.printer.Errf(" (in %s)\n", testDuration)
+		case model.TIMEOUT:
+			d.printer.ColoredErrf(FailureColor, "TIMEOUT")
+			d.printer.Errf(" (after %s)\n", ctx.Config.Timeout.Get())
+		case model.ERRORED:
+			d.printer.ColoredErrf(WarningColor, "ERRORED")
+			d.printer.Errf(" (not executed)\n")
+		case model.IGNORED:
+			if verbose > model.SHOW_FAILED_OUTS {
+				d.printer.ColoredErrf(WarningColor, "IGNORED")
+				d.printer.Err("\n")
+			}
+		default:
 		}
-	case model.FAILED:
-		d.printer.ColoredErrf(FailureColor, "FAILED")
-		d.printer.Errf(" (in %s)\n", testDuration)
-	case model.TIMEOUT:
-		d.printer.ColoredErrf(FailureColor, "TIMEOUT")
-		d.printer.Errf(" (after %s)\n", ctx.Config.Timeout.Get())
-	case model.ERRORED:
-		d.printer.ColoredErrf(WarningColor, "ERRORED")
-		d.printer.Errf(" (not executed)\n")
-	case model.IGNORED:
-		if verbose > model.SHOW_FAILED_OUTS {
-			d.printer.ColoredErrf(WarningColor, "IGNORED")
-			d.printer.Err("\n")
+
+		if verbose >= model.SHOW_FAILED_ONLY && outcome.Outcome != model.PASSED && outcome.Outcome != model.IGNORED || verbose >= model.SHOW_PASSED_OUTS {
+			d.printer.Errf("\tExecuting cmd: \t\t[%s]\n", CmdTitle(ctx))
 		}
-	default:
-	}
 
-	if verbose >= model.SHOW_FAILED_ONLY && outcome.Outcome != model.PASSED && outcome.Outcome != model.IGNORED || verbose >= model.SHOW_PASSED_OUTS {
-		d.printer.Errf("\tExecuting cmd: \t\t[%s]\n", CmdTitle(ctx))
-	}
-
-	if outcome.Err != nil {
-		d.printer.ColoredErrf(model.ErrorColor, "\t%s\n", outcome.Err)
-	}
-
-	if len(outcome.AssertionResults) > 0 {
-		for _, asseriontResult := range outcome.AssertionResults {
-			d.assertionResult(asseriontResult)
+		if outcome.Err != nil {
+			d.printer.ColoredErrf(model.ErrorColor, "\t%s\n", outcome.Err)
 		}
-	}
 
-	if verbose >= model.SHOW_FAILED_OUTS && (len(outcome.AssertionResults) > 0 || outcome.Outcome == model.TIMEOUT || outcome.Outcome == model.ERRORED) || verbose >= model.SHOW_PASSED_OUTS {
-		d.printer.Errf(d.outFormatter.Format(outcome.Stdout))
-		d.printer.Errf(d.errFormatter.Format(outcome.Stderr))
-		d.printer.Errf("\n")
-	}
+		if len(outcome.AssertionResults) > 0 {
+			for _, asseriontResult := range outcome.AssertionResults {
+				d.assertionResult(asseriontResult)
+			}
+		}
+
+		if verbose >= model.SHOW_FAILED_OUTS && (len(outcome.AssertionResults) > 0 || outcome.Outcome == model.TIMEOUT || outcome.Outcome == model.ERRORED) || verbose >= model.SHOW_PASSED_OUTS {
+			d.printer.Errf(d.outFormatter.Format(outcome.Stdout))
+			d.printer.Errf(d.errFormatter.Format(outcome.Stderr))
+			d.printer.Errf("\n")
+		}
 
 }
-
+*/
 func (d basicDisplay) TestStdout(ctx facade.TestContext, s string) {
 	d.openedTest.Stdout(s)
 }
 
-func (d basicDisplay) TestStdout0(ctx facade.TestContext, s string) {
-	if s != "" {
-		d.notQuietPrinter.Out(d.outFormatter.Format(s))
+/*
+	func (d basicDisplay) TestStdout0(ctx facade.TestContext, s string) {
+		if s != "" {
+			d.notQuietPrinter.Out(d.outFormatter.Format(s))
+		}
 	}
-}
-
+*/
 func (d basicDisplay) TestStderr(ctx facade.TestContext, s string) {
 	d.openedTest.Stderr(s)
 }
 
-func (d basicDisplay) TestStderr0(ctx facade.TestContext, s string) {
-	if s != "" {
-		d.notQuietPrinter.Err(d.errFormatter.Format(s))
+/*
+	func (d basicDisplay) TestStderr0(ctx facade.TestContext, s string) {
+		if s != "" {
+			d.notQuietPrinter.Err(d.errFormatter.Format(s))
+		}
 	}
-}
-
+*/
 func (d *basicDisplay) CloseTest(ctx facade.TestContext) {
 	if d.openedTest == nil {
 		panic("no test currently open")

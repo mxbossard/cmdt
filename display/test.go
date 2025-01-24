@@ -34,18 +34,19 @@ type TestDisplayer interface {
 	Stdout(string)
 	Stderr(string)
 	Errors(...error)
-	Flush()
+	//Flush()
 	Open()
 	Close()
 }
 
 type basicTestDisplayer struct {
-	dpl              Displayer
-	ctx              facade.TestContext
-	opened, outcomed bool
-	printer          printz.Printer
-	bufPrinter       printz.Printer
-	//notQuietPrinter printz.Printer
+	dpl                      Displayer
+	ctx                      facade.TestContext
+	opened, titled, outcomed bool
+	printer                  printz.Printer
+	notQuietPrinter          printz.Printer
+	// Buffered printer are flushed after test outcome
+	bufPrinter         printz.Printer
 	bufNotQuietPrinter printz.Printer
 	errors             []error
 	outFormatter       inout.Formatter
@@ -56,7 +57,8 @@ func (d *basicTestDisplayer) title(ctx facade.TestContext) {
 	if ctx.Config.Verbose.Get() == model.SHOW_REPORTS_ONLY {
 		return
 	}
-	defer d.Flush()
+	defer d.flush()
+	d.titled = true
 
 	cfg := ctx.Config
 	timecode := int(time.Since(cfg.SuiteStartTime.Get()).Milliseconds())
@@ -97,7 +99,11 @@ func (d *basicTestDisplayer) Outcome(outcome model.TestOutcome) {
 	if d.ctx.Config.Verbose.Get() == model.SHOW_REPORTS_ONLY {
 		return
 	}
-	defer d.Flush()
+	defer func() {
+		d.outcomed = true
+		d.titled = false
+		d.flush()
+	}()
 
 	// FIXME get outcome from ctx
 	cfg := d.ctx.Config
@@ -126,12 +132,16 @@ func (d *basicTestDisplayer) Outcome(outcome model.TestOutcome) {
 	case model.ERRORED:
 		d.printer.ColoredErrf(WarningColor, "ERRORED")
 		d.printer.Errf(" (not executed)\n")
+	case model.UNKNOWN:
+		d.printer.ColoredErrf(WarningColor, "UNKNOWN")
+		d.printer.Err("\n")
 	case model.IGNORED:
 		if verbose > model.SHOW_FAILED_OUTS {
 			d.printer.ColoredErrf(WarningColor, "IGNORED")
 			d.printer.Err("\n")
 		}
 	default:
+		panic(fmt.Sprintf("unknown outcome: %s", outcome.Outcome))
 	}
 
 	if verbose >= model.SHOW_FAILED_ONLY && outcome.Outcome != model.PASSED && outcome.Outcome != model.IGNORED || verbose >= model.SHOW_PASSED_OUTS {
@@ -153,12 +163,10 @@ func (d *basicTestDisplayer) Outcome(outcome model.TestOutcome) {
 		d.printer.Errf(d.errFormatter.Format(outcome.Stderr))
 		d.printer.Errf("\n")
 	}
-
-	d.outcomed = true
 }
 
 func (d basicTestDisplayer) assertionResult(result model.AssertionResult) {
-	defer d.Flush()
+	defer d.flush()
 	hlClr := ReportColor
 	//log.Printf("failedResult: %v\n", result)
 	assertPrefix := result.Rule.Prefix
@@ -219,9 +227,14 @@ func (d basicTestDisplayer) assertionResult(result model.AssertionResult) {
 
 // Write on stdout
 func (d basicTestDisplayer) Stdout(s string) {
-	defer d.Flush()
+	prtr := d.bufNotQuietPrinter
+	if !d.titled {
+		// Delay stdout flushing after test is outcomed
+		defer d.flush()
+		prtr = d.notQuietPrinter
+	}
 	if s != "" {
-		d.bufNotQuietPrinter.Out(s)
+		prtr.Out(s)
 		//d.bufPrinter.Out(s)
 	}
 	// if !d.opened {
@@ -232,9 +245,14 @@ func (d basicTestDisplayer) Stdout(s string) {
 
 // Write on stderr
 func (d basicTestDisplayer) Stderr(s string) {
-	defer d.Flush()
+	prtr := d.bufNotQuietPrinter
+	if !d.titled {
+		// Delay stdout flushing after test is closed
+		defer d.flush()
+		prtr = d.notQuietPrinter
+	}
 	if s != "" {
-		d.bufNotQuietPrinter.Err(s)
+		prtr.Err(s)
 		//d.bufPrinter.Err(s)
 	}
 	// if !d.opened {
@@ -244,32 +262,39 @@ func (d basicTestDisplayer) Stderr(s string) {
 }
 
 func (d *basicTestDisplayer) Errors(errors ...error) {
-	defer d.Flush()
+	defer d.flush()
 	// Delay error display when test is closed
 
 	d.errors = append(d.errors, errors...)
-	if !d.opened {
-		// Display errors
-		for _, err := range d.errors {
-			d.bufNotQuietPrinter.ColoredErrf(ErrorColor, "ERROR: %s", err)
-		}
-		d.bufNotQuietPrinter.Flush()
-		// Clear errors list
-		d.errors = make([]error, 0)
+	// Display errors
+	for _, err := range d.errors {
+		d.bufNotQuietPrinter.ColoredErrf(ErrorColor, "ERROR: %s", err)
 	}
+	// Clear errors list
+	d.errors = make([]error, 0)
 }
 
-func (d basicTestDisplayer) Flush() {
+func (d basicTestDisplayer) flush() {
+	if !d.titled {
+		err := d.bufPrinter.Flush()
+		if err != nil {
+			panic(err)
+		}
+		err = d.bufNotQuietPrinter.Flush()
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	err := d.printer.Flush()
 	if err != nil {
 		panic(err)
 	}
-	//if !d.opened {
-	err = d.bufNotQuietPrinter.Flush()
+	err = d.notQuietPrinter.Flush()
 	if err != nil {
 		panic(err)
 	}
-	//}
+
 	err = d.dpl.Flush()
 	if err != nil {
 		panic(err)
@@ -277,13 +302,16 @@ func (d basicTestDisplayer) Flush() {
 }
 
 func (d *basicTestDisplayer) Open() {
+	if d.opened {
+		panic(fmt.Sprintf("Test: [%s] already opened !", d.ctx.TestId()))
+	}
 	if d.outcomed {
 		panic(fmt.Sprintf("Test: [%s] already outcomed !", d.ctx.TestId()))
 	}
 	d.opened = true
 }
 
-func (d basicTestDisplayer) Close() {
+func (d *basicTestDisplayer) Close() {
 	if !d.outcomed {
 		// Display a nice outcome if test not closed
 		var to model.TestOutcome
@@ -291,21 +319,15 @@ func (d basicTestDisplayer) Close() {
 			// ERRORED outcome
 			to = d.ctx.ErroredTestOutcome(d.errors...)
 		} else {
-			// UNKOWN outcome ?
+			// UNKNOWN outcome
 			to = d.ctx.UnknownTestOutcome()
 		}
 		d.Outcome(to)
 
-		// d.printer.Flush()
-
-		// display buffered stdout & stderr
-		// d.bufNotQuietPrinter.Flush()
-
 		// display errors
 		d.Errors()
 
-		// d.dpl.Flush()
-		d.Flush()
+		d.flush()
 	}
 
 	d.opened = false
@@ -319,6 +341,7 @@ func NewTestDisplayer(d Displayer, ctx facade.TestContext, printer, notQuietPrin
 		ctx:                ctx,
 		printer:            printer,
 		bufPrinter:         bufPrinter,
+		notQuietPrinter:    notQuietPrinter,
 		bufNotQuietPrinter: bufNotQuietPrinter,
 		outFormatter:       outFormatter,
 		errFormatter:       errFormatter,

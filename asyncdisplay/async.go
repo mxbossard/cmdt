@@ -529,6 +529,7 @@ func (d AsyncDisplay) TestErrors(ctx facade.TestContext, errors ...error) {
 
 func (d AsyncDisplay) Flush() error {
 	// TODO ?
+	// TO remove ?
 	return nil
 }
 

@@ -175,6 +175,9 @@ func reportTestSuite(ctx facade.SuiteContext) (suiteOutcome model.SuiteOutcome, 
 
 func ReportTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	suiteOutcome, exitCode, err := reportTestSuite(ctx)
+	if err != nil {
+		return
+	}
 	Dpl.ReportSuite(suiteOutcome)
 	return
 }
@@ -590,7 +593,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 	logger.Info("exiting", "exitCode", exitCode)
 
 	if err != nil {
-		errorz.Fatal(inputConfig.TestSuite.Get(), inputConfig.Token, err)
+		errorz.Fatal(err, "suite:", inputConfig.TestSuite, "token:", inputConfig.Token)
 	}
 	return
 }

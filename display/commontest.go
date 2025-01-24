@@ -28,7 +28,7 @@ func DisplayReport(d Displayer, suite int) {
 	d.ReportSuite(outcome)
 }
 
-func DisplayTestTitle(t *testing.T, d Displayer, token, isol string, suite int, seq int) {
+func DisplayOpenTitleOutcomeTest(t *testing.T, d Displayer, token, isol string, suite int, seq int) TestDisplayer {
 	testSuite := fmt.Sprintf("suite-%d", suite)
 	ctx, err := facade.NewTestContext(token, isol, testSuite, uint16(seq), model.Config{}, uint32(42))
 	require.NoError(t, err)
@@ -45,29 +45,18 @@ func DisplayTestTitle(t *testing.T, d Displayer, token, isol string, suite int, 
 	td := d.OpenTest(ctx)
 	td.Title()
 	td.Outcome(outcome)
+	return td
 }
 
-func DisplayTestOut(t *testing.T, d Displayer, token, isol string, suite int, seq int) {
-	ctx, err := facade.NewTestContext(token, isol, fmt.Sprintf("suite-%d", suite), uint16(seq), model.Config{}, uint32(42))
-	require.NoError(t, err)
-	ctx.CmdExec = cmdz.Cmd("true")
-	td := d.OpenTest(ctx)
+func DisplayTestOut(t *testing.T, td TestDisplayer, suite int, seq int) {
 	td.Stdout(fmt.Sprintf("suite-%d-%d-out\n", suite, seq))
 }
 
-func DisplayTestErr(t *testing.T, d Displayer, token, isol string, suite int, seq int) {
-	ctx, err := facade.NewTestContext(token, isol, fmt.Sprintf("suite-%d", suite), uint16(seq), model.Config{}, uint32(42))
-	require.NoError(t, err)
-	ctx.CmdExec = cmdz.Cmd("true")
-	td := d.OpenTest(ctx)
+func DisplayTestErr(t *testing.T, td TestDisplayer, suite int, seq int) {
 	td.Stderr(fmt.Sprintf("suite-%d-%d-err\n", suite, seq))
 }
 
-func DisplayEndTest(t *testing.T, d Displayer, token, isol string, suite int, seq int) {
-	ctx, err := facade.NewTestContext(token, isol, fmt.Sprintf("suite-%d", suite), uint16(seq), model.Config{}, uint32(42))
-	require.NoError(t, err)
-	ctx.CmdExec = cmdz.Cmd("true")
-	td := d.OpenTest(ctx)
+func DisplayEndTest(t *testing.T, td TestDisplayer, suite int, seq int) {
 	td.Close()
 }
 
