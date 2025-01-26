@@ -192,6 +192,7 @@ func ProcessReportDef(def model.ReportDefinition) (exitCode int16, err error) {
 }
 
 func PerformTest(testDef model.TestDefinition) (exitCode int16, err error) {
+	logger.Debug("Performing test")
 	exitCode = 1
 	cfg := testDef.Config
 	ctx, err := facade.NewTestContext2(testDef)
@@ -262,6 +263,7 @@ func ProcessTestDef(testDef model.TestDefinition) (exitCode int16) {
 	testCfg := testDef.Config
 	testCtx, err := facade.NewTestContext2(testDef)
 
+	Dpl.Quiet(testCfg.Quiet.Is(true))
 	Dpl.OpenTest(testCtx)
 	defer Dpl.CloseTest(testCtx)
 
@@ -283,7 +285,6 @@ func ProcessTestDef(testDef model.TestDefinition) (exitCode int16) {
 		ProcessTestError(testCtx, err)
 	}
 
-	Dpl.Quiet(testCfg.Quiet.Is(true))
 	if testCfg.ContainerDisabled.Is(true) || testCfg.ContainerImage.IsEmpty() {
 		logger.Debug("Performing test outside container", "image", testCfg.ContainerImage, "containerDisabled", testCfg.ContainerDisabled, "testConfig", testCfg)
 		exitCode, err = PerformTest(testDef)
@@ -351,6 +352,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 	var err error
 	switch action {
 	case model.GlobalAction:
+		logger.Debug("Executing Global action")
 		// if agg.GotError() {
 		// 	log.Fatal(agg.Error())
 		// }
@@ -366,6 +368,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		exitCode, err = GlobalConfig(globalCtx)
 	case model.InitAction:
 		testSuite := inputConfig.TestSuite.Get()
+		logger.Debug("Executing Init action", "suite", testSuite)
 		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig)
 		ProcessSuiteError(suiteCtx, agg.Return())
 		Dpl.SetVerbose(suiteCtx.Config.Verbose.Get())
@@ -386,6 +389,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		//inputConfig.Async.Set(false)
 
 		if inputConfig.ReportAll.Is(true) {
+			logger.Debug("Executing Report all action")
 			// Reporting All test suite
 			if agg.GotError() {
 				errorz.Fatal(agg)
@@ -458,6 +462,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		} else {
 			// Reporting One test suite
 			testSuite := inputConfig.TestSuite.Get()
+			logger.Debug("Executing Report suite action", "suite", testSuite)
 			suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig)
 			ProcessSuiteError(suiteCtx, agg.Return())
 
@@ -533,6 +538,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 	case model.TestAction:
 		testSuite := inputConfig.TestSuite.Get()
 		ppid := uint32(utils.ReadEnvPpid())
+		logger.Debug("Executing Test action", "suite", testSuite)
 		testCtx, err := facade.NewTestContext(token, isolation, testSuite, 0, inputConfig, ppid)
 		ProcessTestError(testCtx, err)
 		testCtx.IncrementTestCount()
@@ -558,7 +564,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			//SuitePrefix: testCtx.Suite.Config.Prefix.Get(),
 			CmdArgs: signifientArgs,
 		}
-
+		logger.Debug("Test definition", "token", token, "isolation", isolation, "suite", testSuite, "seq", seq)
 		if !testCfg.Async.Is(true) {
 			// Process test without daemon
 			// enforce wait
@@ -600,27 +606,30 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 
 func ProcessGlobalError(ctx facade.GlobalContext, err error) {
 	if err != nil {
+		logger.Debug("Reporting global error", "error", err)
 		ctx.Config.TestSuite.IfPresent(func(testSuite string) error {
 			ctx.Repo.UpdateLastTestTime(testSuite)
-			//Dpl.Error(err)
 			return nil
 		})
-		//Dpl.Error(err)
+		Dpl.GlobalErrors(ctx, err)
 	}
 }
 
 func ProcessSuiteError(ctx facade.SuiteContext, err error) {
 	if err != nil {
+		logger.Debug("Reporting suite error", "error", err)
 		ctx.Config.TestSuite.IfPresent(func(testSuite string) error {
 			ctx.IncrementErroredCount()
 			return nil
 		})
+		Dpl.SuiteErrors(ctx, err)
+		ProcessGlobalError(ctx.GlobalContext, err)
 	}
-	ProcessGlobalError(ctx.GlobalContext, err)
 }
 
 func ProcessTestError(ctx facade.TestContext, err error) {
 	if err != nil {
+		logger.Debug("Reporting test error", "error", err)
 		outcome := model.NewTestOutcome2(ctx.Config, ctx.Seq)
 		outcome.Outcome = model.ERRORED
 		outcome.Err = err
@@ -628,7 +637,7 @@ func ProcessTestError(ctx facade.TestContext, err error) {
 		if err2 != nil {
 			logger.Error("unable to save errored test outcome", "error", err2)
 		}
+		Dpl.TestErrors(ctx, err)
+		ProcessSuiteError(ctx.SuiteContext, err)
 	}
-	ProcessSuiteError(ctx.SuiteContext, err)
-	Dpl.TestErrors(ctx, err)
 }

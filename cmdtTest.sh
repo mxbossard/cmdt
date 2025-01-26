@@ -15,8 +15,8 @@ cmdt="cmdt"
 cmdtIn="$cmdt $@"
 
 # Tested cmdt
-cmdt0="$newCmdt @isol=tested @verbose @debug=5"
-cmdt1="$cmdt0 @failuresLimit=-1" # Default verbose show passed test + perform all test beyond failures limit
+cmdt0="$newCmdt @isol=tested"
+cmdt1="$cmdt0 @verbose @failuresLimit=-1" # Default verbose show passed test + perform all test beyond failures limit
 
 die() {
 	>&2 echo "$1"
@@ -338,8 +338,8 @@ $cmdtIn @test=test_config/ @fail @-- $cmdt1 @report=main
 >&2 echo "## Test suite config"
 $cmdt1 @init=suite_config_quiet @quiet
 $cmdtIn @init=suite_config
-$cmdtIn @test=suite_config/ @stdout= @stderr= @-- $cmdt1 @test=suite_config_quiet/ echo foo
-$cmdtIn @test=suite_config/ @stderr:PASSED @-- $cmdt1 @test=suite_config_quiet/ echo foo @quiet=false
+$cmdtIn @test=suite_config/ @stdout= @stderr= @-- $cmdt1 @test=suite_config_quiet/ @verbose echo foo
+$cmdtIn @test=suite_config/ @stderr:PASSED @-- $cmdt1 @test=suite_config_quiet/ @verbose echo foo @quiet=false
 $cmdtIn @test=suite_config/ @stdout="foo\n" @stderr= @-- $cmdt1 @test=suite_config_quiet/ echo foo @keepOutputs
 $cmdtIn @test=suite_config/ @stdout= @stderr="bar\n" @-- $cmdt1 @test=suite_config_quiet/ sh -c ">&2 echo bar" @keepOutputs
 $cmdtIn @test=suite_config/ @-- $cmdt1 @report=suite_config_quiet

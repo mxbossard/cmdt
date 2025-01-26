@@ -268,7 +268,9 @@ func (d *basicTestDisplayer) Errors(errors ...error) {
 	d.errors = append(d.errors, errors...)
 	// Display errors
 	for _, err := range d.errors {
-		d.bufNotQuietPrinter.ColoredErrf(ErrorColor, "ERROR: %s", err)
+		if err != nil {
+			d.bufNotQuietPrinter.ColoredErrf(ErrorColor, "ERROR: %s", err)
+		}
 	}
 	// Clear errors list
 	d.errors = make([]error, 0)
@@ -308,11 +310,14 @@ func (d *basicTestDisplayer) Open() {
 	if d.outcomed {
 		panic(fmt.Sprintf("Test: [%s] already outcomed !", d.ctx.TestId()))
 	}
+	logger.Debug("Opening test", "suite", d.ctx.Config.TestSuite, "seq", d.ctx.Seq)
 	d.opened = true
 }
 
 func (d *basicTestDisplayer) Close() {
+	logger.Debug("Closing test", "suite", d.ctx.Config.TestSuite, "seq", d.ctx.Seq)
 	if !d.outcomed {
+		logger.Debug("Closing not outcomed test.", "suite", d.ctx.Config.TestSuite, "seq", d.ctx.Seq)
 		// Display a nice outcome if test not closed
 		var to model.TestOutcome
 		if len(d.errors) > 0 {

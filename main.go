@@ -237,9 +237,10 @@ var logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultL
 func init() {
 	zlog.ColoredConfig()
 	zlog.SetPart("cmdt")
-	zlog.SetLogLevelThreshold0IsFatal(int(model.StartDebugLevel))
-	zlog.SetLogLevelThreshold0IsFatal(int(model.DEBUG))
-	zlog.SetTruncatedArgsLength(64)
+	zlog.SetLogLevelThreshold0IsFatal6IsTrace(int(model.StartDebugLevel))
+	zlog.SetLogLevelThreshold0IsFatal6IsTrace(4)
+	//zlog.SetTruncatedArgsLength(64)
+	zlog.SetTruncatedArgsLength(1024)
 	zlog.SetDefaultAppendingFileOutput(model.DefaultDebugLogFilepath)
 }
 

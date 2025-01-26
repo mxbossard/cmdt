@@ -22,6 +22,7 @@ import (
 var logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 
 func NewGlobalContext(token, isolation string, inputCfg model.Config) GlobalContext {
+	logger.Debug("Building Global context", "token", token, "isolation", isolation)
 	var err error
 	token, err = utils.ForgeContextualToken(token)
 	if err != nil {
@@ -42,10 +43,12 @@ func NewGlobalContext(token, isolation string, inputCfg model.Config) GlobalCont
 		Repo:      &repo,
 		Config:    cfg,
 	}
+	logger.Debug("Builded Global context", "token", token, "isolation", isolation)
 	return c
 }
 
 func NewSuiteContext(token, isolation, testSuite string, initless bool, action model.Action, inputCfg model.Config) SuiteContext {
+	logger.Debug("Building Suite context", "suite", testSuite, "token", token, "isolation", isolation)
 	globalCtx := NewGlobalContext(token, isolation, model.Config{})
 	suiteCfg, err := globalCtx.Repo.GetSuiteConfig(testSuite, initless)
 	if err != nil {
@@ -61,10 +64,12 @@ func NewSuiteContext(token, isolation, testSuite string, initless bool, action m
 		GlobalContext: globalCtx,
 		Action:        action,
 	}
+	logger.Debug("Builded Suite context", "suite", testSuite, "token", token, "isolation", isolation)
 	return suiteCtx
 }
 
 func NewTestContext(token, isolation, testSuite string, seq uint16, inputCfg model.Config, ppid uint32) (testCtx TestContext, err error) {
+	logger.Debug("Building Test context", "suite", testSuite, "seq", seq)
 	suiteCtx := NewSuiteContext(token, isolation, testSuite, true, model.TestAction, model.Config{})
 	mergedCfg := suiteCtx.Config
 	mergedCfg.Merge(inputCfg)
@@ -85,7 +90,7 @@ func NewTestContext(token, isolation, testSuite string, seq uint16, inputCfg mod
 		_, testCtx.ContainerScope = utils.ReadEnvValue(model.EnvContainerScopeKey)
 		_, testCtx.ContainerImage = utils.ReadEnvValue(model.EnvContainerImageKey)
 	}
-
+	logger.Debug("Builded Test context", "suite", testSuite, "seq", seq)
 	return
 }
 
@@ -225,6 +230,7 @@ func (c TestContext) TestId() (id string) {
 }
 
 func (c *TestContext) IncrementTestCount() (n uint16) {
+	logger.Debug("Incrementing Test count")
 	if utils.IsWithinContainer() {
 		// Do not increment seq
 		n = utils.ReadEnvTestSeq()
@@ -232,6 +238,7 @@ func (c *TestContext) IncrementTestCount() (n uint16) {
 		n = c.SuiteContext.IncrementTestCount()
 	}
 	c.Seq = n
+	logger.Debug("Incremented Test count")
 	return n
 }
 

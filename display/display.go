@@ -12,10 +12,15 @@ import (
 	"mby.fr/utils/format"
 	"mby.fr/utils/inout"
 	"mby.fr/utils/printz"
+	"mby.fr/utils/zlog"
 )
 
 const (
 	MinReportSuiteLabelPadding = 20
+)
+
+var (
+	logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 )
 
 type Displayer interface {
@@ -85,8 +90,13 @@ func (d basicDisplay) CloseSuite(ctx facade.SuiteContext) {
 
 func (d *basicDisplay) OpenTest(ctx facade.TestContext) TestDisplayer {
 	if d.openedTest != nil {
-		// Close the current open test
-		d.CloseTest(d.openedTest.ctx)
+		if ctx.Seq == d.openedTest.ctx.Seq {
+			// Return the currently already opened test
+			return d.openedTest
+		} else {
+			// Close the current open test
+			d.CloseTest(d.openedTest.ctx)
+		}
 	}
 
 	// bufPrinter := printz.New(d.printer.Outputs())
@@ -376,31 +386,36 @@ func (d basicDisplay) TooMuchFailures(ctx facade.SuiteContext, testSuite string)
 
 func (d basicDisplay) Errors(errors ...error) {
 	//  An Error is Fatal
+	var errored bool
 	for _, err := range errors {
-		fmt.Fprintln(os.Stderr, err)
+		if err != nil {
+			errored = true
+			fmt.Fprintln(os.Stderr, err)
+		}
 	}
-	os.Exit(1)
+	if errored {
+		os.Exit(1)
+	}
 }
 
 func (d basicDisplay) GlobalErrors(ctx facade.GlobalContext, errors ...error) {
-	if d.openedTest != nil {
-		// Delegate error display to test display
-		d.openedTest.Errors(errors...)
-	} else {
-		d.Errors(errors...)
+	if len(errors) == 0 {
+		return
 	}
+	d.Errors(errors...)
 }
 
 func (d basicDisplay) SuiteErrors(ctx facade.SuiteContext, errors ...error) {
-	if d.openedTest != nil {
-		// Delegate error display to test display
-		d.openedTest.Errors(errors...)
-	} else {
-		d.Errors(errors...)
+	if len(errors) == 0 {
+		return
 	}
+	d.Errors(errors...)
 }
 
 func (d basicDisplay) TestErrors(ctx facade.TestContext, errors ...error) {
+	if len(errors) == 0 {
+		return
+	}
 	if d.openedTest != nil {
 		d.openedTest.Errors(errors...)
 	} else {
