@@ -8,7 +8,7 @@ ls -lh "$newCmdt"
 
 # Trusted cmdt to works
 cmdt="cmdt"
-cmdt="$newCmdt"
+#cmdt="$newCmdt"
 
 # Cmdt used to test
 #cmdtIn="cmdt"
@@ -17,7 +17,7 @@ cmdtIn="$cmdt $@"
 # Tested cmdt
 newCmdt="$newCmdt"
 cmdt0="$newCmdt @isol=tested"
-cmdt1="$newCmdt @isol=tested @verbose=4 @failuresLimit=-1 @debug=5" # Default verbose show passed test + perform all test beyond failures limit
+cmdt1="$newCmdt @isol=tested @verbose=4 @failuresLimit=-1" # Default verbose show passed test + perform all test beyond failures limit
 #cmdt2="$newCmdt @verbose @failuresLimit=-1 @async @wait"
 
 die() {
@@ -34,10 +34,12 @@ export -n __CMDT_TOKEN
 
 $cmdtIn @init="async success" @verbose=3 @debug=0
 $cmdtIn @test=async success/should init @-- $cmdt1 @init @async @verbose=4
-$cmdtIn @test=async success/"should pass 1" @stderr= @-- $cmdt1 true
-$cmdtIn @test=async success/"should pass 2" @stderr= @-- $cmdt1 true
+$cmdtIn @test=async success/"should pass 1" @stderr= @-- $cmdt1 true @verbose=4
+$cmdtIn @test=async success/"should pass 2" @stderr= @-- $cmdt1 true @verbose=4
 $cmdtIn @test=async success/should report @exit=0 @stderr:"#01" @stderr:"#02" @stderr!:"#03" @stderr:"PASSED" @stderr!:"FAILED" @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @-- $cmdt0 @verbose @report=main @debug=6
 $cmdt @report 2>&1 | grep -v "Failures"
+
+exit 1
 
 $cmdtIn @init="async failure" @verbose=3 @debug=0
 $cmdtIn @test=async failure/should init @-- $cmdt1 @init @async @verbose=4

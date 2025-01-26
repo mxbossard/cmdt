@@ -39,7 +39,7 @@ type Suite struct {
 }
 
 func (d Suite) init() (err error) {
-	_, err = d.db.Exec(`
+	res, err := d.db.Exec(`
 		CREATE TABLE IF NOT EXISTS suite (
 			name TEXT UNIQUE NOT NULL,
 			config BLOB NOT NULL,
@@ -51,6 +51,8 @@ func (d Suite) init() (err error) {
 			outcomeOrder INTEGER DEFAULT 0
 		);
 	`)
+	count, _ := res.RowsAffected()
+	logger.Debug("init suite DAO", "rows affected", count)
 	return
 }
 
@@ -58,12 +60,7 @@ func (d Suite) NextSeq(suite string) (seq uint16, err error) {
 	p := logger.PerfTimer("suite", suite, "filelock", d.db.FileLockPath())
 	defer p.End()
 
-	tx, err := d.db.Begin()
-	if err != nil {
-		return
-	}
-	defer tx.Rollback()
-	row := tx.QueryRow(`
+	row := d.db.QueryRow(`
 		SELECT s.seq
 		FROM suite s
 		WHERE s.name = ?
@@ -72,15 +69,38 @@ func (d Suite) NextSeq(suite string) (seq uint16, err error) {
 	if err != nil {
 		return
 	}
+
+	tx, err := d.db.Begin()
+	if err != nil {
+		return
+	}
+	defer tx.Rollback()
+
+	logger.Debug("nextSeq()", "suite", suite, "before", seq)
 	seq++
 	_, err = tx.Exec(`
 		UPDATE suite SET seq = ? 
 		WHERE name = ?
 	`, seq, suite)
+	if err != nil {
+		return
+	}
 	err = tx.Commit()
 	if err != nil {
 		return
 	}
+	logger.Debug("nextSeq()", "suite", suite, "after", seq)
+
+	row = d.db.QueryRow(`
+		SELECT s.seq
+		FROM suite s
+		WHERE s.name = ?
+	`, suite)
+	err = row.Scan(&seq)
+	if err != nil {
+		return
+	}
+	logger.Debug("nextSeq()", "suite", suite, "reSelect", seq)
 
 	return
 }
@@ -107,6 +127,9 @@ func (d Suite) IncrementTooMuchCount(suite string) (seq uint16, err error) {
 		UPDATE suite SET tooMuch = ? 
 		WHERE name = ?
 	`, seq+1, suite)
+	if err != nil {
+		return
+	}
 	err = tx.Commit()
 	return
 }

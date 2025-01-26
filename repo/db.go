@@ -194,6 +194,7 @@ func (r dbRepo) IncrementSuiteSeq(testSuite, name string) (n uint16) {
 	if err != nil {
 		errorz.Fatal(err)
 	}
+	logger.Debug("Incremented suite seq", "testSuite", testSuite, "name", name, "n", n)
 	return
 }
 

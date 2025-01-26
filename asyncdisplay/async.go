@@ -78,8 +78,8 @@ func (d AsyncDisplay) OpenSuite(ctx facade.SuiteContext) {
 	if d.quiet {
 		return
 	}
-
 	suite := ctx.Config.TestSuite.Get()
+	logger.Info("Opening suite", "suite", suite)
 	session := d.screen.Session(suite, 0)
 	err := session.Start(*ctx.Config.SuiteTimeout.Value)
 	if err != nil {
@@ -632,11 +632,29 @@ func (d *AsyncDisplay) AsyncFlushAll(timeout time.Duration) {
 }
 
 func (d *AsyncDisplay) TailBlocking(suite string, timeout time.Duration) error {
-	return d.tailer.TailBlocking(suite, timeout)
+	// Wait for tailer to be started
+	startTime := time.Now()
+	for d.tailer == nil {
+		if time.Since(startTime) > timeout {
+			panic(fmt.Sprintf("timeout reached waiting for screen tailer: [%s]", timeout))
+		}
+		time.Sleep(1 * time.Millisecond)
+	}
+	updatedTimeout := timeout - time.Since(startTime)
+	return d.tailer.TailBlocking(suite, updatedTimeout)
 }
 
 func (d *AsyncDisplay) TailAllBlocking(timeout time.Duration) error {
-	return d.tailer.TailAllBlocking(timeout)
+	// Wait for tailer to be started
+	startTime := time.Now()
+	for d.tailer == nil {
+		if time.Since(startTime) > timeout {
+			panic(fmt.Sprintf("timeout reached waiting for screen tailer: [%s]", timeout))
+		}
+		time.Sleep(1 * time.Millisecond)
+	}
+	updatedTimeout := timeout - time.Since(startTime)
+	return d.tailer.TailAllBlocking(updatedTimeout)
 }
 
 /*
@@ -841,10 +859,12 @@ func (d *AsyncDisplay) StopDisplayAllRecorded0() {
 }
 */
 
-func New(tmpDir string) *AsyncDisplay {
+func New(tmpDir string, init bool) *AsyncDisplay {
 	outs := printz.NewStandardOutputs()
 	openedTests := make(map[string]display.TestDisplayer, 0)
 	zcreenTmpDir := filepath.Join(tmpDir, "zcreen")
+	logger.Info("Building new async display", "zcreenTmpDir", zcreenTmpDir)
+
 	d := &AsyncDisplay{
 		//token:     token,
 		//isolation: isolation,
@@ -856,9 +876,15 @@ func New(tmpDir string) *AsyncDisplay {
 		quiet:        false,
 		//printers:           newAsyncPrinters(token, isolation, nil, nil),
 		testDisplayers: openedTests,
-		screen:         screen.NewAsyncScreen(zcreenTmpDir),
-		tailer:         screen.NewAsyncScreenTailer(outs, zcreenTmpDir),
 	}
+
+	if init {
+		d.screen = screen.NewAsyncScreen(zcreenTmpDir)
+	}
+	go func() {
+		// Tailer should be build later after daemon initialized the screen
+		d.tailer = screen.NewAsyncScreenTailerWaiting(outs, zcreenTmpDir, 2*time.Second)
+	}()
 	return d
 }
 

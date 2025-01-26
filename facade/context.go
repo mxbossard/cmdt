@@ -238,7 +238,7 @@ func (c *TestContext) IncrementTestCount() (n uint16) {
 		n = c.SuiteContext.IncrementTestCount()
 	}
 	c.Seq = n
-	logger.Debug("Incremented Test count")
+	logger.Debug("Incremented Test count", "n", n)
 	return n
 }
 

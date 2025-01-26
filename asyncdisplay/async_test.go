@@ -45,7 +45,7 @@ func TestAsyncDisplay_TestStdout(t *testing.T) {
 	err = os.RemoveAll(tmpDir)
 	require.NoError(t, err)
 
-	d := New(tmpDir)
+	d := New(tmpDir, true)
 	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
@@ -105,7 +105,7 @@ func TestAsyncDisplay_TestTitle(t *testing.T) {
 	tmpDir := "/tmp/asyncdisplay.foo2002"
 	err = os.RemoveAll(tmpDir)
 	require.NoError(t, err)
-	d := New(tmpDir)
+	d := New(tmpDir, true)
 	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
@@ -154,7 +154,7 @@ func TestBlockTail(t *testing.T) {
 	err = os.RemoveAll(tmpDir)
 	require.NoError(t, err)
 
-	d := New(tmpDir)
+	d := New(tmpDir, true)
 	d.SetVerbose(model.SHOW_ALL)
 
 	// Replace stdPrinter std outputs by 2 string builders
@@ -325,7 +325,7 @@ func TestBlockTail_Twice(t *testing.T) {
 	err = os.RemoveAll(tmpDir)
 	require.NoError(t, err)
 
-	d := New(tmpDir)
+	d := New(tmpDir, true)
 	d.SetVerbose(model.SHOW_ALL)
 
 	// Replace stdPrinter std outputs by 2 string builders
@@ -423,7 +423,7 @@ func TestAsyncFlushThenDisplayThenBlockTail(t *testing.T) {
 	err = os.RemoveAll(tmpDir)
 	require.NoError(t, err)
 
-	d := New(tmpDir)
+	d := New(tmpDir, true)
 	d.SetVerbose(model.SHOW_ALL)
 
 	// Replace stdPrinter std outputs by 2 string builders
@@ -518,7 +518,7 @@ func TestBlockTailAll(t *testing.T) {
 	err = os.RemoveAll(tmpDir)
 	require.NoError(t, err)
 
-	d := New(tmpDir)
+	d := New(tmpDir, true)
 	d.SetVerbose(model.SHOW_ALL)
 
 	// Replace stdPrinter std outputs by 2 string builders
@@ -611,7 +611,7 @@ func TestAsyncFlushAllThenDisplayThenBlockTailAll(t *testing.T) {
 	err = os.RemoveAll(tmpDir)
 	require.NoError(t, err)
 
-	d := New(tmpDir)
+	d := New(tmpDir, true)
 	d.SetVerbose(model.SHOW_ALL)
 
 	// Replace stdPrinter std outputs by 2 string builders
@@ -713,7 +713,7 @@ func TestAsyncDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 	err = os.RemoveAll(tmpDir)
 	require.NoError(t, err)
 
-	d := New(tmpDir)
+	d := New(tmpDir, true)
 	d.SetVerbose(model.SHOW_ALL)
 
 	// Replace stdPrinter std outputs by 2 string builders
@@ -857,7 +857,7 @@ func TestAsyncDisplayUsage_AsyncSuitesSerialTests(t *testing.T) {
 	err = os.RemoveAll(tmpDir)
 	require.NoError(t, err)
 
-	d := New(tmpDir)
+	d := New(tmpDir, true)
 	d.SetVerbose(model.SHOW_ALL)
 
 	// Replace stdPrinter std outputs by 2 string builders
@@ -1012,7 +1012,7 @@ func TestAsyncDisplayUsage_AsyncSuitesAsyncTests(t *testing.T) {
 	err = os.RemoveAll(tmpDir)
 	require.NoError(t, err)
 
-	d := New(tmpDir)
+	d := New(tmpDir, true)
 	d.SetVerbose(model.SHOW_ALL)
 
 	// Replace stdPrinter std outputs by 2 string builders

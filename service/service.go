@@ -51,13 +51,24 @@ func GlobalConfig(ctx facade.GlobalContext) (exitCode int16, err error) {
 	return
 }
 
+func ProcessInitTestSuiteDef(def model.InitSuiteDefinition) (exitCode int16) {
+	var err error
+	ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.InitAction, model.Config{})
+	exitCode, err = InitTestSuite(ctx)
+	if err != nil {
+		errorz.Fatal(err)
+	}
+	return
+}
+
 func InitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
+	logger.Debug("Initializing test suite", "token", ctx.Token, "isolation", ctx.Isolation, "suites", ctx.Config.TestSuite)
 	// Clear and Init new test suite
 	exitCode = 0
 	cfg := ctx.Config
 
 	if cfg.Async.Is(true) {
-		asyncDpl := asyncdisplay.New(ctx.Repo.BackingFilepath())
+		asyncDpl := asyncdisplay.New(ctx.Repo.BackingFilepath(), false)
 		asyncDpl.Clear(cfg.TestSuite.Get())
 	}
 
@@ -427,7 +438,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 					errorz.Fatal(err)
 				}
 
-				asyncDpl := asyncdisplay.New(globalCtx.Repo.BackingFilepath())
+				asyncDpl := asyncdisplay.New(globalCtx.Repo.BackingFilepath(), false)
 				//asyncDpl.StartDisplayAllRecorded(globalCtx.Config.SuiteTimeout.Get())
 
 				err = asyncDpl.TailAllBlocking(globalCtx.Config.SuiteTimeout.Get())
@@ -518,7 +529,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 					exitCode = 0
 				}
 
-				asyncDpl := asyncdisplay.New(suiteCtx.Repo.BackingFilepath())
+				asyncDpl := asyncdisplay.New(suiteCtx.Repo.BackingFilepath(), false)
 				//asyncDpl.StartDisplayRecorded(testSuite, suiteCtx.Config.SuiteTimeout.Get())
 				err = asyncDpl.TailBlocking(testSuite, suiteCtx.Config.SuiteTimeout.Get())
 				ProcessSuiteError(suiteCtx, err)

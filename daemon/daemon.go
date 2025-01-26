@@ -62,21 +62,22 @@ type daemon struct {
 	token, isolation string
 	repo             repo.Repo
 	display          *asyncdisplay.AsyncDisplay
+	openedSuite      string
 }
 
 func (d daemon) run() {
-	logger.Info("daemon: starting ...", "token", d.token, "isolation", d.isolation)
+	logger.Warn("DAEMON: starting ...", "token", d.token, "isolation", d.isolation)
 	startTime := time.Now()
 	debugTime := time.Now()
 	lastUnqueue := time.Now()
 
-	d.display = asyncdisplay.New(d.repo.BackingFilepath())
+	d.display = asyncdisplay.New(d.repo.BackingFilepath(), true)
 	service.Dpl = d.display
 
 	for {
 		if time.Since(debugTime) > time.Second {
 			debugTime = time.Now()
-			logger.Trace("daemon running", "token", d.token, "for", time.Since(startTime))
+			logger.Trace("DAEMON: running", "token", d.token, "for", time.Since(startTime))
 		}
 
 		if op, err := d.unqueue(); err != nil {
@@ -90,7 +91,7 @@ func (d daemon) run() {
 			// nothing to unqueue wait 1ms
 			duration := time.Since(lastUnqueue)
 			if duration > ExtraRunningSecs*time.Second {
-				logger.Debug("daemon: nothing to unqueue", "duration", duration, "token", d.token)
+				logger.Debug("DAEMON: nothing to unqueue", "duration", duration, "token", d.token)
 				// More than ExtraRunningSecs since last unqueue
 				break
 			}
@@ -100,7 +101,7 @@ func (d daemon) run() {
 
 		lastUnqueue = time.Now()
 	}
-	logger.Info("daemon: stopping ...", "token", d.token, "after", time.Since(startTime))
+	logger.Warn("DAEMON: stopping ...", "token", d.token, "after", time.Since(startTime))
 }
 
 func (d daemon) unqueue() (op model.Operater, err error) {
@@ -123,10 +124,11 @@ func (d daemon) process(op model.Operater) (ok bool, err error) {
 		}
 	}()
 	if op != nil {
-		logger.Debug("daemon: unqueued operation.", "kind", op.Kind(), "id", op.Id())
+		logger.Debug("DAEMON: unqueued operation.", "kind", op.Kind(), "id", op.Id(), "suite", op.Suite(), "seq", op.Seq())
 		switch o := op.(type) {
 		case *model.TestOp:
-			op.SetExitCode(uint16(d.performTest(o.Definition)))
+			ec := d.performTest(o.Definition)
+			op.SetExitCode(uint16(ec))
 		case *model.ReportOp:
 			exitCode, err := d.report(o.Definition)
 			if err != nil {
@@ -144,14 +146,27 @@ func (d daemon) process(op model.Operater) (ok bool, err error) {
 	return
 }
 
-func (d daemon) performTest(testDef model.TestDefinition) (exitCode int16) {
+func (d *daemon) performTest(testDef model.TestDefinition) (exitCode int16) {
 	perf := logger.PerfTimer()
 	defer perf.End()
+
+	if d.openedSuite == "" {
+		d.openedSuite = testDef.Config.TestSuite.Get()
+		def := model.InitSuiteDefinition{
+			Token:     d.token,
+			Isolation: d.isolation,
+			TestSuite: testDef.TestSuite,
+			Config:    testDef.Config,
+		}
+		logger.Debug("Initializing test suite", "token", def.Token, "isolation", def.Isolation, "openedSuite", d.openedSuite)
+		service.ProcessInitTestSuiteDef(def)
+	}
+
 	exitCode = service.ProcessTestDef(testDef)
 	return
 }
 
-func (d daemon) report(def model.ReportDefinition) (exitCode int16, err error) {
+func (d *daemon) report(def model.ReportDefinition) (exitCode int16, err error) {
 	perf := logger.PerfTimer()
 	defer perf.End()
 	//d.display.DisplayRecorded(def.TestSuite, def.Config.Timeout.Get())
@@ -162,10 +177,12 @@ func (d daemon) report(def model.ReportDefinition) (exitCode int16, err error) {
 		}
 	}()
 	exitCode, err = service.ProcessReportDef(def)
+	logger.Debug("Closing test suite", "token", def.Token, "isolation", def.Isolation, "openedSuite", d.openedSuite)
+	d.openedSuite = ""
 	return
 }
 
-func (d daemon) reportAll(def model.ReportDefinition) (exitCode int16) {
+func (d *daemon) reportAll(def model.ReportDefinition) (exitCode int16) {
 	perf := logger.PerfTimer()
 	defer perf.End()
 	//d.display.DisplayAllRecorded(def.Config.Timeout.Get())
@@ -176,6 +193,8 @@ func (d daemon) reportAll(def model.ReportDefinition) (exitCode int16) {
 		}
 	}()
 	exitCode = service.ProcessReportAllDef(def)
+	logger.Debug("Closing test suite", "token", def.Token, "isolation", def.Isolation, "openedSuite", d.openedSuite)
+	d.openedSuite = ""
 	return
 }
 
@@ -219,7 +238,7 @@ func TakeOver() {
 		return
 	}
 
-	zlog.ColoredConfig()
+	zlog.ColoredConfig(slog.Int("pid", os.Getpid()))
 	zlog.SetPart("daemon")
 	zlog.SetDefaultAppendingFileOutput(model.DefaultDebugDaemonLogFilepath)
 	token := os.Args[2]
@@ -230,7 +249,7 @@ func TakeOver() {
 	}
 	zlog.SetLogLevelThreshold(slog.Level(debugLevel))
 
-	logger.Warn("daemon started", "pid", os.Getpid(), "token", token, "isolation", isolation, "debugLevel", debugLevel, "args", os.Args[1:])
+	logger.Debug("daemon prechecks", "token", token, "isolation", isolation, "debugLevel", debugLevel, "args", os.Args[1:])
 
 	repo := repo.New(token, isolation)
 	d := daemon{token: token, isolation: isolation, repo: &repo}
@@ -249,7 +268,9 @@ func TakeOver() {
 	}
 
 	// If PID file already exists exit => already running
-	if d.ReadPid() != "" {
+	pid := d.ReadPid()
+	if pid != "" {
+		logger.Info("daemon already running")
 		fileLock.Unlock()
 		os.Exit(3)
 	}
@@ -285,7 +306,7 @@ func TakeOver() {
 		logger = slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 	*/
 
-	logger.Info("daemon taking over", "pid", os.Getpid())
+	logger.Info("daemon taking over")
 
 	// Run daemon
 	d.run()
