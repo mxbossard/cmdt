@@ -17,6 +17,7 @@ import (
 	"mby.fr/cmdtest/repo"
 	"mby.fr/cmdtest/service"
 	"mby.fr/utils/filez"
+	"mby.fr/utils/printz"
 	_ "mby.fr/utils/screen"
 	"mby.fr/utils/zlog"
 )
@@ -71,7 +72,7 @@ func (d daemon) run() {
 	debugTime := time.Now()
 	lastUnqueue := time.Now()
 
-	d.display = asyncdisplay.New(d.repo.BackingFilepath(), true)
+	d.display = asyncdisplay.New(d.repo.BackingFilepath(), true, printz.NewStandardOutputs())
 	service.Dpl = d.display
 
 	for {
@@ -252,6 +253,8 @@ func TakeOver() {
 	logger.Debug("daemon prechecks", "token", token, "isolation", isolation, "debugLevel", debugLevel, "args", os.Args[1:])
 
 	repo := repo.New(token, isolation)
+	defer repo.Close()
+
 	d := daemon{token: token, isolation: isolation, repo: &repo}
 	lockFilepath := filepath.Join(repo.BackingFilepath(), DaemonLockFilename)
 	fileLock := flock.New(lockFilepath)

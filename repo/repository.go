@@ -26,6 +26,8 @@ var (
 type Repo interface {
 	Init() error
 
+	Close() error
+
 	BackingFilepath() string
 
 	MockDirectoryPath(testSuite string, testId uint16) (mockDir string, err error)

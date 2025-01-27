@@ -3,7 +3,7 @@ package asyncdisplay
 import (
 	"fmt"
 	"os"
-	"path/filepath"
+	//"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -19,7 +19,7 @@ import (
 	"mby.fr/utils/ansi"
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/printz"
-	"mby.fr/utils/screen"
+	//"mby.fr/utils/screen"
 	"mby.fr/utils/zlog"
 )
 
@@ -45,12 +45,10 @@ func TestAsyncDisplay_TestStdout(t *testing.T) {
 	err = os.RemoveAll(tmpDir)
 	require.NoError(t, err)
 
-	d := New(tmpDir, true)
-	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
-	zcreenTmpDir := filepath.Join(tmpDir, "zcreen")
-	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), zcreenTmpDir)
+	outs := printz.NewOutputs(outW, errW)
+	d := New(tmpDir, true, outs)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
@@ -105,12 +103,11 @@ func TestAsyncDisplay_TestTitle(t *testing.T) {
 	tmpDir := "/tmp/asyncdisplay.foo2002"
 	err = os.RemoveAll(tmpDir)
 	require.NoError(t, err)
-	d := New(tmpDir, true)
-	// Replace stdPrinter std outputs by 2 string builders
+
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
-	zcreenTmpDir := filepath.Join(tmpDir, "zcreen")
-	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), zcreenTmpDir)
+	outs := printz.NewOutputs(outW, errW)
+	d := New(tmpDir, true, outs)
 
 	sctx := facade.NewSuiteContext(token, isol, suite, false, model.InitAction, model.Config{})
 	d.OpenSuite(sctx)
@@ -154,14 +151,13 @@ func TestBlockTail(t *testing.T) {
 	err = os.RemoveAll(tmpDir)
 	require.NoError(t, err)
 
-	d := New(tmpDir, true)
+	outW := &strings.Builder{}
+	errW := &strings.Builder{}
+	outs := printz.NewOutputs(outW, errW)
+	d := New(tmpDir, true, outs)
 	d.SetVerbose(model.SHOW_ALL)
 
 	// Replace stdPrinter std outputs by 2 string builders
-	outW := &strings.Builder{}
-	errW := &strings.Builder{}
-	zcreenTmpDir := filepath.Join(tmpDir, "zcreen")
-	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), zcreenTmpDir)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
@@ -325,14 +321,10 @@ func TestBlockTail_Twice(t *testing.T) {
 	err = os.RemoveAll(tmpDir)
 	require.NoError(t, err)
 
-	d := New(tmpDir, true)
-	d.SetVerbose(model.SHOW_ALL)
-
-	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
-	zcreenTmpDir := filepath.Join(tmpDir, "zcreen")
-	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), zcreenTmpDir)
+	outs := printz.NewOutputs(outW, errW)
+	d := New(tmpDir, true, outs)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
@@ -423,14 +415,10 @@ func TestAsyncFlushThenDisplayThenBlockTail(t *testing.T) {
 	err = os.RemoveAll(tmpDir)
 	require.NoError(t, err)
 
-	d := New(tmpDir, true)
-	d.SetVerbose(model.SHOW_ALL)
-
-	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
-	zcreenTmpDir := filepath.Join(tmpDir, "zcreen")
-	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), zcreenTmpDir)
+	outs := printz.NewOutputs(outW, errW)
+	d := New(tmpDir, true, outs)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
@@ -518,14 +506,10 @@ func TestBlockTailAll(t *testing.T) {
 	err = os.RemoveAll(tmpDir)
 	require.NoError(t, err)
 
-	d := New(tmpDir, true)
-	d.SetVerbose(model.SHOW_ALL)
-
-	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
-	zcreenTmpDir := filepath.Join(tmpDir, "zcreen")
-	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), zcreenTmpDir)
+	outs := printz.NewOutputs(outW, errW)
+	d := New(tmpDir, true, outs)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
@@ -611,14 +595,10 @@ func TestAsyncFlushAllThenDisplayThenBlockTailAll(t *testing.T) {
 	err = os.RemoveAll(tmpDir)
 	require.NoError(t, err)
 
-	d := New(tmpDir, true)
-	d.SetVerbose(model.SHOW_ALL)
-
-	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
-	zcreenTmpDir := filepath.Join(tmpDir, "zcreen")
-	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), zcreenTmpDir)
+	outs := printz.NewOutputs(outW, errW)
+	d := New(tmpDir, true, outs)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
@@ -713,14 +693,10 @@ func TestAsyncDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 	err = os.RemoveAll(tmpDir)
 	require.NoError(t, err)
 
-	d := New(tmpDir, true)
-	d.SetVerbose(model.SHOW_ALL)
-
-	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
-	zcreenTmpDir := filepath.Join(tmpDir, "zcreen")
-	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), zcreenTmpDir)
+	outs := printz.NewOutputs(outW, errW)
+	d := New(tmpDir, true, outs)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
@@ -857,14 +833,10 @@ func TestAsyncDisplayUsage_AsyncSuitesSerialTests(t *testing.T) {
 	err = os.RemoveAll(tmpDir)
 	require.NoError(t, err)
 
-	d := New(tmpDir, true)
-	d.SetVerbose(model.SHOW_ALL)
-
-	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
-	zcreenTmpDir := filepath.Join(tmpDir, "zcreen")
-	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), zcreenTmpDir)
+	outs := printz.NewOutputs(outW, errW)
+	d := New(tmpDir, true, outs)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
@@ -1012,14 +984,10 @@ func TestAsyncDisplayUsage_AsyncSuitesAsyncTests(t *testing.T) {
 	err = os.RemoveAll(tmpDir)
 	require.NoError(t, err)
 
-	d := New(tmpDir, true)
-	d.SetVerbose(model.SHOW_ALL)
-
-	// Replace stdPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
-	zcreenTmpDir := filepath.Join(tmpDir, "zcreen")
-	d.tailer = screen.NewAsyncScreenTailer(printz.NewOutputs(outW, errW), zcreenTmpDir)
+	outs := printz.NewOutputs(outW, errW)
+	d := New(tmpDir, true, outs)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())

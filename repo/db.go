@@ -43,6 +43,11 @@ func (r *dbRepo) Init() (err error) {
 	return
 }
 
+func (r *dbRepo) Close() error {
+	logger.Info("Closing DB", "file", r.db.FileLockPath())
+	return r.db.Close()
+}
+
 func (r dbRepo) BackingFilepath() string {
 	path, err := forgeWorkDirectoryPath(r.token, r.isolation)
 	if err != nil {

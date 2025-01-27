@@ -173,6 +173,29 @@ func TestNextSeq(t *testing.T) {
 	assert.Equal(t, uint16(1), s)
 }
 
+func TestNextSeq_ReinitDao(t *testing.T) {
+	dirpath := filez.MkdirTempOrPanic("")
+	defer os.RemoveAll(dirpath)
+	dao := initSuiteDao(t, dirpath)
+
+	addSuite(t, dao, "foo")
+	addSuite(t, dao, "bar")
+	addSuite(t, dao, "baz")
+
+	var s uint16
+	var err error
+
+	s, err = dao.NextSeq("foo")
+	require.NoError(t, err)
+	assert.Equal(t, uint16(1), s)
+
+	dao = initSuiteDao(t, dirpath)
+
+	s, err = dao.NextSeq("foo")
+	require.NoError(t, err)
+	assert.Equal(t, uint16(2), s)
+}
+
 func TestUpdateEndTime(t *testing.T) {
 	dirpath := filez.MkdirTempOrPanic("")
 	defer os.RemoveAll(dirpath)

@@ -859,8 +859,7 @@ func (d *AsyncDisplay) StopDisplayAllRecorded0() {
 }
 */
 
-func New(tmpDir string, init bool) *AsyncDisplay {
-	outs := printz.NewStandardOutputs()
+func New(tmpDir string, init bool, outs printz.Outputs) *AsyncDisplay {
 	openedTests := make(map[string]display.TestDisplayer, 0)
 	zcreenTmpDir := filepath.Join(tmpDir, "zcreen")
 	logger.Info("Building new async display", "zcreenTmpDir", zcreenTmpDir)

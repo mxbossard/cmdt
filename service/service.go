@@ -68,7 +68,7 @@ func InitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	cfg := ctx.Config
 
 	if cfg.Async.Is(true) {
-		asyncDpl := asyncdisplay.New(ctx.Repo.BackingFilepath(), false)
+		asyncDpl := asyncdisplay.New(ctx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
 		asyncDpl.Clear(cfg.TestSuite.Get())
 	}
 
@@ -371,6 +371,8 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			errorz.Fatal(agg)
 		}
 		globalCtx := facade.NewGlobalContext(token, isolation, inputConfig)
+		defer globalCtx.Repo.Close()
+
 		ProcessGlobalError(globalCtx, agg.Return())
 		Dpl.SetVerbose(globalCtx.Config.Verbose.Get())
 		logger.Trace("Forged context", "ctx", globalCtx)
@@ -381,6 +383,8 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		testSuite := inputConfig.TestSuite.Get()
 		logger.Debug("Executing Init action", "suite", testSuite)
 		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig)
+		defer suiteCtx.Repo.Close()
+
 		ProcessSuiteError(suiteCtx, agg.Return())
 		Dpl.SetVerbose(suiteCtx.Config.Verbose.Get())
 		logger.Trace("Forged context", "ctx", suiteCtx)
@@ -406,6 +410,8 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				errorz.Fatal(agg)
 			}
 			globalCtx := facade.NewGlobalContext(token, isolation, inputConfig)
+			defer globalCtx.Repo.Close()
+
 			Dpl.SetVerbose(globalCtx.Config.Verbose.Get())
 
 			//asyncDpl := display.NewAsync(token, isolation)
@@ -438,7 +444,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 					errorz.Fatal(err)
 				}
 
-				asyncDpl := asyncdisplay.New(globalCtx.Repo.BackingFilepath(), false)
+				asyncDpl := asyncdisplay.New(globalCtx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
 				//asyncDpl.StartDisplayAllRecorded(globalCtx.Config.SuiteTimeout.Get())
 
 				err = asyncDpl.TailAllBlocking(globalCtx.Config.SuiteTimeout.Get())
@@ -475,6 +481,8 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			testSuite := inputConfig.TestSuite.Get()
 			logger.Debug("Executing Report suite action", "suite", testSuite)
 			suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig)
+			defer suiteCtx.Repo.Close()
+
 			ProcessSuiteError(suiteCtx, agg.Return())
 
 			Dpl.SetVerbose(suiteCtx.Config.Verbose.Get())
@@ -529,7 +537,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 					exitCode = 0
 				}
 
-				asyncDpl := asyncdisplay.New(suiteCtx.Repo.BackingFilepath(), false)
+				asyncDpl := asyncdisplay.New(suiteCtx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
 				//asyncDpl.StartDisplayRecorded(testSuite, suiteCtx.Config.SuiteTimeout.Get())
 				err = asyncDpl.TailBlocking(testSuite, suiteCtx.Config.SuiteTimeout.Get())
 				ProcessSuiteError(suiteCtx, err)
@@ -551,6 +559,8 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		ppid := uint32(utils.ReadEnvPpid())
 		logger.Debug("Executing Test action", "suite", testSuite)
 		testCtx, err := facade.NewTestContext(token, isolation, testSuite, 0, inputConfig, ppid)
+		defer testCtx.Repo.Close()
+
 		ProcessTestError(testCtx, err)
 		testCtx.IncrementTestCount()
 		Dpl.SetVerbose(testCtx.Config.Verbose.Get())
