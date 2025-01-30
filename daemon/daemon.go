@@ -72,14 +72,35 @@ func (d daemon) run() {
 	debugTime := time.Now()
 	lastUnqueue := time.Now()
 
+	/*
+		err := d.repo.Init()
+		if err != nil {
+			return
+		}
+	*/
+
 	d.display = asyncdisplay.New(d.repo.BackingFilepath(), true, printz.NewStandardOutputs())
 	service.Dpl = d.display
+
+	/*
+		err = d.repo.Close()
+		if err != nil {
+			return
+		}
+	*/
 
 	for {
 		if time.Since(debugTime) > time.Second {
 			debugTime = time.Now()
 			logger.Trace("DAEMON: running", "token", d.token, "for", time.Since(startTime))
 		}
+
+		/*
+			err := d.repo.Init()
+			if err != nil {
+				return
+			}
+		*/
 
 		if op, err := d.unqueue(); err != nil {
 			panic(err)
@@ -89,7 +110,7 @@ func (d daemon) run() {
 				return
 			}
 		} else {
-			// nothing to unqueue wait 1ms
+			// nothing to unqueue wait some period
 			duration := time.Since(lastUnqueue)
 			if duration > ExtraRunningSecs*time.Second {
 				logger.Debug("DAEMON: nothing to unqueue", "duration", duration, "token", d.token)
@@ -99,6 +120,13 @@ func (d daemon) run() {
 			time.Sleep(AsyncPollingSleepInMs * time.Millisecond)
 			continue
 		}
+
+		/*
+			err = d.repo.Close()
+			if err != nil {
+				return
+			}
+		*/
 
 		lastUnqueue = time.Now()
 	}
@@ -253,7 +281,7 @@ func TakeOver() {
 	logger.Debug("daemon prechecks", "token", token, "isolation", isolation, "debugLevel", debugLevel, "args", os.Args[1:])
 
 	repo := repo.New(token, isolation)
-	defer repo.Close()
+	//defer repo.Close()
 
 	d := daemon{token: token, isolation: isolation, repo: &repo}
 	lockFilepath := filepath.Join(repo.BackingFilepath(), DaemonLockFilename)

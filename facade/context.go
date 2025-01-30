@@ -30,6 +30,12 @@ func NewGlobalContext(token, isolation string, inputCfg model.Config) GlobalCont
 	}
 
 	repo := repo.New(token, isolation)
+	/*
+		err = repo.Init()
+		if err != nil {
+			errorz.Fatal(err)
+		}
+	*/
 
 	cfg, err := repo.GetGlobalConfig()
 	if err != nil {

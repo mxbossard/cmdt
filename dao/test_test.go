@@ -15,7 +15,7 @@ func initTestDao(t *testing.T, dirpath string) Test {
 	db, err := DbOpen(dirpath)
 	require.NoError(t, err)
 
-	dao, err := NewTest(db)
+	dao, err := NewTest(db, true)
 	require.NoError(t, err)
 	return dao
 }

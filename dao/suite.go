@@ -10,9 +10,11 @@ import (
 	"mby.fr/utils/zql"
 )
 
-func NewSuite(db *zql.SynchronizedDB) (d Suite, err error) {
+func NewSuite(db *zql.SynchronizedDB, init bool) (d Suite, err error) {
 	d.db = db
-	err = d.init()
+	if init {
+		err = d.init()
+	}
 	return
 }
 
@@ -52,7 +54,7 @@ func (d Suite) init() (err error) {
 		);
 	`)
 	count, _ := res.RowsAffected()
-	logger.Debug("init suite DAO", "rows affected", count)
+	logger.Trace("init suite DAO", "rows affected", count)
 	return
 }
 

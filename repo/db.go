@@ -46,6 +46,7 @@ func (r *dbRepo) Init() (err error) {
 func (r *dbRepo) Close() error {
 	logger.Info("Closing DB", "file", r.db.FileLockPath())
 	return r.db.Close()
+	//return nil
 }
 
 func (r dbRepo) BackingFilepath() string {
@@ -365,15 +366,26 @@ func newDbRepo(dirpath, isolation, token string) (r dbRepo, err error) {
 	if err != nil {
 		return
 	}
+
 	db := r.db
-	r.queueDao, err = dao.NewQueue(db)
+	inited, err := dao.IsInitialized(db)
+	if err != nil {
+		return r, err
+	}
+
+	r.queueDao, err = dao.NewQueue(db, !inited)
 	if err != nil {
 		return
 	}
-	r.suiteDao, err = dao.NewSuite(db)
+	r.suiteDao, err = dao.NewSuite(db, !inited)
 	if err != nil {
 		return
 	}
-	r.testDao, err = dao.NewTest(db)
+	r.testDao, err = dao.NewTest(db, !inited)
+	if err != nil {
+		return
+	}
+
+	//err = r.Close()
 	return
 }

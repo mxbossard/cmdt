@@ -2,9 +2,11 @@ package dao
 
 import "mby.fr/utils/zql"
 
-func NewAssertion(db *zql.SynchronizedDB) (d Assertion, err error) {
+func NewAssertion(db *zql.SynchronizedDB, init bool) (d Assertion, err error) {
 	d.db = db
-	d.init()
+	if init {
+		err = d.init()
+	}
 	return
 }
 

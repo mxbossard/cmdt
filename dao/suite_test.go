@@ -16,7 +16,7 @@ func initSuiteDao(t *testing.T, dirpath string) Suite {
 	db, err := DbOpen(dirpath)
 	require.NoError(t, err)
 
-	dao, err := NewSuite(db)
+	dao, err := NewSuite(db, true)
 	require.NoError(t, err)
 	return dao
 }

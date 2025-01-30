@@ -15,9 +15,11 @@ const (
 	CMD_AND_ARGS_SEPARATOR = ","
 )
 
-func NewTest(db *zql.SynchronizedDB) (d Test, err error) {
+func NewTest(db *zql.SynchronizedDB, init bool) (d Test, err error) {
 	d.db = db
-	err = d.init()
+	if init {
+		err = d.init()
+	}
 	return
 }
 

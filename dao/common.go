@@ -41,23 +41,45 @@ func DbOpen(dirpath string) (db *zql.SynchronizedDB, err error) {
 	}
 
 	//db, err = sql.Open("sqlite", file+"?_busy_timeout=5000")
-	db, err = zqlite.OpenSynchronizedDB(file, "", BusyTimeout)
+	db, err = zqlite.OpenSynchronizedClosingDB(file, "", BusyTimeout)
 	if err != nil {
 		return
 	}
 
-	db.SetMaxOpenConns(5)
+	// err = db.Open()
+	// if err != nil {
+	// 	return
+	// }
+	//defer db.Close()
 
-	// Config to increase DB speed : temp objets and transaction journal stored in memory.
-	_, err = db.Exec(`
-		PRAGMA TEMP_STORE = MEMORY;
-		PRAGMA JOURNAL_MODE = MEMORY;
-		PRAGMA SYNCHRONOUS = OFF;
-		PRAGMA LOCKING_MODE = NORMAL;
-	`)
+	/*
+		db.SetMaxOpenConns(5)
+
+		// Config to increase DB speed : temp objets and transaction journal stored in memory.
+		_, err = db.Exec(`
+			PRAGMA TEMP_STORE = MEMORY;
+			PRAGMA JOURNAL_MODE = MEMORY;
+			PRAGMA SYNCHRONOUS = OFF;
+			PRAGMA LOCKING_MODE = NORMAL;
+		`)
+	*/
 
 	logger.Debug("opened db", "file", file)
 	return
+}
+
+func IsInitialized(db *zql.SynchronizedDB) (bool, error) {
+	row := db.QueryRow(`
+		SELECT count(name)
+		FROM sqlite_schema
+		WHERE type ='table' AND name NOT LIKE 'sqlite_%';
+	`)
+	var count int
+	err := row.Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 /*

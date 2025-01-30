@@ -7,9 +7,11 @@ import (
 	"mby.fr/utils/zql"
 )
 
-func NewQueue(db *zql.SynchronizedDB) (d Queue, err error) {
+func NewQueue(db *zql.SynchronizedDB, init bool) (d Queue, err error) {
 	d.db = db
-	d.init()
+	if init {
+		err = d.init()
+	}
 	return
 }
 
