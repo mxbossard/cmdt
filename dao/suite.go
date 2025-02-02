@@ -62,6 +62,14 @@ func (d Suite) NextSeq(suite string) (seq uint16, err error) {
 	p := logger.PerfTimer("suite", suite, "filelock", d.db.FileLockPath())
 	defer p.End()
 
+	err = d.db.Lock()
+	if err != nil {
+		return
+	}
+	defer d.db.Unlock()
+
+	//time.Sleep(time.Second)
+
 	row := d.db.QueryRow(`
 		SELECT s.seq
 		FROM suite s
@@ -110,6 +118,12 @@ func (d Suite) NextSeq(suite string) (seq uint16, err error) {
 func (d Suite) IncrementTooMuchCount(suite string) (seq uint16, err error) {
 	p := logger.PerfTimer("suite", suite, "filelock", d.db.FileLockPath())
 	defer p.End()
+
+	err = d.db.Lock()
+	if err != nil {
+		return
+	}
+	defer d.db.Unlock()
 
 	tx, err := d.db.Begin()
 	if err != nil {
@@ -315,6 +329,13 @@ func (d Suite) SaveSuiteConfig(testSuite string, cfg model.Config) (err error) {
 		return
 	}
 
+	err = d.db.Lock()
+	if err != nil {
+		return
+	}
+	defer d.db.Unlock()
+
+	//time.Sleep(1 * time.Second)
 	_, err = d.db.Exec(`INSERT OR IGNORE INTO suite(name, config) VALUES (@suite, '');`, sql.Named("suite", testSuite))
 	if err != nil {
 		return
@@ -349,6 +370,7 @@ func (d Suite) SaveSuiteConfig(testSuite string, cfg model.Config) (err error) {
 	if err != nil {
 		return
 	}
+
 	return
 }
 

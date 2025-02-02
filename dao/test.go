@@ -72,7 +72,7 @@ func (d Test) init() (err error) {
 	return
 }
 
-func (d Test) DeleteTest(suite string) (err error) {
+func (d Test) DeleteTestsOfSuite(suite string) (err error) {
 	p := logger.PerfTimer("suite", suite)
 	defer p.End()
 

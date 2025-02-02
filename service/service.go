@@ -51,6 +51,7 @@ func GlobalConfig(ctx facade.GlobalContext) (exitCode int16, err error) {
 	return
 }
 
+/*
 func ProcessInitTestSuiteDef(def model.InitSuiteDefinition) (exitCode int16) {
 	var err error
 	ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.InitAction, model.Config{})
@@ -60,6 +61,7 @@ func ProcessInitTestSuiteDef(def model.InitSuiteDefinition) (exitCode int16) {
 	}
 	return
 }
+*/
 
 func InitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	logger.Debug("Initializing test suite", "token", ctx.Token, "isolation", ctx.Isolation, "suites", ctx.Config.TestSuite)
@@ -67,10 +69,12 @@ func InitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	exitCode = 0
 	cfg := ctx.Config
 
-	if cfg.Async.Is(true) {
-		asyncDpl := asyncdisplay.New(ctx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
-		asyncDpl.Clear(cfg.TestSuite.Get())
-	}
+	/*
+		if cfg.Async.Is(true) {
+			asyncDpl := asyncdisplay.New(ctx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
+			asyncDpl.Clear(cfg.TestSuite.Get())
+		}
+	*/
 
 	var token string
 	if cfg.PrintToken.Is(true) {

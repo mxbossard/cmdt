@@ -94,6 +94,10 @@ func (d AsyncDisplay) CloseSuite(ctx facade.SuiteContext) {
 	if err != nil {
 		panic(err)
 	}
+	err = d.screen.ClearSession(suite)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (d AsyncDisplay) SuiteTitle(ctx facade.SuiteContext) {
@@ -603,14 +607,9 @@ func (d *AsyncDisplay) DisplayRecorded0(suite string, timeout time.Duration) err
 }
 */
 
-func (d *AsyncDisplay) Clear(suite string) error {
-	// FIXME: do we need to clear screen suite tmp files ?
-
-	// Clear files on suite init
-	//d.printers.clear(suite)
-	//err := clearFileWriters(d.token, d.isolation, suite)
-	//return err
-	return nil
+func (d *AsyncDisplay) Clear() error {
+	err := d.screen.Clear()
+	return err
 }
 
 func (d *AsyncDisplay) AsyncFlush(suite string, timeout time.Duration) {

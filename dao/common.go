@@ -50,6 +50,7 @@ func DbOpen(dirpath string) (db *zql.SynchronizedDB, err error) {
 	// if err != nil {
 	// 	return
 	// }
+	//logger.Debug("opened db", "file", file)
 	//defer db.Close()
 
 	/*
@@ -63,8 +64,6 @@ func DbOpen(dirpath string) (db *zql.SynchronizedDB, err error) {
 			PRAGMA LOCKING_MODE = NORMAL;
 		`)
 	*/
-
-	logger.Debug("opened db", "file", file)
 	return
 }
 

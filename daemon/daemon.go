@@ -13,6 +13,7 @@ import (
 	"github.com/gofrs/flock"
 
 	"mby.fr/cmdtest/asyncdisplay"
+	"mby.fr/cmdtest/facade"
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/repo"
 	"mby.fr/cmdtest/service"
@@ -66,41 +67,20 @@ type daemon struct {
 	openedSuite      string
 }
 
-func (d daemon) run() {
+func (d *daemon) run() {
 	logger.Warn("DAEMON: starting ...", "token", d.token, "isolation", d.isolation)
 	startTime := time.Now()
 	debugTime := time.Now()
 	lastUnqueue := time.Now()
 
-	/*
-		err := d.repo.Init()
-		if err != nil {
-			return
-		}
-	*/
-
 	d.display = asyncdisplay.New(d.repo.BackingFilepath(), true, printz.NewStandardOutputs())
 	service.Dpl = d.display
-
-	/*
-		err = d.repo.Close()
-		if err != nil {
-			return
-		}
-	*/
 
 	for {
 		if time.Since(debugTime) > time.Second {
 			debugTime = time.Now()
 			logger.Trace("DAEMON: running", "token", d.token, "for", time.Since(startTime))
 		}
-
-		/*
-			err := d.repo.Init()
-			if err != nil {
-				return
-			}
-		*/
 
 		if op, err := d.unqueue(); err != nil {
 			panic(err)
@@ -121,14 +101,8 @@ func (d daemon) run() {
 			continue
 		}
 
-		/*
-			err = d.repo.Close()
-			if err != nil {
-				return
-			}
-		*/
-
 		lastUnqueue = time.Now()
+
 	}
 	logger.Warn("DAEMON: stopping ...", "token", d.token, "after", time.Since(startTime))
 }
@@ -141,7 +115,7 @@ func (d daemon) unqueue() (op model.Operater, err error) {
 	return
 }
 
-func (d daemon) process(op model.Operater) (ok bool, err error) {
+func (d *daemon) process(op model.Operater) (ok bool, err error) {
 	defer func() {
 		if op != nil {
 			//logger.Warn("doning op ...", "op", op)
@@ -152,8 +126,16 @@ func (d daemon) process(op model.Operater) (ok bool, err error) {
 			}
 		}
 	}()
+
 	if op != nil {
 		logger.Debug("DAEMON: unqueued operation.", "kind", op.Kind(), "id", op.Id(), "suite", op.Suite(), "seq", op.Seq())
+		if d.openedSuite == "" {
+			d.openedSuite = op.Suite()
+			logger.Debug("Initializing test suite", "token", d.token, "isolation", d.isolation, "openedSuite", d.openedSuite)
+			ctx := facade.NewSuiteContext(d.token, d.isolation, d.openedSuite, false, model.InitAction, model.Config{})
+			d.display.OpenSuite(ctx)
+			d.display.SuiteTitle(ctx)
+		}
 		switch o := op.(type) {
 		case *model.TestOp:
 			ec := d.performTest(o.Definition)
@@ -178,19 +160,6 @@ func (d daemon) process(op model.Operater) (ok bool, err error) {
 func (d *daemon) performTest(testDef model.TestDefinition) (exitCode int16) {
 	perf := logger.PerfTimer()
 	defer perf.End()
-
-	if d.openedSuite == "" {
-		d.openedSuite = testDef.Config.TestSuite.Get()
-		def := model.InitSuiteDefinition{
-			Token:     d.token,
-			Isolation: d.isolation,
-			TestSuite: testDef.TestSuite,
-			Config:    testDef.Config,
-		}
-		logger.Debug("Initializing test suite", "token", def.Token, "isolation", def.Isolation, "openedSuite", d.openedSuite)
-		service.ProcessInitTestSuiteDef(def)
-	}
-
 	exitCode = service.ProcessTestDef(testDef)
 	return
 }
@@ -208,6 +177,8 @@ func (d *daemon) report(def model.ReportDefinition) (exitCode int16, err error) 
 	exitCode, err = service.ProcessReportDef(def)
 	logger.Debug("Closing test suite", "token", def.Token, "isolation", def.Isolation, "openedSuite", d.openedSuite)
 	d.openedSuite = ""
+	ctx := facade.NewSuiteContext(d.token, d.isolation, def.TestSuite, false, model.InitAction, model.Config{})
+	d.display.CloseSuite(ctx)
 	return
 }
 
@@ -224,6 +195,7 @@ func (d *daemon) reportAll(def model.ReportDefinition) (exitCode int16) {
 	exitCode = service.ProcessReportAllDef(def)
 	logger.Debug("Closing test suite", "token", def.Token, "isolation", def.Isolation, "openedSuite", d.openedSuite)
 	d.openedSuite = ""
+	d.display.Clear()
 	return
 }
 

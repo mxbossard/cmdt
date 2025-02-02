@@ -202,6 +202,30 @@ func (d Queue) CloseSuite(suite string) (err error) {
 	return
 }
 
+func (d Queue) DeleteQueuesOfSuite(suite string) (err error) {
+	p := logger.PerfTimer("suite", suite)
+	defer p.End()
+
+	tx, err := d.db.Begin()
+	if err != nil {
+		return
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec(`
+		DELETE FROM suite_queue
+		WHERE name = @suite;
+		DELETE FROM operation_queue
+		WHERE suite = @suite;
+	`, sql.Named("suite", suite))
+	if err != nil {
+		return
+	}
+
+	err = tx.Commit()
+	return
+}
+
 func (d Queue) QueuedOperationsCount() (count int, err error) {
 	row := d.db.QueryRow(`
 		SELECT count(*) 
