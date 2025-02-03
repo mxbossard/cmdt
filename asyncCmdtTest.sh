@@ -8,7 +8,7 @@ ls -lh "$newCmdt"
 
 # Trusted cmdt to works
 cmdt="cmdt"
-cmdt="$newCmdt"
+#cmdt="$newCmdt"
 
 # Cmdt used to test
 #cmdtIn="cmdt"
@@ -40,7 +40,7 @@ $cmdtIn @test=async success/"should pass 3" @stderr= @-- $cmdt1 @test=main1/t3 t
 $cmdtIn @test=async success/should report @exit=0 @stderr:"#01" @stderr:"#02" @stderr!:"#04" @stderr:"PASSED" @stderr!:"FAILED" @stderr:"3 success" @stderr!:"failure" @stderr!:"error" @-- $cmdt0 @verbose @report=main1 @debug=6
 $cmdtIn @report 2>&1 | grep -v "Failures"
 
-exit 0
+#exit 0
 
 $cmdtIn @init="async failure"
 $cmdtIn @test=async failure/should init @-- $cmdt1 @init=main2 @async @verbose=4

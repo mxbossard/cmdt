@@ -73,7 +73,8 @@ func (d *daemon) run() {
 	debugTime := time.Now()
 	lastUnqueue := time.Now()
 
-	d.display = asyncdisplay.New(d.repo.BackingFilepath(), true, printz.NewStandardOutputs())
+	outs := printz.NewDiscardingOutputs() // Daemon shoud not write on stdouts by default
+	d.display = asyncdisplay.New(d.repo.BackingFilepath(), true, outs)
 	service.Dpl = d.display
 
 	for {
