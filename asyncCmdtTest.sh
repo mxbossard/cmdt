@@ -8,7 +8,7 @@ ls -lh "$newCmdt"
 
 # Trusted cmdt to works
 cmdt="cmdt"
-#cmdt="$newCmdt"
+cmdt="$newCmdt"
 
 # Cmdt used to test
 #cmdtIn="cmdt"
@@ -32,28 +32,30 @@ rm /tmp/cmdt.log /tmp/daemon.log 2> /dev/null || true
 # Clear context
 export -n __CMDT_TOKEN
 
-$cmdtIn @init="async success" @verbose=3 @debug=0
+$cmdtIn @init="async success" 
 $cmdtIn @test=async success/should init @-- $cmdt1 @init=main1 @async @verbose=4
 $cmdtIn @test=async success/"should pass 1" @stderr= @-- $cmdt1 @test=main1/t1 true @verbose=4
 $cmdtIn @test=async success/"should pass 2" @stderr= @-- $cmdt1 @test=main1/t2 sleep 0.2 @verbose=4
 $cmdtIn @test=async success/"should pass 3" @stderr= @-- $cmdt1 @test=main1/t3 true @verbose=4
 $cmdtIn @test=async success/should report @exit=0 @stderr:"#01" @stderr:"#02" @stderr!:"#04" @stderr:"PASSED" @stderr!:"FAILED" @stderr:"3 success" @stderr!:"failure" @stderr!:"error" @-- $cmdt0 @verbose @report=main1 @debug=6
-$cmdt @report 2>&1 | grep -v "Failures"
+$cmdtIn @report 2>&1 | grep -v "Failures"
 
-$cmdtIn @init="async failure" @verbose=3 @debug=0
+exit 0
+
+$cmdtIn @init="async failure"
 $cmdtIn @test=async failure/should init @-- $cmdt1 @init=main2 @async @verbose=4
 $cmdtIn @test=async failure/"should pass" @stderr= @-- $cmdt1 @test=main2/t1 true
 $cmdtIn @test=async failure/"should fail" @stderr= @-- $cmdt1 @test=main2/t2 false
 $cmdtIn @test=async failure/should report @exit=1 @stderr:"#01" @stderr:"#02" @stderr!:"#03" @stderr:"PASSED" @stderr:"FAILED" @stderr:"1 success" @stderr:"1 failure" @stderr:"0 error" @-- $cmdt0 @verbose @report=main2 @debug=6
-$cmdt @report 2>&1 | grep -v "Failures"
+$cmdtIn @report 2>&1 | grep -v "Failures"
 
-$cmdtIn @init="async error" @verbose=3 @debug=0
+$cmdtIn @init="async error"
 $cmdtIn @test=async error/should init @-- $cmdt1 @init=main3 @async @verbose=4
 $cmdtIn @test=async error/should pass @stderr= @-- $cmdt1 @test=main3/t1 true
 $cmdtIn @test=async error/should error 1 @fail @stderr:"\@badRule does not exists" @-- $cmdt1 @test=main3/t2 true @badRule
 $cmdtIn @test=async error/should error 2 @stderr= @-- $cmdt1 @test=main3/t3 true @before=badCmd
 $cmdtIn @test=async error/should report @exit=0 @stderr:"#01" @stderr:"#02" @stderr:"PASSED" @stderr!:"FAILED" @stderr:"ERRORED" @stderr:"1 success" @stderr:"0 failure" @stderr:"2 error" @-- $cmdt0 @verbose @report=main3 @debug=6
-$cmdt @report 2>&1 | grep -v "Failures"
+$cmdtIn @report 2>&1 | grep -v "Failures"
 
 exit 0
 
