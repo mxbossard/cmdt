@@ -81,7 +81,7 @@ func (d AsyncDisplay) OpenSuite(ctx facade.SuiteContext) {
 	suite := ctx.Config.TestSuite.Get()
 	logger.Info("Opening suite", "suite", suite)
 	session := d.screen.Session(suite, 0)
-	err := session.Start(*ctx.Config.SuiteTimeout.Value)
+	err := session.Start(ctx.Config.SuiteTimeout.Get())
 	if err != nil {
 		panic(err)
 	}

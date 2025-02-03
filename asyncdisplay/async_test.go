@@ -3,6 +3,7 @@ package asyncdisplay
 import (
 	"fmt"
 	"os"
+
 	//"path/filepath"
 	"regexp"
 	"strings"
@@ -19,6 +20,8 @@ import (
 	"mby.fr/utils/ansi"
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/printz"
+	"mby.fr/utils/utilz"
+
 	//"mby.fr/utils/screen"
 	"mby.fr/utils/zlog"
 )
@@ -53,7 +56,7 @@ func TestAsyncDisplay_TestStdout(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	sctx := facade.NewSuiteContext(token, isol, suite, false, model.InitAction, model.Config{})
+	sctx := facade.NewSuiteContext(token, isol, suite, false, model.InitAction, model.Config{Timeout: utilz.OptionalOf[time.Duration](time.Second)})
 	d.OpenSuite(sctx)
 
 	// Writing async
