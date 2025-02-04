@@ -27,7 +27,7 @@ die() {
 
 #$cmdt @global @silent
 
-rm /tmp/cmdt.log /tmp/daemon.log 2> /dev/null || true
+rm -rf -- /tmp/cmdt* /tmp/cmdt.log /tmp/daemon.log 2> /dev/null || true
 
 # Clear context
 export -n __CMDT_TOKEN
@@ -40,8 +40,6 @@ $cmdtIn @test=async success/"should pass 3" @stderr= @-- $cmdt1 @test=main1/t3 t
 $cmdtIn @test=async success/should report @exit=0 @stderr:"#01" @stderr:"#02" @stderr!:"#04" @stderr:"PASSED" @stderr!:"FAILED" @stderr:"3 success" @stderr!:"failure" @stderr!:"error" @-- $cmdt0 @verbose @report=main1 @debug=6
 $cmdtIn @report 2>&1 | grep -v "Failures"
 
-#exit 0
-
 $cmdtIn @init="async failure"
 $cmdtIn @test=async failure/should init @-- $cmdt1 @init=main2 @async @verbose=4
 $cmdtIn @test=async failure/"should pass" @stderr= @-- $cmdt1 @test=main2/t1 true
@@ -52,9 +50,9 @@ $cmdtIn @report 2>&1 | grep -v "Failures"
 $cmdtIn @init="async error"
 $cmdtIn @test=async error/should init @-- $cmdt1 @init=main3 @async @verbose=4
 $cmdtIn @test=async error/should pass @stderr= @-- $cmdt1 @test=main3/t1 true
-$cmdtIn @test=async error/should error 1 @fail @stderr:"\@badRule does not exists" @-- $cmdt1 @test=main3/t2 true @badRule
+$cmdtIn @test=async error/should error 1 @fail @stderr:'badRule does not exists' @-- $cmdt1 @test=main3/t2 true @badRule
 $cmdtIn @test=async error/should error 2 @stderr= @-- $cmdt1 @test=main3/t3 true @before=badCmd
-$cmdtIn @test=async error/should report @exit=0 @stderr:"#01" @stderr:"#02" @stderr:"PASSED" @stderr!:"FAILED" @stderr:"ERRORED" @stderr:"1 success" @stderr:"0 failure" @stderr:"2 error" @-- $cmdt0 @verbose @report=main3 @debug=6
+$cmdtIn @test=async error/should report @exit=1 @stderr:"#01" @stderr:"#02" @stderr:"PASSED" @stderr!:"FAILED" @stderr:"ERRORED" @stderr:"1 success" @stderr:"0 failure" @stderr:"2 error" @-- $cmdt0 @verbose @report=main3 @debug=6
 $cmdtIn @report 2>&1 | grep -v "Failures"
 
 exit 0

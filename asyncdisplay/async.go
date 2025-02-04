@@ -640,7 +640,8 @@ func (d *AsyncDisplay) TailBlocking(suite string, timeout time.Duration) error {
 		time.Sleep(1 * time.Millisecond)
 	}
 	updatedTimeout := timeout - time.Since(startTime)
-	return d.tailer.TailBlocking(suite, updatedTimeout)
+	logger.Debug("TailBlocking ...", "suite", suite)
+	return d.tailer.TailOnlyBlocking(suite, updatedTimeout)
 }
 
 func (d *AsyncDisplay) TailAllBlocking(timeout time.Duration) error {
@@ -653,6 +654,7 @@ func (d *AsyncDisplay) TailAllBlocking(timeout time.Duration) error {
 		time.Sleep(1 * time.Millisecond)
 	}
 	updatedTimeout := timeout - time.Since(startTime)
+	logger.Debug("TailAllBlocking ...")
 	return d.tailer.TailAllBlocking(updatedTimeout)
 }
 

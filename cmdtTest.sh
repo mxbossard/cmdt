@@ -25,6 +25,8 @@ die() {
 
 #$cmdt @global @silent
 
+rm -rf -- /tmp/cmdt* /tmp/cmdt.log /tmp/daemon.log 2> /dev/null || true
+
 # Clear context
 export -n __CMDT_TOKEN
 #$cmdt @init=main
