@@ -144,7 +144,9 @@ func (d *basicTestDisplayer) Outcome(outcome model.TestOutcome) {
 		panic(fmt.Sprintf("unknown outcome: %s", outcome.Outcome))
 	}
 
-	if verbose >= model.SHOW_FAILED_ONLY && outcome.Outcome != model.PASSED && outcome.Outcome != model.IGNORED || verbose >= model.SHOW_PASSED_OUTS {
+	if outcome.Outcome == model.ERRORED {
+		d.printer.Errf("\tSupplied cmd: \t\t[%s]\n", CmdTitle(d.ctx))
+	} else if verbose >= model.SHOW_FAILED_ONLY && outcome.Outcome != model.PASSED && outcome.Outcome != model.IGNORED || verbose >= model.SHOW_PASSED_OUTS {
 		d.printer.Errf("\tExecuting cmd: \t\t[%s]\n", CmdTitle(d.ctx))
 	}
 
@@ -200,13 +202,16 @@ func (d basicTestDisplayer) assertionResult(result model.AssertionResult) {
 	}
 
 	var stringifiedGot string
-	if expected != got {
+	if !result.Success {
 		expected = strings.ReplaceAll(expected, "\n", "\\n")
 		if s, ok := got.(string); ok {
 			s = strings.ReplaceAll(s, "\n", "\\n")
 			got = s
 
 			stringifiedGot = ansi.TruncateMid(s, 100, "[...]")
+		} else {
+			stringifiedGot = fmt.Sprintf("%v", got)
+			//panic(fmt.Sprintf("unable to stringify rule %s value: [%v]", assertName, got))
 		}
 
 		if assertOp == "=" || assertOp == "@=" {

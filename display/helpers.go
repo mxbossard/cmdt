@@ -36,6 +36,9 @@ func TestQualifiedName(ctx facade.TestContext, color ansi.Color) (name string) {
 
 func CmdTitle(ctx facade.TestContext) string {
 	cmd := ctx.CmdExec
+	if cmd == nil {
+		return "UNKNONW"
+	}
 	cmdNameParts := strings.Split(cmd.String(), " ")
 	shortenedCmd := filepath.Base(cmdNameParts[0])
 	shortenCmdNameParts := cmdNameParts

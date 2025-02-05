@@ -55,17 +55,23 @@ import (
 - Do not queue async report for simplicity sake => report always in sync
 
 
-### Possible behaviors:
-- for async test log when possible like async=false
-- for async test log nothing until next waiting report
-- for async report log when possible like async=false
-- for async report log nothing until next waiting report
+### Possible output behaviors:
+- for async test output when possible like async=false
+- for async test output nothing until next waiting report
+- for async report output when possible like async=false
+- for async report output nothing until next waiting report
 
 ### Open questions:
-- when outputs async test ? on waiting report ?
-- could wait @report before launching tests if necessary ?
-- @wait = !@async ? => NO: @async=true ran by daemon ; @wait=true => block until operation done properly
 
+
+### Async decisions:
+- cmdt async operation trigger launch a daemon process
+- cmdt record all operations in DB
+- async operations are processed by daemon
+- async operations outputs are produced by daemon
+- cmdt report trigger tailing of async outputs
+- daemon does not output anything
+- @wait != !@async => @async=true ran by daemon ; @wait=true => block until operation done properly
 
 
 ## DEMO:
@@ -98,13 +104,13 @@ Bugs:
 - use suite timeout for container duration
 - @global config updates does not works
 - serialize test outcome instead of writing in report file
-- slower podman exec than docker exec
 - colors ok on black background but should not work on white background
 - Rm Tmp dirs
+- NEW_LINE in outputs are not prefixed by out> nor err>
 
 Cleaning:
 - move seq into utils module
-- move contianer use into utils module
+- move container use into utils module
 - move OneWriterDB into utils module / Rename to something like NotConcurrentDb
 
 
@@ -113,17 +119,19 @@ Optims:
 - mocking container can all be done in //
 - start container can be call async but execs need to wait container to be started
 - unqueue first waiting report
+- probably too slow podman/docker abstraction (check for podman & docker in path everytime)
 
 
 Features:
+- add @out & @err as alias of @stdout & @stderr
 - multiple @stderr or @stdout rules should be aggregated in assertion report
 - add cmdt @version  or cmdt -v or cmdt --version => how to embed version ? git hash ? git tag ?
 - use rule definitions in usage
 - shorten too long outputs on failure. Remove colors from output ?
-- @init=suite should set suite as default for following test (instead of default main)
-- @beforeSuite=CMD_ANG_ARGS & @afterSuite=CMD_ANG_ARGS
+- @init=suite should set suite as default for following test (instead of default main) (/!\ may cause problem if running cmdt in background (&) /!\)
+- @beforeSuite=CMD_AND_ARGS & @afterSuite=CMD_AND_ARGS
 - @called[=:]CMD ARG_S,stdin=IN,count=N assertion => verify a mock was called
-- probably too slow podman/docker abstraction (check for podman & docker in path everytime)
+- @msg to add a test description
 - docker/podman image pre pull once outside of test timeout (store pull in global context)
 - docker/podman image pre build once if supplied ref is a buildable context dir
 - docker/podman container engine resolution once stored in global context
@@ -150,7 +158,15 @@ Features:
 - test port opening if daemon ; test sending data on port ???
 
 
+Refactor:
+- Parse args in daemon for better flow (could perform a parse args in client for quick response and full process in daemon from parse args for simplicity) ?
+- Rework facade / context but how ?
+- log errors => one endpoint to manage all breaking errors (or panic)
+
+
 ## DONE:
+- @exit seems bug it never display the exitCode value ("but got: []")
+
 - replayable report in option with @keep
 - stoping container can be done async (no need to block for end of stop)
 

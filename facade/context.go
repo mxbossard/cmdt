@@ -297,14 +297,18 @@ func (c TestContext) initTestOutcome(seq uint16) (outcome model.TestOutcome) {
 	outcome.TestSuite = testSuite
 	outcome.Seq = seq
 	outcome.ExitCode = -1
-	outcome.Duration = c.CmdExec.Duration()
-	outcome.Stdout = c.CmdExec.StdoutRecord()
-	outcome.Stderr = c.CmdExec.StderrRecord()
+	if c.CmdExec != nil {
+		outcome.Duration = c.CmdExec.Duration()
+		outcome.Stdout = c.CmdExec.StdoutRecord()
+		outcome.Stderr = c.CmdExec.StderrRecord()
+	}
 
 	if c.Config.TestName.IsPresent() && !c.Config.TestName.Is("") {
 		outcome.TestName = c.Config.TestName.Get()
-	} else {
+	} else if c.CmdExec != nil {
 		outcome.TestName = cmdTitle(c.CmdExec)
+	} else {
+		outcome.TestName = "UNKNONW"
 	}
 
 	return

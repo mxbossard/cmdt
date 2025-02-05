@@ -248,6 +248,7 @@ func (d *basicDisplay) CloseTest(ctx facade.TestContext) {
 	d.openedTest = nil
 }
 
+/*
 func (d basicDisplay) assertionResult(result model.AssertionResult) {
 	defer d.Flush()
 	hlClr := ReportColor
@@ -272,7 +273,7 @@ func (d basicDisplay) assertionResult(result model.AssertionResult) {
 			if cmd.StderrRecord() != "" {
 				d.printer.Errf("sdterr> %s\n", cmd.StderrRecord())
 			}
-		*/
+*/ /*
 		return
 	} else if assertName == "cmd" {
 		d.printer.Errf("\t%sExpected%s %s=%s to succeed\n", hlClr, ResetColor, assertLabel, expected)
@@ -290,6 +291,8 @@ func (d basicDisplay) assertionResult(result model.AssertionResult) {
 			got = s
 
 			stringifiedGot = ansi.TruncateMid(s, 100, "[...]")
+		} else {
+			panic(fmt.Sprintf("unable to stringify rule %s value: [%v]", assertName, got))
 		}
 
 		if assertOp == "=" || assertOp == "@=" {
@@ -307,7 +310,7 @@ func (d basicDisplay) assertionResult(result model.AssertionResult) {
 		d.printer.Errf("assertion %s%s%s failed\n", assertLabel, assertOp, expected)
 	}
 }
-
+*/
 func (d basicDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 	defer d.Flush()
 	testCount := outcome.TestCount

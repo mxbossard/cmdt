@@ -229,15 +229,27 @@ func PerformTest(testDef model.TestDefinition) (exitCode int16, err error) {
 	err = ctx.ConfigMocking()
 	ProcessTestError(ctx, err)
 
+	var beforeErrors errorz.Aggregated
 	for _, before := range cfg.Before {
 		cmdBefore := cmdz.Cmd(before...)
 		beforeExit, beforeErr := cmdBefore.BlockRun()
 		// FIXME: what to do of before exit code or beforeErr ?
 		_ = beforeExit
 		if beforeErr != nil {
-			err = fmt.Errorf("error running before cmd: [%s]: %w", cmdBefore.String(), beforeErr)
-			return
+			err := fmt.Errorf("error running before cmd: [%s]: %w", cmdBefore.String(), beforeErr)
+			beforeErrors.Add(err)
 		}
+	}
+	if beforeErrors.GotError() {
+		outcome := model.TestOutcome{
+			Outcome:       model.ERRORED,
+			Duration:      0 * time.Millisecond,
+			TestSignature: testDef.TestSignature,
+			Err:           beforeErrors.Return(),
+		}
+		ctx.Repo.SaveTestOutcome(outcome)
+		td.Outcome(outcome)
+		return 1, nil
 	}
 
 	// Build assertions
@@ -279,8 +291,8 @@ func ProcessTestDef(testDef model.TestDefinition) (exitCode int16) {
 	testCtx, err := facade.NewTestContext2(testDef)
 
 	Dpl.Quiet(testCfg.Quiet.Is(true))
-	Dpl.OpenTest(testCtx)
-	defer Dpl.CloseTest(testCtx)
+	// Dpl.OpenTest(testCtx)
+	// defer Dpl.CloseTest(testCtx)
 
 	ProcessTestError(testCtx, err)
 
@@ -303,6 +315,7 @@ func ProcessTestDef(testDef model.TestDefinition) (exitCode int16) {
 	if testCfg.ContainerDisabled.Is(true) || testCfg.ContainerImage.IsEmpty() {
 		logger.Debug("Performing test outside container", "image", testCfg.ContainerImage, "containerDisabled", testCfg.ContainerDisabled, "testConfig", testCfg)
 		exitCode, err = PerformTest(testDef)
+
 		ProcessTestError(testCtx, err)
 	} else {
 		logger.Info("Performing test inside container", "image", testCfg.ContainerImage, "containeriId", testCfg.ContainerId, "testConfig", testCfg)
@@ -327,6 +340,30 @@ func ProcessTestDef(testDef model.TestDefinition) (exitCode int16) {
 	return
 }
 
+func ProcessMalDefinedTest(testDef model.TestDefinition, malDefErr error) (exitCode int16) {
+	testCtx, err := facade.NewTestContext2(testDef)
+	if err != nil {
+		// TODO
+		panic(err)
+	}
+
+	td := Dpl.OpenTest(testCtx)
+	defer td.Close()
+	td.Title()
+
+	outcome := model.TestOutcome{
+		Outcome:       model.ERRORED,
+		Duration:      0 * time.Millisecond,
+		TestSignature: testDef.TestSignature,
+		Err:           malDefErr,
+	}
+	testCtx.Repo.SaveTestOutcome(outcome)
+	td.Outcome(outcome)
+
+	//ProcessTestError(testCtx, parseArgsErrors.Return())
+	return 1
+}
+
 func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() int16) {
 	var exitCode int16
 	exitCode = 1
@@ -347,10 +384,10 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 	rulePrefix := defaultCfg.Prefix.Get()
 
 	signifientArgs := allArgs[1:]
-	inputConfig, assertions, agg := ParseArgs(rulePrefix, signifientArgs)
+	inputConfig, assertions, parseArgsErrors := ParseArgs(rulePrefix, signifientArgs)
 
 	inputConfig.Token.Default(envToken)
-	logger.Debug("Parsed args", "args", signifientArgs, "inputConfig", inputConfig, "assertions", assertions, "error", agg)
+	logger.Debug("Parsed args", "args", signifientArgs, "inputConfig", inputConfig, "assertions", assertions, "error", parseArgsErrors)
 	if inputConfig.Debug.IsPresent() {
 		model.LoggerLevel.Set(slog.Level(8 - inputConfig.Debug.Get()*4))
 	}
@@ -371,13 +408,12 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		// if agg.GotError() {
 		// 	log.Fatal(agg.Error())
 		// }
-		if agg.GotError() {
-			errorz.Fatal(agg)
+		if parseArgsErrors.GotError() {
+			errorz.Fatal(parseArgsErrors)
 		}
 		globalCtx := facade.NewGlobalContext(token, isolation, inputConfig)
-		defer globalCtx.Repo.Close()
 
-		ProcessGlobalError(globalCtx, agg.Return())
+		ProcessGlobalError(globalCtx, parseArgsErrors.Return())
 		Dpl.SetVerbose(globalCtx.Config.Verbose.Get())
 		logger.Trace("Forged context", "ctx", globalCtx)
 		logger.Info("Processing global action", "token", token)
@@ -387,9 +423,8 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		testSuite := inputConfig.TestSuite.Get()
 		logger.Debug("Executing Init action", "suite", testSuite)
 		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig)
-		defer suiteCtx.Repo.Close()
 
-		ProcessSuiteError(suiteCtx, agg.Return())
+		ProcessSuiteError(suiteCtx, parseArgsErrors.Return())
 		Dpl.SetVerbose(suiteCtx.Config.Verbose.Get())
 		logger.Trace("Forged context", "ctx", suiteCtx)
 		logger.Info("Processing init action", "token", token)
@@ -410,11 +445,10 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		if inputConfig.ReportAll.Is(true) {
 			logger.Debug("Executing Report all action")
 			// Reporting All test suite
-			if agg.GotError() {
-				errorz.Fatal(agg)
+			if parseArgsErrors.GotError() {
+				errorz.Fatal(parseArgsErrors)
 			}
 			globalCtx := facade.NewGlobalContext(token, isolation, inputConfig)
-			defer globalCtx.Repo.Close()
 
 			Dpl.SetVerbose(globalCtx.Config.Verbose.Get())
 
@@ -485,9 +519,8 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			testSuite := inputConfig.TestSuite.Get()
 			logger.Debug("Executing Report suite action", "suite", testSuite)
 			suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig)
-			defer suiteCtx.Repo.Close()
 
-			ProcessSuiteError(suiteCtx, agg.Return())
+			ProcessSuiteError(suiteCtx, parseArgsErrors.Return())
 
 			Dpl.SetVerbose(suiteCtx.Config.Verbose.Get())
 
@@ -563,13 +596,16 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		ppid := uint32(utils.ReadEnvPpid())
 		logger.Debug("Executing Test action", "suite", testSuite)
 		testCtx, err := facade.NewTestContext(token, isolation, testSuite, 0, inputConfig, ppid)
-		defer testCtx.Repo.Close()
 
-		ProcessTestError(testCtx, err)
+		if err != nil {
+			Dpl.Errors(err)
+		}
+		//ProcessTestError(testCtx, err)
+
 		testCtx.IncrementTestCount()
 		Dpl.SetVerbose(testCtx.Config.Verbose.Get())
 		seq := testCtx.Seq
-		ProcessTestError(testCtx, agg.Return())
+
 		testCfg := testCtx.Config
 		token = testCtx.Token
 		logger.Trace("Forged context", "ctx", testCtx)
@@ -589,6 +625,12 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			//SuitePrefix: testCtx.Suite.Config.Prefix.Get(),
 			CmdArgs: signifientArgs,
 		}
+
+		if parseArgsErrors.GotError() {
+			exitCode = ProcessMalDefinedTest(testDef, parseArgsErrors.Return())
+			return
+		}
+
 		logger.Debug("Test definition", "token", token, "isolation", isolation, "suite", testSuite, "seq", seq)
 		if !testCfg.Async.Is(true) {
 			// Process test without daemon

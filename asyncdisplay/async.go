@@ -10,7 +10,6 @@ import (
 	"mby.fr/cmdtest/display"
 	"mby.fr/cmdtest/facade"
 	"mby.fr/cmdtest/model"
-	"mby.fr/utils/ansi"
 	"mby.fr/utils/errorz"
 	"mby.fr/utils/format"
 	"mby.fr/utils/inout"
@@ -316,7 +315,7 @@ func (d AsyncDisplay) TestStderr0(ctx facade.TestContext, s string) {
 	}
 }
 */
-
+/*
 func (d AsyncDisplay) assertionResult(printer printz.Printer, result model.AssertionResult) {
 	hlClr := display.ReportColor
 	//log.Printf("failedResult: %v\n", result)
@@ -340,7 +339,7 @@ func (d AsyncDisplay) assertionResult(printer printz.Printer, result model.Asser
 			if cmd.StderrRecord() != "" {
 				d.printer.Errf("sdterr> %s\n", cmd.StderrRecord())
 			}
-		*/
+*/ /*
 		return
 	} else if assertName == "cmd" {
 		printer.Errf("\t%sExpected%s %s=%s to succeed\n", hlClr, display.ResetColor, assertLabel, expected)
@@ -358,6 +357,8 @@ func (d AsyncDisplay) assertionResult(printer printz.Printer, result model.Asser
 			got = s
 
 			stringifiedGot = ansi.TruncateMid(s, 100, "[...]")
+		} else {
+			panic(fmt.Sprintf("unable to stringify rule %s value: [%v]", assertName, got))
 		}
 
 		if assertOp == "=" || assertOp == "@=" {
@@ -375,6 +376,7 @@ func (d AsyncDisplay) assertionResult(printer printz.Printer, result model.Asser
 		printer.Errf("assertion %s%s%s failed\n", assertLabel, assertOp, expected)
 	}
 }
+*/
 
 func (d AsyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 	testCount := outcome.TestCount

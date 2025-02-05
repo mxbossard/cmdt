@@ -124,12 +124,14 @@ grep "4 errors" "$of" || die "reporting should_error bad errors count"
 
 nothingToReportExpectedStderrMsg="you must perform some test prior to report"
 >&2 echo "## Test @report without test"
-$cmdtIn @init=meta1 #@verbose=4
-$cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=foo #@debug=4
-$cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=foo #@debug=4
-$cmdtIn @test=meta1/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report #@debug=4
+$cmdtIn @init=meta0 #@verbose=4
+$cmdtIn @test=meta0/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=foo #@debug=4
+$cmdtIn @test=meta0/ @stderr= @-- $cmdt0 @init=foo #@debug=4
+$cmdtIn @test=meta0/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=foo #@debug=4
+$cmdtIn @test=meta0/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report #@debug=4
 
 >&2 echo "## Meta1 test context not shared without token"
+$cmdtIn @init=meta1 #@verbose=4
 $cmdtIn @test=meta1/"without token one" @stderr:"PASSED" @stderr:"#01" @-- $cmdt1 true #@debug
 $cmdtIn @test=meta1/"without token two" @stderr:"PASSED" @stderr:"#02" @-- $cmdt1 true #@debug
 $cmdtIn @test=meta1/"command before rule stop" @fail @stderr:"before rule parsing stopper" @-- $cmdt1 true @-- @success
@@ -266,19 +268,19 @@ $cmdtIn @test=display_verbosity/ @stdout= @stderr=                              
 # verbose=SHOW_FAILED_ONLY
 $cmdtIn @test=display_verbosity/ @stdout= @stderr=                                                   @-- $cmdt0 @verbose=1 echo foo 
 $cmdtIn @test=display_verbosity/ @stdout= @stderr:FAILED @stderr:"Executing cmd" @stderr!:">foo"     @-- $cmdt0 @verbose=1 echo foo @fail
-$cmdtIn @test=display_verbosity/ @stdout= @stderr:ERRORED @stderr:"Executing cmd"                    @-- $cmdt0 @verbose=1 foo
+$cmdtIn @test=display_verbosity/ @stdout= @stderr:ERRORED @stderr:"Supplied cmd"                     @-- $cmdt0 @verbose=1 foo
 # verbose=SHOW_FAILED_OUTS
 $cmdtIn @test=display_verbosity/ @stdout= @stderr=                                                   @-- $cmdt0 @verbose=2 echo foo
 $cmdtIn @test=display_verbosity/ @stdout= @stderr:FAILED @stderr:"Executing cmd" @stderr:">foo"      @-- $cmdt0 @verbose=2 echo foo @fail
-$cmdtIn @test=display_verbosity/ @stdout= @stderr:ERRORED @stderr:"Executing cmd"                    @-- $cmdt0 @verbose=2 foo
+$cmdtIn @test=display_verbosity/ @stdout= @stderr:ERRORED @stderr:"Supplied cmd"                     @-- $cmdt0 @verbose=2 foo
 # verbose=SHOW_PASSED
 $cmdtIn @test=display_verbosity/ @stdout= @stderr:PASSED @stderr!:"Executing cmd" @stderr!:">foo"    @-- $cmdt0 @verbose=3 echo foo
 $cmdtIn @test=display_verbosity/ @stdout= @stderr:FAILED @stderr:"Executing cmd" @stderr:">foo"      @-- $cmdt0 @verbose=3 echo foo @fail
-$cmdtIn @test=display_verbosity/ @stdout= @stderr:ERRORED @stderr:"Executing cmd"                    @-- $cmdt0 @verbose=3 foo
+$cmdtIn @test=display_verbosity/ @stdout= @stderr:ERRORED @stderr:"Supplied cmd"                     @-- $cmdt0 @verbose=3 foo
 # verbose=SHOW_PASSED_OUTS
 $cmdtIn @test=display_verbosity/ @stdout= @stderr:PASSED @stderr:"Executing cmd" @stderr:">foo"      @-- $cmdt0 @verbose=4 echo foo
 $cmdtIn @test=display_verbosity/ @stdout= @stderr:FAILED @stderr:"Executing cmd" @stderr:">foo"      @-- $cmdt0 @verbose=4 echo foo @fail
-$cmdtIn @test=display_verbosity/ @stdout= @stderr:ERRORED @stderr:"Executing cmd"                    @-- $cmdt0 @verbose=4 foo
+$cmdtIn @test=display_verbosity/ @stdout= @stderr:ERRORED @stderr:"Supplied cmd"                     @-- $cmdt0 @verbose=4 foo
 
 
 >&2 echo "## Test rules missusage"

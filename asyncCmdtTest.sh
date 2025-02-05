@@ -8,7 +8,7 @@ ls -lh "$newCmdt"
 
 # Trusted cmdt to works
 cmdt="cmdt"
-#cmdt="$newCmdt"
+cmdt="$newCmdt"
 
 # Cmdt used to test
 #cmdtIn="cmdt"
@@ -47,28 +47,40 @@ $cmdtIn @test=async failure/"should fail" @stderr= @-- $cmdt1 @test=main2/t2 fal
 $cmdtIn @test=async failure/should report @exit=1 @stderr:"#01" @stderr:"#02" @stderr!:"#03" @stderr:"PASSED" @stderr:"FAILED" @stderr:"1 success" @stderr:"1 failure" @stderr:"0 error" @-- $cmdt0 @verbose @report=main2 @debug=6
 $cmdtIn @report 2>&1 | grep -v "Failures"
 
-$cmdtIn @init="async error"
-$cmdtIn @test=async error/should init @-- $cmdt1 @init=main3 @async @verbose=4
-$cmdtIn @test=async error/should pass @stderr= @-- $cmdt1 @test=main3/t1 true
-$cmdtIn @test=async error/should error 1 @fail @stderr:'badRule does not exists' @-- $cmdt1 @test=main3/t2 true @badRule
-$cmdtIn @test=async error/should error 2 @stderr= @-- $cmdt1 @test=main3/t3 true @before=badCmd
-$cmdtIn @test=async error/should report @exit=1 @stderr:"#01" @stderr:"#02" @stderr:"PASSED" @stderr!:"FAILED" @stderr:"ERRORED" @stderr:"1 success" @stderr:"0 failure" @stderr:"2 error" @-- $cmdt0 @verbose @report=main3 @debug=6
+$cmdtIn @init="sync error" #@verbose=4
+$cmdtIn @test=sync error/should init @-- $cmdt1 @init=main3 @async=false @verbose=5
+$cmdtIn @test=sync error/should pass @stderr:"#01" @stderr:"PASSED" @-- $cmdt1 @test=main3/t1 true
+$cmdtIn @test=sync error/should error 1 @fail @stderr:"#02" @stderr:"ERRORED" @stderr:'badRule does not exists' @-- $cmdt1 @test=main3/t2 true @badRule
+$cmdtIn @test=sync error/should error 2 @fail @stderr:"#03" @stderr:"ERRORED" @-- $cmdt1 @test=main3/t3 true @before=badCmd
+$cmdtIn @test=sync error/should report @exit=1 @stderr:"1 success" @stderr:"0 failure" @stderr:"2 error" @stderr:"3 test" @-- $cmdt0 @verbose @report=main3 @debug=6
 $cmdtIn @report 2>&1 | grep -v "Failures"
 
-exit 0
+$cmdtIn @init="async error" #@verbose=4
+$cmdtIn @test=async error/should init @-- $cmdt1 @init=main4 @async @verbose=4
+$cmdtIn @test=async error/should pass @stderr= @-- $cmdt1 @test=main4/t1 true
+$cmdtIn @test=async error/should error 1 @fail @stderr:'badRule does not exists' @-- $cmdt1 @test=main4/t2 true @badRule
+$cmdtIn @test=async error/should error 2 @stderr= @-- $cmdt1 @test=main4/t3 true @before=badCmd
+$cmdtIn @test=async error/should report @exit=1 @stderr:"#01" @stderr!:"#02" @stderr:"#03" @stderr!:"#04" @stderr:"PASSED" @stderr!:"FAILED" @stderr:"ERRORED" @stderr:"1 success" @stderr:"0 failure" @stderr:"2 error" @-- $cmdt0 @verbose @report=main4 @debug=6
+$cmdtIn @report 2>&1 | grep -v "Failures"
 
-nothingToReportExpectedStderrMsg="you must perform some test prior to report"
+
+# FIXME: async report should not fail if no test exist yet. It should fail after a short timeout if no test to report.
+nothingToReportExpectedStderrMsg="no test to report"
+>&2 echo "## Test @report without test"
+$cmdtIn @init=meta0 #@verbose=4
+$cmdtIn @test=meta0/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=foo @async #@debug=4
+$cmdtIn @test=meta0/ @stderr= @-- $cmdt0 @init=foo @async #@debug=4
+$cmdtIn @test=meta0/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report=foo @async #@debug=4
+$cmdtIn @test=meta0/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt0 @report @async #@debug=4
+
 >&2 echo "## Meta1 test context not shared without token"
-$cmdtIn @init=meta1 @verbose=4 @debug=4
+$cmdtIn @init=meta1 #@verbose=4
 $cmdtIn @test=meta1/init @stderr= @-- $cmdt1 @init @async @verbose=4
-$cmdtIn @test=meta1/"should pass 1" @stderr= @-- $cmdt1 true
-$cmdtIn @test=meta1/"should pass 2" @stderr= @-- $cmdt1 true
-$cmdtIn @test=meta1/"should error" @stderr= @-- $cmdt1 true
-
-#$cmdtIn @test=meta1/"command before rule stop" @stderr= @-- $cmdt1 true @-- @success
+$cmdtIn @test=meta1/"without token one" @stderr= @-- $cmdt1 true #@debug
+$cmdtIn @test=meta1/"without token two" @stderr= @-- $cmdt1 true #@debug
+$cmdtIn @test=meta1/"command before rule stop" @fail @stderr:"ERRORED" @stderr:"before rule parsing stopper" @-- $cmdt1 true @-- @success
 $cmdtIn @test=meta1/"rule on 2 args" @stderr= @-- $cmdt1 @stdout:foo bar @-- echo foo bar
-$cmdtIn @test=meta1/ @exit=0 @stderr:"#01" @stderr:"#02" @stderr:"before rule parsing stopper" @stderr:"PASSED" @stderr:"3 success" @stderr:"0 failure" @stderr:"0 error" @-- $cmdt0 @verbose @report=main @debug=6
-$cmdt @report 2>&1 | grep -v "Failures"
+$cmdtIn @test=meta1/ @exit=1 @stderr:"3 success" @stderr:"0 failure" @stderr:"1 error" @stderr:"PASSED" @stderr!:"ERRORED" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @stderr:"#04" @stderr!:"#05" @-- $cmdt0 @report=main
 
 exit 0
 
