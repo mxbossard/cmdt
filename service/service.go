@@ -82,6 +82,7 @@ func InitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 		if err != nil {
 			return
 		}
+		logger.Debug("printToken", "token", ctx.Token)
 		fmt.Printf("%s\n", token)
 		cfg.Token = utilz.OptionalOf(token)
 	} else if cfg.ExportToken.Is(true) {
@@ -89,6 +90,7 @@ func InitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 		if err != nil {
 			return
 		}
+		logger.Debug("exportToken", "token", ctx.Token)
 		fmt.Printf("export %s=%s\n", model.ContextTokenEnvVarName, token)
 		cfg.Token = utilz.OptionalOf(token)
 	}

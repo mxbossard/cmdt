@@ -20,6 +20,14 @@ cmdt0="$newCmdt @isol=tested"
 cmdt1="$newCmdt @isol=tested @verbose=4 @failuresLimit=-1" # Default verbose show passed test + perform all test beyond failures limit
 #cmdt2="$newCmdt @verbose @failuresLimit=-1 @async @wait"
 
+# Isolate tester & tested cmdt with tokens
+testerTk=$( $cmdt @init @printToken )
+cmdt="$cmdt @token=$testerTk"
+cmdtIn="$cmdtIn @token=$testerTk"
+newTk=$( $newCmdt @isol=tested @init @printToken @debug )
+newCmdt0="$newCmdt0 @token=$newTk"
+newCmdt1="$newCmdt1 @token=$newTk"
+
 die() {
 	>&2 echo "$1"
 	exit 1
@@ -91,7 +99,7 @@ $cmdtIn @init=meta2 #@verbose=4
 $cmdtIn @test=meta2/init @-- $cmdt1 @init @async
 $cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#01" @-- $cmdt1 true @token=$tk0
 $cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#02" @-- $cmdt1 true @token=$tk0
-$cmdtIn @test=meta2/ @fail @-- $cmdt1 @report=main
+$cmdtIn @test=meta2/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $cmdt1 @report=main
 $cmdtIn @test=meta2/ @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @-- $cmdt1 @report @token=$tk0
 $cmdt @report 2>&1 | grep -v "Failures"
 

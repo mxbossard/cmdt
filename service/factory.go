@@ -574,8 +574,14 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 			c.Token, err = TranslateOptional(rule, DummyMapper, OperatorValidater[string]("="), NotEmptyValidater[string])
 		case "printToken":
 			c.PrintToken, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
+			if c.PrintToken.Is(true) {
+				c.ExportToken = utilz.OptionalOf(false)
+			}
 		case "exportToken":
 			c.ExportToken, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
+			if c.ExportToken.Is(true) {
+				c.PrintToken = utilz.OptionalOf(false)
+			}
 		case "isol":
 			c.Isol, err = TranslateOptional(rule, DummyMapper, OperatorValidater[string]("="), NotEmptyValidater[string])
 		case "keep":

@@ -301,9 +301,9 @@ type Config struct {
 	AfterSuite      [][]string                    `yaml:""`
 
 	// Test or TestSuite
-	PrintToken    utilz.Optional[bool]          `yaml:""`
-	ExportToken   utilz.Optional[bool]          `yaml:""`
-	ReportAll     utilz.Optional[bool]          `yaml:""`
+	PrintToken    utilz.Optional[bool]          `yaml:"-"`
+	ExportToken   utilz.Optional[bool]          `yaml:"-"`
+	ReportAll     utilz.Optional[bool]          `yaml:"-"`
 	Keep          utilz.Optional[bool]          `yaml:""`
 	Verbose       utilz.Optional[VerboseLevel]  `yaml:""`
 	Debug         utilz.Optional[DebugLevel]    `yaml:""`

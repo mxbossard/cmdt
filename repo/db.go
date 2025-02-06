@@ -25,12 +25,15 @@ type dbRepo struct {
 }
 
 func (r *dbRepo) Init() (err error) {
-	if r.db != nil {
-		err = r.db.Close()
-		if err != nil {
-			return
+	/*
+		if r.db != nil {
+			err = r.db.Close()
+			if err != nil {
+				return
+			}
 		}
-	}
+	*/
+
 	db, err := dao.DbOpen(r.dirpath)
 	if err != nil {
 		return
@@ -100,6 +103,7 @@ func (r dbRepo) InitSuite(cfg model.Config) (err error) {
 	if err != nil {
 		return
 	}
+
 	//err = persistSuiteConfig(r.token, cfg)
 	err = r.SaveSuiteConfig(cfg)
 	if err != nil {

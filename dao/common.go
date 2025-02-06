@@ -71,13 +71,26 @@ func IsInitialized(db *zql.SynchronizedDB) (bool, error) {
 	row := db.QueryRow(`
 		SELECT count(name)
 		FROM sqlite_schema
-		WHERE type ='table' AND name NOT LIKE 'sqlite_%';
+		WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name IS NOT NULL;
 	`)
 	var count int
 	err := row.Scan(&count)
 	if err != nil {
 		return false, err
 	}
+
+	var names string
+	row = db.QueryRow(`
+			SELECT coalesce(group_concat(coalesce(name, 'NIL')), 'NULL')
+			FROM sqlite_schema
+			WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name IS NOT NULL;
+		`)
+	err = row.Scan(&names)
+	if err != nil {
+		return false, err
+	}
+
+	logger.Debug("cmdt sqlite tables", "count", count, "file", db.FileLockPath(), "tables", names)
 	return count > 0, nil
 }
 
