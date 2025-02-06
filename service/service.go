@@ -69,13 +69,6 @@ func InitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	exitCode = 0
 	cfg := ctx.Config
 
-	/*
-		if cfg.Async.Is(true) {
-			asyncDpl := asyncdisplay.New(ctx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
-			asyncDpl.Clear(cfg.TestSuite.Get())
-		}
-	*/
-
 	var token string
 	if cfg.PrintToken.Is(true) {
 		token, err = utils.ForgeUuid()
@@ -98,8 +91,12 @@ func InitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	err = ctx.InitSuite()
 	ProcessSuiteError(ctx, err)
 
-	Dpl.OpenSuite(ctx)
-	Dpl.SuiteTitle(ctx)
+	if !cfg.Async.Is(true) {
+		// On async init do not display
+		Dpl.OpenSuite(ctx)
+		Dpl.SuiteTitle(ctx)
+	}
+
 	return
 }
 
@@ -469,6 +466,16 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			// }
 
 			if globalCtx.Config.Async.Is(true) {
+
+				start := time.Now()
+				for globalCtx.Repo.NotReportedTestCount() == 0 {
+					if time.Since(start) > model.WaitAsyncReportTestTimeout {
+						err := fmt.Errorf("no test to report")
+						ProcessGlobalError(globalCtx, err)
+					}
+					time.Sleep(time.Millisecond)
+				}
+
 				// Delegate report all processing to daemon
 				//logger.Info("executing report all on async display")
 				logger.Info("executing report all (queueing report)")
@@ -487,10 +494,11 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				asyncDpl := asyncdisplay.New(globalCtx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
 				//asyncDpl.StartDisplayAllRecorded(globalCtx.Config.SuiteTimeout.Get())
 
-				err = asyncDpl.TailAllBlocking(globalCtx.Config.SuiteTimeout.Get())
-				if err != nil {
-					errorz.Fatal(err)
-				}
+				err = asyncDpl.TailAllBlocking(globalCtx.Config.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
+				ProcessGlobalError(globalCtx, err)
+				// if err != nil {
+				// 	errorz.Fatal(err)
+				// }
 
 				// // Daemon must be off or No test remaining in suite queue
 				// globalCtx.Repo.WaitAllEmpty(globalCtx.Config.SuiteTimeout.GetOr(defaultGlobalTimeout)) // FIXME: bad timeout
@@ -548,6 +556,15 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 
 			if suiteCtx.Config.Async.Is(true) {
 				//logger.Info("executing report on async display", "suite", testSuite)
+
+				start := time.Now()
+				for suiteCtx.Repo.TestCount(testSuite) == 0 {
+					if time.Since(start) > model.WaitAsyncReportTestTimeout {
+						err := fmt.Errorf("no test to report")
+						ProcessSuiteError(suiteCtx, err)
+					}
+					time.Sleep(time.Millisecond)
+				}
 
 				// Delegate report processing to daemon
 				logger.Info("executing report async (queueing report)", "suite", testSuite)

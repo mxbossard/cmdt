@@ -115,6 +115,7 @@ Cleaning:
 
 
 Optims:
+- Do not launch daemon if already running (for now a new daemon is started everytime then stop if not needed)
 - Use sqlite as DB
 - mocking container can all be done in //
 - start container can be call async but execs need to wait container to be started

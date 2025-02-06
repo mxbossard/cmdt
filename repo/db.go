@@ -98,6 +98,14 @@ func (r dbRepo) GetGlobalConfig() (cfg model.Config, err error) {
 	return
 }
 
+func (r dbRepo) NotReportedTestCount() (n uint16) {
+	n, err := r.suiteDao.NotReportedTestCount()
+	if err != nil {
+		errorz.Fatal(err)
+	}
+	return
+}
+
 func (r dbRepo) InitSuite(cfg model.Config) (err error) {
 	err = r.ClearTestSuite(cfg.TestSuite.Get())
 	if err != nil {
@@ -118,7 +126,6 @@ func (r dbRepo) SaveSuiteConfig(cfg model.Config) (err error) {
 }
 
 func (r dbRepo) GetSuiteConfig(testSuite string, initless bool) (cfg model.Config, err error) {
-	// TODO
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("cannot load suite config: %w", err)

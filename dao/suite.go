@@ -150,6 +150,19 @@ func (d Suite) IncrementTooMuchCount(suite string) (seq uint16, err error) {
 	return
 }
 
+func (d Suite) NotReportedTestCount() (n uint16, err error) {
+	p := logger.PerfTimer()
+	defer p.End()
+
+	row := d.db.QueryRow(`
+		SELECT coalesce(sum(s.seq), 0)
+		FROM suite s
+		WHERE s.outcome <> 'Z'
+	`)
+	err = row.Scan(&n)
+	return
+}
+
 func (d Suite) TestCount(suite string) (n uint16, err error) {
 	p := logger.PerfTimer("suite", suite)
 	defer p.End()

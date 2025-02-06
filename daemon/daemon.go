@@ -24,11 +24,12 @@ import (
 )
 
 const (
-	DaemonLockFilename    = "daemon.lock"
-	DaemonPidFilename     = "daemon.pid"
-	LockWatingSecs        = 5
-	ExtraRunningSecs      = 5
-	AsyncPollingSleepInMs = 50
+	DaemonLockFilename         = "daemon.lock"
+	DaemonPidFilename          = "daemon.pid"
+	LockWatingSecs             = 5
+	ExtraRunningSecs           = 5
+	AsyncPollingSleepInMs      = 50
+	WaitAsyncReportTestTimeout = 2 * time.Second
 )
 
 var logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
@@ -168,6 +169,35 @@ func (d *daemon) performTest(testDef model.TestDefinition) (exitCode int16) {
 func (d *daemon) report(def model.ReportDefinition) (exitCode int16, err error) {
 	perf := logger.PerfTimer()
 	defer perf.End()
+
+	// Check if suite was started or wait some time
+	start := time.Now()
+	cfg, err := d.repo.GetSuiteConfig(def.TestSuite, true)
+	if err != nil {
+		return 1, err
+	}
+	for cfg.SuiteStartTime.IsEmpty() {
+		// Wait until suite is started
+		if time.Since(start) > WaitAsyncReportTestTimeout {
+			return 1, fmt.Errorf("no test to report")
+		}
+		time.Sleep(time.Millisecond)
+		cfg, err = d.repo.GetSuiteConfig(def.TestSuite, true)
+		if err != nil {
+			return 1, err
+		}
+	}
+
+	// Wait for some test until suite timeout
+	testCount := d.repo.TestCount(def.TestSuite)
+	for testCount == 0 {
+		if time.Since(start) > cfg.SuiteTimeout.Get() {
+			return 1, fmt.Errorf("reached suite timeout")
+		}
+		time.Sleep(time.Millisecond)
+		testCount = d.repo.TestCount(def.TestSuite)
+	}
+
 	//d.display.DisplayRecorded(def.TestSuite, def.Config.Timeout.Get())
 	go func() {
 		err := d.display.TailBlocking(def.TestSuite, def.Config.Timeout.Get())

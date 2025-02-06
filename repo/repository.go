@@ -36,6 +36,8 @@ type Repo interface {
 
 	GetGlobalConfig() (cfg model.Config, err error)
 
+	NotReportedTestCount() (n uint16)
+
 	InitSuite(cfg model.Config) (err error)
 
 	SaveSuiteConfig(cfg model.Config) (err error)

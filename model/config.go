@@ -28,6 +28,7 @@ const (
 	DefaultDebugLevel           = DEBUG
 	DefaultTooMuchFailures      = 3
 	TooMuchFailuresNoLimit      = -1
+	WaitAsyncReportTestTimeout  = 1 * time.Second
 
 	ContextTokenEnvVarName    = "__CMDT_TOKEN"
 	ContextPpidEnvVarName     = "__CMDT_PPID"
@@ -84,10 +85,11 @@ var (
 )
 
 var (
-	DefaultTestTimeout = 5 * time.Second
-	AbsNamePattern     = fmt.Sprintf("(%s/)?(%s)?", NamePattern, NamePattern)
-	NameRegexp         = regexp.MustCompile("^" + NamePattern + "$")
-	AbsNameRegexp      = regexp.MustCompile("^" + AbsNamePattern + "$")
+	DefaultSuiteTimeout = 30 * time.Second
+	DefaultTestTimeout  = 5 * time.Second
+	AbsNamePattern      = fmt.Sprintf("(%s/)?(%s)?", NamePattern, NamePattern)
+	NameRegexp          = regexp.MustCompile("^" + NamePattern + "$")
+	AbsNameRegexp       = regexp.MustCompile("^" + AbsNamePattern + "$")
 )
 
 var (
