@@ -117,6 +117,7 @@ type SuiteOutcome struct {
 	PassedCount    uint32
 	FailedCount    uint32
 	ErroredCount   uint32
+	TimeoutedCount uint32
 	IgnoredCount   uint32
 	TooMuchCount   uint32
 	Outcome        Outcome

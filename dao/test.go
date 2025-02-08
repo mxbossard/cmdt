@@ -41,6 +41,7 @@ func (d Test) init() (err error) {
 			failed INTEGER NOT NULL DEFAULT 0,
 			errored INTEGER NOT NULL DEFAULT 0,
 			ignored INTEGER NOT NULL DEFAULT 0,
+			timeouted INTEGER NOT NULL DEFAULT 0,
 			exitCode INTEGER NOT NULL DEFAULT -1,
 			stdout TEXT NOT NULL DEFAULT '',
 			stderr TEXT NOT NULL DEFAULT '',
@@ -100,7 +101,7 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 	p := logger.PerfTimer("suite", suite)
 	defer p.End()
 
-	var passedCount, failedCount, erroredCount, ignoredCount uint32
+	var passedCount, failedCount, erroredCount, ignoredCount, timeoutCount uint32
 	var testName, cmdAndArgs, testOc, stdout, stderr, testErrorMsg, prefix, assertName, op, expected, value, assertErrorMsg string
 	var success bool
 	var startTime, endTime, testDuration int64
@@ -115,11 +116,11 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 	defer tx.Rollback()
 
 	row := tx.QueryRow(`
-		SELECT coalesce(sum(t.passed), 0), coalesce(sum(t.failed), 0), coalesce(sum(t.errored), 0), coalesce(sum(t.ignored), 0)
+		SELECT coalesce(sum(t.passed), 0), coalesce(sum(t.failed), 0), coalesce(sum(t.errored), 0), coalesce(sum(t.ignored), 0), coalesce(sum(t.timeouted), 0)
 		FROM tested t
 		WHERE t.suite = @suite
 	`, sql.Named("suite", suite))
-	err = row.Scan(&passedCount, &failedCount, &erroredCount, &ignoredCount)
+	err = row.Scan(&passedCount, &failedCount, &erroredCount, &ignoredCount, &timeoutCount)
 	if err != nil {
 		return
 	}
@@ -188,7 +189,7 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 	if err != nil {
 		return
 	}
-	testCount := passedCount + failedCount + erroredCount + ignoredCount
+	testCount := passedCount + failedCount + erroredCount + ignoredCount + timeoutCount
 	duration := time.Duration((endTime - startTime) * 1000)
 	var ocm model.Outcome
 	if testCount == passedCount {
@@ -207,6 +208,7 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 	outcome.PassedCount = passedCount
 	outcome.FailedCount = failedCount
 	outcome.ErroredCount = erroredCount
+	outcome.TimeoutedCount = timeoutCount
 	outcome.IgnoredCount = ignoredCount
 	outcome.Outcome = ocm
 	//outcome.FailureReports = failedAssertionsMessages
@@ -233,6 +235,7 @@ func (d Test) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 	ignored := outcome.Outcome == model.IGNORED
 	failed := outcome.Outcome == model.FAILED
 	errored := outcome.Outcome == model.ERRORED
+	timeouted := outcome.Outcome == model.TIMEOUT
 	exitCode := outcome.ExitCode
 	stdout := outcome.Stdout
 	stderr := outcome.Stderr
@@ -245,13 +248,14 @@ func (d Test) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 	defer tx.Rollback()
 
 	_, err = tx.Exec(`
-		INSERT INTO tested(suite, seq, name, cmdAndArgs, errorMsg, duration, outcome, passed, ignored, failed, errored, exitCode, stdout, stderr, report) 
-		VALUES (@suite, @seq, @name, @cmdAndArgs, @errorMsg, @micros, @outcome, @passed, @ignored, @failed, @errored, @exitCode, @stdout, @stderr, @report);
+		INSERT INTO tested(suite, seq, name, cmdAndArgs, errorMsg, duration, outcome, passed, ignored, failed, errored, timeouted, exitCode, stdout, stderr, report) 
+		VALUES (@suite, @seq, @name, @cmdAndArgs, @errorMsg, @micros, @outcome, @passed, @ignored, @failed, @errored, @timeouted, @exitCode, @stdout, @stderr, @report);
 	`, sql.Named("suite", suite), sql.Named("seq", seq), sql.Named("name", name),
 		sql.Named("cmdAndArgs", cmdAndArgs), sql.Named("errorMsg", errorMsg),
 		sql.Named("micros", micros), sql.Named("outcome", oc),
 		sql.Named("passed", passed), sql.Named("ignored", ignored),
 		sql.Named("failed", failed), sql.Named("errored", errored),
+		sql.Named("timeouted", timeouted),
 		sql.Named("exitCode", exitCode), sql.Named("stdout", stdout),
 		sql.Named("stderr", stderr), sql.Named("report", report))
 	if err != nil {

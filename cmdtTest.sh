@@ -30,100 +30,13 @@ die() {
 
 rm -rf -- /tmp/cmdt* /tmp/cmdt.log /tmp/daemon.log 2> /dev/null || true
 
+# Mandatory assertions
+"$scriptDir/assertCmdt.sh" "$cmdt"
+
+
 # Clear context
 export -n __CMDT_TOKEN
 #$cmdt @init=main
-
->&2 echo "## Test cmdt basic assertions should passed"
-$cmdtIn @init=should_succeed @stopOnFailure=false
-
-$cmdtIn @test=should_succeed/ true
-$cmdtIn @test=should_succeed/ true @success
-$cmdtIn @test=should_succeed/ false @fail
-$cmdtIn @test=should_succeed/ true @exit=0
-$cmdtIn @test=should_succeed/ false @exit=1
-
-$cmdtIn @test=should_succeed/ echo foo bar @stdout:foo @stderr=
-$cmdtIn @test=should_succeed/ echo foo bar @stdout:bar
-$cmdtIn @test=should_succeed/ echo foo bar @stdout!:baz
-$cmdtIn @test=should_succeed/ echo foo bar @stdout!=baz
-$cmdtIn @test=should_succeed/ echo foo bar @stdout~/^foo/ @stderr=
-$cmdtIn @test=should_succeed/ echo foo bar @stdout~/BaR/i
-$cmdtIn @test=should_succeed/ echo foo bar @stdout~"/^foo bar\n$/"
-$cmdtIn @test=should_succeed/ echo foo bar @stdout~"/^foo bar$/m"
-$cmdtIn @test=should_succeed/ echo foo bar @stdout!~/bar$/
-$cmdtIn @test=should_succeed/ echo foo\nbar\nbaz @stdout!~/^bar$/
-$cmdtIn @test=should_succeed/ echo foo\nbar\nbaz @stdout!~/^bar$/m
-$cmdtIn @test=should_succeed/ echo foo bar @stdout:foo @stdout:bar @stderr=
-$cmdtIn @test=should_succeed/ echo foo bar @stdout="foo bar\n" @stderr=
-
-$cmdtIn @test=should_succeed/ sh -c ">&2 echo foo bar" @stderr:foo @stdout=
-$cmdtIn @test=should_succeed/ sh -c ">&2 echo foo bar" @stderr:bar
-$cmdtIn @test=should_succeed/ sh -c ">&2 echo foo bar" @stderr!:baz
-$cmdtIn @test=should_succeed/ sh -c ">&2 echo foo bar" @stderr!=baz
-$cmdtIn @test=should_succeed/ sh -c ">&2 echo foo bar" @stderr~/^foo/ @stdout=
-$cmdtIn @test=should_succeed/ sh -c ">&2 echo foo bar" @stderr~/BaR/i
-$cmdtIn @test=should_succeed/ sh -c ">&2 echo foo bar" @stderr~"/^foo bar\n$/"
-$cmdtIn @test=should_succeed/ sh -c ">&2 echo foo bar" @stderr!~/bar$/
-$cmdtIn @test=should_succeed/ sh -c ">&2 echo foo bar" @stderr:foo @stderr:bar
-$cmdtIn @test=should_succeed/ sh -c ">&2 echo foo bar" @stderr="foo bar\n" @stdout=
-
->&2 echo "## Test cmdt basic assertions should failed"
-$cmdtIn @init=should_fail @failuresLimit=-1 @verbose=0
-
-$cmdtIn 2> /dev/null @test=should_fail/ false
-$cmdtIn 2> /dev/null @test=should_fail/ true @fail
-$cmdtIn 2> /dev/null @test=should_fail/ false @success
-$cmdtIn 2> /dev/null @test=should_fail/ true @exit=1
-$cmdtIn 2> /dev/null @test=should_fail/ false @exit=0
-
-$cmdtIn 2> /dev/null @test=should_fail/ echo foo bar @stdout=
-$cmdtIn 2> /dev/null @test=should_fail/ echo foo bar @stdout=foo
-$cmdtIn 2> /dev/null @test=should_fail/ echo foo bar @stdout=foo bar
-$cmdtIn 2> /dev/null @test=should_fail/ echo foo bar @stdout:baz
-$cmdtIn 2> /dev/null @test=should_fail/ echo foo bar @stdout:foo @stdout:baz
-$cmdtIn 2> /dev/null @test=should_fail/ echo foo bar @stderr:foo
-
-$cmdtIn 2> /dev/null @test=should_fail/ sh -c ">&2 echo foo bar" @stderr=
-$cmdtIn 2> /dev/null @test=should_fail/ sh -c ">&2 echo foo bar" @stderr=foo
-$cmdtIn 2> /dev/null @test=should_fail/ sh -c ">&2 echo foo bar" @stderr=foo bar
-$cmdtIn 2> /dev/null @test=should_fail/ sh -c ">&2 echo foo bar" @stderr:baz
-$cmdtIn 2> /dev/null @test=should_fail/ sh -c ">&2 echo foo bar" @stderr:foo @stderr:baz
-$cmdtIn 2> /dev/null @test=should_fail/ sh -c ">&2 echo foo bar" @stdout:foo
-
->&2 echo "## Test cmdt basic assertions should error"
-$cmdtIn @init=should_error @failuresLimit=-1 @verbose=0
-
-! $cmdtIn @test=should_error/ true @stdout:"" || die "should error because empty contains"
-! $cmdtIn @test=should_error/ true @stdout~"" || die "should error because empty regex"
-! $cmdtIn @test=should_error/ true @stderr:"" || die "should error because empty contains"
-! $cmdtIn @test=should_error/ true @stderr~"" || die "should error because empty regex"
-
-
-of="/tmp/cmdtReportContent.txt"
-
->&2 echo "## reporting should_succeed"
-rc=0
-$cmdt @report=should_succeed > "$of" 2>&1 || rc=$?
-test "$rc" -eq 0 || die "reporting should_succeed should exit=0"
-grep "28 success" "$of" || die "reporting should_succeed bad success count"
-
-
->&2 echo "## reporting should_fail"
-rc=0
-$cmdt @report=should_fail > "$of" 2>&1 || rc=$?
-test "$rc" -eq 1 || die "reporting should_fail shoud exit=1"
-grep "17 failures" "$of" || die "reporting should_fail bad failures count"
-
->&2 echo "## reporting should_error"
-rc=0
-$cmdt @report=should_error > "$of" 2>&1 || rc=$?
-test "$rc" -eq 1 || die "reporting should_error should exit=1"
-grep "4 errors" "$of" || die "reporting should_error bad errors count"
-
-
->&2 echo "## reporting all"
-! $cmdt @report >/dev/null 2>&1 || die "reporting all should exit=1"
 
 nothingToReportExpectedStderrMsg="you must perform some test prior to report"
 >&2 echo "## Test @report without test"
@@ -258,7 +171,7 @@ $cmdtIn @test=outputs_assertions/ @stderr:"#01..." @stderr:"PASSED" @-- $newCmdt
 $cmdtIn @test=outputs_assertions/ @stderr:"#02..." @stderr:"PASSED" @-- $newCmdt0 true @test=t1/
 $cmdtIn @test=outputs_assertions/ @stderr:"#03..." @stderr:"FAILED" @-- $newCmdt0 false @test=t1/
 $cmdtIn @test=outputs_assertions/ @stderr:"#04..." @stderr:"PASSED" @-- $newCmdt0 false @fail @test=t1/
-$cmdtIn @test=outputs_assertions/ @fail @stderr~"/Failures running \[.*t1.*\] test suite .*\(\s*3 success, \s*1 failures, \s*0 errors on \s*4 tests\)/" @-- $newCmdt0 @report=t1
+$cmdtIn @test=outputs_assertions/ @fail @stderr~"/Failures running \[.*t1.*\] test suite .*\(\s*3 success, \s*1 failures, \s*0 errors, \s*0 timeouts on \s*4 tests\)/" @-- $newCmdt0 @report=t1
 
 
 >&2 echo "## Test namings"

@@ -139,6 +139,7 @@ func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int16, err error) {
 
 	if testCount == 0 {
 		err = fmt.Errorf("you must perform some test prior to report all suites")
+		exitCode = 1
 		return
 	}
 
@@ -167,6 +168,7 @@ func reportTestSuite(ctx facade.SuiteContext) (suiteOutcome model.SuiteOutcome, 
 
 	if testCount == 0 {
 		err = fmt.Errorf("you must perform some test prior to report: [%s] suite", testSuite)
+		exitCode = 1
 		return
 	}
 
@@ -175,7 +177,7 @@ func reportTestSuite(ctx facade.SuiteContext) (suiteOutcome model.SuiteOutcome, 
 		return
 	}
 
-	if suiteOutcome.FailedCount == 0 && suiteOutcome.ErroredCount == 0 {
+	if suiteOutcome.FailedCount == 0 && suiteOutcome.ErroredCount == 0 && suiteOutcome.TimeoutedCount == 0 {
 		exitCode = 0
 	}
 

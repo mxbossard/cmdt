@@ -28,7 +28,7 @@ const (
 	DefaultDebugLevel           = DEBUG
 	DefaultTooMuchFailures      = 3
 	TooMuchFailuresNoLimit      = -1
-	WaitAsyncReportTestTimeout  = 1 * time.Second
+	WaitAsyncReportTestTimeout  = 500 * time.Millisecond
 
 	ContextTokenEnvVarName    = "__CMDT_TOKEN"
 	ContextPpidEnvVarName     = "__CMDT_PPID"

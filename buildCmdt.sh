@@ -2,7 +2,7 @@
 set -e -o pipefail
 scriptDir=$( dirname $( readlink -f $0 ) )
 
->&2 echo "##### Building cmdtest binary ..."
+>&2 echo "## Building cmdtest binary ..."
 export GOBIN="$scriptDir/bin"
 cd "$scriptDir"
 
@@ -16,4 +16,10 @@ export BUILT_CMDT_BIN="$GOBIN/cmdt"
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o "$BUILT_CMDT_BIN" -tags netgo -ldflags '-w'
 
 cd - > /dev/null
+
+>&2 echo "Built $BUILT_CMDT_BIN cmdt binary."
+>&2 echo
+
+# Mandatory assertions
+"$scriptDir/assertCmdt.sh" "$BUILT_CMDT_BIN"
 

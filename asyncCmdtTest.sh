@@ -8,7 +8,7 @@ ls -lh "$newCmdt"
 
 # Trusted cmdt to works
 cmdt="cmdt"
-cmdt="$newCmdt"
+#cmdt="$newCmdt"
 
 # Cmdt used to test
 #cmdtIn="cmdt"
@@ -21,14 +21,6 @@ params1="@verbose @failuresLimit=-1" # Default verbose show passed test + perfor
 newCmdt0="$newCmdt @isol=tested $params0"
 newCmdt1="$newCmdt @isol=tested $params0 $params1"
 
-# Isolate tester & tested cmdt with tokens
-#testerTk=$( $cmdt @init @printToken )
-#cmdt="$cmdt @token=$testerTk"
-#cmdtIn="$cmdtIn @token=$testerTk"
-#newTk=$( $newCmdt @isol=tested @init @printToken @debug )
-#newCmdt0="$newCmdt0 @token=$newTk"
-#newCmdt1="$newCmdt1 @token=$newTk"
-
 die() {
 	>&2 echo "$1"
 	exit 1
@@ -37,6 +29,10 @@ die() {
 #$cmdt @global @silent
 
 rm -rf -- /tmp/cmdt* /tmp/cmdt.log /tmp/daemon.log 2> /dev/null || true
+
+# Mandatory assertions
+"$scriptDir/assertCmdt.sh" "$cmdt"
+
 
 # Clear context
 export -n __CMDT_TOKEN
@@ -84,7 +80,7 @@ $cmdtIn @test=meta0/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newC
 
 >&2 echo "## Meta1 test context not shared without token"
 $cmdtIn @init=meta1 #@verbose=4
-$cmdtIn @test=meta1/init @stderr= @-- $newCmdt1 @init @async #@verbose=4
+$cmdtIn @test=meta1/init @stderr= @-- $newCmdt1 @init @async @verbose=4
 $cmdtIn @test=meta1/"without token one" @stderr= @-- $newCmdt1 true #@debug
 $cmdtIn @test=meta1/"without token two" @stderr= @-- $newCmdt1 true #@debug
 $cmdtIn @test=meta1/"command before rule stop" @fail @stderr:"ERRORED" @stderr:"before rule parsing stopper" @-- $newCmdt1 true @-- @success
@@ -122,4 +118,114 @@ $cmdt @report 2>&1 | grep -v "Failures"
 
 export -n __CMDT_TOKEN
 
-exit 0
+
+# Isolate tester & tested cmdt with tokens
+testerTk=$( $cmdt @init @printToken )
+cmdt="$cmdt @token=$testerTk"
+cmdtIn="$cmdtIn @token=$testerTk"
+newTk=$( $newCmdt @isol=tested @init @printToken @debug )
+newCmdt0="$newCmdt0 @token=$newTk"
+newCmdt1="$newCmdt1 @token=$newTk"
+
+noPanic="@stderr!:'panic'"
+
+# Test success
+$cmdtIn @init=success_sync #@verbose
+$cmdtIn @test=success_sync/init $noPanic @-- $newCmdt1 @init=success_sync_sub @async=false @verbose=5
+$cmdtIn @test=success_sync/success1 $noPanic @stderr:"PASSED" @-- $newCmdt1 @test=success_sync_sub/success1 true
+$cmdtIn @test=success_sync/success2 $noPanic @stderr:"PASSED" @-- $newCmdt1 @test=success_sync_sub/success2 true
+$cmdtIn @test=success_sync/report $noPanic @exit=0 @stderr:"2 success" @-- $newCmdt1 @report=success_sync_sub
+
+$cmdtIn @init=success_async #@verbose
+$cmdtIn @test=success_async/init $noPanic @-- $newCmdt1 @init=success_async_sub @async=true @verbose=5
+$cmdtIn @test=success_async/success1 @stderr= @-- $newCmdt1 @test=success_async_sub/success1 true
+$cmdtIn @test=success_async/success1 @stderr= @-- $newCmdt1 @test=success_async_sub/success2 true
+$cmdtIn @test=success_async/report $noPanic @exit=0 @stderr:"PASSED" @stderr!:"IGNORED" @stderr!:"FAILED" @stderr!:"ERRORED"  @stderr!:"TIMEOUT" @stderr:"2 success" @-- $newCmdt1 @report=success_async_sub
+
+# Test ignore
+$cmdtIn @init=ignore_sync #@verbose
+$cmdtIn @test=ignore_sync/init $noPanic @-- $newCmdt1 @init=ignore_sync_sub @async=false @verbose=5
+$cmdtIn @test=ignore_sync/success $noPanic @stderr:"PASSED" @-- $newCmdt1 @test=ignore_sync_sub/success true
+$cmdtIn @test=ignore_sync/ignored $noPanic @stderr:"IGNORED" @-- $newCmdt1 @test=ignore_sync_sub/ignored @ignore false
+$cmdtIn @test=ignore_sync/report $noPanic @exit=0 @stderr:"1 success" @stderr:"1 ignored" @-- $newCmdt1 @report=ignore_sync_sub
+
+$cmdtIn @init=ignore_async #@verbose
+$cmdtIn @test=ignore_async/init $noPanic @-- $newCmdt1 @init=ignore_async_sub @async=true @verbose=5
+$cmdtIn @test=ignore_async/success @stderr= @-- $newCmdt1 @test=ignore_async_sub/success true
+$cmdtIn @test=ignore_async/ignored @stderr= @-- $newCmdt1 @test=ignore_async_sub/ignored @ignore false
+$cmdtIn @test=ignore_async/report $noPanic @exit=0 @stderr:"PASSED" @stderr:"IGNORED" @stderr!:"FAILED" @stderr!:"ERRORED"  @stderr!:"TIMEOUT" @stderr:"1 success" @stderr:"1 ignored" @-- $newCmdt1 @report=ignore_async_sub
+
+# Test failure
+$cmdtIn @init=failure_sync #@verbose
+$cmdtIn @test=failure_sync/init $noPanic @-- $newCmdt1 @init=failure_sync_sub @async=false @verbose=5
+$cmdtIn @test=failure_sync/success $noPanic @stderr:"PASSED" @-- $newCmdt1 @test=failure_sync_sub/success true
+$cmdtIn @test=failure_sync/failure $noPanic @stderr:"FAILED" @-- $newCmdt1 @test=failure_sync_sub/failure false
+$cmdtIn @test=failure_sync/report $noPanic @exit=1 @stderr:"1 success" @stderr:"1 failure" @-- $newCmdt1 @report=failure_sync_sub
+
+$cmdtIn @init=failure_async #@verbose
+$cmdtIn @test=failure_async/init $noPanic @-- $newCmdt1 @init=failure_async_sub @async=true @verbose=5
+$cmdtIn @test=failure_async/success @stderr= @-- $newCmdt1 @test=failure_async_sub/success true
+$cmdtIn @test=failure_async/failure @stderr= @-- $newCmdt1 @test=failure_async_sub/failure false
+$cmdtIn @test=failure_async/report $noPanic @exit=1 @stderr:"PASSED" @stderr!:"IGNORED" @stderr:"FAILED" @stderr!:"ERRORED" @stderr!:"TIMEOUT" @stderr:"1 success" @stderr:"1 failure" @-- $newCmdt1 @report=failure_async_sub
+
+# Test error
+$cmdtIn @init=error_sync #@verbose
+$cmdtIn @test=error_sync/init $noPanic @-- $newCmdt1 @init=error_sync_sub @async=false @verbose=5
+$cmdtIn @test=error_sync/success $noPanic @stderr:"PASSED" @-- $newCmdt1 @test=error_sync_sub/success true
+$cmdtIn @test=error_sync/error $noPanic @stderr:"ERRORED" @-- $newCmdt1 @test=error_sync_sub/error doNotExists
+$cmdtIn @test=error_sync/report $noPanic @exit=1 @stderr:"1 success" @stderr:"1 error" @-- $newCmdt1 @report=error_sync_sub
+
+$cmdtIn @init=error_async #@verbose
+$cmdtIn @test=error_async/init $noPanic @-- $newCmdt1 @init=error_async_sub @async=true @verbose=5
+$cmdtIn @test=error_async/success @stderr= @-- $newCmdt1 @test=error_async_sub/success true
+$cmdtIn @test=error_async/error @stderr= @-- $newCmdt1 @test=error_async_sub/timeout doNotExists
+$cmdtIn @test=error_async/report $noPanic @exit=1 @stderr:"PASSED" @stderr!:"IGNORED" @stderr!:"FAILED" @stderr:"ERRORED" @stderr!:"TIMEOUT" @stderr:"1 success" @stderr:"1 error" @-- $newCmdt1 @report=error_async_sub
+
+# Test timeout
+$cmdtIn @init=timeout_sync #@verbose
+$cmdtIn @test=timeout_sync/init $noPanic @-- $newCmdt1 @init=timeout_sync_sub @async=false @verbose=5
+$cmdtIn @test=timeout_sync/success $noPanic @stderr:"PASSED" @-- $newCmdt1 @test=timeout_sync_sub/success true
+$cmdtIn @test=timeout_sync/timeout $noPanic @stderr:"TIMEOUT" @-- $newCmdt1 @test=timeout_sync_sub/timeout @timeout=0.1s sleep 1
+$cmdtIn @test=timeout_sync/report $noPanic @exit=1 @stderr:"1 success" @stderr:"1 timeout" @-- $newCmdt1 @report=timeout_sync_sub
+
+$cmdtIn @init=timeout_async #@verbose
+$cmdtIn @test=timeout_async/init $noPanic @-- $newCmdt1 @init=timeout_async_sub @async=true @verbose=5
+$cmdtIn @test=timeout_async/success @stderr= @-- $newCmdt1 @test=timeout_async_sub/success true
+$cmdtIn @test=timeout_async/timeout @stderr= @-- $newCmdt1 @test=timeout_async_sub/timeout @timeout=0.1s sleep 1
+$cmdtIn @test=timeout_async/report $noPanic @exit=1 @stderr:"PASSED" @stderr!:"IGNORED" @stderr:"TIMEOUT" @stderr:"1 success" @stderr:"1 timeout" @-- $newCmdt1 @report=timeout_async_sub
+
+
+## Launch a longer suite async
+
+$cmdtIn @init=longer_sync0 #@verbose
+$cmdtIn @test=longer_sync0/init $noPanic @stderr:"[longer_sync0_sub]" @-- $newCmdt1 @init=longer_sync0_sub @async=false @verbose=5
+for i in $( seq 1 4 ); do
+    $cmdtIn @test=longer_sync0/ $noPanic @stderr:"#0$i" @-- $newCmdt1 @test=longer_sync0_sub/t$i @stdout:"end$i" @-- sh -c "echo end$i"
+done
+# should report nearly instantly
+$cmdtIn @test=longer_sync0/report $noPanic @timeout=2s @-- $newCmdt1 @report=longer_sync0_sub
+
+$cmdtIn @init=longer_async0 #@verbose
+$cmdtIn @test=longer_async0/init @stderr= @-- $newCmdt1 @init=longer_async0_sub @async @verbose=5
+for i in $( seq 1 4 ); do
+    $cmdtIn @test=longer_async0/ @stderr= @-- $newCmdt1 @test=longer_async0_sub/t$i @stdout:"end$i" @-- sh -c "echo end$i"
+done
+# should report nearly instantly
+$cmdtIn @test=longer_async0/report $noPanic @timeout=2s @stderr:"[longer_async0_sub]" @stderr:"#01" @stderr:"#02" @stderr:"#03" @stderr:"#04" @stderr:"#05" @stderr!:"#06" @-- $newCmdt1 @report=longer_async0_sub
+
+$cmdtIn @init=longer_async1 #@verbose
+$cmdtIn @test=longer_async1/init @stderr= @-- $newCmdt1 @init=longer_async1_sub @async @verbose=5
+for i in $( seq 1 4 ); do
+    $cmdtIn @test=longer_async1/ @stderr= @-- $newCmdt1 @test=longer_async1_sub/t$i @stdout:"end$i" @-- sh -c "sleep $i; echo end$i"
+done
+$cmdtIn @test=longer_async1/report $noPanic @timeout=10s @stderr:"[longer_async1_sub]" @stderr:"#01" @stderr:"#02" @stderr:"#03" @stderr:"#04" @stderr:"#05" @stderr!:"#06" @-- $newCmdt1 @report=longer_async1_sub
+
+$cmdtIn @init=longer_async2 #@verbose
+$cmdtIn @test=longer_async2/init @stderr= @-- $newCmdt1 @init=longer_async2_sub @async @verbose=5
+for i in $( seq 1 4 ); do
+    $cmdtIn @test=longer_async2/ @stderr= @-- $newCmdt1 @test=longer_async2_sub/t$i @stdout:"end$i" @-- sh -c "sleep $i; echo end$i"
+done
+$cmdtIn @test=longer_async2/report_all $noPanic @timeout=10s @stderr:"[longer_async2_sub]" @stderr:"#01" @stderr:"#02" @stderr:"#03" @stderr:"#04" @stderr:"#05" @stderr!:"#06" @-- $newCmdt1 @report
+
+$cmdtIn @report
+
