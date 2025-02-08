@@ -155,9 +155,10 @@ func (d *basicTestDisplayer) Outcome(outcome model.TestOutcome) {
 	}
 
 	if len(outcome.AssertionResults) > 0 {
-		for _, asseriontResult := range outcome.AssertionResults {
-			d.assertionResult(asseriontResult)
-		}
+		// for _, asseriontResult := range outcome.AssertionResults {
+		// 	d.assertionResult(asseriontResult)
+		// }
+		d.assertionResults(outcome.AssertionResults)
 	}
 
 	if verbose >= model.SHOW_FAILED_OUTS && (len(outcome.AssertionResults) > 0 || outcome.Outcome == model.TIMEOUT || outcome.Outcome == model.ERRORED) || verbose >= model.SHOW_PASSED_OUTS {
@@ -227,6 +228,101 @@ func (d basicTestDisplayer) assertionResult(result model.AssertionResult) {
 		}
 	} else {
 		d.printer.Errf("assertion %s%s%s failed\n", assertLabel, assertOp, expected)
+	}
+}
+
+func (d basicTestDisplayer) assertionResults(results []model.AssertionResult) {
+	defer d.flush()
+
+	// Sort results grouped by types
+	resultsMap := make(map[string][]model.AssertionResult)
+	for _, result := range results {
+		key := fmt.Sprintf("%s-%s", result.Name, result.Op)
+		col, ok := resultsMap[key]
+		if !ok {
+			col = []model.AssertionResult{}
+		}
+		col = append(col, result)
+		resultsMap[key] = col
+	}
+
+	for _, ruleResults := range resultsMap {
+
+		hlClr := ReportColor
+		//log.Printf("failedResult: %v\n", result)
+		assertPrefix := ruleResults[0].Prefix
+		assertName := ruleResults[0].Name
+		assertOp := ruleResults[0].Op
+
+		for _, result := range ruleResults {
+			if result.ErrMessage != "" {
+				d.printer.ColoredErrf(ErrorColor, result.ErrMessage+"\n")
+			}
+		}
+
+		assertLabel := format.Sprintf(TestColor, "%s%s", assertPrefix, assertName)
+
+		for _, result := range ruleResults {
+			expected := result.Expected
+			if assertName == "success" || assertName == "fail" {
+				d.printer.Errf("\t%sExpected%s %s\n", hlClr, ResetColor, assertLabel)
+				//d.Stdout(cmd.StdoutRecord())
+				//d.Stderr(cmd.StderrRecord())
+				/*
+					if cmd.StderrRecord() != "" {
+						d.printer.Errf("sdterr> %s\n", cmd.StderrRecord())
+					}
+				*/
+				return
+			} else if assertName == "cmd" {
+				d.printer.Errf("\t%sExpected%s %s=%s to succeed\n", hlClr, ResetColor, assertLabel, expected)
+				return
+			} else if assertName == "exists" {
+				d.printer.Errf("\t%sExpected%s file %s=%s file to exists\n", hlClr, ResetColor, assertLabel, expected)
+				return
+			}
+		}
+
+		firstError := true
+		printButGot := false
+		for _, result := range ruleResults {
+			expected := result.Expected
+			expected = strings.ReplaceAll(expected, "\n", "\\n")
+			if !result.Success {
+				if firstError {
+					firstError = false
+					printButGot = true
+					if assertOp == "=" || assertOp == "@=" {
+						d.printer.Errf("\t%sExpected%s %s \n\t\t%sto be%s: \t", hlClr, ResetColor, assertLabel, hlClr, ResetColor)
+					} else if assertOp == ":" || assertOp == "@:" {
+						d.printer.Errf("\t%sExpected%s %s \n\t\t%sto contains%s: ", hlClr, ResetColor, assertLabel, hlClr, ResetColor)
+					} else if assertOp == "!:" {
+						d.printer.Errf("\t%sExpected%s %s \n\t\t%snot to contains%s: ", hlClr, ResetColor, assertLabel, hlClr, ResetColor)
+					} else if assertOp == "~" {
+						d.printer.Errf("\t%sExpected%s %s \n\t\t%sto match%s: ", hlClr, ResetColor, assertLabel, hlClr, ResetColor)
+					} else if assertOp == "!~" {
+						d.printer.Errf("\t%sExpected%s %s \n\t\t%snot to match%s: ", hlClr, ResetColor, assertLabel, hlClr, ResetColor)
+					}
+				}
+				d.printer.Errf("\t[%s]", expected)
+			} else {
+				d.printer.Errf("assertion %s%s%s failed\n", assertLabel, assertOp, expected)
+			}
+		}
+
+		if printButGot {
+			got := ruleResults[0].Value
+			var stringifiedGot string
+			if s, ok := got.(string); ok {
+				s = strings.ReplaceAll(s, "\n", "\\n")
+				got = s
+				stringifiedGot = ansi.TruncateMid(s, 100, "[...]")
+			} else {
+				stringifiedGot = fmt.Sprintf("%v", got)
+				//panic(fmt.Sprintf("unable to stringify rule %s value: [%v]", assertName, got))
+			}
+			d.printer.Errf("\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, stringifiedGot)
+		}
 	}
 }
 

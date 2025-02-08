@@ -8,7 +8,7 @@ ls -lh "$newCmdt"
 
 # Trusted cmdt to works
 cmdt="cmdt"
-#cmdt="$newCmdt"
+cmdt="$newCmdt"
 
 # Cmdt used to test
 #cmdtIn="cmdt"
@@ -198,7 +198,7 @@ $cmdtIn @test=timeout_async/report $noPanic @exit=1 @stderr:"PASSED" @stderr!:"I
 ## Launch a longer suite async
 
 $cmdtIn @init=longer_sync0 #@verbose
-$cmdtIn @test=longer_sync0/init $noPanic @stderr:"[longer_sync0_sub]" @-- $newCmdt1 @init=longer_sync0_sub @async=false @verbose=5
+$cmdtIn @test=longer_sync0/init $noPanic @stderr:"longer_sync0_sub" @-- $newCmdt1 @init=longer_sync0_sub @async=false @verbose=5
 for i in $( seq 1 4 ); do
     $cmdtIn @test=longer_sync0/ $noPanic @stderr:"#0$i" @-- $newCmdt1 @test=longer_sync0_sub/t$i @stdout:"end$i" @-- sh -c "echo end$i"
 done
@@ -211,21 +211,21 @@ for i in $( seq 1 4 ); do
     $cmdtIn @test=longer_async0/ @stderr= @-- $newCmdt1 @test=longer_async0_sub/t$i @stdout:"end$i" @-- sh -c "echo end$i"
 done
 # should report nearly instantly
-$cmdtIn @test=longer_async0/report $noPanic @timeout=2s @stderr:"[longer_async0_sub]" @stderr:"#01" @stderr:"#02" @stderr:"#03" @stderr:"#04" @stderr:"#05" @stderr!:"#06" @-- $newCmdt1 @report=longer_async0_sub
+$cmdtIn @test=longer_async0/report $noPanic @timeout=2s @stderr:"longer_async0_sub" @stderr:"#01" @stderr:"#02" @stderr:"#03" @stderr:"#04" @stderr!:"#05" @-- $newCmdt1 @report=longer_async0_sub
 
 $cmdtIn @init=longer_async1 #@verbose
 $cmdtIn @test=longer_async1/init @stderr= @-- $newCmdt1 @init=longer_async1_sub @async @verbose=5
 for i in $( seq 1 4 ); do
     $cmdtIn @test=longer_async1/ @stderr= @-- $newCmdt1 @test=longer_async1_sub/t$i @stdout:"end$i" @-- sh -c "sleep $i; echo end$i"
 done
-$cmdtIn @test=longer_async1/report $noPanic @timeout=10s @stderr:"[longer_async1_sub]" @stderr:"#01" @stderr:"#02" @stderr:"#03" @stderr:"#04" @stderr:"#05" @stderr!:"#06" @-- $newCmdt1 @report=longer_async1_sub
+$cmdtIn @test=longer_async1/report $noPanic @timeout=10s @stderr:"longer_async1_sub" @stderr:"#01" @stderr:"#02" @stderr:"#03" @stderr:"#04" @stderr:"#05" @stderr!:"#06" @-- $newCmdt1 @report=longer_async1_sub
 
 $cmdtIn @init=longer_async2 #@verbose
 $cmdtIn @test=longer_async2/init @stderr= @-- $newCmdt1 @init=longer_async2_sub @async @verbose=5
 for i in $( seq 1 4 ); do
     $cmdtIn @test=longer_async2/ @stderr= @-- $newCmdt1 @test=longer_async2_sub/t$i @stdout:"end$i" @-- sh -c "sleep $i; echo end$i"
 done
-$cmdtIn @test=longer_async2/report_all $noPanic @timeout=10s @stderr:"[longer_async2_sub]" @stderr:"#01" @stderr:"#02" @stderr:"#03" @stderr:"#04" @stderr:"#05" @stderr!:"#06" @-- $newCmdt1 @report
+$cmdtIn @test=longer_async2/report_all $noPanic @timeout=10s @stderr:"longer_async2_sub" @stderr:"#01" @stderr:"#02" @stderr:"#03" @stderr:"#04" @stderr:"#05" @stderr!:"#06" @-- $newCmdt1 @report
 
 $cmdtIn @report
 
