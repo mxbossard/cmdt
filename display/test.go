@@ -336,7 +336,6 @@ func (d basicTestDisplayer) Stdout(s string) {
 	}
 	if s != "" {
 		prtr.Out(s)
-		//d.bufPrinter.Out(s)
 	}
 	// if !d.opened {
 	// 	d.bufNotQuietPrinter.Flush()
@@ -354,7 +353,6 @@ func (d basicTestDisplayer) Stderr(s string) {
 	}
 	if s != "" {
 		prtr.Err(s)
-		//d.bufPrinter.Err(s)
 	}
 	// if !d.opened {
 	// 	d.bufNotQuietPrinter.Flush()

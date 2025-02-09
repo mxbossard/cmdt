@@ -93,7 +93,9 @@ import (
 ## TODO:
 
 Bugs:
-- %f logged on stderr is badly formatted by display : %!f(MISSING)
+- [x] @exit seems bug it never display the exitCode value ("but got: []")
+- NEW_LINE in outputs are not prefixed by out> nor err>
+- %f outputed on stderr is badly formatted by display : %!f(MISSING)
 - @verbose @debug=0 log some INFO level (maybe daemon only)
 - @async test not compatible with stdin usage (because it's the daemon who shoud read from stdin
 - Environ not passed to test run by daemon => should embed cmdt environ into operation
@@ -103,43 +105,53 @@ Bugs:
 - Suite Timeout not managed (should error if timeout exceeded) Should ask for suite clear and no test should pass; initless suite should have a greater default timeout
 - use suite timeout for container duration
 - @global config updates does not works
-- serialize test outcome instead of writing in report file
+- [x] serialize test outcome instead of writing in report file
 - colors ok on black background but should not work on white background
 - Rm Tmp dirs
-- NEW_LINE in outputs are not prefixed by out> nor err>
+
 
 Cleaning:
-- move seq into utils module
-- move container use into utils module
-- move OneWriterDB into utils module / Rename to something like NotConcurrentDb
+- [x] move seq into utils module
+- [x] move OneWriterDB into utils module / Rename to something like NotConcurrentDb
+- [x] remove old async screen
+- [x] clean screen commented old impl
+- remove file repo ?
+- move container use into utils module ?
 
 
 Optims:
 - Do not launch daemon if already running (for now a new daemon is started everytime then stop if not needed)
+  - idea1: check if daemon is running with stored PID
+  - idae2: before daemon is closing, remove the PID from storage
+  - idea3: daemon should report it's activity (increment processed operation count with time)
+  - idea4: waiting operation should check for daemon activity
 - Use sqlite as DB
 - mocking container can all be done in //
 - start container can be call async but execs need to wait container to be started
 - unqueue first waiting report
 - probably too slow podman/docker abstraction (check for podman & docker in path everytime)
+- docker/podman image pre pull once outside of test timeout (store pull in global context)
+- docker/podman image pre build once if supplied ref is a buildable context dir
+- docker/podman container engine resolution once stored in global context
+- docker/podman checkpoint for dirties to avoid container rm/creation
+- Add stop daemon controll for big failures from cmdt ?
 
 
 Features:
+- [x] timeouted test must trigger a report failure (with toimout tests count)
+- [x] multiple @stderr or @stdout rules should be aggregated in assertion report
 - add @out & @err as alias of @stdout & @stderr
-- multiple @stderr or @stdout rules should be aggregated in assertion report
 - add cmdt @version  or cmdt -v or cmdt --version => how to embed version ? git hash ? git tag ?
+- add cmdt @help or cmdt -h or cmdt --help to print basic documentation based on Refactord ules config
+- add cmdt @timeout @help to print dedicated timeout config documentation (timeout usage, config scope)
+- add cmdt @test @help to print dedicated test action documentation (test usage, test workflow, test config)
 - use rule definitions in usage
 - shorten too long outputs on failure. Remove colors from output ?
 - @init=suite should set suite as default for following test (instead of default main) (/!\ may cause problem if running cmdt in background (&) /!\)
 - @beforeSuite=CMD_AND_ARGS & @afterSuite=CMD_AND_ARGS
 - @called[=:]CMD ARG_S,stdin=IN,count=N assertion => verify a mock was called
 - @msg to add a test description
-- docker/podman image pre pull once outside of test timeout (store pull in global context)
-- docker/podman image pre build once if supplied ref is a buildable context dir
-- docker/podman container engine resolution once stored in global context
-- docker/podman checkpoint for dirties to avoid container rm/creation
 
-- Add stop daemon controll for big failures from cmdt ?
-- rewrite mock wrapper script inside cmdt to not depend on shell to mock
 - possibilité de passer un scénario ligne à ligne dans le stdin de cmdtest
 	- un scenario pourrait-il être de la forme d'un script shell ? => être executable comme scenario et comme script ?
 	- cmdt cmd arg1 argN @scenario=filepath
@@ -163,11 +175,12 @@ Refactor:
 - Parse args in daemon for better flow (could perform a parse args in client for quick response and full process in daemon from parse args for simplicity) ?
 - Rework facade / context but how ?
 - log errors => one endpoint to manage all breaking errors (or panic)
+- Rework Arg parser to be able to do all the work (validation, completion, ...) as soon  as possible
+- Rework Rules config to ease new feature adding : a tree of Rule & RuleSet with rule aliases and which can ease errors explaination
+- rewrite mock wrapper script inside cmdt to not depend on shell to mock
 
 
 ## DONE:
-- @exit seems bug it never display the exitCode value ("but got: []")
-
 - replayable report in option with @keep
 - stoping container can be done async (no need to block for end of stop)
 

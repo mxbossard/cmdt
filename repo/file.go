@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"mby.fr/cmdtest/model"
-	"mby.fr/cmdtest/utils"
 	"mby.fr/utils/errorz"
+	"mby.fr/utils/filez"
 	"mby.fr/utils/format"
 	"mby.fr/utils/utilz"
 )
@@ -169,8 +169,8 @@ func (r FileRepo) ListTestSuites() (suites []string, err error) {
 	for _, m := range dirs {
 		testSuite := filepath.Base(m)
 		if !strings.HasPrefix(testSuite, "_") {
-			failedCount := utils.ReadSeq(tmpDir, testSuite, model.FailedSequenceFilename)
-			errorCount := utils.ReadSeq(tmpDir, testSuite, model.ErroredSequenceFilename)
+			failedCount := filez.ReadSeq(tmpDir, testSuite, model.FailedSequenceFilename)
+			errorCount := filez.ReadSeq(tmpDir, testSuite, model.ErroredSequenceFilename)
 			if failedCount == 0 && errorCount == 0 {
 				suites = append(suites, testSuite)
 			}
@@ -180,8 +180,8 @@ func (r FileRepo) ListTestSuites() (suites []string, err error) {
 	for _, m := range dirs {
 		testSuite := filepath.Base(m)
 		if !strings.HasPrefix(testSuite, "_") {
-			failedCount := utils.ReadSeq(tmpDir, testSuite, model.FailedSequenceFilename)
-			errorCount := utils.ReadSeq(tmpDir, testSuite, model.ErroredSequenceFilename)
+			failedCount := filez.ReadSeq(tmpDir, testSuite, model.FailedSequenceFilename)
+			errorCount := filez.ReadSeq(tmpDir, testSuite, model.ErroredSequenceFilename)
 			if failedCount > 0 && errorCount == 0 {
 				suites = append(suites, testSuite)
 			}
@@ -191,7 +191,7 @@ func (r FileRepo) ListTestSuites() (suites []string, err error) {
 	for _, m := range dirs {
 		testSuite := filepath.Base(m)
 		if !strings.HasPrefix(testSuite, "_") {
-			errorCount := utils.ReadSeq(tmpDir, testSuite, model.ErroredSequenceFilename)
+			errorCount := filez.ReadSeq(tmpDir, testSuite, model.ErroredSequenceFilename)
 			if errorCount > 0 {
 				suites = append(suites, testSuite)
 			}
@@ -291,7 +291,7 @@ func (r FileRepo) IncrementSuiteSeq(testSuite, name string) (n uint32) {
 	if err != nil {
 		errorz.Fatal(err)
 	}
-	n = utils.IncrementSeq(suiteDir, name)
+	n = filez.IncrementSeq(suiteDir, name)
 	logger.Trace("Incrementing seq", "testSuite", testSuite, "name", name, "next", n)
 	return
 }
@@ -357,7 +357,7 @@ func (r FileRepo) readSuiteSeq(testSuite, name string) (n uint32) {
 	if err != nil {
 		errorz.Fatal(err)
 	}
-	n = utils.ReadSeq(suiteDir, name)
+	n = filez.ReadSeq(suiteDir, name)
 	return
 }
 
