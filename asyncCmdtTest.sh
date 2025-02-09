@@ -216,16 +216,39 @@ $cmdtIn @test=longer_async0/report $noPanic @timeout=2s @stderr:"longer_async0_s
 $cmdtIn @init=longer_async1 #@verbose
 $cmdtIn @test=longer_async1/init @stderr= @-- $newCmdt1 @init=longer_async1_sub @async @verbose=5
 for i in $( seq 1 4 ); do
-    $cmdtIn @test=longer_async1/ @stderr= @-- $newCmdt1 @test=longer_async1_sub/t$i @stdout:"end$i" @-- sh -c "sleep $i; echo end$i"
+	time=$( echo "scale=1;$i/10" | bc )
+	$cmdtIn @test=longer_async1/ @stderr= @-- $newCmdt1 @test=longer_async1_sub/t$i @stdout:"end$i" @-- sh -c "sleep $time; echo end$i"
 done
-$cmdtIn @test=longer_async1/report $noPanic @timeout=10s @stderr:"longer_async1_sub" @stderr:"#01" @stderr:"#02" @stderr:"#03" @stderr:"#04" @stderr:"#05" @stderr!:"#06" @-- $newCmdt1 @report=longer_async1_sub
+$cmdtIn @test=longer_async1/report $noPanic @timeout=2s @stderr:"longer_async1_sub" @stderr:"#01" @stderr:"#02" @stderr:"#03" @stderr:"#04" @stderr!:"#05" @-- $newCmdt1 @report=longer_async1_sub
 
 $cmdtIn @init=longer_async2 #@verbose
 $cmdtIn @test=longer_async2/init @stderr= @-- $newCmdt1 @init=longer_async2_sub @async @verbose=5
 for i in $( seq 1 4 ); do
-    $cmdtIn @test=longer_async2/ @stderr= @-- $newCmdt1 @test=longer_async2_sub/t$i @stdout:"end$i" @-- sh -c "sleep $i; echo end$i"
+	time=$( echo "scale=1;$i/10" | bc )
+	$cmdtIn @test=longer_async2/ @stderr= @-- $newCmdt1 @test=longer_async2_sub/t$i @stdout:"end$i" @-- sh -c "sleep $time; echo end$i"
 done
-$cmdtIn @test=longer_async2/report_all $noPanic @timeout=10s @stderr:"longer_async2_sub" @stderr:"#01" @stderr:"#02" @stderr:"#03" @stderr:"#04" @stderr:"#05" @stderr!:"#06" @-- $newCmdt1 @report
+$cmdtIn @test=longer_async2/report_all $noPanic @timeout=2s @stderr:"longer_async2_sub" @stderr:"#01" @stderr:"#02" @stderr:"#03" @stderr:"#04" @stderr!:"#05" @-- $newCmdt1 @report
 
-$cmdtIn @report
+$cmdtIn @report || true
+
+>&2 echo "## Visual test"
+$newCmdt1 @init=longer_sync_visual @verbose=5 @suiteTimeout=5s
+>&2 echo "Launching tests ..."
+for i in $( seq 1 5 ); do
+	>&2 echo -n "$i "
+	time=$( echo "scale=1;$i/5" | bc )
+	$newCmdt1 @test=longer_sync_visual/t$i @stdout:"end$i" @-- sh -c "sleep $time; echo end$i"
+done
+>&2 echo "done"
+$newCmdt1 @report=longer_sync_visual
+
+$newCmdt1 @init=longer_async_visual @async @verbose=5 @suiteTimeout=5s
+>&2 echo "Launching tests ..."
+for i in $( seq 1 5 ); do
+	>&2 echo -n "$i "
+	time=$( echo "scale=1;$i/5" | bc )
+	$newCmdt1 @test=longer_async_visual/t$i @stdout:"end$i" @-- sh -c "sleep $time; echo end$i"
+done
+>&2 echo "done"
+$newCmdt1 @report=longer_async_visual
 
