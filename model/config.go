@@ -42,7 +42,7 @@ const (
 	EnvContainerImageKey          = "__CMDT_CONTAINER_IMAGE"
 	EnvContainerIdKey             = "__CMDT_CONTAINER_ID"
 
-	NamePattern = "[a-zA-Z][^/]*[a-zA-Z0-9]"
+	NamePattern = "[a-zA-Z0-9][^/]*[a-zA-Z0-9]"
 
 	TempDirPrefix                 = "cmdtest"
 	ContextFilename               = "context.yaml"
