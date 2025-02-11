@@ -117,11 +117,12 @@ func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int16, err error) {
 	exitCode = 0
 
 	var suiteOutcomes []model.SuiteOutcome
-
+	var suiteContexts []facade.SuiteContext
 	for _, testSuite := range testSuites {
 		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, model.ReportAction, ctx.Config)
 		count := suiteCtx.Repo.TestCount(testSuite)
 		if count > 0 {
+			suiteContexts = append(suiteContexts, suiteCtx)
 			testCount += count
 			var code int16
 			var suiteOutcome model.SuiteOutcome
@@ -145,6 +146,12 @@ func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int16, err error) {
 
 	Dpl.ReportSuites(suiteOutcomes)
 	Dpl.ReportAllFooter(ctx)
+
+	for _, suiteCtx := range suiteContexts {
+		if !suiteCtx.Config.Keep.Is(true) {
+			Dpl.CloseSuite(suiteCtx)
+		}
+	}
 
 	return
 }
@@ -195,6 +202,9 @@ func ReportTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 		return
 	}
 	Dpl.ReportSuite(suiteOutcome)
+	if !ctx.Config.Keep.Is(true) {
+		Dpl.CloseSuite(ctx)
+	}
 	return
 }
 

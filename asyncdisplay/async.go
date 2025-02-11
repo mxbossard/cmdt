@@ -73,6 +73,7 @@ func (d AsyncDisplay) OpenSuite(ctx facade.SuiteContext) {
 	if err != nil {
 		panic(err)
 	}
+	fmt.Printf("Opened zcreen session: %s\n", suite)
 }
 
 func (d AsyncDisplay) CloseSuite(ctx facade.SuiteContext) {
@@ -82,10 +83,12 @@ func (d AsyncDisplay) CloseSuite(ctx facade.SuiteContext) {
 	if err != nil {
 		panic(err)
 	}
-	err = d.screen.ClearSession(suite)
-	if err != nil {
-		panic(err)
-	}
+	// Must clear session from tailer
+	// err = d.screen.ClearSession(suite)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	fmt.Printf("Cleared zcreen session: %s\n", suite)
 }
 
 func (d AsyncDisplay) SuiteTitle(ctx facade.SuiteContext) {
@@ -300,8 +303,15 @@ func (d *AsyncDisplay) SetVerbose(level model.VerboseLevel) {
 	d.verbose = level
 }
 
+func (d *AsyncDisplay) ClearSession(suite string) error {
+	err := d.tailer.ClearSession(suite)
+	fmt.Printf("async screen cleared session: [%s]\n", suite)
+	return err
+}
+
 func (d *AsyncDisplay) Clear() error {
-	err := d.screen.Clear()
+	err := d.tailer.Clear()
+	fmt.Printf("async screen cleared\n")
 	return err
 }
 

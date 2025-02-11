@@ -208,8 +208,6 @@ func (d *daemon) report(def model.ReportDefinition) (exitCode int16, err error) 
 	exitCode, err = service.ProcessReportDef(def)
 	logger.Debug("Closing test suite", "token", def.Token, "isolation", def.Isolation, "openedSuite", d.openedSuite)
 	d.openedSuite = ""
-	ctx := facade.NewSuiteContext(d.token, d.isolation, def.TestSuite, false, model.InitAction, model.Config{})
-	d.display.CloseSuite(ctx)
 	return
 }
 
@@ -226,7 +224,7 @@ func (d *daemon) reportAll(def model.ReportDefinition) (exitCode int16) {
 	exitCode = service.ProcessReportAllDef(def)
 	logger.Debug("Closing test suite", "token", def.Token, "isolation", def.Isolation, "openedSuite", d.openedSuite)
 	d.openedSuite = ""
-	d.display.Clear()
+	//d.display.Clear()
 	return
 }
 

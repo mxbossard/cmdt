@@ -94,6 +94,10 @@ import (
 
 Bugs:
 - [x] @exit seems bug it never display the exitCode value ("but got: []")
+- zcreen bug on session reopening :
+  - if we end and reopen a session how to tail 2 sessions ?
+  - we need to keep session ser & outputs files for tailing to works.
+  - ClearSession should be called by tailer only if we want to be sure to not clear not tailed sessions
 - NEW_LINE in outputs are not prefixed by out> nor err>
 - %f outputed on stderr is badly formatted by display : %!f(MISSING)
 - @verbose @debug=0 log some INFO level (maybe daemon only)
