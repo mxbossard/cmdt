@@ -3,7 +3,7 @@ package parser
 import "mby.fr/cmdtest/model"
 
 func ParseArgs(args []string) (cfg model.Config, err error) {
-	_ = ruleConfig
+	_ = ruleTree
 	return
 }
 
