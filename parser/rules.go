@@ -1,6 +1,12 @@
 package parser
 
-import "mby.fr/cmdtest/model"
+import (
+	"fmt"
+	"strings"
+
+	"mby.fr/cmdtest/model"
+	"mby.fr/utils/errorz"
+)
 
 /**
 ## Rules
@@ -14,10 +20,20 @@ OPEN: comment gérer le multi value ?
 - while no command is parsed allow prefix to be - for 1 char aliases or -- for aliases ?
 */
 
+type configurer interface {
+	Mutate(cfg *model.Config, assertions *[]model.Assertion)
+}
+
 type ruleMatcher interface {
 	Name() string
-	//Match([]string) (bool, error)
-	Mutate([]string, *model.Config) error
+	Match(prefix string, args []string) (int, configurer, errorz.Aggregated)
+	//MutateIfMatch(args []string, cfg *model.Config, assertions *[]model.Assertion) errorz.Aggregated
+}
+
+type operator[T any] struct {
+	op         string
+	mapper     *mapper[T]
+	validaters []*validater[T]
 }
 
 type rule[T any] struct {
@@ -26,6 +42,7 @@ type rule[T any] struct {
 	mutater     *configMutater[T]
 	aliases     []string
 	prefixMask  string // @: Standard behavior: rules prefixed by PREFIX ; -: allow - and -- ;
+	assertion   bool
 	multiValued bool
 }
 
@@ -33,15 +50,176 @@ func (r rule[T]) Name() string {
 	return r.name
 }
 
-func (r rule[T]) Mutate([]string, *model.Config) error {
-	// TODO
-	return nil
+func (r rule[T]) Match(prefix string, args []string) (n int, cfg configurer, agg errorz.Aggregated) {
+	// Verify if supplied args match the rule
+	// If so, return the args count matched, the errors encountered and an object abale to mutate the config
+	// FIXME: should return an object able to mutate the config
+
+	if len(args) == 0 {
+		return
+	}
+
+	// 1- identify if prefix match and which prefix is it
+	var matchPrefix bool
+	if strings.Contains(r.prefixMask, "@") {
+		// arg can begin with prefix
+		if strings.HasPrefix(args[0], prefix) {
+			matchPrefix = true
+		}
+	}
+	if strings.Contains(r.prefixMask, "-") {
+		// arg can begin with - or --
+		if strings.HasPrefix(args[0], "--") {
+			prefix = "--"
+			matchPrefix = true
+		} else if strings.HasPrefix(args[0], "-") {
+			prefix = "-"
+			matchPrefix = true
+		}
+	}
+
+	if !matchPrefix {
+		return 0, nil, agg
+	}
+
+	// 2- identifiy if rule name and operator match
+	if r.operators == nil {
+		// To match must not have an operator nor a value
+		if args[0] == prefix+r.name {
+			n = 1
+			cfg2 := &config2[T]{}
+			cfg2.op = ""
+			cfg2.prefix = prefix
+			cfg2.rule = &r
+			cfg2.value = ""
+			cfg = cfg2
+			return
+		}
+	}
+
+	var matchingOpLen int
+	var matchingOp *operator[T]
+	var value string
+	for _, op := range r.operators {
+		// Multiple op could match, must keep longest op
+		if op.op == " " {
+			// Special case: space operator
+			if args[0] == prefix+r.name {
+				if len(args) == 1 {
+					n = 1
+					agg.Add(fmt.Errorf("missing arg after space operator"))
+					return
+				}
+				matchingOp = op
+				n = 2
+				value = args[1]
+			}
+			break
+		}
+		if len(op.op) > matchingOpLen && strings.HasPrefix(args[0], prefix+r.name+op.op) {
+			matchingOpLen = len(op.op)
+			matchingOp = op
+			n = 1
+			value = strings.TrimPrefix(args[0], prefix+r.name+op.op)
+			return
+		}
+	}
+
+	if matchingOp == nil {
+		// FIXME: if one alias match but no operator should hint with an error
+		return 0, nil, agg
+	}
+
+	// 3- validate value
+	mapper := *matchingOp.mapper
+	mappedValue, err := mapper(matchingOp.op, value)
+	if err != nil {
+		agg.Add(err)
+	} else {
+		for _, validaterPtr := range matchingOp.validaters {
+			validater := *validaterPtr
+			err := validater(mappedValue)
+			if err != nil {
+				agg.Add(err)
+			}
+		}
+	}
+
+	if agg.GotError() {
+		return n, nil, agg
+	}
+	cfg2 := &config2[T]{}
+	cfg2.op = matchingOp.op
+	cfg2.prefix = prefix
+	cfg2.rule = &r
+	cfg2.value = value
+	cfg2.mappedValue = mappedValue
+	cfg = cfg2
+
+	return
 }
 
-type operator[T any] struct {
-	op         string
-	mapper     *mapper[T]
-	validaters []*validater[T]
+func (r rule[T]) MutateIfMatch(args []string, cfg *model.Config, assertions *[]model.Assertion) (agg errorz.Aggregated) {
+	var matchingArgs []string
+	for _, arg := range args {
+		// TODO: IF MATCH
+		// Need to concat args which must be concatenated
+		_ = arg
+	}
+
+	for _, arg := range matchingArgs {
+		// TODO: separate operator & value
+		_ = arg
+		var matchingPrefix, matchingName, matchingOp, matchingValue string
+		for _, op := range r.operators {
+			if op.op == matchingOp {
+				mapper := *op.mapper
+				value, err := mapper(matchingOp, matchingValue)
+				if err != nil {
+					agg.Add(err)
+				} else if r.assertion {
+					assertion := model.Assertion{
+						Rule: model.Rule{
+							Prefix:   matchingPrefix,
+							Name:     matchingName,
+							Op:       matchingOp,
+							Expected: matchingValue,
+						},
+					}
+					*assertions = append(*assertions, assertion)
+				} else if r.mutater != nil {
+					mutater := *r.mutater
+					mutater(cfg, matchingOp, value)
+				}
+			}
+		}
+	}
+	return agg
+}
+
+type config struct {
+	prefix string
+	rule   ruleMatcher
+	op     string
+	value  string
+}
+
+func (c config) Mutate(cfg *model.Config, assertions *[]model.Assertion) {
+	// TODO
+	return
+}
+
+type config2[T any] struct {
+	prefix      string
+	rule        *rule[T]
+	op          string
+	value       string
+	mappedValue T
+}
+
+func (c config2[T]) Mutate(cfg *model.Config, assertions *[]model.Assertion) {
+	mutater := *c.rule.mutater
+	mutater(cfg, c.op, c.mappedValue)
 }
 
 type ruleSet struct {
@@ -53,156 +231,9 @@ type ruleSet struct {
 	//ruleSets          []RuleSet
 }
 
-type mapper[T any] func(value string) (T, error)
+type mapper[T any] func(op, value string) (T, error)
 type validater[T any] func(value T) error
 type configMutater[T any] func(cfg *model.Config, op string, value T)
-
-type Config struct {
-	prefix   string
-	rule     ruleMatcher
-	operator string
-	value    string
-}
-
-var (
-
-	// ACTIONS
-	global = buildRule("global", ops(noOp[string]()), nil, "g")
-	suite  = buildRule("suite", ops(noOp[string](), equalSuiteName),
-		mutater(),
-		"s", "init", "i")
-	test = buildRule("test", ops(noOp[string](), equalTestName),
-		mutater(),
-		"t")
-	report = buildRule("report", ops(noOp[string](), equalSuiteName),
-		mutater(),
-		"r")
-	help  = buildRule("help", ops(noOp[string]()), nil, "h")
-	usage = buildRule("usage", ops(noOp[string]()), nil) // ???
-
-	// ISOLATION
-	token = buildRule("token", ops(equalString),
-		mutater())
-	isolation = buildRule("isolation", ops(equalString),
-		mutater(),
-		"isol")
-
-	// TOKEN_ACTIONS
-	printToken  = buildRule("printToken", ops(noOp[string]()), nil, "print_token")
-	exportToken = buildRule("exportToken", ops(noOp[string]()), nil, "export_token")
-
-	// PARSING
-	prefix = buildRule("prefix", ops(equalString),
-		mutater())
-
-	// VERBOSITY
-	quiet = buildRule("quiet", ops(noOp[bool](), equalBoolean),
-		mutater(),
-		"q")
-	verbose = buildMvRule("verbose", ops(noOp[int](), equalUint8),
-		mutater(),
-		"v")
-	debug = buildMvRule("debug", ops(noOp[int](), equalUint8),
-		mutater(),
-		"d", "x")
-
-	// SUITE CONFIG
-	fork = buildRule("fork", ops(noOp[int](), equalUint8),
-		mutater())
-	suiteTimeout = buildRule("suiteTimeout", ops(equalDuration),
-		mutater(),
-		"suite_timeout", "timeoutSuite", "timeout_suite")
-	async = buildRule("async", ops(noOp[bool](), equalBoolean),
-		mutater())
-	stopOnFailure = buildRule("stopOnFailure", ops(noOp[bool](), equalBoolean),
-		mutater(),
-		"stop_on_failure")
-	failuresLimit = buildRule("failuresLimit", ops(equalUint8),
-		mutater(),
-		"failures_limit")
-	beforeSuite = buildMvRule("beforeSuite", ops(equalCmd),
-		mutater(),
-		"before_suite")
-	afterSuite = buildMvRule("afterSuite", ops(equalCmd),
-		mutater(),
-		"after_suite")
-
-	// TEST CONFIG
-	wait = buildRule("wait", ops(noOp[bool](),
-		mutater(),
-		equalBoolean))
-	ignore = buildRule("ignore", ops(noOp[bool](),
-		mutater(),
-		equalBoolean))
-	keepStdout = buildRule("keepStdout", ops(noOp[bool](), equalBoolean),
-		mutater(),
-		"keep_stdout", "keepOut", "keep_out")
-	keepStderr = buildRule("keepStderr", ops(noOp[bool](), equalBoolean),
-		mutater(),
-		"keep_stderr", "keepErr", "keep_err")
-	keepOutputs = buildRule("keepOutputs", ops(noOp[bool](), equalBoolean),
-		mutater(),
-		"keep_outputs", "keepOuts", "keep_outs")
-	timeout = buildRule("timeout", ops(equalDuration),
-		mutater())
-	runCount = buildRule("runCount", ops(equalUint8),
-		mutater(),
-		"run_count")
-	mock = buildRule("mock", ops(equalMock),
-		mutater())
-	before = buildMvRule("before", ops(equalCmd),
-		mutater())
-	after = buildMvRule("after", ops(equalCmd),
-		mutater())
-	container = buildRule("container", ops(noOp[bool]()),
-		mutater())
-	dirtyContainer = buildRule("dirtyContainer", ops(noOp[bool]()),
-		mutater(),
-		"dirty_container")
-
-	// REPORT CONFIG
-	keepReport = buildRule("keep", ops(noOp[bool]()), nil)
-
-	// WHERE ?
-	//parallel = buildRule("parallel", nil)
-
-	// ASSERTIONS CONFIG
-	success = buildRule("success", ops(noOp[bool]()),
-		mutater())
-	failure = buildRule("failure", ops(noOp[bool]()),
-		mutater(),
-		"fail")
-	exit = buildRule("exit", ops(equalUint8),
-		mutater(),
-		"rc")
-	stdout = buildMvRule("stdout", ops(equalStringOrEmpty, equalString, notEqualString, containsString,
-		notContainsString, matchString, notMatchString, equalFileContent, containsFileContent),
-		mutater(),
-		"out")
-	stderr = buildMvRule("stderr", ops(equalStringOrEmpty, equalString, notEqualString, containsString,
-		notContainsString, matchString, notMatchString, equalFileContent, containsFileContent),
-		mutater(),
-		"err")
-	cmd = buildMvRule("cmd", ops(equalCmd),
-		mutater())
-	exists = buildMvRule("exists", ops(equalFilepath),
-		mutater())
-)
-
-var ruleTree = []*ruleSet{
-	buildMERS("action", nil, rules(global, suite, test, report, help, usage), test),
-	buildRS("isolation", nil, rules(token, isolation), nil),
-	buildMERS("tokenAction", nil, rules(printToken, exportToken), nil),
-	buildRS("parsing", nil, rules(prefix), nil),
-	buildRS("verbosity", nil, rules(quiet, verbose, debug), nil),
-	buildRS("suiteConfig", rules(global, suite), rules(fork, suiteTimeout, async, stopOnFailure,
-		failuresLimit, beforeSuite, afterSuite), nil),
-	buildRS("testConfig", rules(global, suite, test), rules(wait, ignore, keepStdout, keepStderr,
-		keepOutputs, timeout, runCount, mock, before, after, container, dirtyContainer), nil),
-	buildRS("reportConfig", rules(report), rules(keepReport), nil),
-	buildMERS("outcomeAssertions", rules(test), rules(success, failure, exit), success),
-	buildRS("stackableAssertions", rules(test), rules(stdout, stderr, cmd, exists), nil),
-}
 
 func rules(rules ...ruleMatcher) []ruleMatcher {
 	return rules
@@ -229,6 +260,28 @@ func buildMvRule[T any](name string, ops []*operator[T], mutater *configMutater[
 		mutater:     mutater,
 		aliases:     aliases,
 		multiValued: true,
+	}
+}
+
+func buildAssertRule[T any](name string, ops []*operator[T], mutater *configMutater[T], aliases ...string) *rule[T] {
+	return &rule[T]{
+		name:        name,
+		operators:   ops,
+		mutater:     mutater,
+		aliases:     aliases,
+		multiValued: false,
+		assertion:   true,
+	}
+}
+
+func buildMvAssertRule[T any](name string, ops []*operator[T], mutater *configMutater[T], aliases ...string) *rule[T] {
+	return &rule[T]{
+		name:        name,
+		operators:   ops,
+		mutater:     mutater,
+		aliases:     aliases,
+		multiValued: true,
+		assertion:   true,
 	}
 }
 
