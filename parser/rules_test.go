@@ -49,21 +49,7 @@ func TestMatch(t *testing.T) {
 	assert.Nil(t, configurer)
 	assert.Equal(t, 0, n)
 
-	args = []string{"@test "}
-	n, configurer, agg = test.Match(expectedPrefix, args)
-	require.NotNil(t, agg)
-	assert.NoError(t, agg.Return())
-	assert.Nil(t, configurer)
-	assert.Equal(t, 0, n)
-
 	args = []string{"@testa"}
-	n, configurer, agg = test.Match(expectedPrefix, args)
-	require.NotNil(t, agg)
-	assert.NoError(t, agg.Return())
-	assert.Nil(t, configurer)
-	assert.Equal(t, 0, n)
-
-	args = []string{"@test foo bar baz"}
 	n, configurer, agg = test.Match(expectedPrefix, args)
 	require.NotNil(t, agg)
 	assert.NoError(t, agg.Return())
@@ -75,7 +61,23 @@ func TestMatch(t *testing.T) {
 	n, configurer, agg = test.Match(expectedPrefix, args)
 	require.NotNil(t, agg)
 	assert.Error(t, agg.Return())
-	assert.ErrorContains(t, agg.Return(), "unknown operator")
+	assert.ErrorContains(t, agg.Return(), "invalid operator")
+	assert.Nil(t, configurer)
+	assert.Equal(t, 0, n)
+
+	args = []string{"@test "}
+	n, configurer, agg = test.Match(expectedPrefix, args)
+	require.NotNil(t, agg)
+	assert.Error(t, agg.Return())
+	assert.ErrorContains(t, agg.Return(), "invalid operator")
+	assert.Nil(t, configurer)
+	assert.Equal(t, 0, n)
+
+	args = []string{"@test foo bar baz"}
+	n, configurer, agg = test.Match(expectedPrefix, args)
+	require.NotNil(t, agg)
+	assert.Error(t, agg.Return())
+	assert.ErrorContains(t, agg.Return(), "invalid operator")
 	assert.Nil(t, configurer)
 	assert.Equal(t, 0, n)
 

@@ -56,9 +56,11 @@ func (r rule[T]) Match(prefix string, args []string) (n int, cfg configurer, agg
 	// FIXME: should return an object able to mutate the config
 
 	if len(args) == 0 {
-		fmt.Printf("no args\n")
+		//fmt.Printf("no args\n")
 		return
 	}
+
+	matchingRule := prefix + r.name
 
 	// 1- identify if prefix match and which prefix is it
 	var matchPrefix bool
@@ -80,14 +82,14 @@ func (r rule[T]) Match(prefix string, args []string) (n int, cfg configurer, agg
 	}
 
 	if !matchPrefix {
-		fmt.Printf("no prefix matching\n")
+		//fmt.Printf("no prefix matching\n")
 		return 0, nil, agg
 	}
 
 	// 2- identifiy if rule name and operator match
 	if r.operators == nil {
 		// To match must not have an operator nor a value
-		if args[0] == prefix+r.name {
+		if args[0] == matchingRule {
 			n = 1
 			cfg2 := &config2[T]{}
 			cfg2.op = ""
@@ -95,7 +97,7 @@ func (r rule[T]) Match(prefix string, args []string) (n int, cfg configurer, agg
 			cfg2.rule = &r
 			cfg2.value = ""
 			cfg = cfg2
-			fmt.Printf("match no operator\n")
+			//fmt.Printf("match no operator\n")
 			return
 		}
 	}
@@ -107,11 +109,11 @@ func (r rule[T]) Match(prefix string, args []string) (n int, cfg configurer, agg
 		// Multiple op could match, must keep longest op
 		if op.op == " " {
 			// Special case: space operator
-			if args[0] == prefix+r.name {
+			if args[0] == matchingRule {
 				if len(args) == 1 {
 					n = 1
 					agg.Add(fmt.Errorf("missing arg after space operator"))
-					fmt.Printf("missing arg after space operator\n")
+					//fmt.Printf("missing arg after space operator\n")
 					return
 				}
 				matchingOp = op
@@ -120,21 +122,32 @@ func (r rule[T]) Match(prefix string, args []string) (n int, cfg configurer, agg
 			}
 			break
 		}
-		fmt.Printf("testing if arg: [%s] match: [%s]\n", args[0], prefix+r.name+op.op)
-		if len(op.op) > matchingOpLen && ((op.op == "" && args[0] == prefix+r.name+op.op) ||
-			(op.op != "" && strings.HasPrefix(args[0], prefix+r.name+op.op))) {
+		//fmt.Printf("testing if arg: [%s] match: [%s]\n", args[0], matchingRule+op.op)
+		if len(op.op) > matchingOpLen && ((op.op == "" && args[0] == matchingRule+op.op) ||
+			(op.op != "" && strings.HasPrefix(args[0], matchingRule+op.op))) {
 			// if longer op AND ( (noOp + match exactly) OR (op + match begining) )
-			fmt.Printf("op: [%s] match\n", op.op)
+			//fmt.Printf("op: [%s] match\n", op.op)
 			matchingOpLen = len(op.op)
 			matchingOp = op
 			n = 1
-			value = strings.TrimPrefix(args[0], prefix+r.name+op.op)
+			value = strings.TrimPrefix(args[0], matchingRule+op.op)
 		}
 	}
 
 	if matchingOp == nil {
 		// FIXME: if one alias match but no operator should hint with an error
-		fmt.Printf("no operator match\n")
+		//fmt.Printf("no operator match\n")
+
+		p := len(matchingRule)
+		if len(args[0]) > p && strings.HasPrefix(args[0], matchingRule) {
+			// prefix & rule name match
+			badOp := operatorPrefix(args[0][p:])
+			if badOp != "" {
+				//  valid operator not registered for the rule is used
+				agg.Add(fmt.Errorf("invalid operator: [%s] used for rule: [%s] (%s)", badOp, matchingRule, args[0]))
+			}
+		}
+
 		return 0, nil, agg
 	}
 
@@ -165,7 +178,7 @@ func (r rule[T]) Match(prefix string, args []string) (n int, cfg configurer, agg
 	}
 
 	if agg.GotError() {
-		fmt.Printf("some error\n")
+		//fmt.Printf("some error\n")
 		return n, nil, agg
 	}
 	cfg2 := &config2[T]{}
@@ -175,7 +188,7 @@ func (r rule[T]) Match(prefix string, args []string) (n int, cfg configurer, agg
 	cfg2.value = value
 	cfg2.mappedValue = mappedValue
 	cfg = cfg2
-	fmt.Printf("match\n")
+	//fmt.Printf("match\n")
 	return
 }
 

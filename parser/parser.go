@@ -20,7 +20,8 @@ type ruleRepo struct {
 }
 
 func (r *ruleRepo) addRuleSet(rs *ruleSet) {
-	// TODO: check for doublons ?
+	// TODO: check for doublons
+	// TODO: check for authorized operator
 	r.ruleSets = append(r.ruleSets, rs)
 	for _, rule := range rs.rules {
 		if rule != nil {

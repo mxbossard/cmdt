@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -10,8 +11,9 @@ import (
 	"mby.fr/utils/filez"
 )
 
-var (
+var authorizedOperators = []string{"", " ", "=", "!=", ":", "!:", "~", "!~", "@=", "@:"}
 
+var (
 	// VALIDATERS
 	isUint8         = buildValidater(func(val string) error { return nil })
 	isUint16        = buildValidater(func(val string) error { return nil })
@@ -387,4 +389,30 @@ func stringValidater(min, max int) *validater[string] {
 		return nil
 	}
 	return &f
+}
+
+var authorizedOperatorsPattern = buildAuthorizedOperatorsPattern()
+
+func buildAuthorizedOperatorsPattern() regexp.Regexp {
+
+	rex := "^" + authorizedOperators[0] + "$"
+	for _, op := range authorizedOperators[1:] {
+		rex = rex + "|^" + op + "$"
+	}
+	return *regexp.MustCompile(rex)
+}
+
+func isOperatorPrefixed(s string) bool {
+	return operatorPrefix(s) != ""
+}
+
+func operatorPrefix(s string) string {
+	maxLen := min(len(s), 3)
+	for p := maxLen; p > 0; p-- {
+		m := authorizedOperatorsPattern.FindString(s[:p])
+		if m != "" {
+			return m
+		}
+	}
+	return ""
 }
