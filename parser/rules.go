@@ -56,6 +56,7 @@ func (r rule[T]) Match(prefix string, args []string) (n int, cfg configurer, agg
 	// FIXME: should return an object able to mutate the config
 
 	if len(args) == 0 {
+		fmt.Printf("no args\n")
 		return
 	}
 
@@ -79,6 +80,7 @@ func (r rule[T]) Match(prefix string, args []string) (n int, cfg configurer, agg
 	}
 
 	if !matchPrefix {
+		fmt.Printf("no prefix matching\n")
 		return 0, nil, agg
 	}
 
@@ -93,11 +95,12 @@ func (r rule[T]) Match(prefix string, args []string) (n int, cfg configurer, agg
 			cfg2.rule = &r
 			cfg2.value = ""
 			cfg = cfg2
+			fmt.Printf("match no operator\n")
 			return
 		}
 	}
 
-	var matchingOpLen int
+	matchingOpLen := -1
 	var matchingOp *operator[T]
 	var value string
 	for _, op := range r.operators {
@@ -108,6 +111,7 @@ func (r rule[T]) Match(prefix string, args []string) (n int, cfg configurer, agg
 				if len(args) == 1 {
 					n = 1
 					agg.Add(fmt.Errorf("missing arg after space operator"))
+					fmt.Printf("missing arg after space operator\n")
 					return
 				}
 				matchingOp = op
@@ -116,36 +120,52 @@ func (r rule[T]) Match(prefix string, args []string) (n int, cfg configurer, agg
 			}
 			break
 		}
-		if len(op.op) > matchingOpLen && strings.HasPrefix(args[0], prefix+r.name+op.op) {
+		fmt.Printf("testing if arg: [%s] match: [%s]\n", args[0], prefix+r.name+op.op)
+		if len(op.op) > matchingOpLen && ((op.op == "" && args[0] == prefix+r.name+op.op) ||
+			(op.op != "" && strings.HasPrefix(args[0], prefix+r.name+op.op))) {
+			// if longer op AND ( (noOp + match exactly) OR (op + match begining) )
+			fmt.Printf("op: [%s] match\n", op.op)
 			matchingOpLen = len(op.op)
 			matchingOp = op
 			n = 1
 			value = strings.TrimPrefix(args[0], prefix+r.name+op.op)
-			return
 		}
 	}
 
 	if matchingOp == nil {
 		// FIXME: if one alias match but no operator should hint with an error
+		fmt.Printf("no operator match\n")
 		return 0, nil, agg
 	}
 
 	// 3- validate value
-	mapper := *matchingOp.mapper
-	mappedValue, err := mapper(matchingOp.op, value)
-	if err != nil {
-		agg.Add(err)
+	var mappedValue T
+	var err error
+	if matchingOp.mapper != nil {
+		mapper := *matchingOp.mapper
+		mappedValue, err = mapper(matchingOp.op, value)
+		if err != nil {
+			agg.Add(err)
+		}
 	} else {
-		for _, validaterPtr := range matchingOp.validaters {
-			validater := *validaterPtr
-			err := validater(mappedValue)
-			if err != nil {
-				agg.Add(err)
-			}
+		var val any = value
+		var ok bool
+		mappedValue, ok = val.(T)
+		if !ok {
+			panic(fmt.Errorf("unable to map value of rule: [%s]", r.name))
+		}
+	}
+
+	for _, validaterPtr := range matchingOp.validaters {
+		validater := *validaterPtr
+		err := validater(mappedValue)
+		if err != nil {
+			agg.Add(err)
 		}
 	}
 
 	if agg.GotError() {
+		fmt.Printf("some error\n")
 		return n, nil, agg
 	}
 	cfg2 := &config2[T]{}
@@ -155,7 +175,7 @@ func (r rule[T]) Match(prefix string, args []string) (n int, cfg configurer, agg
 	cfg2.value = value
 	cfg2.mappedValue = mappedValue
 	cfg = cfg2
-
+	fmt.Printf("match\n")
 	return
 }
 
@@ -249,6 +269,7 @@ func buildRule[T any](name string, ops []*operator[T], mutater *configMutater[T]
 		operators:   ops,
 		mutater:     mutater,
 		aliases:     aliases,
+		prefixMask:  "@",
 		multiValued: false,
 	}
 }
@@ -259,6 +280,7 @@ func buildMvRule[T any](name string, ops []*operator[T], mutater *configMutater[
 		operators:   ops,
 		mutater:     mutater,
 		aliases:     aliases,
+		prefixMask:  "@",
 		multiValued: true,
 	}
 }
@@ -269,6 +291,7 @@ func buildAssertRule[T any](name string, ops []*operator[T], mutater *configMuta
 		operators:   ops,
 		mutater:     mutater,
 		aliases:     aliases,
+		prefixMask:  "@",
 		multiValued: false,
 		assertion:   true,
 	}
@@ -280,6 +303,7 @@ func buildMvAssertRule[T any](name string, ops []*operator[T], mutater *configMu
 		operators:   ops,
 		mutater:     mutater,
 		aliases:     aliases,
+		prefixMask:  "@",
 		multiValued: true,
 		assertion:   true,
 	}
