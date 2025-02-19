@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"mby.fr/cmdtest/model"
+	"mby.fr/utils/collections"
 	"mby.fr/utils/errorz"
 	"mby.fr/utils/zlog"
 )
@@ -30,29 +31,168 @@ func (r *ruleRepo) addRuleSet(rs *ruleSet) {
 	}
 }
 
-func (r ruleRepo) parseArgs(prefix string, args []string) (configurers []configurer, agg errorz.Aggregated) {
+func prefixReplacer(prefix, rule string) (bool, string) {
+	prefixPattern := regexp.MustCompile("^" + prefix + "prefix=(.)$")
+	submatch := prefixPattern.FindStringSubmatch(rule)
+	if submatch != nil {
+		return true, submatch[1]
+	}
+	return false, prefix
+}
+
+func (r ruleRepo) parseArgs0(prefix string, args []string) (allMatches []ruleMatch, cmdAndArgs []string, agg errorz.Aggregated) {
+	// FIXME: add change prefix management
+	// FIXME: if ruleParsingStopper encountered consider all following args as cmdAndArgs
+	// FIXME: if not matched begin with prefix, do not consider it a cmdAndArgs, but an unkown rule
 	args = concatArgs(prefix, args)
-	for len(args) > 0 {
-		var matched bool
-		for _, rule := range r.rules {
-			n, configurer, agg2 := rule.Match(prefix, args)
-			if agg2.GotError() {
-				agg.Concat(agg2)
+	parseRules := true
+	for p := 0; p < len(args); p++ {
+		if parseRules {
+			var replaced bool
+			replaced, prefix = prefixReplacer(prefix, args[p])
+			if replaced {
 				continue
 			}
-			if n == 0 {
-				continue
-			}
-			configurers = append(configurers, configurer)
-			// remove matched args
-			args = args[n:]
-			matched = true
 		}
 
-		if !matched {
-			agg.Add(fmt.Errorf("unable to parse args: [%s]", args))
-			return
+		ruleParsingStopper := prefix + "--"
+		if parseRules && args[p] == ruleParsingStopper {
+			// Reached rule parsing stopper
+			if len(cmdAndArgs) > 0 {
+				err := fmt.Errorf("bad placement for command: [%s] before rule parsing stopper %s", cmdAndArgs, ruleParsingStopper)
+				agg.Add(err)
+			}
+			// stop parsing rules
+			parseRules = false
+			continue
 		}
+
+		var matched bool
+		if parseRules {
+			for _, rs := range r.ruleSets {
+				matches, noMatches, agg2 := rs.Match(prefix, args[p:])
+				_ = noMatches
+				if agg2.GotError() {
+					agg.Concat(agg2)
+					continue
+				}
+				if len(matches) == 0 {
+					continue
+				}
+				agg2 = rs.Check(matches...)
+				agg.Concat(agg2)
+
+				allMatches = append(allMatches, matches...)
+				// remove matched args
+				p += len(matches) - 1
+				matched = true
+			}
+
+			/*
+				for _, rule := range r.rules {
+					n, configurer, agg2 := rule.Match(prefix, args[p:])
+					if agg2.GotError() {
+						agg.Concat(agg2)
+						continue
+					}
+					if n == 0 {
+						continue
+					}
+					configurers = append(configurers, configurer)
+					// remove matched args
+					p += n - 1
+					matched = true
+				}
+			*/
+		}
+
+		if !matched && (!strings.HasPrefix(args[p], prefix) || !parseRules) {
+			cmdAndArgs = append(cmdAndArgs, args[p])
+		} else if !matched {
+			agg.Add(fmt.Errorf("unkown rule: [%s]", args[p]))
+		}
+
+		for _, rs := range r.ruleSets {
+			agg2 := rs.Check(allMatches...)
+			agg.Concat(agg2)
+		}
+	}
+
+	return
+}
+
+func (r ruleRepo) parseArgs(prefix string, args []string) (allMatches []ruleMatch, cmdAndArgs []string, agg errorz.Aggregated) {
+	args = concatArgs(prefix, args)
+
+	firstRuleParsingStopper := ""
+	parseRuleStopperPos := -1
+	prefix2 := prefix
+	for p, arg := range args {
+		replaced := false
+		replaced, prefix2 = prefixReplacer(prefix2, arg)
+		if replaced {
+			continue
+		}
+		ruleParsingStopper := prefix2 + "--"
+		if arg == ruleParsingStopper {
+			if parseRuleStopperPos > -1 {
+				err := fmt.Errorf("rule parsing stopper: [%s] must be uniq", ruleParsingStopper)
+				agg.Add(err)
+			} else {
+				parseRuleStopperPos = p
+				firstRuleParsingStopper = ruleParsingStopper
+			}
+		}
+	}
+
+	if parseRuleStopperPos > -1 {
+		cmdAndArgs = args[parseRuleStopperPos+1:]
+		args = args[0:parseRuleStopperPos]
+	}
+
+	var allNoMatches [][]string
+	for _, rs := range r.ruleSets {
+		matches, noMatches, agg2 := rs.Match(prefix, args)
+		agg.Concat(agg2)
+
+		//fmt.Printf("Checking(RS=%s) %s for args: %s...\n", rs.name, matches, args)
+		agg2 = rs.Check(matches...)
+		//fmt.Printf("Agg2 errors: %s\n", agg2)
+		agg.Concat(agg2)
+
+		allMatches = append(allMatches, matches...)
+		allNoMatches = append(allNoMatches, noMatches)
+	}
+
+	allNoMatchesIntersect := allNoMatches[0]
+	if len(allNoMatches) > 1 {
+		for p := 1; p < len(allNoMatches); p++ {
+			allNoMatchesIntersect = collections.Intersect(&allNoMatchesIntersect, &allNoMatches[p])
+		}
+	}
+
+	prefix2 = prefix
+	for _, noMatch := range allNoMatchesIntersect {
+		replaced := false
+		replaced, prefix2 = prefixReplacer(prefix2, noMatch)
+		if replaced {
+			continue
+		}
+
+		if !strings.HasPrefix(noMatch, prefix) && parseRuleStopperPos > -1 {
+			// noMatch arg without prefix is encountered before rule parsing stopper
+			if len(cmdAndArgs) > 0 {
+				err := fmt.Errorf("bad placement for command: [%s] before rule parsing stopper %s", cmdAndArgs, firstRuleParsingStopper)
+				agg.Add(err)
+			}
+		} else if !strings.HasPrefix(noMatch, prefix2) {
+			// noMatch arg without prefix is encountered
+			cmdAndArgs = append(cmdAndArgs, noMatch)
+		} else {
+			// noMatch arg with prefix is encountered
+			agg.Add(fmt.Errorf("unkown rule: [%s]", noMatch))
+		}
+
 	}
 
 	return
@@ -62,12 +202,12 @@ func ParseArgs(args []string) (cfg model.Config, err error) {
 	return
 }
 
-func buildArgsConfig(prefix string, args []string) (configs []config, err error) {
+func buildArgsConfig(prefix string, args []string) (configs []config0, err error) {
 	//TODO
 	return
 }
 
-func completeArgsConfig(prefix string, args []string) (configs []config, err error) {
+func completeArgsConfig(prefix string, args []string) (configs []config0, err error) {
 	//TODO
 	return
 }

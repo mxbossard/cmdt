@@ -147,17 +147,20 @@ var (
 	success = buildAssertRule("success", ops(noOp[bool]()), nil)
 	failure = buildAssertRule("failure", ops(noOp[bool]()), nil, "fail")
 	exit    = buildAssertRule("exit", ops(equalUint8), nil, "rc")
-	// Not multi valued
-	// FIXME: can have only one stdoutIs rule if @stdout= used and no stdoutMach rule can be used
-	stdoutIs = buildAssertRule("stdout", ops(equalStringOrEmpty, equalString, equalFileContent), nil, "out")
-	stderrIs = buildAssertRule("stderr", ops(equalStringOrEmpty, equalString, equalFileContent), nil, "err")
 	// Multi valued
-	stdoutMatch = buildMvAssertRule("stdout", ops(notEqualString, containsString, notContainsString,
-		matchString, notMatchString, containsFileContent), nil, "out")
-	stderrMatch = buildMvAssertRule("stderr", ops(notEqualString, containsString, notContainsString,
-		matchString, notMatchString, containsFileContent), nil, "err")
 	cmd    = buildMvAssertRule("cmd", ops(equalCmd), nil)
 	exists = buildMvAssertRule("exists", ops(equalFilepath), nil)
+	// Multi valued or exclusive by Ops
+	stdout = buildMvExclOpsAssertRule("stdout", 
+	    ops(equalString, equalStringOrEmpty, notEqualString, containsString, notContainsString, matchString, notMatchString, equalFileContent, containsFileContent),
+	    ops(notEqualString, containsString, notContainsString, matchString, notMatchString, containsFileContent),
+	    ops(equalStringOrEmpty, equalString, equalFileContent),
+	    nil, "out")
+	stderr = buildMvExclOpsAssertRule("stderr", 
+	    ops(equalString, equalStringOrEmpty, notEqualString, containsString, notContainsString, matchString, notMatchString, equalFileContent, containsFileContent),
+	    ops(notEqualString, containsString, notContainsString, matchString, notMatchString, containsFileContent),
+	    ops(equalStringOrEmpty, equalString, equalFileContent),
+	    nil, "err")
 )
 
 var (
@@ -173,5 +176,5 @@ var (
 		keepOutputs, timeout, runCount, mock, before, after, container, dirtyContainer), nil)
 	rsReportCOnfig        = buildRS("reportConfig", rules(report), rules(keepReport), nil)
 	rsOutcomeAssertions   = buildMERS("outcomeAssertions", rules(test), rules(success, failure, exit), success)
-	rsStackableAssertions = buildRS("stackableAssertions", rules(test), rules(stdoutIs, stdoutMatch, stderrIs, stderrMatch, cmd, exists), nil)
+	rsStackableAssertions = buildRS("stackableAssertions", rules(test), rules(stdout, stderr, cmd, exists), nil)
 )

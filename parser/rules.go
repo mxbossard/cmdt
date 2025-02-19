@@ -2,9 +2,11 @@ package parser
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"mby.fr/cmdtest/model"
+	"mby.fr/utils/collections"
 	"mby.fr/utils/errorz"
 )
 
@@ -24,10 +26,31 @@ type configurer interface {
 	Mutate(cfg *model.Config, assertions *[]model.Assertion)
 }
 
-type ruleMatcher interface {
+type ruleMatch interface {
+	configurer
+	Prefix() string
 	Name() string
-	Match(prefix string, args []string) (int, configurer, errorz.Aggregated)
+	Op() string
+	//Check() errorz.Aggregated
+	//CheckAgainst([]ruleMatch) errorz.Aggregated
+}
+
+type matchChecker interface {
+	Check(...ruleMatch) errorz.Aggregated
+}
+
+type ruleMatcher interface {
+	matchChecker
+	Name() string
+	Aliases() []string
+	Match(prefix string, args []string) (int, ruleMatch, errorz.Aggregated)
 	//MutateIfMatch(args []string, cfg *model.Config, assertions *[]model.Assertion) errorz.Aggregated
+}
+
+type ruleSetMatcher interface {
+	matchChecker
+	Name() string
+	Match(prefix string, args []string) ([]ruleMatch, []string, errorz.Aggregated)
 }
 
 type operator[T any] struct {
@@ -37,20 +60,62 @@ type operator[T any] struct {
 }
 
 type rule[T any] struct {
-	name        string
-	operators   []*operator[T]
-	mutater     *configMutater[T]
-	aliases     []string
-	prefixMask  string // @: Standard behavior: rules prefixed by PREFIX ; -: allow - and -- ;
-	assertion   bool
-	multiValued bool
+	name           string
+	operators      []*operator[T]
+	mutater        *configMutater[T]
+	aliases        []string
+	prefixMask     string // @: Standard behavior: rules prefixed by PREFIX ; -: allow - and -- ;
+	assertion      bool
+	multiValued    bool
+	multiValuedOps []*operator[T]
+	exclusiveOps   []*operator[T]
 }
 
 func (r rule[T]) Name() string {
 	return r.name
 }
 
-func (r rule[T]) Match(prefix string, args []string) (n int, cfg configurer, agg errorz.Aggregated) {
+func (r rule[T]) Aliases() []string {
+	return r.aliases
+}
+
+func (r rule[T]) Check(matches ...ruleMatch) (agg errorz.Aggregated) {
+	matchingCount := 0
+	countByOperatorMap := make(map[string]int, 2)
+	ruleByOperatorMap := make(map[string][]string, 2)
+	var matchingRules []string // FIXME: could be a set
+	for _, match := range matches {
+		if r.name == match.Name() || slices.Contains(r.aliases, match.Name()) {
+			// Can check against this match
+			matchingCount++
+			countByOp := countByOperatorMap[match.Op()] + 1
+			countByOperatorMap[match.Op()] = countByOp
+			ruleByOperatorMap[match.Op()] = append(ruleByOperatorMap[match.Op()], match.Prefix()+match.Name()+match.Op())
+			matchingRules = append(matchingRules, match.Prefix()+match.Name()+match.Op())
+		}
+	}
+	matchingRules = collections.Deduplicate(&matchingRules)
+	uniqOps := collections.Sub(&r.operators, &r.multiValuedOps)
+	for _, op := range uniqOps {
+		if countByOperatorMap[op.op] > 1 {
+			usedRules := ruleByOperatorMap[op.op]
+			usedRules = collections.Deduplicate(&usedRules)
+			err := fmt.Errorf("rule [%s%s] is uniq and cannot be used more than once (like: [%s])", r.name, op.op, strings.Join(usedRules, ", "))
+			agg.Add(err)
+		}
+	}
+	for _, op := range r.exclusiveOps {
+		exclusiveCount := countByOperatorMap[op.op]
+		if exclusiveCount > 0 && matchingCount > exclusiveCount {
+			otherOps := collections.Delete(matchingRules, op.op)
+			err := fmt.Errorf("rule [%s%s] is exclusive and cannot be used with other operators (like: [%s])", r.name, op.op, strings.Join(otherOps, ", "))
+			agg.Add(err)
+		}
+	}
+	return
+}
+
+func (r rule[T]) Match(prefix string, args []string) (n int, match ruleMatch, agg errorz.Aggregated) {
 	// Verify if supplied args match the rule
 	// If so, return the args count matched, the errors encountered and an object abale to mutate the config
 	// FIXME: should return an object able to mutate the config
@@ -59,8 +124,6 @@ func (r rule[T]) Match(prefix string, args []string) (n int, cfg configurer, agg
 		//fmt.Printf("no args\n")
 		return
 	}
-
-	matchingRule := prefix + r.name
 
 	// 1- identify if prefix match and which prefix is it
 	var matchPrefix bool
@@ -86,17 +149,38 @@ func (r rule[T]) Match(prefix string, args []string) (n int, cfg configurer, agg
 		return 0, nil, agg
 	}
 
-	// 2- identifiy if rule name and operator match
+	// 2- Determinate which alias is used
+	var matchingAlias string
+	var matchingRule string
+	if strings.HasPrefix(args[0], prefix+r.name) {
+		matchingAlias = r.name
+		matchingRule = prefix + r.name
+	} else {
+		for _, alias := range r.aliases {
+			if strings.HasPrefix(args[0], prefix+alias) {
+				matchingAlias = alias
+				matchingRule = prefix + alias
+				break
+			}
+		}
+	}
+
+	if matchingRule == "" {
+		// Does not match the rule
+		return 0, nil, agg
+	}
+
+	// 3- identifiy if rule name and operator match
 	if r.operators == nil {
 		// To match must not have an operator nor a value
 		if args[0] == matchingRule {
 			n = 1
-			cfg2 := &config2[T]{}
+			cfg2 := &basicRuleMatch[T]{}
 			cfg2.op = ""
 			cfg2.prefix = prefix
 			cfg2.rule = &r
 			cfg2.value = ""
-			cfg = cfg2
+			match = cfg2
 			//fmt.Printf("match no operator\n")
 			return
 		}
@@ -151,7 +235,7 @@ func (r rule[T]) Match(prefix string, args []string) (n int, cfg configurer, agg
 		return 0, nil, agg
 	}
 
-	// 3- validate value
+	// 4- validate value
 	var mappedValue T
 	var err error
 	if matchingOp.mapper != nil {
@@ -161,12 +245,15 @@ func (r rule[T]) Match(prefix string, args []string) (n int, cfg configurer, agg
 			agg.Add(err)
 		}
 	} else {
-		var val any = value
-		var ok bool
-		mappedValue, ok = val.(T)
-		if !ok {
-			panic(fmt.Errorf("unable to map value of rule: [%s]", r.name))
-		}
+		// no mapper => no value : nothing to do
+		/*
+			var val any = value
+			var ok bool
+			mappedValue, ok = val.(T)
+			if !ok {
+				panic(fmt.Errorf("unable to map value of rule: [%s]", r.name))
+			}
+		*/
 	}
 
 	for _, validaterPtr := range matchingOp.validaters {
@@ -181,18 +268,19 @@ func (r rule[T]) Match(prefix string, args []string) (n int, cfg configurer, agg
 		//fmt.Printf("some error\n")
 		return n, nil, agg
 	}
-	cfg2 := &config2[T]{}
-	cfg2.op = matchingOp.op
+	cfg2 := &basicRuleMatch[T]{}
 	cfg2.prefix = prefix
+	cfg2.name = matchingAlias
+	cfg2.op = matchingOp.op
 	cfg2.rule = &r
 	cfg2.value = value
 	cfg2.mappedValue = mappedValue
-	cfg = cfg2
+	match = cfg2
 	//fmt.Printf("match\n")
 	return
 }
 
-func (r rule[T]) MutateIfMatch(args []string, cfg *model.Config, assertions *[]model.Assertion) (agg errorz.Aggregated) {
+func (r rule[T]) MutateIfMatch0(args []string, cfg *model.Config, assertions *[]model.Assertion) (agg errorz.Aggregated) {
 	var matchingArgs []string
 	for _, arg := range args {
 		// TODO: IF MATCH
@@ -230,27 +318,40 @@ func (r rule[T]) MutateIfMatch(args []string, cfg *model.Config, assertions *[]m
 	return agg
 }
 
-type config struct {
+type config0 struct {
 	prefix string
 	rule   ruleMatcher
 	op     string
 	value  string
 }
 
-func (c config) Mutate(cfg *model.Config, assertions *[]model.Assertion) {
+func (c config0) Mutate(cfg *model.Config, assertions *[]model.Assertion) {
 	// TODO
 	return
 }
 
-type config2[T any] struct {
-	prefix      string
+type basicRuleMatch[T any] struct {
 	rule        *rule[T]
+	prefix      string
+	name        string
 	op          string
 	value       string
 	mappedValue T
 }
 
-func (c config2[T]) Mutate(cfg *model.Config, assertions *[]model.Assertion) {
+func (c basicRuleMatch[T]) Prefix() string {
+	return c.prefix
+}
+
+func (c basicRuleMatch[T]) Name() string {
+	return c.name
+}
+
+func (c basicRuleMatch[T]) Op() string {
+	return c.op
+}
+
+func (c basicRuleMatch[T]) Mutate(cfg *model.Config, assertions *[]model.Assertion) {
 	mutater := *c.rule.mutater
 	mutater(cfg, c.op, c.mappedValue)
 }
@@ -262,6 +363,132 @@ type ruleSet struct {
 	defaults          []ruleMatcher
 	rules             []ruleMatcher
 	//ruleSets          []RuleSet
+}
+
+func (r ruleSet) Name() string {
+	return r.name
+}
+
+func (r ruleSet) Check(matches ...ruleMatch) (agg errorz.Aggregated) {
+	// TODO: perform cfgs valdiation for each rule
+	// FIXME: how to delegate validation of each rule to each rule ?
+	for _, rule := range r.rules {
+		// Check matches agains each rule
+		agg2 := rule.Check(matches...)
+		agg.Concat(agg2)
+	}
+
+	// TODO: perform ruleSet validations
+	// FIXME: need to validate against aliases
+	if r.mutuallyExclusive {
+		// Check for Mutually exclusive usage
+		var ruleAliases []string
+		for _, rm := range r.rules {
+			ruleAliases = append(ruleAliases, rm.Name())
+			ruleAliases = append(ruleAliases, rm.Aliases()...)
+		}
+
+		var matchedRules []string // FIXME: could be a set
+		for _, match := range matches {
+			//fmt.Printf("Does %s is in: %s ?\n", match.Name(), ruleAliases)
+			if slices.Contains(ruleAliases, match.Name()) {
+				matchedRules = append(matchedRules, match.Name())
+			}
+		}
+		matchedRules = collections.Deduplicate(&matchedRules)
+		if len(matchedRules) > 1 {
+			err := fmt.Errorf("[%s] rules are mutually exclusives", strings.Join(matchedRules, ", "))
+			agg.Add(err)
+		}
+	}
+
+	return
+}
+
+func (r ruleSet) Match(prefix string, args []string) (matches []ruleMatch, notMatched []string, agg errorz.Aggregated) {
+	// TODO: Match each args agains each rules MUST manage prefix changes and "stop parsing"
+	// TODO: perform rules multiValuedOps & eclusiveOps validations
+	// TODO: perform ruleSet validations
+
+	args = concatArgs(prefix, args)
+	parseRules := true
+	for p := 0; p < len(args); p++ {
+		if parseRules {
+			var replaced bool
+			replaced, prefix = prefixReplacer(prefix, args[p])
+			if replaced {
+				notMatched = append(notMatched, args[p])
+				continue
+			}
+		}
+
+		ruleParsingStopper := prefix + "--"
+		if parseRules && args[p] == ruleParsingStopper {
+			// Reached rule parsing stopper
+			/*
+				if len(cmdAndArgs) > 0 {
+					err := fmt.Errorf("bad placement for command: [%s] before rule parsing stopper %s", cmdAndArgs, ruleParsingStopper)
+					agg.Add(err)
+				}
+			*/
+			// stop parsing rules
+			parseRules = false
+			notMatched = append(notMatched, args[p])
+			continue
+		}
+
+		// TODO: check for prefix change
+		// TODO: check for rule stopper
+		var matched bool
+		if parseRules {
+			for _, rule := range r.rules {
+				n, match, agg2 := rule.Match(prefix, args[p:])
+				agg.Concat(agg2)
+				if n > 0 {
+					// matched
+					matched = true
+					matches = append(matches, match)
+					p += n - 1
+				}
+			}
+		}
+		if !matched {
+			notMatched = append(notMatched, args[p])
+		}
+	}
+
+	/*
+		for _, rule := range r.rules {
+			agg2 := rule.Check(matches...)
+			agg.Concat(agg2)
+		}
+
+		agg2 := r.Check(matches...)
+		agg.Concat(agg2)
+	*/
+	return
+}
+
+type metaRuleSet struct {
+	name            string
+	ruleSetMatchers []ruleSetMatcher
+}
+
+func (r metaRuleSet) Name() string {
+	return r.name
+}
+
+func (r metaRuleSet) Match(prefix string, args []string) (matches []ruleMatch, notMatched []string, agg errorz.Aggregated) {
+	// TODO: Match each args against each ruleSetMatcher
+	notMatched = args
+	for _, rsm := range r.ruleSetMatchers {
+		matches2, notMatched2, agg2 := rsm.Match(prefix, notMatched)
+		matches = append(matches, matches2...)
+		notMatched = notMatched2
+		agg.Concat(agg2)
+	}
+	// TODO: perform metaRuleSet validations
+	return
 }
 
 type mapper[T any] func(op, value string) (T, error)
@@ -289,12 +516,13 @@ func buildRule[T any](name string, ops []*operator[T], mutater *configMutater[T]
 
 func buildMvRule[T any](name string, ops []*operator[T], mutater *configMutater[T], aliases ...string) *rule[T] {
 	return &rule[T]{
-		name:        name,
-		operators:   ops,
-		mutater:     mutater,
-		aliases:     aliases,
-		prefixMask:  "@",
-		multiValued: true,
+		name:           name,
+		operators:      ops,
+		mutater:        mutater,
+		aliases:        aliases,
+		prefixMask:     "@",
+		multiValued:    true,
+		multiValuedOps: ops,
 	}
 }
 
@@ -312,13 +540,28 @@ func buildAssertRule[T any](name string, ops []*operator[T], mutater *configMuta
 
 func buildMvAssertRule[T any](name string, ops []*operator[T], mutater *configMutater[T], aliases ...string) *rule[T] {
 	return &rule[T]{
-		name:        name,
-		operators:   ops,
-		mutater:     mutater,
-		aliases:     aliases,
-		prefixMask:  "@",
-		multiValued: true,
-		assertion:   true,
+		name:           name,
+		operators:      ops,
+		mutater:        mutater,
+		aliases:        aliases,
+		prefixMask:     "@",
+		multiValued:    true,
+		assertion:      true,
+		multiValuedOps: ops,
+	}
+}
+
+func buildMvExclOpsAssertRule[T any](name string, ops []*operator[T], mvOps []*operator[T], exclOps []*operator[T], mutater *configMutater[T], aliases ...string) *rule[T] {
+	return &rule[T]{
+		name:           name,
+		operators:      ops,
+		mutater:        mutater,
+		aliases:        aliases,
+		prefixMask:     "@",
+		multiValued:    true,
+		assertion:      true,
+		multiValuedOps: mvOps,
+		exclusiveOps:   exclOps,
 	}
 }
 
