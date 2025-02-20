@@ -93,7 +93,10 @@ func (d *basicDisplay) OpenTest(ctx facade.TestContext) TestDisplayer {
 		}
 	}
 
-	td := NewTestDisplayer(d, ctx, d.printer, d.notQuietPrinter, d.outFormatter, d.errFormatter)
+	flusher := func() error {
+		return d.Flush()
+	}
+	td := NewTestDisplayer(flusher, ctx, d.printer, d.notQuietPrinter, d.outFormatter, d.errFormatter)
 	d.openedTest = td
 	return td
 }

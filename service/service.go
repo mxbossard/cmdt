@@ -205,6 +205,7 @@ func ReportTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	if !ctx.Config.Keep.Is(true) {
 		Dpl.CloseSuite(ctx)
 	}
+	err = Dpl.Flush()
 	return
 }
 
@@ -226,6 +227,8 @@ func PerformTest(testDef model.TestDefinition) (exitCode int16, err error) {
 	seq := testDef.Seq
 
 	td := Dpl.OpenTest(ctx)
+	//defer td.Close()
+	defer Dpl.CloseTest(ctx)
 	td.Title()
 
 	if cfg.Ignore.Is(true) {
@@ -303,7 +306,7 @@ func ProcessTestDef(testDef model.TestDefinition) (exitCode int16) {
 
 	Dpl.Quiet(testCfg.Quiet.Is(true))
 	// Dpl.OpenTest(testCtx)
-	// defer Dpl.CloseTest(testCtx)
+	//defer Dpl.CloseTest(testCtx)
 
 	ProcessTestError(testCtx, err)
 

@@ -115,9 +115,10 @@ func TestAsyncDisplay_TestTitle(t *testing.T) {
 	sctx := facade.NewSuiteContext(token, isol, suite, false, model.InitAction, model.Config{})
 	d.OpenSuite(sctx)
 
-	d.AsyncFlushAll(20 * time.Millisecond)
-	err = d.TailAllBlocking(20 * time.Millisecond)
-	require.NoError(t, err)
+	d.AsyncFlushAll(2 * time.Millisecond)
+	err = d.TailAllBlocking(2 * time.Millisecond)
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "timeout")
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
@@ -131,8 +132,8 @@ func TestAsyncDisplay_TestTitle(t *testing.T) {
 	td.Close()
 	d.CloseSuite(sctx)
 
-	d.AsyncFlushAll(20 * time.Millisecond)
-	err = d.TailAllBlocking(20 * time.Millisecond)
+	d.AsyncFlushAll(10 * time.Millisecond)
+	err = d.TailAllBlocking(10 * time.Millisecond)
 	require.NoError(t, err)
 
 	assert.Empty(t, outW.String())

@@ -69,23 +69,13 @@ func DbOpen(dirpath string) (db *zql.SynchronizedDB, err error) {
 
 func IsInitialized(db *zql.SynchronizedDB) (bool, error) {
 	row := db.QueryRow(`
-		SELECT count(name)
+		SELECT count(name), coalesce(group_concat(coalesce(name, 'NIL')), 'NULL')
 		FROM sqlite_schema
 		WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name IS NOT NULL;
 	`)
 	var count int
-	err := row.Scan(&count)
-	if err != nil {
-		return false, err
-	}
-
 	var names string
-	row = db.QueryRow(`
-			SELECT coalesce(group_concat(coalesce(name, 'NIL')), 'NULL')
-			FROM sqlite_schema
-			WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name IS NOT NULL;
-		`)
-	err = row.Scan(&names)
+	err := row.Scan(&count, &names)
 	if err != nil {
 		return false, err
 	}

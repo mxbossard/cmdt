@@ -165,7 +165,7 @@ func (d Suite) NotReportedTestCount() (n uint16, err error) {
 
 func (d Suite) TestCount(suite string) (n uint16, err error) {
 	p := logger.PerfTimer("suite", suite)
-	defer p.End()
+	defer p.End("n", n)
 
 	row := d.db.QueryRow(`
 		SELECT coalesce(max(s.seq), 0)

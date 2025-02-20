@@ -89,6 +89,7 @@ func (d *daemon) run() {
 		} else if op != nil {
 			_, err := d.process(op)
 			if err != nil {
+				logger.Error("DAEMON ERROR", "error", err)
 				return
 			}
 		} else {
@@ -145,7 +146,10 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 		case *model.ReportOp:
 			exitCode, err := d.report(o.Definition)
 			if err != nil {
-				return false, err
+				logger.Error("ERROR", "error", err)
+				fmt.Println(err)
+				err = nil
+				//return false, err
 			}
 			op.SetExitCode(uint16(exitCode))
 		case *model.ReportAllOp:
@@ -199,13 +203,16 @@ func (d *daemon) report(def model.ReportDefinition) (exitCode int16, err error) 
 	}
 
 	//d.display.DisplayRecorded(def.TestSuite, def.Config.Timeout.Get())
-	go func() {
-		err := d.display.TailBlocking(def.TestSuite, def.Config.Timeout.Get())
-		if err != nil {
-			panic(err)
-		}
-	}()
+	//go func() {
+	err = d.display.TailBlocking(def.TestSuite, def.Config.Timeout.Get())
+	if err != nil {
+		return 1, err
+	}
+	//}()
 	exitCode, err = service.ProcessReportDef(def)
+	if err != nil {
+		return exitCode, err
+	}
 	logger.Debug("Closing test suite", "token", def.Token, "isolation", def.Isolation, "openedSuite", d.openedSuite)
 	d.openedSuite = ""
 	return

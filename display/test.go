@@ -28,6 +28,8 @@ const (
 	ResetColor   = ansi.Reset
 )
 
+type Flusher = func() error
+
 type TestDisplayer interface {
 	Title()
 	Outcome(model.TestOutcome)
@@ -40,7 +42,7 @@ type TestDisplayer interface {
 }
 
 type basicTestDisplayer struct {
-	dpl                      Displayer
+	flusher                  Flusher
 	ctx                      facade.TestContext
 	opened, titled, outcomed bool
 	printer                  printz.Printer
@@ -396,7 +398,8 @@ func (d basicTestDisplayer) flush() {
 		panic(err)
 	}
 
-	err = d.dpl.Flush()
+	//err = d.dpl.Flush()
+	err = d.flusher()
 	if err != nil {
 		panic(err)
 	}
@@ -437,11 +440,11 @@ func (d *basicTestDisplayer) Close() {
 	d.opened = false
 }
 
-func NewTestDisplayer(d Displayer, ctx facade.TestContext, printer, notQuietPrinter printz.Printer, outFormatter, errFormatter inout.Formatter) *basicTestDisplayer {
+func NewTestDisplayer(flusher Flusher, ctx facade.TestContext, printer, notQuietPrinter printz.Printer, outFormatter, errFormatter inout.Formatter) *basicTestDisplayer {
 	bufPrinter := printz.Buffered(printer)
 	bufNotQuietPrinter := printz.Buffered(notQuietPrinter)
 	td := &basicTestDisplayer{
-		dpl:                d,
+		flusher:            flusher,
 		ctx:                ctx,
 		printer:            printer,
 		bufPrinter:         bufPrinter,

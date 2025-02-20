@@ -73,7 +73,11 @@ func (d AsyncDisplay) OpenSuite(ctx facade.SuiteContext) {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Opened zcreen session: %s\n", suite)
+	// fmt.Printf("Opened zcreen session: %s\n", suite)
+	err = session.Flush()
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (d AsyncDisplay) CloseSuite(ctx facade.SuiteContext) {
@@ -88,7 +92,11 @@ func (d AsyncDisplay) CloseSuite(ctx facade.SuiteContext) {
 	// if err != nil {
 	// 	panic(err)
 	// }
-	fmt.Printf("Cleared zcreen session: %s\n", suite)
+	// fmt.Printf("Cleared zcreen session: %s\n", suite)
+	err = session.Flush()
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (d AsyncDisplay) SuiteTitle(ctx facade.SuiteContext) {
@@ -99,6 +107,10 @@ func (d AsyncDisplay) SuiteTitle(ctx facade.SuiteContext) {
 		printer.ColoredErrf(display.MessageColor, "## Test suite [%s] (token: %s)\n", suite, ctx.Token)
 		printer.Flush()
 		session.ClosePrinter(SuiteBeginPrinterName)
+	}
+	err := session.Flush()
+	if err != nil {
+		panic(err)
 	}
 }
 
@@ -113,7 +125,10 @@ func (d AsyncDisplay) OpenTest(ctx facade.TestContext) display.TestDisplayer {
 		seq := ctx.Seq
 		session := d.screen.Session(cfg.TestSuite.Get(), 0)
 		printer := session.Printer(id, int(seq))
-		td := display.NewTestDisplayer(&d, ctx, printer, printer, d.outFormatter, d.errFormatter)
+		flusher := func() error {
+			return session.Flush()
+		}
+		td := display.NewTestDisplayer(flusher, ctx, printer, printer, d.outFormatter, d.errFormatter)
 		d.testDisplayers[key] = td
 		logger.Debug("new test displayer", "openedTests", d.testDisplayers)
 		td.Open()
@@ -159,23 +174,30 @@ func (d AsyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 
 	suite := outcome.TestSuite
 	session := d.screen.Session(suite, 0)
-	// err := session.Flush()
-	// if err != nil {
-	// 	panic(err)
-	// }
 
 	printer := session.Printer(SuiteEndPrinterName, 9999)
 
 	defer func() {
-		err := session.ClosePrinter(SuiteEndPrinterName)
+		err := printer.Flush()
 		if err != nil {
 			panic(err)
 		}
-		err = session.End()
+		err = session.Flush()
 		if err != nil {
 			panic(err)
 		}
+		err = session.ClosePrinter(SuiteEndPrinterName)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("flushed end suite printer & session\n")
+		// err = session.End()
+		// if err != nil {
+		// 	panic(err)
+		// }
 	}()
+
+	fmt.Printf("reporting suite ...\n")
 
 	ignoredMessage := ""
 	if ignoredCount > 0 {
@@ -290,8 +312,7 @@ func (d AsyncDisplay) TestErrors(ctx facade.TestContext, errors ...error) {
 }
 
 func (d AsyncDisplay) Flush() error {
-	// TODO ?
-	// TO remove ?
+	// FIXME: how and what to flush ?
 	return nil
 }
 
@@ -303,18 +324,21 @@ func (d *AsyncDisplay) SetVerbose(level model.VerboseLevel) {
 	d.verbose = level
 }
 
+/** TODO: doc */
 func (d *AsyncDisplay) ClearSession(suite string) error {
 	err := d.tailer.ClearSession(suite)
 	fmt.Printf("async screen cleared session: [%s]\n", suite)
 	return err
 }
 
+/** TODO: doc */
 func (d *AsyncDisplay) Clear() error {
 	err := d.tailer.Clear()
 	fmt.Printf("async screen cleared\n")
 	return err
 }
 
+/** Launch a goroutine to flush the display. */
 func (d *AsyncDisplay) AsyncFlush(suite string, timeout time.Duration) {
 	go func() {
 		err := d.screen.FlushBlocking(suite, timeout)

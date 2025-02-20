@@ -8,7 +8,7 @@ ls -lh "$newCmdt"
 
 # Trusted cmdt to works
 cmdt="cmdt"
-#cmdt="$newCmdt"
+cmdt="$newCmdt"
 
 # Cmdt used to test
 #cmdtIn="cmdt"

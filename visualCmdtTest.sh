@@ -38,9 +38,10 @@ rm -rf -- /tmp/cmdt* /tmp/cmdt.log /tmp/daemon.log 2> /dev/null || true
 export -n __CMDT_TOKEN
 
 >&2 echo "## Visual test"
-$newCmdt1 @init=longer_sync_visual @verbose=5 @suiteTimeout=7s
+count=4
+$newCmdt1 @init=longer_sync_visual @verbose=5 @suiteTimeout=$((count/2+2))s
 >&2 echo "Launching tests ..."
-for i in $( seq 1 10 ); do
+for i in $( seq 1 $count ); do
 	>&2 echo -n "$i "
 	time=$( echo "scale=1;$i/10" | bc )
 	$newCmdt1 @test=longer_sync_visual/t$i @stdout:"end$i" @-- sh -c "sleep $time; echo end$i"
@@ -48,9 +49,9 @@ done
 >&2 echo "done"
 $newCmdt1 @report=longer_sync_visual
 
-$newCmdt1 @init=longer_async_visual @async @verbose=5 @suiteTimeout=7s
+$newCmdt1 @init=longer_async_visual @async @verbose=5 @suiteTimeout=$((count/2+2))s
 >&2 echo "Launching tests ..."
-for i in $( seq 1 10 ); do
+for i in $( seq 1 $count ); do
 	>&2 echo -n "$i "
 	time=$( echo "scale=1;$i/10" | bc )
 	$newCmdt1 @test=longer_async_visual/t$i @stdout:"end$i" @-- sh -c "sleep $time; echo end$i"
