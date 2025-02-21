@@ -175,12 +175,14 @@ func reportTestSuite(ctx facade.SuiteContext) (suiteOutcome model.SuiteOutcome, 
 
 	if testCount == 0 {
 		err = fmt.Errorf("you must perform some test prior to report: [%s] suite", testSuite)
+		ProcessSuiteError(ctx, err)
 		exitCode = 1
 		return
 	}
 
 	suiteOutcome, err = ctx.Repo.LoadSuiteOutcome(testSuite)
 	if err != nil {
+		ProcessSuiteError(ctx, err)
 		return
 	}
 
@@ -191,30 +193,35 @@ func reportTestSuite(ctx facade.SuiteContext) (suiteOutcome model.SuiteOutcome, 
 	if !cfg.Keep.Is(true) {
 		err = ctx.Repo.ClearTestSuite(suiteOutcome.TestSuite)
 		logger.Debug("Cleared suite", "suite", suiteOutcome.TestSuite)
+		ProcessSuiteError(ctx, err)
 	}
 
 	return
 }
 
 func ReportTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
+	fmt.Printf("ReportTestSuite ctx suite: %s \n", ctx.Config.TestSuite.Get())
 	suiteOutcome, exitCode, err := reportTestSuite(ctx)
-	if err != nil {
-		return
-	}
+	fmt.Printf("ReportTestSuite outcome suite: %s \n", suiteOutcome.TestSuite)
+
 	Dpl.ReportSuite(suiteOutcome)
 	if !ctx.Config.Keep.Is(true) {
 		Dpl.CloseSuite(ctx)
 	}
-	err = Dpl.Flush()
+	return
+}
+
+func ProcessReportDef0(def model.ReportDefinition) (exitCode int16, err error) {
+	//logger.Warn("ProcessReportDef()", "def", def)
+	ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.ReportAction, def.Config)
+	exitCode, err = ReportTestSuite(ctx)
 	return
 }
 
 func ProcessReportDef(def model.ReportDefinition) (exitCode int16, err error) {
 	//logger.Warn("ProcessReportDef()", "def", def)
-	//var err error
 	ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.ReportAction, def.Config)
 	exitCode, err = ReportTestSuite(ctx)
-	//ctx.NoErrorOrFatal(err)
 	return
 }
 
@@ -620,7 +627,6 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			} else {
 				//exitCode, err = ReportTestSuite(suiteCtx)
 				exitCode, err = ProcessReportDef(def)
-				ProcessSuiteError(suiteCtx, err)
 				suiteCtx.Repo.Done(&op)
 			}
 

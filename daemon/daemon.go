@@ -89,8 +89,9 @@ func (d *daemon) run() {
 		} else if op != nil {
 			_, err := d.process(op)
 			if err != nil {
-				logger.Error("DAEMON ERROR", "error", err)
-				return
+				logger.Errorf("DAEMON ERROR: %s", err)
+				d.display.Errors(err)
+				panic(err)
 			}
 		} else {
 			// nothing to unqueue wait some period
@@ -125,7 +126,6 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 			err = d.repo.Done(op)
 			if err != nil {
 				err = fmt.Errorf("unable to done op: [%s] : %w", op, err)
-				panic(err)
 			}
 		}
 	}()
@@ -144,13 +144,8 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 			ec := d.performTest(o.Definition)
 			op.SetExitCode(uint16(ec))
 		case *model.ReportOp:
-			exitCode, err := d.report(o.Definition)
-			if err != nil {
-				logger.Error("ERROR", "error", err)
-				fmt.Println(err)
-				err = nil
-				//return false, err
-			}
+			exitCode, err2 := d.report(o.Definition)
+			err = err2
 			op.SetExitCode(uint16(exitCode))
 		case *model.ReportAllOp:
 			op.SetExitCode(uint16(d.reportAll(o.Definition)))
@@ -202,6 +197,8 @@ func (d *daemon) report(def model.ReportDefinition) (exitCode int16, err error) 
 		testCount = d.repo.TestCount(def.TestSuite)
 	}
 
+	fmt.Printf("reporting suite %s, tail blocking ...\n", def.TestSuite)
+
 	//d.display.DisplayRecorded(def.TestSuite, def.Config.Timeout.Get())
 	//go func() {
 	err = d.display.TailBlocking(def.TestSuite, def.Config.Timeout.Get())
@@ -209,10 +206,10 @@ func (d *daemon) report(def model.ReportDefinition) (exitCode int16, err error) 
 		return 1, err
 	}
 	//}()
+
+	fmt.Printf("reporting suite %s, processing report ...\n", def.TestSuite)
+
 	exitCode, err = service.ProcessReportDef(def)
-	if err != nil {
-		return exitCode, err
-	}
 	logger.Debug("Closing test suite", "token", def.Token, "isolation", def.Isolation, "openedSuite", d.openedSuite)
 	d.openedSuite = ""
 	return

@@ -46,8 +46,9 @@ for i in $( seq 1 $count ); do
 	time=$( echo "scale=1;$i/10" | bc )
 	$newCmdt1 @test=longer_sync_visual/t$i @stdout:"end$i" @-- sh -c "sleep $time; echo end$i"
 done
->&2 echo "done"
+>&2 echo "done tests"
 $newCmdt1 @report=longer_sync_visual
+>&2 echo "done report"
 
 $newCmdt1 @init=longer_async_visual @async @verbose=5 @suiteTimeout=$((count/2+2))s
 >&2 echo "Launching tests ..."
@@ -56,6 +57,7 @@ for i in $( seq 1 $count ); do
 	time=$( echo "scale=1;$i/10" | bc )
 	$newCmdt1 @test=longer_async_visual/t$i @stdout:"end$i" @-- sh -c "sleep $time; echo end$i"
 done
->&2 echo "done"
+>&2 echo "done tests"
 $newCmdt1 @report=longer_async_visual
+>&2 echo "done report"
 

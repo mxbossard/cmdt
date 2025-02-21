@@ -29,6 +29,12 @@ var (
 	logger = zlog.New()
 )
 
+func logErrors(errors ...error) {
+	for _, err := range errors {
+		logger.Errorf("ERROR: %s", err)
+		fmt.Printf("ERROR: %s\n", err)
+	}
+}
 func testDisplayerKey(ctx facade.TestContext) string {
 	return fmt.Sprintf("%s//%d", ctx.Config.TestSuite.Get(), ctx.Seq)
 }
@@ -186,11 +192,12 @@ func (d AsyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 		if err != nil {
 			panic(err)
 		}
-		err = session.ClosePrinter(SuiteEndPrinterName)
-		if err != nil {
-			panic(err)
-		}
 		fmt.Printf("flushed end suite printer & session\n")
+		// err = session.ClosePrinter(SuiteEndPrinterName)
+		// if err != nil {
+		// 	panic(err)
+		// }
+
 		// err = session.End()
 		// if err != nil {
 		// 	panic(err)
@@ -275,28 +282,36 @@ func (d AsyncDisplay) TooMuchFailures(ctx facade.SuiteContext, testSuite string)
 	}
 	session := d.screen.Session(testSuite, 0)
 	printer := session.Printer(SuiteEndPrinterName, 9999)
+	defer printer.Flush()
 	printer.ColoredErrf(display.WarningColor, "Too much failure for [%s] test suite. Stop testing.\n", testSuite)
 }
 
 func (d AsyncDisplay) Errors(errors ...error) {
+	logErrors(errors...)
 	//  An Error cannot be Fatal
 	printer := d.screen.NotifyPrinter()
+	defer printer.Flush()
 	for _, err := range errors {
 		printer.ColoredErrf(display.ErrorColor, "ERROR: %s\n", err)
 	}
 }
 
 func (d AsyncDisplay) GlobalErrors(ctx facade.GlobalContext, errors ...error) {
+	logErrors(errors...)
 	printer := d.screen.NotifyPrinter()
+	defer printer.Flush()
 	for _, err := range errors {
 		printer.ColoredErrf(display.ErrorColor, "ERROR: %s\n", err)
 	}
 }
 
 func (d AsyncDisplay) SuiteErrors(ctx facade.SuiteContext, errors ...error) {
-	testSuite := ctx.Config.TestSuite.Get()
-	session := d.screen.Session(testSuite, 0)
-	printer := session.Printer(SuiteEndPrinterName, 9999)
+	logErrors(errors...)
+	// testSuite := ctx.Config.TestSuite.Get()
+	// session := d.screen.Session(testSuite, 0)
+	// printer := session.Printer(SuiteEndPrinterName, 9999)
+	printer := d.screen.NotifyPrinter()
+	defer printer.Flush()
 	for _, err := range errors {
 		printer.ColoredErrf(display.ErrorColor, "ERROR: %s\n", err)
 	}
@@ -368,7 +383,7 @@ func (d *AsyncDisplay) TailBlocking(suite string, timeout time.Duration) error {
 	}
 	updatedTimeout := timeout - time.Since(startTime)
 	logger.Debug("TailBlocking ...", "suite", suite)
-	return d.tailer.TailOnlyBlocking(suite, updatedTimeout)
+	return d.tailer.TailBlocking(suite, updatedTimeout)
 }
 
 func (d *AsyncDisplay) TailAllBlocking(timeout time.Duration) error {
