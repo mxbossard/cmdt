@@ -307,10 +307,9 @@ func (d AsyncDisplay) GlobalErrors(ctx facade.GlobalContext, errors ...error) {
 
 func (d AsyncDisplay) SuiteErrors(ctx facade.SuiteContext, errors ...error) {
 	logErrors(errors...)
-	// testSuite := ctx.Config.TestSuite.Get()
-	// session := d.screen.Session(testSuite, 0)
-	// printer := session.Printer(SuiteEndPrinterName, 9999)
-	printer := d.screen.NotifyPrinter()
+	testSuite := ctx.Config.TestSuite.Get()
+	session := d.screen.Session(testSuite, 0)
+	printer := session.NotifyPrinter()
 	defer printer.Flush()
 	for _, err := range errors {
 		printer.ColoredErrf(display.ErrorColor, "ERROR: %s\n", err)

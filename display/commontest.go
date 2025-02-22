@@ -28,6 +28,11 @@ func DisplayReport(d Displayer, suite int) {
 	d.ReportSuite(outcome)
 }
 
+func CloseSuite(d Displayer, suite int, token, isol string) {
+	ctx := facade.NewSuiteContext(token, isol, fmt.Sprintf("suite-%d", suite), true, model.InitAction, model.Config{})
+	d.CloseSuite(ctx)
+}
+
 func DisplayOpenTitleOutcomeTest(t *testing.T, d Displayer, token, isol string, suite int, seq int) TestDisplayer {
 	testSuite := fmt.Sprintf("suite-%d", suite)
 	ctx, err := facade.NewTestContext(token, isol, testSuite, uint16(seq), model.Config{}, uint32(42))

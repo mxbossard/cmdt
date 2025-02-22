@@ -166,14 +166,6 @@ func TestBlockTail(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	//stdoutFile, stderrFile, doneFile, flushedFile, err := repo.DaemonSuiteReportFilepathes("suite-101", token, isol)
-	//require.NoError(t, err)
-
-	// assert.NoFileExists(t, stdoutFile)
-	// assert.NoFileExists(t, stderrFile)
-	// assert.NoFileExists(t, doneFile)
-	// assert.NoFileExists(t, flushedFile)
-
 	// Scénario: Writing on 3 suites in sync with test ran serial
 	// 100- Init suite101
 	// 110- Test suite101 #1
@@ -193,61 +185,26 @@ func TestBlockTail(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	// assert.FileExists(t, stdoutFile)
-	// assert.FileExists(t, stderrFile)
-	// assert.NoFileExists(t, doneFile)
-	// assert.NoFileExists(t, flushedFile)
-	// assert.Empty(t, func() string { s, _ := filez.ReadString(stdoutFile); return s }())
-	// assert.Empty(t, func() string { s, _ := filez.ReadString(stderrFile); return s }())
-
 	// Simulate outputs sent disordered
 	td := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 101, 1)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	// assert.FileExists(t, stdoutFile)
-	// assert.FileExists(t, stderrFile)
-	// assert.NoFileExists(t, doneFile)
-	// assert.NoFileExists(t, flushedFile)
-	// assert.Empty(t, func() string { s, _ := filez.ReadString(stdoutFile); return s }())
-	// assert.Empty(t, func() string { s, _ := filez.ReadString(stderrFile); return s }())
-
 	display.DisplayTestOut(t, td, 101, 1)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
-
-	// assert.FileExists(t, stdoutFile)
-	// assert.FileExists(t, stderrFile)
-	// assert.NoFileExists(t, doneFile)
-	// assert.NoFileExists(t, flushedFile)
-	// assert.Empty(t, func() string { s, _ := filez.ReadString(stdoutFile); return s }())
-	// assert.Empty(t, func() string { s, _ := filez.ReadString(stderrFile); return s }())
 
 	display.DisplayTestErr(t, td, 101, 1)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	// assert.FileExists(t, stdoutFile)
-	// assert.FileExists(t, stderrFile)
-	// assert.NoFileExists(t, doneFile)
-	// assert.NoFileExists(t, flushedFile)
-	// assert.Empty(t, func() string { s, _ := filez.ReadString(stdoutFile); return s }())
-	// assert.Empty(t, func() string { s, _ := filez.ReadString(stderrFile); return s }())
-
 	display.DisplayEndTest(t, td, 101, 1)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
-
-	// assert.FileExists(t, stdoutFile)
-	// assert.FileExists(t, stderrFile)
-	// assert.NoFileExists(t, doneFile)
-	// assert.NoFileExists(t, flushedFile)
-	// assert.Empty(t, func() string { s, _ := filez.ReadString(stdoutFile); return s }())
-	// assert.Empty(t, func() string { s, _ := filez.ReadString(stderrFile); return s }())
 
 	td = display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 101, 3)
 	display.DisplayTestOut(t, td, 101, 3)
@@ -264,26 +221,12 @@ func TestBlockTail(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	// assert.NoFileExists(t, stdoutFile)
-	// assert.NoFileExists(t, stderrFile)
-	// assert.NoFileExists(t, doneFile)
-	// assert.NoFileExists(t, flushedFile)
-
 	d.AsyncFlush("suite-101", 20*time.Millisecond)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	// stdoutContent, err := filez.ReadString(stdoutFile)
-	// require.NoError(t, err)
-	// assert.Empty(t, stdoutContent)
-
-	// stderrContent, err := filez.ReadString(stderrFile)
-	// require.NoError(t, err)
-	// assert.Empty(t, stderrContent)
-
-	// assert.NoFileExists(t, doneFile)
-	// assert.NoFileExists(t, flushedFile)
+	display.CloseSuite(d, 101, token, isol)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
@@ -348,6 +291,9 @@ func TestBlockTail_Twice(t *testing.T) {
 
 	require.NoError(t, err)
 	d.AsyncFlush("suite-1", 20*time.Millisecond)
+
+	display.CloseSuite(d, 1, token, isol)
+
 	err = d.TailBlocking("suite-1", 20*time.Millisecond)
 	require.NoError(t, err)
 
@@ -373,37 +319,6 @@ func TestBlockTail_Twice(t *testing.T) {
 		display.DisplaySuite(d, token, isol, 1) // 100- Init suite1
 	})
 
-	/*
-		display.DisplayTestTitle(t, d, token, isol, 1, 1)
-		display.DisplayTestOut(t, d, token, isol, 1, 1)
-		//displayTestErr(t, d, token, isol, 1, 1)
-		display.DisplayEndTest(t, d, token, isol, 1, 1)
-
-		display.DisplayReport(d, 1)
-
-		assert.Empty(t, outW.String())
-		assert.Empty(t, errW.String())
-
-		require.NoError(t, err)
-		d.AsyncFlush("suite-1", 20*time.Millisecond)
-		err = d.TailBlocking("suite-1", 20*time.Millisecond)
-		require.NoError(t, err)
-
-		outScenarioRegexp = regexp.MustCompile("^" +
-			display.TestStdoutRegexp(1, 1) +
-			"$")
-		assert.Regexp(t, outScenarioRegexp, ansi.Unformat(outW.String()))
-
-		// Expect scénario to be test2
-		errScenarioRegexp = regexp.MustCompile("^" +
-			display.SuiteInitRegexp(token, 1) +
-			display.TestTitleRegexp(1, 1) +
-			display.TestStdoutRegexp(1, 1) +
-			//testStderrRegexp(1, 1) +
-			display.ReportSuitePattern(1) +
-			"$")
-		assert.Regexp(t, errScenarioRegexp, ansi.Unformat(errW.String()))
-	*/
 }
 
 func TestAsyncFlushThenDisplayThenBlockTail(t *testing.T) {
@@ -440,8 +355,6 @@ func TestAsyncFlushThenDisplayThenBlockTail(t *testing.T) {
 	// 132- Test suite1 #3 err>
 	// 170- Report suite1
 
-	//d.Clear("suite-1")
-
 	// Start 3 tests async/unordered
 	display.DisplaySuite(d, token, isol, 1) // 100- Init suite1
 
@@ -471,6 +384,8 @@ func TestAsyncFlushThenDisplayThenBlockTail(t *testing.T) {
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
+
+	display.CloseSuite(d, 1, token, isol)
 
 	err = d.TailBlocking("suite-1", 20*time.Millisecond)
 	require.NoError(t, err)
@@ -555,6 +470,7 @@ func TestBlockTailAll(t *testing.T) {
 	display.DisplayEndTest(t, td, 1, 2)
 
 	display.DisplayReport(d, 1)
+	display.CloseSuite(d, 1, token, isol)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
@@ -621,10 +537,6 @@ func TestAsyncFlushAllThenDisplayThenBlockTailAll(t *testing.T) {
 	// 132- Test suite1 #3 err>
 	// 170- Report suite1
 
-	// Clear files on suite init
-	// err = clearFileWriters(token, isol, "")
-	// require.NoError(t, err)
-
 	gctx := facade.NewGlobalContext(token, isol, model.Config{})
 	d.Global(gctx)
 
@@ -657,6 +569,7 @@ func TestAsyncFlushAllThenDisplayThenBlockTailAll(t *testing.T) {
 	display.DisplayEndTest(t, td2, 1, 2)
 
 	display.DisplayReport(d, 1)
+	display.CloseSuite(d, 1, token, isol)
 
 	err = d.TailAllBlocking(20 * time.Millisecond)
 	require.NoError(t, err)
@@ -753,6 +666,8 @@ func TestAsyncDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 	display.DisplayTestErr(t, td, 1, 3)
 	display.DisplayEndTest(t, td, 1, 3)
 	display.DisplayReport(d, 1)
+	display.CloseSuite(d, 1, token, isol)
+
 	display.DisplaySuite(d, token, isol, 2) // 200- Init suite2
 	td = display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 2, 1)
 	display.DisplayTestOut(t, td, 2, 1)
@@ -763,6 +678,7 @@ func TestAsyncDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 	display.DisplayTestErr(t, td, 2, 2)
 	display.DisplayEndTest(t, td, 2, 2)
 	display.DisplayReport(d, 2)
+	display.CloseSuite(d, 2, token, isol)
 
 	display.DisplaySuite(d, token, isol, 3) // 300- Init suite3
 	td = display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 3, 1)
@@ -774,6 +690,7 @@ func TestAsyncDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 	display.DisplayTestErr(t, td, 3, 2)
 	display.DisplayEndTest(t, td, 3, 2)
 	display.DisplayReport(d, 3)
+	display.CloseSuite(d, 3, token, isol)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
@@ -912,6 +829,7 @@ func TestAsyncDisplayUsage_AsyncSuitesSerialTests(t *testing.T) {
 	display.DisplayEndTest(t, td22, 2, 2)
 
 	display.DisplayReport(d, 2) // 270- Report suite2
+	display.CloseSuite(d, 2, token, isol)
 
 	td13 := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 1, 3) // 130- Test suite1 #3
 	display.DisplayTestOut(t, td13, 1, 3)                                // 131- Test suite1 #3 out>
@@ -919,6 +837,7 @@ func TestAsyncDisplayUsage_AsyncSuitesSerialTests(t *testing.T) {
 	display.DisplayEndTest(t, td13, 1, 3)
 
 	display.DisplayReport(d, 1) // 170- Report suite1
+	display.CloseSuite(d, 1, token, isol)
 
 	td32 := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 3, 2) // 320- Test suite3 #2
 	display.DisplayTestOut(t, td32, 3, 2)                                // 321- Test suite3 #2 out>
@@ -926,6 +845,7 @@ func TestAsyncDisplayUsage_AsyncSuitesSerialTests(t *testing.T) {
 	display.DisplayEndTest(t, td32, 3, 2)
 
 	display.DisplayReport(d, 3) // 370- Report suite3
+	display.CloseSuite(d, 3, token, isol)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
@@ -1061,12 +981,14 @@ func TestAsyncDisplayUsage_AsyncSuitesAsyncTests(t *testing.T) {
 	display.DisplayTestErr(t, td22, 2, 2) // 222- Test suite2 #2 err>
 	display.DisplayEndTest(t, td22, 2, 2)
 	display.DisplayReport(d, 2) // 270- Report suite2
+	display.CloseSuite(d, 2, token, isol)
 
 	td13 := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 1, 3) // 130- Test suite1 #3
 	display.DisplayTestOut(t, td13, 1, 3)                                // 131- Test suite1 #3 out>
 	display.DisplayTestErr(t, td13, 1, 3)                                // 132- Test suite1 #3 err>
 	display.DisplayEndTest(t, td13, 1, 3)
 	display.DisplayReport(d, 1) // 170- Report suite1
+	display.CloseSuite(d, 1, token, isol)
 
 	td32 := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 3, 2) // 320- Test suite3 #2
 
@@ -1078,6 +1000,7 @@ func TestAsyncDisplayUsage_AsyncSuitesAsyncTests(t *testing.T) {
 	display.DisplayEndTest(t, td32, 3, 2)
 
 	display.DisplayReport(d, 3) // 370- Report suite3
+	display.CloseSuite(d, 3, token, isol)
 
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
