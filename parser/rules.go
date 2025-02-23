@@ -26,6 +26,13 @@ type configurer interface {
 	Mutate(cfg *model.Config, assertions *[]model.Assertion)
 }
 
+type RuleDef interface {
+	Name() string
+	Kind() string
+	Aliases() []string
+	Ops() []string
+}
+
 type ruleMatch interface {
 	configurer
 	Prefix() string

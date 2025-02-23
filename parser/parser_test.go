@@ -191,3 +191,89 @@ func TestParseArgs(t *testing.T) {
 	assert.Len(t, cmdAndArgs, 0)
 
 }
+
+func TestParseArgs_Missmatch(t *testing.T) {
+	repo := ruleRepo{}
+	repo.addRuleSet(rsActions)
+	repo.addRuleSet(rsVerbosity)
+
+	var args []string
+	expectedPrefix := "@"
+
+	// ## ----- config only should return an error
+	args = []string{"@suiteTimeout=3s"}
+	matches, cmdAndArgs, agg := repo.parseArgs(expectedPrefix, args)
+	require.NotNil(t, agg)
+	assert.Error(t, agg.Return())
+	assert.ErrorContains(t, agg.Return(), "missing action")
+	assert.Len(t, matches, 1)
+	assert.Len(t, cmdAndArgs, 0)
+
+	// ## ----- bad action's config should return an error
+	args = []string{"@test", "@suiteTimeout=3s"}
+	matches, cmdAndArgs, agg = repo.parseArgs(expectedPrefix, args)
+	require.NotNil(t, agg)
+	assert.Error(t, agg.Return())
+	assert.ErrorContains(t, agg.Return(), "bad config rule")
+	assert.Len(t, matches, 2)
+	assert.Len(t, cmdAndArgs, 0)
+
+	args = []string{"@suite", "@fail"}
+	matches, cmdAndArgs, agg = repo.parseArgs(expectedPrefix, args)
+	require.NotNil(t, agg)
+	assert.Error(t, agg.Return())
+	assert.ErrorContains(t, agg.Return(), "assertion rule can only be used in @test context")
+	assert.Len(t, matches, 2)
+	assert.Len(t, cmdAndArgs, 0)
+}
+
+func TestParseArgs_Validation(t *testing.T) {
+	repo := ruleRepo{}
+	repo.addRuleSet(rsActions)
+	repo.addRuleSet(rsVerbosity)
+
+	var args []string
+	expectedPrefix := "@"
+
+	// ## ----- should be valid and return no error
+	args = []string{"@test", "@timeout=3s"}
+	matches, cmdAndArgs, agg := repo.parseArgs(expectedPrefix, args)
+	require.NotNil(t, agg)
+	assert.NoError(t, agg.Return())
+	assert.Len(t, matches, 2)
+	assert.Len(t, cmdAndArgs, 0)
+
+	// ## ----- should not be valid and return an error
+	args = []string{"@test", "@timeout=3"}
+	matches, cmdAndArgs, agg = repo.parseArgs(expectedPrefix, args)
+	require.NotNil(t, agg)
+	assert.Error(t, agg.Return())
+	assert.ErrorContains(t, agg.Return(), "invalid value for rule")
+	assert.Len(t, matches, 1)
+	assert.Len(t, cmdAndArgs, 0)
+
+	args = []string{"@test", "@timeout=a"}
+	matches, cmdAndArgs, agg = repo.parseArgs(expectedPrefix, args)
+	require.NotNil(t, agg)
+	assert.Error(t, agg.Return())
+	assert.ErrorContains(t, agg.Return(), "invalid value for rule")
+	assert.Len(t, matches, 1)
+	assert.Len(t, cmdAndArgs, 0)
+
+	args = []string{"@test", "@timeout:3s"}
+	matches, cmdAndArgs, agg = repo.parseArgs(expectedPrefix, args)
+	require.NotNil(t, agg)
+	assert.Error(t, agg.Return())
+	assert.ErrorContains(t, agg.Return(), "invalid operator for rule")
+	assert.Len(t, matches, 1)
+	assert.Len(t, cmdAndArgs, 0)
+
+	args = []string{"@test", "@timeout:3"}
+	matches, cmdAndArgs, agg = repo.parseArgs(expectedPrefix, args)
+	require.NotNil(t, agg)
+	assert.Error(t, agg.Return())
+	assert.ErrorContains(t, agg.Return(), "invalid operator for rule")
+	assert.ErrorContains(t, agg.Return(), "invalid value for rule")
+	assert.Len(t, matches, 1)
+	assert.Len(t, cmdAndArgs, 0)
+}

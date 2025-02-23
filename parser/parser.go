@@ -40,87 +40,6 @@ func prefixReplacer(prefix, rule string) (bool, string) {
 	return false, prefix
 }
 
-func (r ruleRepo) parseArgs0(prefix string, args []string) (allMatches []ruleMatch, cmdAndArgs []string, agg errorz.Aggregated) {
-	// FIXME: add change prefix management
-	// FIXME: if ruleParsingStopper encountered consider all following args as cmdAndArgs
-	// FIXME: if not matched begin with prefix, do not consider it a cmdAndArgs, but an unkown rule
-	args = concatArgs(prefix, args)
-	parseRules := true
-	for p := 0; p < len(args); p++ {
-		if parseRules {
-			var replaced bool
-			replaced, prefix = prefixReplacer(prefix, args[p])
-			if replaced {
-				continue
-			}
-		}
-
-		ruleParsingStopper := prefix + "--"
-		if parseRules && args[p] == ruleParsingStopper {
-			// Reached rule parsing stopper
-			if len(cmdAndArgs) > 0 {
-				err := fmt.Errorf("bad placement for command: [%s] before rule parsing stopper %s", cmdAndArgs, ruleParsingStopper)
-				agg.Add(err)
-			}
-			// stop parsing rules
-			parseRules = false
-			continue
-		}
-
-		var matched bool
-		if parseRules {
-			for _, rs := range r.ruleSets {
-				matches, noMatches, agg2 := rs.Match(prefix, args[p:])
-				_ = noMatches
-				if agg2.GotError() {
-					agg.Concat(agg2)
-					continue
-				}
-				if len(matches) == 0 {
-					continue
-				}
-				agg2 = rs.Check(matches...)
-				agg.Concat(agg2)
-
-				allMatches = append(allMatches, matches...)
-				// remove matched args
-				p += len(matches) - 1
-				matched = true
-			}
-
-			/*
-				for _, rule := range r.rules {
-					n, configurer, agg2 := rule.Match(prefix, args[p:])
-					if agg2.GotError() {
-						agg.Concat(agg2)
-						continue
-					}
-					if n == 0 {
-						continue
-					}
-					configurers = append(configurers, configurer)
-					// remove matched args
-					p += n - 1
-					matched = true
-				}
-			*/
-		}
-
-		if !matched && (!strings.HasPrefix(args[p], prefix) || !parseRules) {
-			cmdAndArgs = append(cmdAndArgs, args[p])
-		} else if !matched {
-			agg.Add(fmt.Errorf("unkown rule: [%s]", args[p]))
-		}
-
-		for _, rs := range r.ruleSets {
-			agg2 := rs.Check(allMatches...)
-			agg.Concat(agg2)
-		}
-	}
-
-	return
-}
-
 func (r ruleRepo) parseArgs(prefix string, args []string) (allMatches []ruleMatch, cmdAndArgs []string, agg errorz.Aggregated) {
 	args = concatArgs(prefix, args)
 
@@ -199,17 +118,23 @@ func (r ruleRepo) parseArgs(prefix string, args []string) (allMatches []ruleMatc
 }
 
 func ParseArgs(args []string) (cfg model.Config, err error) {
-	return
+	//TODO
+	panic("not implemented yet")
+}
+
+func Childs(args ...string) []RuleDef {
+	//TODO
+	panic("not implemented yet")
 }
 
 func buildArgsConfig(prefix string, args []string) (configs []config0, err error) {
 	//TODO
-	return
+	panic("not implemented yet")
 }
 
 func completeArgsConfig(prefix string, args []string) (configs []config0, err error) {
 	//TODO
-	return
+	panic("not implemented yet")
 }
 
 func replacingPrefix(prefix, rule string) string {
