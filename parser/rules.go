@@ -47,6 +47,7 @@ type matchChecker interface {
 }
 
 type ruleMatcher interface {
+	RuleDef
 	matchChecker
 	Name() string
 	Aliases() []string
@@ -68,6 +69,7 @@ type operator[T any] struct {
 
 type rule[T any] struct {
 	name           string
+	kind           string
 	operators      []*operator[T]
 	mutater        *configMutater[T]
 	aliases        []string
@@ -82,8 +84,18 @@ func (r rule[T]) Name() string {
 	return r.name
 }
 
+func (r rule[T]) Kind() string {
+	return r.kind
+}
+
 func (r rule[T]) Aliases() []string {
 	return r.aliases
+}
+
+func (r rule[T]) Ops() []string {
+	return collections.Map[*operator[T], string](&r.operators, func(op *operator[T]) string {
+		return op.op
+	})
 }
 
 func (r rule[T]) Check(matches ...ruleMatch) (agg errorz.Aggregated) {
@@ -287,56 +299,6 @@ func (r rule[T]) Match(prefix string, args []string) (n int, match ruleMatch, ag
 	return
 }
 
-func (r rule[T]) MutateIfMatch0(args []string, cfg *model.Config, assertions *[]model.Assertion) (agg errorz.Aggregated) {
-	var matchingArgs []string
-	for _, arg := range args {
-		// TODO: IF MATCH
-		// Need to concat args which must be concatenated
-		_ = arg
-	}
-
-	for _, arg := range matchingArgs {
-		// TODO: separate operator & value
-		_ = arg
-		var matchingPrefix, matchingName, matchingOp, matchingValue string
-		for _, op := range r.operators {
-			if op.op == matchingOp {
-				mapper := *op.mapper
-				value, err := mapper(matchingOp, matchingValue)
-				if err != nil {
-					agg.Add(err)
-				} else if r.assertion {
-					assertion := model.Assertion{
-						Rule: model.Rule{
-							Prefix:   matchingPrefix,
-							Name:     matchingName,
-							Op:       matchingOp,
-							Expected: matchingValue,
-						},
-					}
-					*assertions = append(*assertions, assertion)
-				} else if r.mutater != nil {
-					mutater := *r.mutater
-					mutater(cfg, matchingOp, value)
-				}
-			}
-		}
-	}
-	return agg
-}
-
-type config0 struct {
-	prefix string
-	rule   ruleMatcher
-	op     string
-	value  string
-}
-
-func (c config0) Mutate(cfg *model.Config, assertions *[]model.Assertion) {
-	// TODO
-	return
-}
-
 type basicRuleMatch[T any] struct {
 	rule        *rule[T]
 	prefix      string
@@ -504,6 +466,17 @@ type configMutater[T any] func(cfg *model.Config, op string, value T)
 
 func rules(rules ...ruleMatcher) []ruleMatcher {
 	return rules
+}
+
+func ruleDefs(rules ...ruleMatcher) []RuleDef {
+	return defs(rules)
+}
+
+func defs(rules []ruleMatcher) (defs []RuleDef) {
+	for _, rule := range rules {
+		defs = append(defs, rule)
+	}
+	return
 }
 
 func ops[T any](ops ...*operator[T]) []*operator[T] {

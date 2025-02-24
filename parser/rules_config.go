@@ -151,16 +151,16 @@ var (
 	cmd    = buildMvAssertRule("cmd", ops(equalCmd), nil)
 	exists = buildMvAssertRule("exists", ops(equalFilepath), nil)
 	// Multi valued or exclusive by Ops
-	stdout = buildMvExclOpsAssertRule("stdout", 
-	    ops(equalString, equalStringOrEmpty, notEqualString, containsString, notContainsString, matchString, notMatchString, equalFileContent, containsFileContent),
-	    ops(notEqualString, containsString, notContainsString, matchString, notMatchString, containsFileContent),
-	    ops(equalStringOrEmpty, equalString, equalFileContent),
-	    nil, "out")
-	stderr = buildMvExclOpsAssertRule("stderr", 
-	    ops(equalString, equalStringOrEmpty, notEqualString, containsString, notContainsString, matchString, notMatchString, equalFileContent, containsFileContent),
-	    ops(notEqualString, containsString, notContainsString, matchString, notMatchString, containsFileContent),
-	    ops(equalStringOrEmpty, equalString, equalFileContent),
-	    nil, "err")
+	stdout = buildMvExclOpsAssertRule("stdout",
+		ops(equalString, equalStringOrEmpty, notEqualString, containsString, notContainsString, matchString, notMatchString, equalFileContent, containsFileContent),
+		ops(notEqualString, containsString, notContainsString, matchString, notMatchString, containsFileContent),
+		ops(equalStringOrEmpty, equalString, equalFileContent),
+		nil, "out")
+	stderr = buildMvExclOpsAssertRule("stderr",
+		ops(equalString, equalStringOrEmpty, notEqualString, containsString, notContainsString, matchString, notMatchString, equalFileContent, containsFileContent),
+		ops(notEqualString, containsString, notContainsString, matchString, notMatchString, containsFileContent),
+		ops(equalStringOrEmpty, equalString, equalFileContent),
+		nil, "err")
 )
 
 var (
