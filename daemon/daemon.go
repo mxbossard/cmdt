@@ -141,14 +141,26 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 		}
 		switch o := op.(type) {
 		case *model.TestOp:
-			ec := d.performTest(o.Definition)
+			// FIXME: must override bad token & isolation inside ReportDefinition !
+			def := o.Definition
+			def.Token = d.token
+			def.Isolation = d.isolation
+			ec := d.performTest(def)
 			op.SetExitCode(uint16(ec))
 		case *model.ReportOp:
-			exitCode, err2 := d.report(o.Definition)
+			// FIXME: must override bad token & isolation inside ReportDefinition !
+			def := o.Definition
+			def.Token = d.token
+			def.Isolation = d.isolation
+			exitCode, err2 := d.report(def)
 			err = err2
 			op.SetExitCode(uint16(exitCode))
 		case *model.ReportAllOp:
-			op.SetExitCode(uint16(d.reportAll(o.Definition)))
+			// FIXME: must override bad token & isolation inside ReportDefinition !
+			def := o.Definition
+			def.Token = d.token
+			def.Isolation = d.isolation
+			op.SetExitCode(uint16(d.reportAll(def)))
 		default:
 			err = fmt.Errorf("unknown operation %T", op)
 			return
@@ -197,17 +209,13 @@ func (d *daemon) report(def model.ReportDefinition) (exitCode int16, err error) 
 		testCount = d.repo.TestCount(def.TestSuite)
 	}
 
-	fmt.Printf("reporting suite %s, tail blocking ...\n", def.TestSuite)
-
 	//d.display.DisplayRecorded(def.TestSuite, def.Config.Timeout.Get())
-	//go func() {
-	err = d.display.TailBlocking(def.TestSuite, def.Config.Timeout.Get())
-	if err != nil {
-		return 1, err
-	}
-	//}()
-
-	fmt.Printf("reporting suite %s, processing report ...\n", def.TestSuite)
+	go func() {
+		err = d.display.TailBlocking(def.TestSuite, def.Config.Timeout.Get())
+		if err != nil {
+			panic(err)
+		}
+	}()
 
 	exitCode, err = service.ProcessReportDef(def)
 	logger.Debug("Closing test suite", "token", def.Token, "isolation", def.Isolation, "openedSuite", d.openedSuite)

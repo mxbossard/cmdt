@@ -390,6 +390,10 @@ func newDbRepo(dirpath, isolation, token string) (r dbRepo, err error) {
 		return r, err
 	}
 
+	// if !inited {
+	// 	fmt.Printf(">>> DB not initialized yet. pid: %d; dirpath: %s; token: %s; isol: %s\n", os.Getpid(), dirpath, token, isolation)
+	// }
+
 	r.queueDao, err = dao.NewQueue(db, !inited)
 	if err != nil {
 		return
@@ -402,6 +406,8 @@ func newDbRepo(dirpath, isolation, token string) (r dbRepo, err error) {
 	if err != nil {
 		return
 	}
+
+	logger.Info("New db repo", "dirpath", dirpath, "token", token, "isolation", isolation)
 
 	//err = r.Close()
 	return

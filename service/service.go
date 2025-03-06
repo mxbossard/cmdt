@@ -200,9 +200,9 @@ func reportTestSuite(ctx facade.SuiteContext) (suiteOutcome model.SuiteOutcome, 
 }
 
 func ReportTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
-	fmt.Printf("ReportTestSuite ctx suite: %s \n", ctx.Config.TestSuite.Get())
+	//fmt.Printf("ReportTestSuite ctx suite: %s \n", ctx.Config.TestSuite.Get())
 	suiteOutcome, exitCode, err := reportTestSuite(ctx)
-	fmt.Printf("ReportTestSuite outcome suite: %s \n", suiteOutcome.TestSuite)
+	//fmt.Printf("ReportTestSuite outcome suite: %s \n", suiteOutcome.TestSuite)
 
 	Dpl.ReportSuite(suiteOutcome)
 	if !ctx.Config.Keep.Is(true) {
@@ -625,6 +625,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				daemonIsol = suiteCtx.Isolation
 				daemonToken = suiteCtx.Token
 			} else {
+				logger.Info("executing report in sync", "suite", testSuite)
 				//exitCode, err = ReportTestSuite(suiteCtx)
 				exitCode, err = ProcessReportDef(def)
 				suiteCtx.Repo.Done(&op)

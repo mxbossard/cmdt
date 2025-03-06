@@ -192,7 +192,7 @@ func (d AsyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 		if err != nil {
 			panic(err)
 		}
-		fmt.Printf("flushed end suite printer & session\n")
+		//fmt.Printf("flushed end suite printer & session\n")
 		// err = session.ClosePrinter(SuiteEndPrinterName)
 		// if err != nil {
 		// 	panic(err)
@@ -204,7 +204,7 @@ func (d AsyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 		// }
 	}()
 
-	fmt.Printf("reporting suite ...\n")
+	//fmt.Printf("reporting suite ...\n")
 
 	ignoredMessage := ""
 	if ignoredCount > 0 {
