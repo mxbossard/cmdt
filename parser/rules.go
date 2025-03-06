@@ -22,27 +22,24 @@ OPEN: comment gérer le multi value ?
 - while no command is parsed allow prefix to be - for 1 char aliases or -- for aliases ?
 */
 
-type configurer interface {
-	Mutate(cfg *model.Config, assertions *[]model.Assertion)
-}
-
 type RuleDef interface {
 	Name() string
 	Kind() string
 	Aliases() []string
 	Ops() []string
+	Matcher() ruleMatcher
 }
 
 type ruleMatch interface {
-	configurer
 	Prefix() string
 	Name() string
 	Op() string
-	//Check() errorz.Aggregated
-	//CheckAgainst([]ruleMatch) errorz.Aggregated
+	Def() RuleDef
+	Mutate(cfg *model.Config, assertions *[]model.Assertion)
 }
 
 type matchChecker interface {
+	Name() string
 	Check(...ruleMatch) errorz.Aggregated
 }
 
@@ -57,7 +54,6 @@ type ruleMatcher interface {
 
 type ruleSetMatcher interface {
 	matchChecker
-	Name() string
 	Match(prefix string, args []string) ([]ruleMatch, []string, errorz.Aggregated)
 }
 
@@ -88,14 +84,20 @@ func (r rule[T]) Kind() string {
 	return r.kind
 }
 
-func (r rule[T]) Aliases() []string {
-	return r.aliases
+func (r rule[T]) Aliases() (a []string) {
+	a = append(a, r.Name())
+	a = append(a, r.aliases...)
+	return
 }
 
 func (r rule[T]) Ops() []string {
 	return collections.Map[*operator[T], string](&r.operators, func(op *operator[T]) string {
 		return op.op
 	})
+}
+
+func (r rule[T]) Matcher() ruleMatcher {
+	return r
 }
 
 func (r rule[T]) Check(matches ...ruleMatch) (agg errorz.Aggregated) {
@@ -136,7 +138,7 @@ func (r rule[T]) Check(matches ...ruleMatch) (agg errorz.Aggregated) {
 
 func (r rule[T]) Match(prefix string, args []string) (n int, match ruleMatch, agg errorz.Aggregated) {
 	// Verify if supplied args match the rule
-	// If so, return the args count matched, the errors encountered and an object abale to mutate the config
+	// If so, return the args count matched, the errors encountered and an object able to mutate the config
 	// FIXME: should return an object able to mutate the config
 
 	if len(args) == 0 {
@@ -261,7 +263,7 @@ func (r rule[T]) Match(prefix string, args []string) (n int, match ruleMatch, ag
 		mapper := *matchingOp.mapper
 		mappedValue, err = mapper(matchingOp.op, value)
 		if err != nil {
-			agg.Add(err)
+			agg.Add(fmt.Errorf("invalid value for rule [%s%s%s%s], error: %w", prefix, matchingAlias, matchingOp.op, value, err))
 		}
 	} else {
 		// no mapper => no value : nothing to do
@@ -320,6 +322,10 @@ func (c basicRuleMatch[T]) Op() string {
 	return c.op
 }
 
+func (c basicRuleMatch[T]) Def() RuleDef {
+	return c.rule
+}
+
 func (c basicRuleMatch[T]) Mutate(cfg *model.Config, assertions *[]model.Assertion) {
 	mutater := *c.rule.mutater
 	mutater(cfg, c.op, c.mappedValue)
@@ -336,6 +342,21 @@ type ruleSet struct {
 
 func (r ruleSet) Name() string {
 	return r.name
+}
+
+func (r ruleSet) Aliases() []string {
+	return collections.Flatten(collections.Map(&r.rules, func(r ruleMatcher) []string {
+		return r.Aliases()
+	}))
+}
+
+func (r ruleSet) Contains(rd RuleDef) bool {
+	for _, rule := range r.rules {
+		if rule.Name() == rd.Name() {
+			return true
+		}
+	}
+	return false
 }
 
 func (r ruleSet) Check(matches ...ruleMatch) (agg errorz.Aggregated) {
@@ -416,8 +437,10 @@ func (r ruleSet) Match(prefix string, args []string) (matches []ruleMatch, notMa
 				if n > 0 {
 					// matched
 					matched = true
-					matches = append(matches, match)
 					p += n - 1
+					if match != nil {
+						matches = append(matches, match)
+					}
 				}
 			}
 		}

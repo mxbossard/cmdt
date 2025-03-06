@@ -134,8 +134,7 @@ var boolMapper mapper[bool] = func(op, val string) (res bool, err error) {
 	return
 }
 var durationMapper mapper[time.Duration] = func(op, val string) (time.Duration, error) {
-	// TODO
-	return 0, nil
+	return time.ParseDuration(val)
 }
 
 // TODO: could have a Cmd type wrapping []string ?
@@ -385,6 +384,19 @@ func stringValidater(min, max int) *validater[string] {
 		}
 		if len(val) > max {
 			return fmt.Errorf("length must be <= %d", max)
+		}
+		return nil
+	}
+	return &f
+}
+
+func durationValidater(min, max time.Duration) *validater[time.Duration] {
+	var f validater[time.Duration] = func(val time.Duration) error {
+		if val < min {
+			return fmt.Errorf("duration must be >= %d", min)
+		}
+		if val > max {
+			return fmt.Errorf("duration must be <= %d", max)
 		}
 		return nil
 	}

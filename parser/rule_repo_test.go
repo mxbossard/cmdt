@@ -8,6 +8,8 @@ import (
 	"mby.fr/utils/errorz"
 )
 
+const badContextUseErrorMsg = "can only be used in context"
+
 func TestParseArgs(t *testing.T) {
 	repo := ruleRepo{}
 	repo.addRuleSet(rsActions)
@@ -53,13 +55,6 @@ func TestParseArgs(t *testing.T) {
 	assert.Len(t, matches, 1)
 	assert.Len(t, cmdAndArgs, 0)
 
-	args = []string{"@debug"}
-	matches, cmdAndArgs, agg = repo.parseArgs(expectedPrefix, args)
-	require.NotNil(t, agg)
-	assert.NoError(t, agg.Return())
-	assert.Len(t, matches, 1)
-	assert.Len(t, cmdAndArgs, 0)
-
 	args = []string{"@test", "@debug"}
 	matches, cmdAndArgs, agg = repo.parseArgs(expectedPrefix, args)
 	require.NotNil(t, agg)
@@ -74,6 +69,15 @@ func TestParseArgs(t *testing.T) {
 	assert.Len(t, matches, 0)
 	assert.Len(t, cmdAndArgs, 1)
 	assert.Contains(t, cmdAndArgs, "test")
+
+	// Should error because of badly scoped rules
+	args = []string{"@debug"}
+	matches, cmdAndArgs, agg = repo.parseArgs(expectedPrefix, args)
+	require.NotNil(t, agg)
+	assert.Error(t, agg.Return())
+	assert.ErrorContains(t, agg.Return(), badContextUseErrorMsg)
+	assert.Len(t, matches, 1)
+	assert.Len(t, cmdAndArgs, 0)
 
 	// after rule stopper @unknown should be a command
 	args = []string{"@test", "@--", "unknown", "@--"}
@@ -197,6 +201,8 @@ func TestParseArgs_Missmatch(t *testing.T) {
 	repo := ruleRepo{}
 	repo.addRuleSet(rsActions)
 	repo.addRuleSet(rsVerbosity)
+	repo.addRuleSet(rsSuiteConfig)
+	repo.addRuleSet(rsOutcomeAssertions)
 
 	var args []string
 	expectedPrefix := "@"
@@ -206,7 +212,7 @@ func TestParseArgs_Missmatch(t *testing.T) {
 	matches, cmdAndArgs, agg := repo.parseArgs(expectedPrefix, args)
 	require.NotNil(t, agg)
 	assert.Error(t, agg.Return())
-	assert.ErrorContains(t, agg.Return(), "missing action")
+	assert.ErrorContains(t, agg.Return(), badContextUseErrorMsg)
 	assert.Len(t, matches, 1)
 	assert.Len(t, cmdAndArgs, 0)
 
@@ -215,7 +221,7 @@ func TestParseArgs_Missmatch(t *testing.T) {
 	matches, cmdAndArgs, agg = repo.parseArgs(expectedPrefix, args)
 	require.NotNil(t, agg)
 	assert.Error(t, agg.Return())
-	assert.ErrorContains(t, agg.Return(), "bad config rule")
+	assert.ErrorContains(t, agg.Return(), badContextUseErrorMsg)
 	assert.Len(t, matches, 2)
 	assert.Len(t, cmdAndArgs, 0)
 
@@ -223,7 +229,7 @@ func TestParseArgs_Missmatch(t *testing.T) {
 	matches, cmdAndArgs, agg = repo.parseArgs(expectedPrefix, args)
 	require.NotNil(t, agg)
 	assert.Error(t, agg.Return())
-	assert.ErrorContains(t, agg.Return(), "assertion rule can only be used in @test context")
+	assert.ErrorContains(t, agg.Return(), badContextUseErrorMsg)
 	assert.Len(t, matches, 2)
 	assert.Len(t, cmdAndArgs, 0)
 }
@@ -232,6 +238,7 @@ func TestParseArgs_Validation(t *testing.T) {
 	repo := ruleRepo{}
 	repo.addRuleSet(rsActions)
 	repo.addRuleSet(rsVerbosity)
+	repo.addRuleSet(rsTestConfig)
 
 	var args []string
 	expectedPrefix := "@"
@@ -245,7 +252,7 @@ func TestParseArgs_Validation(t *testing.T) {
 	assert.Len(t, cmdAndArgs, 0)
 
 	// ## ----- should not be valid and return an error
-	args = []string{"@test", "@timeout=3"}
+	args = []string{"@test", "@timeout=3a"}
 	matches, cmdAndArgs, agg = repo.parseArgs(expectedPrefix, args)
 	require.NotNil(t, agg)
 	assert.Error(t, agg.Return())
@@ -265,16 +272,16 @@ func TestParseArgs_Validation(t *testing.T) {
 	matches, cmdAndArgs, agg = repo.parseArgs(expectedPrefix, args)
 	require.NotNil(t, agg)
 	assert.Error(t, agg.Return())
-	assert.ErrorContains(t, agg.Return(), "invalid operator for rule")
+	assert.ErrorContains(t, agg.Return(), "invalid operator")
 	assert.Len(t, matches, 1)
 	assert.Len(t, cmdAndArgs, 0)
 
-	args = []string{"@test", "@timeout:3"}
+	args = []string{"@test", "@timeout:3a"}
 	matches, cmdAndArgs, agg = repo.parseArgs(expectedPrefix, args)
 	require.NotNil(t, agg)
 	assert.Error(t, agg.Return())
-	assert.ErrorContains(t, agg.Return(), "invalid operator for rule")
-	assert.ErrorContains(t, agg.Return(), "invalid value for rule")
+	assert.ErrorContains(t, agg.Return(), "invalid operator")
+	//assert.ErrorContains(t, agg.Return(), "invalid value")
 	assert.Len(t, matches, 1)
 	assert.Len(t, cmdAndArgs, 0)
 }
@@ -282,116 +289,178 @@ func TestParseArgs_Validation(t *testing.T) {
 func TestChilds(t *testing.T) {
 	repo := ruleRepo{}
 	repo.addRuleSet(rsActions)
+	repo.addRuleSet(rsReportConfig)
 	repo.addRuleSet(rsVerbosity)
 
 	var args []string
 	var ruleDefs []RuleDef
 	var warns errorz.Aggregated
-	var agg errorz.Aggregated
+	var errors errorz.Aggregated
 
 	// ## ----- calls that should works
 	args = []string{}
-	ruleDefs, warns, agg = repo.childs(args...)
-	assert.NoError(t, agg.Return())
+	ruleDefs, warns, errors = repo.children(args...)
+	assert.NoError(t, errors.Return())
 	assert.NoError(t, warns.Return())
 	assert.NotEmpty(t, ruleDefs)
-	assert.Len(t, ruleDefs, len(rsActions.rules)+len(rsVerbosity.rules))
+	assert.Len(t, ruleDefs, len(rsActions.rules))
 
-	args = []string{"suite"}
-	ruleDefs, warns, agg = repo.childs(args...)
-	assert.NoError(t, agg.Return())
+	args = []string{"@suite"}
+	ruleDefs, warns, errors = repo.children(args...)
+	assert.NoError(t, errors.Return())
 	assert.NoError(t, warns.Return())
 	assert.NotEmpty(t, ruleDefs)
 	assert.Len(t, ruleDefs, len(rsVerbosity.rules))
 
-	args = []string{"@suite"}
-	ruleDefs, warns, agg = repo.childs(args...)
-	assert.NoError(t, agg.Return())
+	args = []string{"suite"}
+	ruleDefs, warns, errors = repo.children(args...)
+	assert.NoError(t, errors.Return())
+	assert.NoError(t, warns.Return())
+	assert.NotEmpty(t, ruleDefs)
+	assert.Len(t, ruleDefs, len(rsVerbosity.rules))
+
+	args = []string{"-suite"}
+	ruleDefs, warns, errors = repo.children(args...)
+	assert.NoError(t, errors.Return())
+	assert.NoError(t, warns.Return())
+	assert.NotEmpty(t, ruleDefs)
+	assert.Len(t, ruleDefs, len(rsVerbosity.rules))
+
+	args = []string{"--suite"}
+	ruleDefs, warns, errors = repo.children(args...)
+	assert.NoError(t, errors.Return())
+	assert.NoError(t, warns.Return())
+	assert.NotEmpty(t, ruleDefs)
+	assert.Len(t, ruleDefs, len(rsVerbosity.rules))
+
+	args = []string{"s"}
+	ruleDefs, warns, errors = repo.children(args...)
+	assert.NoError(t, errors.Return())
+	assert.NoError(t, warns.Return())
+	assert.NotEmpty(t, ruleDefs)
+	assert.Len(t, ruleDefs, len(rsVerbosity.rules))
+
+	args = []string{"-s"}
+	ruleDefs, warns, errors = repo.children(args...)
+	assert.NoError(t, errors.Return())
+	assert.NoError(t, warns.Return())
+	assert.NotEmpty(t, ruleDefs)
+	assert.Len(t, ruleDefs, len(rsVerbosity.rules))
+
+	args = []string{"--s"}
+	ruleDefs, warns, errors = repo.children(args...)
+	assert.NoError(t, errors.Return())
 	assert.NoError(t, warns.Return())
 	assert.NotEmpty(t, ruleDefs)
 	assert.Len(t, ruleDefs, len(rsVerbosity.rules))
 
 	args = []string{"init"}
-	ruleDefs, warns, agg = repo.childs(args...)
-	assert.NoError(t, agg.Return())
+	ruleDefs, warns, errors = repo.children(args...)
+	assert.NoError(t, errors.Return())
 	assert.NoError(t, warns.Return())
 	assert.NotEmpty(t, ruleDefs)
 	assert.Len(t, ruleDefs, len(rsVerbosity.rules))
 
 	args = []string{"test"}
-	ruleDefs, warns, agg = repo.childs(args...)
-	assert.NoError(t, agg.Return())
+	ruleDefs, warns, errors = repo.children(args...)
+	assert.NoError(t, errors.Return())
 	assert.NoError(t, warns.Return())
 	assert.NotEmpty(t, ruleDefs)
 	assert.Len(t, ruleDefs, len(rsVerbosity.rules))
 
 	args = []string{"suite", "debug"}
-	ruleDefs, warns, agg = repo.childs(args...)
-	assert.NoError(t, agg.Return())
+	ruleDefs, warns, errors = repo.children(args...)
+	assert.NoError(t, errors.Return())
 	assert.NoError(t, warns.Return())
 	assert.Empty(t, ruleDefs)
 
 	args = []string{"@init", "@verbose"}
-	ruleDefs, warns, agg = repo.childs(args...)
-	assert.NoError(t, agg.Return())
+	ruleDefs, warns, errors = repo.children(args...)
+	assert.NoError(t, errors.Return())
 	assert.NoError(t, warns.Return())
 	assert.Empty(t, ruleDefs)
 
 	args = []string{"test", "@verbose"}
-	ruleDefs, warns, agg = repo.childs(args...)
-	assert.NoError(t, agg.Return())
+	ruleDefs, warns, errors = repo.children(args...)
+	assert.NoError(t, errors.Return())
 	assert.NoError(t, warns.Return())
 	assert.Empty(t, ruleDefs)
 
 	args = []string{"test=foo"}
-	ruleDefs, warns, agg = repo.childs(args...)
-	assert.NoError(t, agg.Return())
+	ruleDefs, warns, errors = repo.children(args...)
+	assert.NoError(t, errors.Return())
 	assert.NoError(t, warns.Return())
 	assert.NotEmpty(t, ruleDefs)
 	assert.Len(t, ruleDefs, len(rsVerbosity.rules))
 
 	args = []string{"test=foo", "@verbose"}
-	ruleDefs, warns, agg = repo.childs(args...)
-	assert.NoError(t, agg.Return())
+	ruleDefs, warns, errors = repo.children(args...)
+	assert.NoError(t, errors.Return())
 	assert.NoError(t, warns.Return())
 	assert.Empty(t, ruleDefs)
 
+	args = []string{"report"}
+	ruleDefs, warns, errors = repo.children(args...)
+	assert.NoError(t, errors.Return())
+	assert.NoError(t, warns.Return())
+	assert.Len(t, ruleDefs, len(rsReportConfig.rules)+len(rsVerbosity.rules))
+
+	args = []string{"report", "keep"}
+	ruleDefs, warns, errors = repo.children(args...)
+	assert.NoError(t, errors.Return())
+	assert.NoError(t, warns.Return())
+	assert.Empty(t, ruleDefs)
+	//assert.Len(t, ruleDefs, len(rsVerbosity.rules))
+
 	// ## ----- should be valid to help user but indicate an improper usage
 	args = []string{"test:foo"}
-	ruleDefs, warns, agg = repo.childs(args...)
-	assert.NoError(t, agg.Return())
+	// should return a warning because op : does not exists for test rule
+	ruleDefs, warns, errors = repo.children(args...)
+	assert.NoError(t, errors.Return())
 	assert.Error(t, warns.Return())
 	assert.NotEmpty(t, ruleDefs)
 	assert.Len(t, ruleDefs, len(rsVerbosity.rules))
 
 	args = []string{"test=foo", "debug=bar"}
-	ruleDefs, warns, agg = repo.childs(args...)
-	assert.NoError(t, agg.Return())
+	// should return a warning because debug value is invalid
+	ruleDefs, warns, errors = repo.children(args...)
+	assert.NoError(t, errors.Return())
 	assert.Error(t, warns.Return())
 	assert.Empty(t, ruleDefs)
 
 	args = []string{"test=foo", "debug:4"}
-	ruleDefs, warns, agg = repo.childs(args...)
-	assert.NoError(t, agg.Return())
+	// should return a warning because debug op is invalid
+	ruleDefs, warns, errors = repo.children(args...)
+	assert.NoError(t, errors.Return())
 	assert.Error(t, warns.Return())
 	assert.Empty(t, ruleDefs)
 
 	// ## ----- calls that should not works
 	args = []string{"unknown"}
-	ruleDefs, warns, agg = repo.childs(args...)
-	assert.Error(t, agg.Return())
+	// should return an error because unknown rule does not exists
+	ruleDefs, warns, errors = repo.children(args...)
+	assert.Error(t, errors.Return())
 	assert.NoError(t, warns.Return())
 	assert.Len(t, ruleDefs, 0)
 
 	args = []string{"suite", "unknown"}
-	ruleDefs, warns, agg = repo.childs(args...)
-	assert.Error(t, agg.Return())
+	// should return an error because unknown rule does not exists
+	ruleDefs, warns, errors = repo.children(args...)
+	assert.Error(t, errors.Return())
 	assert.NoError(t, warns.Return())
 	assert.Len(t, ruleDefs, 0)
 
 	args = []string{"unknown", "timeout"}
-	ruleDefs, warns, agg = repo.childs(args...)
-	assert.Error(t, agg.Return())
+	// should return an error because unknown rule does not exists
+	ruleDefs, warns, errors = repo.children(args...)
+	assert.Error(t, errors.Return())
+	assert.NoError(t, warns.Return())
+	assert.Len(t, ruleDefs, 0)
+
+	args = []string{"suite", "keep"}
+	// should return an error because keepReport rule is not a valid child of suite rule
+	ruleDefs, warns, errors = repo.children(args...)
+	assert.Error(t, errors.Return())
 	assert.NoError(t, warns.Return())
 	assert.Len(t, ruleDefs, 0)
 

@@ -117,43 +117,153 @@ func (r ruleRepo) parseArgs(prefix string, args []string) (allMatches []ruleMatc
 
 	}
 
+	// FIXME: Validate each rule found satisfy it's dependency
+	// 1- foreach rule get ruleSet
+	// 2- if ruleset depends on a rule, check the rule is present or add error
+	allMatchesNames := collections.Map(&allMatches, func(rm ruleMatch) string {
+		return rm.Name()
+	})
+Exit:
+	for _, rule := range allMatches {
+		var containingRuleSet *ruleSet
+		for _, rs := range r.ruleSets {
+			if rs.Contains(rule.Def()) {
+				containingRuleSet = rs
+				break
+			}
+		}
+		if containingRuleSet != nil && len(containingRuleSet.dependsOn) > 0 {
+			// Verify at least one of depending rule is present
+			dependendingNames := collections.Map(&(containingRuleSet.dependsOn), func(rm ruleMatcher) string {
+				return rm.Name()
+			})
+			for _, dependendingName := range dependendingNames {
+				if slices.Contains(allMatchesNames, dependendingName) {
+					break Exit
+				}
+			}
+			agg.Add(fmt.Errorf("rule: [%s] can only be used in context of rules: [%s]", rule.Name(), strings.Join(dependendingNames, ", ")))
+		}
+	}
+
 	return
 }
 
-func (r ruleRepo) childs(args ...string) (ruleDefs []RuleDef, warns errorz.Aggregated, errors errorz.Aggregated) {
-	// TODO implements warnings & errors
+func (r ruleRepo) children(args ...string) (ruleDefs []RuleDef, warns errorz.Aggregated, errors errorz.Aggregated) {
+	// 1- Identify the rule targeted by the supplied args (path)
+	// 1a- Validate path to targeted rule
+	// 2- List rules depending on the targeted rule + not dependings rules (?? isolate this in global() func ??)
+	// 2a- Scope depending rules to supplied path ?
+	// 2b- which not depending rules add ? config ok but not actions !
 
+	prefixes := []string{"@", ""}
+
+	// 1- Identify the last RuleDef in args path
 	var lastRuleDef RuleDef
-	for _, arg := range args {
+	var lastRuleChilrenNames []string
+	for p, arg := range args {
 		argRuleName := extractRuleName(arg)
 		if argRuleName == "" {
-			errors.Add(fmt.Errorf("unknown rule: [%s]", arg))
+			errors.Add(fmt.Errorf("malformed rule: [%s]", arg))
 			return
 		}
-	exit:
+		// FIXME: args path is not checked
+		var knownRule bool
+	Exit:
 		for _, ruleSet := range r.ruleSets {
 			for _, rule := range ruleSet.rules {
-				if argRuleName == arg || slices.Contains(rule.Aliases(), argRuleName) {
+				//fmt.Printf("Checking arg: %s against aliases: %s \n", arg, rule.Aliases())
+				if slices.Contains(rule.Aliases(), argRuleName) {
 					// arg matches the rule
+					//fmt.Printf(">> arg: %s match rule name: %s \n", arg, rule.Name())
+					knownRule = true
 					lastRuleDef = rule
-					break exit
+					break Exit
 				}
 			}
 		}
+
+		if !knownRule {
+			// arg not found in any ruleset
+			errors.Add(fmt.Errorf("unknown rule: [%s]", arg))
+			return
+		}
+
+		if p > 0 {
+			// Validate path: is rule a child of previous rule
+			if !slices.Contains(lastRuleChilrenNames, lastRuleDef.Name()) {
+				errors.Add(fmt.Errorf("rule: [%s] is not a child of rule: [%s] (%s)", args[p], args[p-1], lastRuleChilrenNames))
+			}
+		}
+
+		// List rule children to validate next rule ancestry
+		if len(args) > 1 && p < len(args) {
+			lastRuleChilren, ws, es := r.children(args[p])
+			lastRuleChilrenNames = collections.Map(&lastRuleChilren, func(r RuleDef) string { return r.Name() })
+			warns.Concat(ws)
+			errors.Concat(es)
+		}
 	}
 
+	// 2- Attempt to match the last RuleDef with the minimum last supplied args
+	if lastRuleDef != nil {
+		lastRuleMatcher := lastRuleDef.Matcher()
+		var lastRuleMatch ruleMatch
+		l := len(args)
+	Exit2:
+		for _, prefix := range prefixes {
+			// Attempt to match with last arg, then with 2 last args, ...
+			for p := 1; p <= l; p++ {
+				lastArgs := args[l-p : l]
+				//fmt.Printf(">> matching args: %s with rule: %s ... \n", lastArgs, lastRuleMatcher.Name())
+				n, m, agg := lastRuleMatcher.Match(prefix, lastArgs)
+				warns.Concat(agg)
+				if n > 0 {
+					// found args matched by the last rule
+					lastRuleMatch = m
+
+					break Exit2
+				}
+			}
+		}
+
+		// if lastRuleMatch == nil {
+		// 	errors.Add(fmt.Errorf("problem with not matching rule: [%s]", lastRuleDef))
+		// }
+		if lastRuleMatch != nil {
+			agg := lastRuleMatcher.Check(lastRuleMatch)
+			warns.Concat(agg)
+		}
+	}
+
+	// 3- List ruleSets dependings on last rule
 	var dependingSets []*ruleSet
 	for _, ruleSet := range r.ruleSets {
+		dependsOnNames := collections.Map(&ruleSet.dependsOn, func(r ruleMatcher) string {
+			return r.Name()
+		})
 		if len(args) == 0 && len(ruleSet.dependsOn) == 0 {
 			// should select all sets depending on nothing
 			dependingSets = append(dependingSets, ruleSet)
-		} else if slices.Contains(defs(ruleSet.dependsOn), lastRuleDef) {
-			// FIXME: the following test probably don't works for ptr reason
-			// Last arg depens on this rule
+		} else if lastRuleDef != nil && slices.Contains(dependsOnNames, lastRuleDef.Name()) {
+			// Last arg depends on this rule
+			//fmt.Printf("ruleSet: %s depends on args: [%s]\n", ruleSet.Name(), args)
 			dependingSets = append(dependingSets, ruleSet)
 		}
 	}
 
+	/*
+		dependingSetsNames := collections.Map(&dependingSets, func(r *ruleSet) string {
+			return r.Name()
+		})
+		if lastRuleDef != nil {
+			fmt.Printf("rule: %s depends on sets: [%s]\n", lastRuleDef.Name(), dependingSetsNames)
+		} else {
+			fmt.Printf("rule: [] depends on sets: [%s]\n", dependingSetsNames)
+		}
+	*/
+
+	// 4- Append rules of dependings ruleSets
 	for _, ruleSet := range dependingSets {
 		ruleDefs = append(ruleDefs, defs(ruleSet.rules)...)
 	}
@@ -171,7 +281,7 @@ func replacingPrefix(prefix, rule string) string {
 }
 
 func extractRuleName(arg string) string {
-	assertionRulePattern := regexp.MustCompile("^(?:@|-|--)?([-_a-zA-Z]+).*")
+	assertionRulePattern := regexp.MustCompile("^(?:@|-|--)?([a-zA-Z][-_a-zA-Z]*).*")
 	submatch := assertionRulePattern.FindStringSubmatch(arg)
 	if submatch != nil {
 		return submatch[1]

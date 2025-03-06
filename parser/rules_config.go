@@ -169,12 +169,12 @@ var (
 	rsIsolation    = buildRS("isolation", nil, rules(token, isolation), nil)
 	rsTokenActions = buildMERS("tokenAction", nil, rules(printToken, exportToken), nil)
 	rsParsing      = buildRS("parsing", nil, rules(prefix), nil)
-	rsVerbosity    = buildRS("verbosity", nil, rules(quiet, verbose, debug), nil)
+	rsVerbosity    = buildRS("verbosity", rules(global, suite, test, report), rules(quiet, verbose, debug), nil)
 	rsSuiteConfig  = buildRS("suiteConfig", rules(global, suite), rules(fork, suiteTimeout, async, stopOnFailure,
 		failuresLimit, beforeSuite, afterSuite), nil)
 	rsTestConfig = buildRS("testConfig", rules(global, suite, test), rules(wait, ignore, keepStdout, keepStderr,
 		keepOutputs, timeout, runCount, mock, before, after, container, dirtyContainer), nil)
-	rsReportCOnfig        = buildRS("reportConfig", rules(report), rules(keepReport), nil)
+	rsReportConfig        = buildRS("reportConfig", rules(report), rules(keepReport), nil)
 	rsOutcomeAssertions   = buildMERS("outcomeAssertions", rules(test), rules(success, failure, exit), success)
 	rsStackableAssertions = buildRS("stackableAssertions", rules(test), rules(stdout, stderr, cmd, exists), nil)
 )
