@@ -166,6 +166,7 @@ func (r dbRepo) ClearTestSuite(testSuite string) (err error) {
 	if err != nil {
 		return
 	}
+	// FIXME: why is that commented out ? => timing out if uncommented
 	/*
 		err = r.queueDao.DeleteQueuesOfSuite(testSuite)
 		if err != nil {

@@ -382,7 +382,8 @@ func (d *AsyncDisplay) TailBlocking(suite string, timeout time.Duration) error {
 	}
 	updatedTimeout := timeout - time.Since(startTime)
 	logger.Debug("TailBlocking ...", "suite", suite)
-	return d.tailer.TailBlocking(suite, updatedTimeout)
+	// FIXME: use TailOnlyBlocking because TailBlocking keep re-tailing all previously tailed sessions.
+	return d.tailer.TailOnlyBlocking(suite, updatedTimeout)
 }
 
 func (d *AsyncDisplay) TailAllBlocking(timeout time.Duration) error {

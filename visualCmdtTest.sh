@@ -53,6 +53,7 @@ $newCmdt1 @report=longer_sync_visual
 
 rm -rf -- /tmp/cmdt* /tmp/cmdt*.log /tmp/daemon*.log 2> /dev/null || true
 
+>&2 echo
 >&2 echo "## Visual test async"
 $newCmdt1 @init=longer_async_visual @async @verbose=5 @suiteTimeout=$((count/2+2))s
 >&2 echo "Launching tests ..."

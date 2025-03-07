@@ -218,15 +218,15 @@ func (d basicTestDisplayer) assertionResult(result model.AssertionResult) {
 		}
 
 		if assertOp == "=" || assertOp == "@=" {
-			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto be%s: \t\t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, assertLabel, hlClr, ResetColor, expected, hlClr, ResetColor, stringifiedGot)
+			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto be%s:\t\t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, assertLabel, hlClr, ResetColor, expected, hlClr, ResetColor, stringifiedGot)
 		} else if assertOp == ":" || assertOp == "@:" {
-			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto contains%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, assertLabel, hlClr, ResetColor, expected, hlClr, ResetColor, stringifiedGot)
+			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto contains%s:\t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, assertLabel, hlClr, ResetColor, expected, hlClr, ResetColor, stringifiedGot)
 		} else if assertOp == "!:" {
-			d.printer.Errf("\t%sExpected%s %s \n\t\t%snot to contains%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, assertLabel, hlClr, ResetColor, expected, hlClr, ResetColor, stringifiedGot)
+			d.printer.Errf("\t%sExpected%s %s \n\t%sdon't contains%s:\t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, assertLabel, hlClr, ResetColor, expected, hlClr, ResetColor, stringifiedGot)
 		} else if assertOp == "~" {
-			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto match%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, assertLabel, hlClr, ResetColor, expected, hlClr, ResetColor, stringifiedGot)
+			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto match%s:\t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, assertLabel, hlClr, ResetColor, expected, hlClr, ResetColor, stringifiedGot)
 		} else if assertOp == "!~" {
-			d.printer.Errf("\t%sExpected%s %s \n\t\t%snot to match%s: \t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, assertLabel, hlClr, ResetColor, expected, hlClr, ResetColor, stringifiedGot)
+			d.printer.Errf("\t%sExpected%s %s \n\t\t%sdon't match%s:\t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, assertLabel, hlClr, ResetColor, expected, hlClr, ResetColor, stringifiedGot)
 		}
 	} else {
 		d.printer.Errf("assertion %s%s%s failed\n", assertLabel, assertOp, expected)
@@ -239,7 +239,8 @@ func (d basicTestDisplayer) assertionResults(results []model.AssertionResult) {
 	// Sort results grouped by types
 	resultsMap := make(map[string][]model.AssertionResult)
 	for _, result := range results {
-		key := fmt.Sprintf("%s-%s", result.Name, result.Op)
+		// key := fmt.Sprintf("%s-%s", result.Name, result.Op)
+		key := result.Name
 		col, ok := resultsMap[key]
 		if !ok {
 			col = []model.AssertionResult{}
@@ -254,7 +255,7 @@ func (d basicTestDisplayer) assertionResults(results []model.AssertionResult) {
 		//log.Printf("failedResult: %v\n", result)
 		assertPrefix := ruleResults[0].Prefix
 		assertName := ruleResults[0].Name
-		assertOp := ruleResults[0].Op
+		//assertOp := ruleResults[0].Op
 
 		for _, result := range ruleResults {
 			if result.ErrMessage != "" {
@@ -286,26 +287,45 @@ func (d basicTestDisplayer) assertionResults(results []model.AssertionResult) {
 		}
 
 		firstError := true
+		lastOperator := ""
 		printButGot := false
 		for _, result := range ruleResults {
+			assertOp := result.Op
 			expected := result.Expected
 			expected = strings.ReplaceAll(expected, "\n", "\\n")
 			if !result.Success {
 				if firstError {
 					firstError = false
 					printButGot = true
+					/*
+						if assertOp == "=" || assertOp == "@=" {
+							d.printer.Errf("\t%sExpected%s %s \n\t\t%sto be%s:", hlClr, ResetColor, assertLabel, hlClr, ResetColor)
+						} else if assertOp == ":" || assertOp == "@:" {
+							d.printer.Errf("\t%sExpected%s %s \n\t\t%sto contains%s:", hlClr, ResetColor, assertLabel, hlClr, ResetColor)
+						} else if assertOp == "!:" {
+							d.printer.Errf("\t%sExpected%s %s \n\t\t%sdon't contains%s:", hlClr, ResetColor, assertLabel, hlClr, ResetColor)
+						} else if assertOp == "~" {
+							d.printer.Errf("\t%sExpected%s %s \n\t\t%sto match%s:", hlClr, ResetColor, assertLabel, hlClr, ResetColor)
+						} else if assertOp == "!~" {
+							d.printer.Errf("\t%sExpected%s %s \n\t\t%sdon't match%s:", hlClr, ResetColor, assertLabel, hlClr, ResetColor)
+						}
+					*/
+					d.printer.Errf("\t%sExpected%s %s", hlClr, ResetColor, assertLabel)
+				}
+				if lastOperator != assertOp {
 					if assertOp == "=" || assertOp == "@=" {
-						d.printer.Errf("\t%sExpected%s %s \n\t\t%sto be%s: \t", hlClr, ResetColor, assertLabel, hlClr, ResetColor)
+						d.printer.Errf("\n\t\t%sto be%s:", hlClr, ResetColor)
 					} else if assertOp == ":" || assertOp == "@:" {
-						d.printer.Errf("\t%sExpected%s %s \n\t\t%sto contains%s: ", hlClr, ResetColor, assertLabel, hlClr, ResetColor)
+						d.printer.Errf("\n\t\t%sto contains%s:", hlClr, ResetColor)
 					} else if assertOp == "!:" {
-						d.printer.Errf("\t%sExpected%s %s \n\t\t%snot to contains%s: ", hlClr, ResetColor, assertLabel, hlClr, ResetColor)
+						d.printer.Errf("\n\t\t%sdon't contains%s:", hlClr, ResetColor)
 					} else if assertOp == "~" {
-						d.printer.Errf("\t%sExpected%s %s \n\t\t%sto match%s: ", hlClr, ResetColor, assertLabel, hlClr, ResetColor)
+						d.printer.Errf("\n\t\t%sto match%s:", hlClr, ResetColor)
 					} else if assertOp == "!~" {
-						d.printer.Errf("\t%sExpected%s %s \n\t\t%snot to match%s: ", hlClr, ResetColor, assertLabel, hlClr, ResetColor)
+						d.printer.Errf("\n\t\t%sdon't match%s:", hlClr, ResetColor)
 					}
 				}
+				lastOperator = assertOp
 				d.printer.Errf("\t[%s]", expected)
 			} else {
 				d.printer.Errf("assertion %s%s%s failed\n", assertLabel, assertOp, expected)
