@@ -50,7 +50,9 @@ func (d Suite) init() (err error) {
 			tooMuch INTEGER NOT NULL DEFAULT 0,
 			endTime INTEGER NOT NULL DEFAULT 0,
 			outcome TEXT NOT NULL DEFAULT 'Z',
-			outcomeOrder INTEGER DEFAULT 0
+			outcomeOrder INTEGER DEFAULT 0,
+			reported INTEGER NOT NULL DEFAULT 0,
+			kept INTEGER NOT NULL DEFAULT 0
 		);
 	`)
 	count, _ := res.RowsAffected()
@@ -205,22 +207,11 @@ func (d Suite) UpdateSuiteEndTime(suite string, end time.Time) (err error) {
 	p := logger.PerfTimer("suite", suite)
 	defer p.End()
 
-	/*
-		q, err := d.db.Prepare(`
-			UPDATE suite SET endTime = ?
-			WHERE name = ?
-		`)
-		if err != nil {
-			return
-		}*/
 	micros := end.UnixMicro()
-
 	_, err = d.db.Exec(`
 			UPDATE suite SET endTime = ?
 			WHERE name = ?
 		`, micros, suite)
-
-	//_, err = q.Exec(micros, suite)
 	return
 }
 
@@ -233,6 +224,34 @@ func (d Suite) UpdateSuiteOutcome(suite string, outcome model.Outcome) (err erro
 		UPDATE suite SET outcome = ?, outcomeOrder = ?
 		WHERE name = ? AND outcome > ?
 	`, outcome, order, suite, outcome)
+	return
+}
+
+func (d Suite) MarkSuiteReported(suite string, kept bool) (err error) {
+	p := logger.PerfTimer("suite", suite, "kept", kept)
+	defer p.End()
+
+	_, err = d.db.Exec(`
+		UPDATE suite SET reported = 1, kept = ?
+		WHERE name = ?
+	`, kept, suite)
+	return
+}
+
+func (d Suite) IsSuiteReported(suite string) (exists, reported, kept bool, err error) {
+	p := logger.PerfTimer("suite", suite)
+	defer p.End()
+
+	row := d.db.QueryRow(`
+		SELECT s.reported, s.kept
+		FROM suite s
+		WHERE s.name = @suite
+	`, sql.Named("suite", suite))
+	err = row.Scan(&reported, &kept)
+	if err == sql.ErrNoRows {
+		// Suite do not exists
+		return false, false, false, nil
+	}
 	return
 }
 

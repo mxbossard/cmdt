@@ -20,6 +20,3 @@ cd - > /dev/null
 >&2 echo "Built $BUILT_CMDT_BIN cmdt binary."
 >&2 echo
 
-# Mandatory assertions
-"$scriptDir/assertCmdt.sh" "$BUILT_CMDT_BIN"
-

@@ -88,11 +88,28 @@ func InitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 		cfg.Token = utilz.OptionalOf(token)
 	}
 
+	// Check if suite exists and it's status
+	testSuite := ctx.Config.TestSuite.Get()
+	exists, reported, kept, err := ctx.Repo.SuiteStatus(testSuite)
+	ProcessSuiteError(ctx, err)
+
+	if exists && !reported {
+		err = fmt.Errorf("cannot erase test suite: [%s] not reported yet", testSuite)
+		ProcessSuiteError(ctx, err)
+	}
+
+	if exists && kept {
+		err = fmt.Errorf("cannot erase test suite: [%s] which must be kept", testSuite)
+		ProcessSuiteError(ctx, err)
+	}
+
+	// Can erase previous suite if it exists
 	err = ctx.InitSuite()
 	ProcessSuiteError(ctx, err)
 
 	if !cfg.Async.Is(true) {
 		// On async init do not display
+		Dpl.ClearSuite(ctx)
 		Dpl.OpenSuite(ctx)
 		Dpl.SuiteTitle(ctx)
 	}
@@ -152,6 +169,13 @@ func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int16, err error) {
 			Dpl.CloseSuite(suiteCtx)
 		}
 	}
+	for _, outcome := range suiteOutcomes {
+		err = ctx.Repo.MarkSuiteReported(outcome.TestSuite, ctx.Config.Keep.GetOr(false))
+		if err != nil {
+			// FIXME: aggregate errors
+			return
+		}
+	}
 
 	return
 }
@@ -202,19 +226,17 @@ func reportTestSuite(ctx facade.SuiteContext) (suiteOutcome model.SuiteOutcome, 
 func ReportTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	//fmt.Printf("ReportTestSuite ctx suite: %s \n", ctx.Config.TestSuite.Get())
 	suiteOutcome, exitCode, err := reportTestSuite(ctx)
+	if err != nil {
+		return 1, err
+	}
 	//fmt.Printf("ReportTestSuite outcome suite: %s \n", suiteOutcome.TestSuite)
 
 	Dpl.ReportSuite(suiteOutcome)
 	if !ctx.Config.Keep.Is(true) {
 		Dpl.CloseSuite(ctx)
 	}
-	return
-}
 
-func ProcessReportDef0(def model.ReportDefinition) (exitCode int16, err error) {
-	//logger.Warn("ProcessReportDef()", "def", def)
-	ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.ReportAction, def.Config)
-	exitCode, err = ReportTestSuite(ctx)
+	err = ctx.Repo.MarkSuiteReported(ctx.Config.TestSuite.Get(), ctx.Config.Keep.GetOr(false))
 	return
 }
 

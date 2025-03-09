@@ -198,6 +198,14 @@ func (r dbRepo) UpdateLastTestTime(testSuite string) {
 	}
 }
 
+func (r dbRepo) MarkSuiteReported(suite string, kept bool) (err error) {
+	return r.suiteDao.MarkSuiteReported(suite, kept)
+}
+
+func (r dbRepo) SuiteStatus(suite string) (exists, reported, kept bool, err error) {
+	return r.suiteDao.IsSuiteReported(suite)
+}
+
 func (r dbRepo) LoadSuiteOutcome(testSuite string) (outcome model.SuiteOutcome, err error) {
 	outcome, err = r.testDao.GetSuiteOutcome(testSuite)
 	return

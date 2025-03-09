@@ -54,6 +54,10 @@ type Repo interface {
 
 	LoadSuiteOutcome(testSuite string) (outcome model.SuiteOutcome, err error)
 
+	MarkSuiteReported(suite string, kept bool) (err error)
+
+	SuiteStatus(suite string) (exists, reported, kept bool, err error)
+
 	IncrementSuiteSeq(testSuite, name string) (n uint16)
 
 	TestCount(testSuite string) (n uint16)

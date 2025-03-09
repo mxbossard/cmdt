@@ -136,6 +136,7 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 			d.openedSuite = op.Suite()
 			logger.Debug("Initializing test suite", "token", d.token, "isolation", d.isolation, "openedSuite", d.openedSuite)
 			ctx := facade.NewSuiteContext(d.token, d.isolation, d.openedSuite, false, model.InitAction, model.Config{})
+			d.display.ClearSuite(ctx)
 			d.display.OpenSuite(ctx)
 			d.display.SuiteTitle(ctx)
 		}
@@ -160,7 +161,8 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 			def := o.Definition
 			def.Token = d.token
 			def.Isolation = d.isolation
-			op.SetExitCode(uint16(d.reportAll(def)))
+			exitCode := d.reportAll(def)
+			op.SetExitCode(uint16(exitCode))
 		default:
 			err = fmt.Errorf("unknown operation %T", op)
 			return
@@ -226,6 +228,20 @@ func (d *daemon) report(def model.ReportDefinition) (exitCode int16, err error) 
 func (d *daemon) reportAll(def model.ReportDefinition) (exitCode int16) {
 	perf := logger.PerfTimer()
 	defer perf.End()
+
+	start := time.Now()
+
+	// Wait for some test until suite timeout
+	testCount := d.repo.NotReportedTestCount()
+	for testCount == 0 {
+		if time.Since(start) > def.Config.Timeout.Get() {
+			// FIXME: why not return an error ?
+			return 1
+		}
+		time.Sleep(time.Millisecond)
+		testCount = d.repo.NotReportedTestCount()
+	}
+
 	//d.display.DisplayAllRecorded(def.Config.Timeout.Get())
 	go func() {
 		err := d.display.TailAllBlocking(def.Config.Timeout.Get())

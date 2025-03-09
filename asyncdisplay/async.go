@@ -105,6 +105,18 @@ func (d AsyncDisplay) CloseSuite(ctx facade.SuiteContext) {
 	}
 }
 
+func (d AsyncDisplay) ClearSuite(ctx facade.SuiteContext) {
+	suite := ctx.Config.TestSuite.Get()
+	err := d.tailer.ClearSession(suite)
+	if err != nil {
+		panic(err)
+	}
+	err = d.screen.ClearSession(suite)
+	if err != nil {
+		panic(err)
+	}
+}
+
 func (d AsyncDisplay) SuiteTitle(ctx facade.SuiteContext) {
 	suite := ctx.Config.TestSuite.Get()
 	session := d.screen.Session(suite, 0)
@@ -339,14 +351,14 @@ func (d *AsyncDisplay) SetVerbose(level model.VerboseLevel) {
 }
 
 /** TODO: doc */
-func (d *AsyncDisplay) ClearSession(suite string) error {
+func (d *AsyncDisplay) ClearSession0(suite string) error {
 	err := d.tailer.ClearSession(suite)
 	fmt.Printf("async screen cleared session: [%s]\n", suite)
 	return err
 }
 
 /** TODO: doc */
-func (d *AsyncDisplay) Clear() error {
+func (d *AsyncDisplay) Clear0() error {
 	err := d.tailer.Clear()
 	fmt.Printf("async screen cleared\n")
 	return err
