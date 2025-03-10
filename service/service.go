@@ -15,7 +15,6 @@ import (
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/errorz"
 	"mby.fr/utils/printz"
-	"mby.fr/utils/utilz"
 	"mby.fr/utils/zlog"
 )
 
@@ -51,73 +50,7 @@ func GlobalConfig(ctx facade.GlobalContext) (exitCode int16, err error) {
 	return
 }
 
-/*
-func ProcessInitTestSuiteDef(def model.InitSuiteDefinition) (exitCode int16) {
-	var err error
-	ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.InitAction, model.Config{})
-	exitCode, err = InitTestSuite(ctx)
-	if err != nil {
-		errorz.Fatal(err)
-	}
-	return
-}
-*/
-
-func InitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
-	logger.Debug("Initializing test suite", "token", ctx.Token, "isolation", ctx.Isolation, "suites", ctx.Config.TestSuite)
-	// Clear and Init new test suite
-	exitCode = 0
-	cfg := ctx.Config
-
-	var token string
-	if cfg.PrintToken.Is(true) {
-		token, err = utils.ForgeUuid()
-		if err != nil {
-			return
-		}
-		logger.Debug("printToken", "token", ctx.Token)
-		fmt.Printf("%s\n", token)
-		cfg.Token = utilz.OptionalOf(token)
-	} else if cfg.ExportToken.Is(true) {
-		token, err = utils.ForgeUuid()
-		if err != nil {
-			return
-		}
-		logger.Debug("exportToken", "token", ctx.Token)
-		fmt.Printf("export %s=%s\n", model.ContextTokenEnvVarName, token)
-		cfg.Token = utilz.OptionalOf(token)
-	}
-
-	// Check if suite exists and it's status
-	testSuite := ctx.Config.TestSuite.Get()
-	exists, reported, kept, err := ctx.Repo.SuiteStatus(testSuite)
-	ProcessSuiteError(ctx, err)
-
-	if exists && !reported {
-		err = fmt.Errorf("cannot erase test suite: [%s] not reported yet", testSuite)
-		ProcessSuiteError(ctx, err)
-	}
-
-	if exists && kept {
-		err = fmt.Errorf("cannot erase test suite: [%s] which must be kept", testSuite)
-		ProcessSuiteError(ctx, err)
-	}
-
-	// Can erase previous suite if it exists
-	err = ctx.InitSuite()
-	ProcessSuiteError(ctx, err)
-
-	if !cfg.Async.Is(true) {
-		// On async init do not display
-		Dpl.ClearSuite(ctx)
-		Dpl.OpenSuite(ctx)
-		Dpl.SuiteTitle(ctx)
-	}
-
-	return
-}
-
-func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int16, err error) {
+func reportAllTestSuites(ctx facade.GlobalContext) (exitCode int16, err error) {
 	exitCode = 1
 	token := ctx.Token
 	isolation := ctx.Isolation
@@ -183,7 +116,7 @@ func ReportAllTestSuites(ctx facade.GlobalContext) (exitCode int16, err error) {
 func ProcessReportAllDef(def model.ReportDefinition) (exitCode int16) {
 	var err error
 	ctx := facade.NewGlobalContext(def.Token, def.Isolation, model.Config{})
-	exitCode, err = ReportAllTestSuites(ctx)
+	exitCode, err = reportAllTestSuites(ctx)
 	if err != nil {
 		errorz.Fatal(err)
 	}
@@ -223,7 +156,10 @@ func reportTestSuite(ctx facade.SuiteContext) (suiteOutcome model.SuiteOutcome, 
 	return
 }
 
-func ReportTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
+func ProcessReportDef(def model.ReportDefinition) (exitCode int16, err error) {
+	//logger.Warn("ProcessReportDef()", "def", def)
+	ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.ReportAction, def.Config)
+
 	//fmt.Printf("ReportTestSuite ctx suite: %s \n", ctx.Config.TestSuite.Get())
 	suiteOutcome, exitCode, err := reportTestSuite(ctx)
 	if err != nil {
@@ -237,17 +173,11 @@ func ReportTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	}
 
 	err = ctx.Repo.MarkSuiteReported(ctx.Config.TestSuite.Get(), ctx.Config.Keep.GetOr(false))
+
 	return
 }
 
-func ProcessReportDef(def model.ReportDefinition) (exitCode int16, err error) {
-	//logger.Warn("ProcessReportDef()", "def", def)
-	ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.ReportAction, def.Config)
-	exitCode, err = ReportTestSuite(ctx)
-	return
-}
-
-func PerformTest(testDef model.TestDefinition) (exitCode int16, err error) {
+func performTest(testDef model.TestDefinition) (exitCode int16, err error) {
 	logger.Debug("Performing test")
 	exitCode = 1
 	cfg := testDef.Config
@@ -318,8 +248,6 @@ func PerformTest(testDef model.TestDefinition) (exitCode int16, err error) {
 
 	if cfg.StopOnFailure.Is(true) && outcome.Outcome != model.PASSED {
 		exitCode = max(outcome.ExitCode, 1)
-		//ReportTestSuite(ctx)
-		// FIXME do we need to call ReportTestSuite ?
 	} else {
 		exitCode = 0
 	}
@@ -357,7 +285,7 @@ func ProcessTestDef(testDef model.TestDefinition) (exitCode int16) {
 
 	if testCfg.ContainerDisabled.Is(true) || testCfg.ContainerImage.IsEmpty() {
 		logger.Debug("Performing test outside container", "image", testCfg.ContainerImage, "containerDisabled", testCfg.ContainerDisabled, "testConfig", testCfg)
-		exitCode, err = PerformTest(testDef)
+		exitCode, err = performTest(testDef)
 
 		ProcessTestError(testCtx, err)
 	} else {
@@ -473,7 +401,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		logger.Info("Processing init action", "token", token)
 		Dpl.Quiet(suiteCtx.Config.Quiet.Is(true))
 
-		exitCode, err = InitTestSuite(suiteCtx)
+		exitCode, err = cliInitTestSuite(suiteCtx)
 
 	case model.ReportAction:
 		// Report can be async (run by daemon) or not
@@ -566,7 +494,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				daemonIsol = globalCtx.Isolation
 				daemonToken = globalCtx.Token
 			} else {
-				exitCode, err = ReportAllTestSuites(globalCtx)
+				exitCode, err = reportAllTestSuites(globalCtx)
 			}
 		} else {
 			// Reporting One test suite
@@ -625,12 +553,12 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				if suiteCtx.Config.Wait.Is(true) {
 					wait = func() int16 {
 						// FIXME: bad timeout
-						p := logger.QualifiedPerfTimer("waiting report done ...", "suite", testSuite)
+						pt := logger.QualifiedPerfTimer("waiting report done ...", "suite", testSuite)
+						defer pt.End()
 						exitCode, err = suiteCtx.Repo.WaitOperationDone(&op, suiteCtx.Config.SuiteTimeout.Get())
 						if err != nil {
 							panic(err)
 						}
-						p.End()
 						return exitCode
 					}
 				} else {
@@ -648,7 +576,6 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				daemonToken = suiteCtx.Token
 			} else {
 				logger.Info("executing report in sync", "suite", testSuite)
-				//exitCode, err = ReportTestSuite(suiteCtx)
 				exitCode, err = ProcessReportDef(def)
 				suiteCtx.Repo.Done(&op)
 			}

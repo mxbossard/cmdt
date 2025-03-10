@@ -112,7 +112,6 @@ func (r dbRepo) InitSuite(cfg model.Config) (err error) {
 		return
 	}
 
-	//err = persistSuiteConfig(r.token, cfg)
 	err = r.SaveSuiteConfig(cfg)
 	if err != nil {
 		err = fmt.Errorf("unable to init suite: %w", err)
