@@ -197,12 +197,13 @@ $cmdtIn @test=timeout_async/report $noPanic @exit=1 @stderr:"PASSED" @stderr!:"I
 
 ## Flow test
 
-syncOpenExpected="$noPanic"
+syncOpenExpected="$noPanic @stderr:Test suite ["
 syncTestExpected="$noPanic @stderr:#01 @stderr!:#02"
 syncReportExpected="$noPanic @stderr:1 success"
-asyncOpenExpected="$noPanic"
-asyncTestExpected="$noPanic @stderr!:#01 @stderr!:#02"
-asyncReportExpected="$noPanic @stderr:#01 @stderr!:#02 @stderr:1 success"
+asyncOpenExpected="@stderr="
+#asyncTestExpected="$noPanic @stderr!:#01 @stderr!:#02"
+asyncTestExpected="@stderr="
+asyncReportExpected="$noPanic @stderr:Test suite [ @stderr:#01 @stderr!:#02 @stderr:1 success"
 
 $cmdtIn @init=sync_suite_flow
 $cmdtIn @test=sync_suite_flow/A_open $syncOpenExpected @-- $newCmdt1 @init=sync_suite_flow_sub @async=false @verbose=5 @suiteTimeout=2s
@@ -222,20 +223,33 @@ $cmdtIn @test=sync_suite_flow/E_test $syncTestExpected @stderr:t5 @-- $newCmdt1 
 $cmdtIn @test=sync_suite_flow/E_report_all $syncReportExpected @stderr!:t1 @stderr!:t2 @stderr!:t3 @stderr!:t4 @stderr!:t5 @-- $newCmdt1 @report
 
 $cmdtIn @init=async_suite_flow
+#>&2 echo "A1"
 $cmdtIn @test=async_suite_flow/A_open $asyncOpenExpected @-- $newCmdt1 @init=async_suite_flow_sub @async=true @verbose=5 @suiteTimeout=2s
+#>&2 echo "A2"
 $cmdtIn @test=async_suite_flow/A_test $asyncTestExpected @-- $newCmdt1 @test=async_suite_flow_sub/t1 true
+#>&2 echo "A3"
 $cmdtIn @test=async_suite_flow/A_report_suite $asyncReportExpected @stderr:t1 @-- $newCmdt1 @report=async_suite_flow_sub
+#>&2 echo "A4"
 
-sleep 3
+sleepTime=0
+sleep $sleepTime
+#>&2 echo "B1"
 $cmdtIn @test=async_suite_flow/B0_reopen $asyncOpenExpected @-- $newCmdt1 @init=async_suite_flow_sub @async=true @verbose=5 @suiteTimeout=2s
+#>&2 echo "B2"
 $cmdtIn @test=async_suite_flow/B0_test $asyncTestExpected @-- $newCmdt1 @test=async_suite_flow_sub/t2 true
+#>&2 echo "B3"
 $cmdtIn @test=async_suite_flow/B0_report_suite $asyncReportExpected @stderr:t2 @stderr!:t1 @-- $newCmdt1 @report=async_suite_flow_sub
+#>&2 echo "B4"
 
 for i in $( seq 1 10 ); do
-	sleep 3
+	sleep $sleepTime
+	#>&2 echo "B1-$i"
 	$cmdtIn @test=async_suite_flow/B${i}_reopen $asyncOpenExpected @-- $newCmdt1 @init=async_suite_flow_sub @async=true @verbose=5 @suiteTimeout=2s
+	#>&2 echo "B2-$i"
 	$cmdtIn @test=async_suite_flow/B${i}_test $asyncTestExpected @-- $newCmdt1 @test=async_suite_flow_sub/tB${i}z true
+	#>&2 echo "B3-$i"
 	$cmdtIn @test=async_suite_flow/B${i}_report_suite $asyncReportExpected @stderr:tB${i}z @stderr!:t1 @stderr!=t2 @-- $newCmdt1 @report=async_suite_flow_sub
+	#>&2 echo "B4-$i"
 done
 
 exit 1

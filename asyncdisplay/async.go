@@ -42,6 +42,7 @@ func testDisplayerKey(ctx facade.TestContext) string {
 type AsyncDisplay struct {
 	verbose model.VerboseLevel
 	quiet   bool
+	tmpDir  string
 
 	screen screen.Sink
 	tailer screen.Tailer
@@ -107,11 +108,20 @@ func (d AsyncDisplay) CloseSuite(ctx facade.SuiteContext) {
 
 func (d AsyncDisplay) ClearSuite(ctx facade.SuiteContext) {
 	suite := ctx.Config.TestSuite.Get()
-	err := d.tailer.ClearSession(suite)
-	if err != nil {
-		panic(err)
+	if d.tailer != nil {
+		err := d.tailer.ClearSession(suite)
+		if err != nil {
+			panic(err)
+		}
 	}
-	err = d.screen.ClearSession(suite)
+	if d.screen != nil {
+		err := d.screen.ClearSession(suite)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	err := screen.ClearSession(d.tmpDir, suite)
 	if err != nil {
 		panic(err)
 	}
@@ -350,20 +360,6 @@ func (d *AsyncDisplay) SetVerbose(level model.VerboseLevel) {
 	d.verbose = level
 }
 
-/** TODO: doc */
-func (d *AsyncDisplay) ClearSession0(suite string) error {
-	err := d.tailer.ClearSession(suite)
-	fmt.Printf("async screen cleared session: [%s]\n", suite)
-	return err
-}
-
-/** TODO: doc */
-func (d *AsyncDisplay) Clear0() error {
-	err := d.tailer.Clear()
-	fmt.Printf("async screen cleared\n")
-	return err
-}
-
 /** Launch a goroutine to flush the display. */
 func (d *AsyncDisplay) AsyncFlush(suite string, timeout time.Duration) {
 	go func() {
@@ -386,11 +382,9 @@ func (d *AsyncDisplay) AsyncFlushAll(timeout time.Duration) {
 func (d *AsyncDisplay) TailBlocking(suite string, timeout time.Duration) error {
 	// Wait for tailer to be started
 	startTime := time.Now()
-	for d.tailer == nil {
-		if time.Since(startTime) > timeout {
-			panic(fmt.Sprintf("timeout reached waiting for screen tailer: [%s]", timeout))
-		}
-		time.Sleep(1 * time.Millisecond)
+	err := d.WaitForTailerInit(timeout)
+	if err != nil {
+		return err
 	}
 	updatedTimeout := timeout - time.Since(startTime)
 	logger.Debug("TailBlocking ...", "suite", suite)
@@ -401,23 +395,37 @@ func (d *AsyncDisplay) TailBlocking(suite string, timeout time.Duration) error {
 func (d *AsyncDisplay) TailAllBlocking(timeout time.Duration) error {
 	// Wait for tailer to be started
 	startTime := time.Now()
-	for d.tailer == nil {
-		if time.Since(startTime) > timeout {
-			panic(fmt.Sprintf("timeout reached waiting for screen tailer: [%s]", timeout))
-		}
-		time.Sleep(1 * time.Millisecond)
+	err := d.WaitForTailerInit(timeout)
+	if err != nil {
+		return err
 	}
 	updatedTimeout := timeout - time.Since(startTime)
 	logger.Debug("TailAllBlocking ...")
 	return d.tailer.TailAllBlocking(updatedTimeout)
 }
 
+func (d *AsyncDisplay) WaitForTailerInit(timeout time.Duration) error {
+	startTime := time.Now()
+	for d.tailer == nil {
+		if time.Since(startTime) > timeout {
+			return fmt.Errorf("timeout reached waiting for screen tailer: [%s]", timeout)
+		}
+		time.Sleep(1 * time.Millisecond)
+	}
+	return nil
+}
+
+func zcreenTmpDir(tmpDir string) string {
+	return filepath.Join(tmpDir, "zcreen")
+}
+
 func New(tmpDir string, init bool, outs printz.Outputs) *AsyncDisplay {
 	openedTests := make(map[string]display.TestDisplayer, 0)
-	zcreenTmpDir := filepath.Join(tmpDir, "zcreen")
+	zcreenTmpDir := zcreenTmpDir(tmpDir)
 	logger.Info("Building new async display", "zcreenTmpDir", zcreenTmpDir)
 
 	d := &AsyncDisplay{
+		tmpDir:         zcreenTmpDir,
 		outFormatter:   inout.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", display.TestColor, display.ResetColor)},
 		errFormatter:   inout.PrefixFormatter{Prefix: fmt.Sprintf("%serr%s>", display.ReportColor, display.ResetColor)},
 		verbose:        model.DefaultVerboseLevel,

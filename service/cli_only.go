@@ -3,9 +3,11 @@ package service
 import (
 	"fmt"
 
+	"mby.fr/cmdtest/asyncdisplay"
 	"mby.fr/cmdtest/facade"
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/utils"
+	"mby.fr/utils/printz"
 	"mby.fr/utils/utilz"
 )
 
@@ -53,12 +55,14 @@ func cliInitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	err = ctx.InitSuite()
 	ProcessSuiteError(ctx, err)
 
-	Dpl.ClearSuite(ctx)
-
 	if !cfg.Async.Is(true) {
-		// On async init do not display
+		Dpl.ClearSuite(ctx)
 		Dpl.OpenSuite(ctx)
 		Dpl.SuiteTitle(ctx)
+	} else {
+		// On async init do not display but attempt to clear session
+		asyncDpl := asyncdisplay.New(ctx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
+		asyncDpl.ClearSuite(ctx)
 	}
 
 	return
