@@ -252,6 +252,7 @@ for i in $( seq 1 10 ); do
 	#>&2 echo "B4-$i"
 done
 
+$cmdtIn @report
 exit 1
 
 $cmdtIn @test=async_suite_flow/C_reopen $asyncOpenExpected @-- $newCmdt1 @init=async_suite_flow_sub @async=true @verbose=5 @suiteTimeout=2s
