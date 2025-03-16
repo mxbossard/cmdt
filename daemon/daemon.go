@@ -80,6 +80,7 @@ func (d *daemon) run() {
 
 	for {
 		if time.Since(debugTime) > time.Second {
+			// fmt.Printf("\n<<>> Daemon is running ... \n")
 			debugTime = time.Now()
 			logger.Trace("DAEMON: running", "token", d.token, "for", time.Since(startTime))
 		}
@@ -87,6 +88,7 @@ func (d *daemon) run() {
 		if op, err := d.unqueue(); err != nil {
 			panic(err)
 		} else if op != nil {
+			lastUnqueue = time.Now()
 			_, err := d.process(op)
 			if err != nil {
 				logger.Errorf("DAEMON ERROR: %s", err)
@@ -99,15 +101,14 @@ func (d *daemon) run() {
 			if duration > ExtraRunningSecs*time.Second {
 				logger.Debug("DAEMON: nothing to unqueue", "duration", duration, "token", d.token)
 				// More than ExtraRunningSecs since last unqueue
+				// fmt.Printf("\n<<>> Stopping daemon\n")
 				break
 			}
 			time.Sleep(AsyncPollingSleepInMs * time.Millisecond)
 			continue
 		}
-
-		lastUnqueue = time.Now()
-
 	}
+	// fmt.Printf("\n<<>> Stopping daemon\n")
 	logger.Warn("DAEMON: stopping ...", "token", d.token, "after", time.Since(startTime))
 }
 
@@ -212,12 +213,12 @@ func (d *daemon) report(def model.ReportDefinition) (exitCode int16, err error) 
 	}
 
 	//d.display.DisplayRecorded(def.TestSuite, def.Config.Timeout.Get())
-	go func() {
-		err = d.display.TailBlocking(def.TestSuite, def.Config.Timeout.Get())
-		if err != nil {
-			panic(err)
-		}
-	}()
+	// go func() {
+	// 	err = d.display.TailBlocking(def.TestSuite, def.Config.Timeout.Get())
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+	// }()
 
 	exitCode, err = service.ProcessReportDef(def)
 	logger.Debug("Closing test suite", "token", def.Token, "isolation", def.Isolation, "openedSuite", d.openedSuite)
@@ -243,14 +244,14 @@ func (d *daemon) reportAll(def model.ReportDefinition) (exitCode int16) {
 	}
 
 	//d.display.DisplayAllRecorded(def.Config.Timeout.Get())
-	go func() {
-		err := d.display.TailAllBlocking(def.Config.Timeout.Get())
-		if err != nil {
-			panic(err)
-		}
-	}()
+	// go func() {
+	// 	err := d.display.TailAllBlocking(def.Config.Timeout.Get())
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+	// }()
 	exitCode = service.ProcessReportAllDef(def)
-	logger.Debug("Closing test suite", "token", def.Token, "isolation", def.Isolation, "openedSuite", d.openedSuite)
+	logger.Debug("Closing all test suites", "token", def.Token, "isolation", def.Isolation)
 	d.openedSuite = ""
 	//d.display.Clear()
 	return
@@ -258,6 +259,7 @@ func (d *daemon) reportAll(def model.ReportDefinition) (exitCode int16) {
 
 func (d daemon) ReadPid() string {
 	pidFilepath := filepath.Join(d.repo.BackingFilepath(), DaemonPidFilename)
+	//fmt.Printf("reading PID file: %s ...", pidFilepath)
 	pid, err := filez.ReadString(pidFilepath)
 	if os.IsNotExist(err) {
 		return ""
@@ -324,6 +326,7 @@ func TakeOver() {
 		panic(err)
 	}
 	if !locked {
+		fmt.Printf("Cannot locked file to start daemon properly !")
 		os.Exit(2)
 	}
 
@@ -369,14 +372,18 @@ func TakeOver() {
 	logger.Info("daemon taking over")
 
 	// Run daemon
+	//fmt.Printf("\n<<>> Running new daemon ; pid: %d ; isol: %s ; token: %s\n", os.Getpid(), isolation, token)
 	d.run()
 
 	// Lock prior last unqueue
+	lockCtx, cancel = context.WithTimeout(context.Background(), LockWatingSecs*time.Second)
+	defer cancel()
 	locked, err = fileLock.TryLockContext(lockCtx, time.Millisecond)
 	if err != nil && err != context.DeadlineExceeded {
 		panic(err)
 	}
 	if !locked {
+		fmt.Printf("Cannot locked file to stop daemon properly !")
 		os.Exit(2)
 	}
 
@@ -391,6 +398,8 @@ func TakeOver() {
 
 	// Release file lock
 	fileLock.Unlock()
+
+	//fmt.Printf("\n<<>> Stopped daemon ; isol: %s ; token: %s\n", isolation, token)
 
 	os.Exit(0)
 }

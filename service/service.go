@@ -170,6 +170,8 @@ func ProcessReportDef(def model.ReportDefinition) (exitCode int16, err error) {
 	Dpl.ReportSuite(suiteOutcome)
 	if !ctx.Config.Keep.Is(true) {
 		Dpl.CloseSuite(ctx)
+		Dpl.ClearSuite(ctx)
+		fmt.Printf("\n<<>> Cleared suite: %s\n", suiteOutcome.TestSuite)
 	}
 
 	err = ctx.Repo.MarkSuiteReported(ctx.Config.TestSuite.Get(), ctx.Config.Keep.GetOr(false))
@@ -463,11 +465,6 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 					errorz.Fatal(err)
 				}
 
-				asyncDpl := asyncdisplay.New(globalCtx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
-				//asyncDpl.StartDisplayAllRecorded(globalCtx.Config.SuiteTimeout.Get())
-
-				err = asyncDpl.TailAllBlocking(globalCtx.Config.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
-				ProcessGlobalError(globalCtx, err)
 				// if err != nil {
 				// 	errorz.Fatal(err)
 				// }
@@ -490,6 +487,12 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				// } else {
 				// 	exitCode = 0
 				// }
+
+				asyncDpl := asyncdisplay.New(globalCtx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
+				//asyncDpl.StartDisplayAllRecorded(globalCtx.Config.SuiteTimeout.Get())
+
+				err = asyncDpl.TailAllBlocking(globalCtx.Config.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
+				ProcessGlobalError(globalCtx, err)
 
 				daemonIsol = globalCtx.Isolation
 				daemonToken = globalCtx.Token

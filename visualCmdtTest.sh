@@ -44,8 +44,8 @@ $newCmdt1 @init=sync_visual @verbose=5 @suiteTimeout=$((count/2+2))s
 >&2 echo "Launching tests ..."
 for i in $( seq 1 $count ); do
 	>&2 echo -n "$i "
-	time=$( echo "scale=2;$i/20 + 0.1" | bc )
-	$newCmdt1 @test=sync_visual/t$i @stdout:"end$i" @-- sh -c "sleep $time; echo end$i"
+	time=$( echo "scale=1;$i/20 + 0.11" | bc )
+	$newCmdt1 @test=sync_visual/tA$i @stdout:"endA$i" @-- sh -c "sleep $time; echo endA$i"
 done
 >&2 echo "done tests"
 $newCmdt1 @report=sync_visual
@@ -59,23 +59,37 @@ $newCmdt1 @init=async_visual @async @verbose=5 @suiteTimeout=$((count/2+2))s
 >&2 echo "Launching tests ..."
 for i in $( seq 1 $count ); do
 	>&2 echo -n "$i "
-	time=$( echo "scale=2;$i/20 + 0.1" | bc )
-	$newCmdt1 @test=async_visual/t$i @stdout:"end$i" @-- sh -c "sleep $time; echo end$i"
+	time=$( echo "scale=1;$i/20 + 0.12" | bc )
+	$newCmdt1 @test=async_visual/tB$i @stdout:"endB$i" @-- sh -c "sleep $time; echo endB$i"
 done
 >&2 echo "done tests"
 $newCmdt1 @report=async_visual
 >&2 echo "done report"
 
 >&2 echo
+>&2 echo "## Visual test in sync report all"
+$newCmdt1 @init=sync_reportall_visual @verbose=5 @suiteTimeout=$((count/2+2))s
+>&2 echo "Launching tests ..."
+for i in $( seq 1 $count ); do
+	>&2 echo -n "$i "
+	time=$( echo "scale=1;$i/20 + 0.13" | bc )
+	$newCmdt1 @test=sync_reportall_visual/tC$i @stdout:"endC$i" @-- sh -c "sleep $time; echo endC$i"
+done
+>&2 echo "done tests"
+$newCmdt1 @report
+>&2 echo "done report"
+
+rm -rf -- /tmp/cmdt*.log /tmp/daemon*.log 2> /dev/null || true
+>&2 echo
 >&2 echo "## Visual test async report all"
 $newCmdt1 @init=async_reportall_visual @async @verbose=5 @suiteTimeout=$((count/2+2))s
 >&2 echo "Launching tests ..."
 for i in $( seq 1 $count ); do
 	>&2 echo -n "$i "
-	time=$( echo "scale=2;$i/20 + 0.1" | bc )
-	$newCmdt1 @test=async_reportall_visual/t$i @stdout:"end$i" @-- sh -c "sleep $time; echo end$i"
+	time=$( echo "scale=1;$i/20 + 0.14" | bc )
+	$newCmdt1 @test=async_reportall_visual/tD$i @stdout:"endD$i" @-- sh -c "sleep $time; echo endD$i"
 done
 >&2 echo "done tests"
-$newCmdt1 @report
+$newCmdt1 @report @async
 >&2 echo "done report"
 
