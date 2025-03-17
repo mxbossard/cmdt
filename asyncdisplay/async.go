@@ -121,10 +121,10 @@ func (d AsyncDisplay) ClearSuite(ctx facade.SuiteContext) {
 		}
 	}
 
-	err := screen.ClearSession(d.tmpDir, suite)
-	if err != nil {
-		panic(err)
-	}
+	// err := screen.ClearSession(d.tmpDir, suite)
+	// if err != nil {
+	// 	panic(err)
+	// }
 }
 
 func (d AsyncDisplay) SuiteTitle(ctx facade.SuiteContext) {
