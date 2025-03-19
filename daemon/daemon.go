@@ -212,14 +212,6 @@ func (d *daemon) report(def model.ReportDefinition) (exitCode int16, err error) 
 		testCount = d.repo.TestCount(def.TestSuite)
 	}
 
-	//d.display.DisplayRecorded(def.TestSuite, def.Config.Timeout.Get())
-	// go func() {
-	// 	err = d.display.TailBlocking(def.TestSuite, def.Config.Timeout.Get())
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-	// }()
-
 	exitCode, err = service.ProcessReportDef(def)
 	logger.Debug("Closing test suite", "token", def.Token, "isolation", def.Isolation, "openedSuite", d.openedSuite)
 	d.openedSuite = ""
@@ -243,13 +235,6 @@ func (d *daemon) reportAll(def model.ReportDefinition) (exitCode int16) {
 		testCount = d.repo.NotReportedTestCount()
 	}
 
-	//d.display.DisplayAllRecorded(def.Config.Timeout.Get())
-	// go func() {
-	// 	err := d.display.TailAllBlocking(def.Config.Timeout.Get())
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-	// }()
 	exitCode = service.ProcessReportAllDef(def)
 	logger.Debug("Closing all test suites", "token", def.Token, "isolation", def.Isolation)
 	d.openedSuite = ""

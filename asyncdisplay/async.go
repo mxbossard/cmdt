@@ -80,7 +80,6 @@ func (d AsyncDisplay) OpenSuite(ctx facade.SuiteContext) {
 	if err != nil {
 		panic(err)
 	}
-	// fmt.Printf("Opened zcreen session: %s\n", suite)
 	err = session.Flush()
 	if err != nil {
 		panic(err)
@@ -94,12 +93,6 @@ func (d AsyncDisplay) CloseSuite(ctx facade.SuiteContext) {
 	if err != nil {
 		panic(err)
 	}
-	// Must clear session from tailer
-	// err = d.screen.ClearSession(suite)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// fmt.Printf("Cleared zcreen session: %s\n", suite)
 	err = session.Flush()
 	if err != nil {
 		panic(err)
@@ -120,11 +113,6 @@ func (d AsyncDisplay) ClearSuite(ctx facade.SuiteContext) {
 			panic(err)
 		}
 	}
-
-	// err := screen.ClearSession(d.tmpDir, suite)
-	// if err != nil {
-	// 	panic(err)
-	// }
 }
 
 func (d AsyncDisplay) SuiteTitle(ctx facade.SuiteContext) {

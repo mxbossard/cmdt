@@ -98,8 +98,9 @@ func reportAllTestSuites(ctx facade.GlobalContext) (exitCode int16, err error) {
 	Dpl.ReportAllFooter(ctx)
 
 	for _, suiteCtx := range suiteContexts {
+		Dpl.CloseSuite(suiteCtx)
 		if !suiteCtx.Config.Keep.Is(true) {
-			Dpl.CloseSuite(suiteCtx)
+
 		}
 	}
 	for _, outcome := range suiteOutcomes {
@@ -168,10 +169,9 @@ func ProcessReportDef(def model.ReportDefinition) (exitCode int16, err error) {
 	//fmt.Printf("ReportTestSuite outcome suite: %s \n", suiteOutcome.TestSuite)
 
 	Dpl.ReportSuite(suiteOutcome)
+	Dpl.CloseSuite(ctx)
 	if !ctx.Config.Keep.Is(true) {
-		Dpl.CloseSuite(ctx)
-		Dpl.ClearSuite(ctx)
-		fmt.Printf("\n<<>> Cleared suite: %s\n", suiteOutcome.TestSuite)
+		//Dpl.ClearSuite(ctx)
 	}
 
 	err = ctx.Repo.MarkSuiteReported(ctx.Config.TestSuite.Get(), ctx.Config.Keep.GetOr(false))
@@ -569,11 +569,10 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				}
 
 				asyncDpl := asyncdisplay.New(suiteCtx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
-				//asyncDpl.StartDisplayRecorded(testSuite, suiteCtx.Config.SuiteTimeout.Get())
 				err = asyncDpl.TailBlocking(testSuite, suiteCtx.Config.SuiteTimeout.Get())
 				ProcessSuiteError(suiteCtx, err)
-				//suiteCtx.Repo.WaitEmptyQueue(testSuite, suiteCtx.Config.SuiteTimeout.Get())
-				//asyncDpl.WaitDisplayRecorded()
+
+				asyncDpl.ClearSuite(suiteCtx)
 
 				daemonIsol = suiteCtx.Isolation
 				daemonToken = suiteCtx.Token
