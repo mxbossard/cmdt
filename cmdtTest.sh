@@ -38,7 +38,9 @@ rm -rf -- /tmp/cmdt* /tmp/cmdt.log /tmp/daemon.log 2> /dev/null || true
 export -n __CMDT_TOKEN
 #$cmdt @init=main
 
+cannotReinitMsg="cannot erase test suite"
 nothingToReportExpectedStderrMsg="you must perform some test prior to report"
+
 >&2 echo "## Test @report without test"
 $cmdtIn @init=meta0 #@verbose=4
 $cmdtIn @test=meta0/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt0 @report=foo #@debug=4
@@ -106,22 +108,22 @@ newCmdt0="$newCmdt0 @token=$newTk"
 newCmdt1="$newCmdt1 @token=$newTk"
 
 >&2 echo "## Test Suite re-init"
-$cmdtIn @init=reinit
+$cmdtIn @init=reinit #@verbose=5
 $cmdtIn @test=reinit/ @-- $newCmdt1 @test=sub1/ true
-$cmdtIn @test=reinit/ @-- $newCmdt1 @init=sub1
-$cmdtIn @test=reinit/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=sub1
+$cmdtIn @test=reinit/ @fail @stderr:"$cannotReinitMsg" @-- $newCmdt1 @init=sub1
+$cmdtIn @test=reinit/ @stderr:"1 success" @-- $newCmdt1 @report=sub1
 
 $cmdtIn @test=reinit/ @-- $newCmdt1 @keepOutputs @test=sub2/ true
-$cmdtIn @test=reinit/ @-- $newCmdt1 @keepOutputs @init=sub2
+$cmdtIn @test=reinit/ @fail @stderr:"$cannotReinitMsg" @-- $newCmdt1 @keepOutputs @init=sub2
 $cmdtIn @test=reinit/ @-- $newCmdt1 @keepOutputs @test=sub2/ true
 $cmdtIn @test=reinit/ @-- $newCmdt1 @keepOutputs @test=sub2/ true
-$cmdtIn @test=reinit/ @stderr:"2 success" @-- $newCmdt1 @report=sub2
+$cmdtIn @test=reinit/ @stderr:"3 success" @-- $newCmdt1 @report=sub2
 
 $cmdtIn @test=reinit/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=sub3
 $cmdtIn @test=reinit/ @-- $newCmdt1 @test=sub3/ true
-$cmdtIn @test=reinit/ @-- $newCmdt1 @init=sub3
+$cmdtIn @test=reinit/ @fail @stderr:"$cannotReinitMsg" @-- $newCmdt1 @init=sub3
 $cmdtIn @test=reinit/ @-- $newCmdt1 @test=sub3/ true
-$cmdtIn @test=reinit/ @-- $newCmdt1 @report=sub3
+$cmdtIn @test=reinit/ @stderr:"2 success" @-- $newCmdt1 @report=sub3
 $cmdtIn @test=reinit/ @-- $newCmdt1 @init=sub3
 $cmdtIn @test=reinit/ @-- $newCmdt1 @test=sub3/ true
 $cmdtIn @test=reinit/ @stderr:"1 success" @-- $newCmdt1 @report=sub3
@@ -394,7 +396,7 @@ $cmdtIn @test=mutually_exclusive_rules/ @fail "$merExpectedMsgRule" @-- $newCmdt
 $cmdtIn @test=mutually_exclusive_rules/ @fail "$merExpectedMsgRule" @-- $newCmdt1 @test @report
 
 # Assertions are only accepted on test actions
-for action in @global @init @report; do
+for action in @global @init=baz @report; do
 	for assertion in @success @fail @exit=0 @cmd=true @stdout= @stderr= @exists=foo; do
 		$cmdtIn @test=mutually_exclusive_rules/ @fail "$actionExpectedMsgRule" @-- $newCmdt1 "$action" "$assertion"
 	done
@@ -423,15 +425,15 @@ done
 >&2 echo "## Test flow"
 $cmdt @init=main 2> /dev/null # clear main test suite
 $cmdtIn @init=test_flow
-$cmdtIn @test=test_flow/ @-- $newCmdt1 @init=main
-$cmdtIn @test=test_flow/ @stderr:"#01" @stderr:PASSED @-- $newCmdt1 @fail false
-$cmdtIn @test=test_flow/ @stderr:"#02" @stderr:PASSED @-- $newCmdt1 true
-$cmdtIn @test=test_flow/ @fail @stderr:"you can't use rule:" @-- $newCmdt1 "@test" "@fork=5" # Should error because of bad param
-$cmdtIn @test=test_flow/ @stderr:"#04" @stderr:ERROR @-- $newCmdt1 doNotExists @stderr:"not executed" # Should error because of not executable
-$cmdtIn @test=test_flow/ @stderr:"#05" @stderr:PASSED @-- $newCmdt1 true
-$cmdtIn @test=test_flow/ @fail @stderr:"3 success" @stderr:"2 error" @-- $newCmdt1 @report=main
-$cmdtIn @test=test_flow/ @stderr:"#01" @stderr:PASSED @-- $newCmdt1 true
-$cmdtIn @test=test_flow/ @stderr:"1 success" @-- $newCmdt1 @report=main
+$cmdtIn @test=test_flow/ @-- $newCmdt1 @init=flow
+$cmdtIn @test=test_flow/ @stderr:"#01" @stderr:PASSED @-- $newCmdt1 @test=flow/ @fail false
+$cmdtIn @test=test_flow/ @stderr:"#02" @stderr:PASSED @-- $newCmdt1 @test=flow/ true
+$cmdtIn @test=test_flow/ @fail @stderr:"you can't use rule:" @-- $newCmdt1 @test=flow/ "@test" "@fork=5" # Should error because of bad param
+$cmdtIn @test=test_flow/ @stderr:"#04" @stderr:ERROR @-- $newCmdt1 @test=flow/ doNotExists @stderr:"not executed" # Should error because of not executable
+$cmdtIn @test=test_flow/ @stderr:"#05" @stderr:PASSED @-- $newCmdt1 @test=flow/ true
+$cmdtIn @test=test_flow/ @fail @stderr:"3 success" @stderr:"2 error" @-- $newCmdt1 @report=flow
+$cmdtIn @test=test_flow/ @stderr:"#01" @stderr:PASSED @-- $newCmdt1 @test=flow/ true
+$cmdtIn @test=test_flow/ @stderr:"1 success" @-- $newCmdt1 @report=flow
 
 
 >&2 echo "## Test @mock"

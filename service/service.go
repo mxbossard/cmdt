@@ -405,7 +405,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		if exists {
 			n := rep.TestCount(testSuite)
 			if n > 0 && !reported {
-				err = fmt.Errorf("cannot erase test suite: [%s] not reported yet", testSuite)
+				err = fmt.Errorf("cannot erase test suite: [%s] which contains %d test(s) not reported yet", testSuite, n)
 				ProcessSuiteError(suiteCtx, err)
 			} else if n > 0 && kept {
 				err = fmt.Errorf("cannot erase test suite: [%s] which must be kept", testSuite)
