@@ -378,9 +378,6 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 	switch action {
 	case model.GlobalAction:
 		logger.Debug("Executing Global action")
-		// if agg.GotError() {
-		// 	log.Fatal(agg.Error())
-		// }
 		if parseArgsErrors.GotError() {
 			errorz.Fatal(parseArgsErrors)
 		}
@@ -395,7 +392,26 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 	case model.InitAction:
 		testSuite := inputConfig.TestSuite.Get()
 		logger.Debug("Executing Init action", "suite", testSuite)
+
+		// Check if suite exists and it's status
+		rep := facade.Repo(token, isolation)
+		exists, reported, kept, err := rep.SuiteStatus(testSuite)
+
 		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig)
+		ProcessSuiteError(suiteCtx, err)
+
+		logger.Debug("repo suite status", "testSuite", testSuite, "exists", exists, "reported", reported, "kept", kept)
+
+		if exists {
+			n := rep.TestCount(testSuite)
+			if n > 0 && !reported {
+				err = fmt.Errorf("cannot erase test suite: [%s] not reported yet", testSuite)
+				ProcessSuiteError(suiteCtx, err)
+			} else if n > 0 && kept {
+				err = fmt.Errorf("cannot erase test suite: [%s] which must be kept", testSuite)
+				ProcessSuiteError(suiteCtx, err)
+			}
+		}
 
 		ProcessSuiteError(suiteCtx, parseArgsErrors.Return())
 		Dpl.SetVerbose(suiteCtx.Config.Verbose.Get())
@@ -404,6 +420,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		Dpl.Quiet(suiteCtx.Config.Quiet.Is(true))
 
 		exitCode, err = cliInitTestSuite(suiteCtx)
+		ProcessSuiteError(suiteCtx, err)
 
 	case model.ReportAction:
 		// Report can be async (run by daemon) or not
@@ -553,6 +570,8 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				err = suiteCtx.Repo.QueueOperation(&op)
 				ProcessSuiteError(suiteCtx, err)
 
+				asyncDpl := asyncdisplay.New(suiteCtx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
+
 				if suiteCtx.Config.Wait.Is(true) {
 					wait = func() int16 {
 						// FIXME: bad timeout
@@ -562,17 +581,15 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 						if err != nil {
 							panic(err)
 						}
+						asyncDpl.ClearSuite(suiteCtx)
 						return exitCode
 					}
 				} else {
 					exitCode = 0
 				}
 
-				asyncDpl := asyncdisplay.New(suiteCtx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
 				err = asyncDpl.TailBlocking(testSuite, suiteCtx.Config.SuiteTimeout.Get())
 				ProcessSuiteError(suiteCtx, err)
-
-				asyncDpl.ClearSuite(suiteCtx)
 
 				daemonIsol = suiteCtx.Isolation
 				daemonToken = suiteCtx.Token

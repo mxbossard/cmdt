@@ -251,6 +251,8 @@ func (d Suite) IsSuiteReported(suite string) (exists, reported, kept bool, err e
 	if err == sql.ErrNoRows {
 		// Suite do not exists
 		return false, false, false, nil
+	} else {
+		exists = true
 	}
 	return
 }

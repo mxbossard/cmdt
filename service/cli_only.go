@@ -36,21 +36,6 @@ func cliInitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 		cfg.Token = utilz.OptionalOf(token)
 	}
 
-	// Check if suite exists and it's status
-	testSuite := ctx.Config.TestSuite.Get()
-	exists, reported, kept, err := ctx.Repo.SuiteStatus(testSuite)
-	ProcessSuiteError(ctx, err)
-
-	if exists && !reported {
-		err = fmt.Errorf("cannot erase test suite: [%s] not reported yet", testSuite)
-		ProcessSuiteError(ctx, err)
-	}
-
-	if exists && kept {
-		err = fmt.Errorf("cannot erase test suite: [%s] which must be kept", testSuite)
-		ProcessSuiteError(ctx, err)
-	}
-
 	// Can erase previous suite if it exists
 	err = ctx.InitSuite()
 	ProcessSuiteError(ctx, err)

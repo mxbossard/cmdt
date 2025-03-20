@@ -21,6 +21,17 @@ import (
 
 var logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 
+var _repo = make(map[string]repo.Repo)
+
+func Repo(token, isolation string) repo.Repo {
+	key := fmt.Sprintf("%s;%s", token, isolation)
+	if ok := _repo[key]; ok == nil {
+		r := repo.New(token, isolation)
+		_repo[key] = &r
+	}
+	return _repo[key]
+}
+
 func NewGlobalContext(token, isolation string, inputCfg model.Config) GlobalContext {
 	logger.Debug("Building Global context", "token", token, "isolation", isolation)
 	var err error
@@ -29,13 +40,7 @@ func NewGlobalContext(token, isolation string, inputCfg model.Config) GlobalCont
 		errorz.Fatal(err)
 	}
 
-	repo := repo.New(token, isolation)
-	/*
-		err = repo.Init()
-		if err != nil {
-			errorz.Fatal(err)
-		}
-	*/
+	repo := Repo(token, isolation)
 
 	cfg, err := repo.GetGlobalConfig()
 	if err != nil {
@@ -46,7 +51,7 @@ func NewGlobalContext(token, isolation string, inputCfg model.Config) GlobalCont
 	c := GlobalContext{
 		Token:     token,
 		Isolation: isolation,
-		Repo:      &repo,
+		Repo:      repo,
 		Config:    cfg,
 	}
 	logger.Debug("Builded Global context", "token", token, "isolation", isolation)
