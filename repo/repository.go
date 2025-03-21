@@ -47,6 +47,8 @@ type Repo interface {
 	ClearTestSuite(testSuite string) (err error)
 
 	ListTestSuites() (suites []string, err error)
+	ListSyncSuites() (suites []string, err error)
+	ListAsyncSuites() (suites []string, err error)
 
 	SaveTestOutcome(outcome model.TestOutcome) (err error)
 

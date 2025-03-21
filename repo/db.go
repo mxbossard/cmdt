@@ -181,6 +181,16 @@ func (r dbRepo) ListTestSuites() (suites []string, err error) {
 	return
 }
 
+func (r dbRepo) ListSyncSuites() (suites []string, err error) {
+	suites, err = r.suiteDao.ListSync()
+	return
+}
+
+func (r dbRepo) ListAsyncSuites() (suites []string, err error) {
+	suites, err = r.suiteDao.ListAsync()
+	return
+}
+
 func (r dbRepo) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 	err = r.testDao.SaveTestOutcome(outcome)
 	if err != nil {

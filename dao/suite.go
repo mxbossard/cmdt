@@ -52,7 +52,8 @@ func (d Suite) init() (err error) {
 			outcome TEXT NOT NULL DEFAULT 'Z',
 			outcomeOrder INTEGER DEFAULT 0,
 			reported INTEGER NOT NULL DEFAULT 0,
-			kept INTEGER NOT NULL DEFAULT 0
+			kept INTEGER NOT NULL DEFAULT 0,
+			async INTEGER NOT NULL DEFAULT 0
 		);
 	`)
 	count, _ := res.RowsAffected()
@@ -294,6 +295,56 @@ func (d Suite) ListPassedFailedErrored() (suites []string, err error) {
 	return
 }
 
+func (d Suite) ListSync() (suites []string, err error) {
+	p := logger.PerfTimer()
+	defer p.End()
+
+	rows, err := d.db.Query(`
+		SELECT s.name
+		FROM suite s
+		WHERE name <> '' AND s.startTime IS NOT NULL AND s.async = 0
+	`)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var suiteName string
+		err = rows.Scan(&suiteName)
+		if err != nil {
+			return
+		}
+		suites = append(suites, suiteName)
+	}
+	return
+}
+
+func (d Suite) ListAsync() (suites []string, err error) {
+	p := logger.PerfTimer()
+	defer p.End()
+
+	rows, err := d.db.Query(`
+		SELECT s.name
+		FROM suite s
+		WHERE name <> '' AND s.startTime IS NOT NULL AND s.async = 1
+	`)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var suiteName string
+		err = rows.Scan(&suiteName)
+		if err != nil {
+			return
+		}
+		suites = append(suites, suiteName)
+	}
+	return
+}
+
 func (d Suite) FindGlobalConfig() (cfg *model.Config, err error) {
 	p := logger.PerfTimer()
 	defer p.End()
@@ -369,8 +420,9 @@ func (d Suite) SaveSuiteConfig(testSuite string, cfg model.Config) (err error) {
 	}
 	defer d.db.Unlock()
 
-	//time.Sleep(1 * time.Second)
-	_, err = d.db.Exec(`INSERT OR IGNORE INTO suite(name, config) VALUES (@suite, '');`, sql.Named("suite", testSuite))
+	_, err = d.db.Exec(
+		`INSERT OR IGNORE INTO suite(name, config, async) VALUES (@suite, '',  @async);`,
+		sql.Named("suite", testSuite), sql.Named("async", cfg.Async.GetOr(model.DefaultAsync)))
 	if err != nil {
 		return
 	}

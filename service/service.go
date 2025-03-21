@@ -433,6 +433,8 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		//inputConfig.Async.Set(false)
 
 		if inputConfig.ReportAll.Is(true) {
+			// Report all sync suites then all async suites
+
 			logger.Debug("Executing Report all action")
 			// Reporting All test suite
 			if parseArgsErrors.GotError() {
@@ -442,26 +444,34 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 
 			Dpl.SetVerbose(globalCtx.Config.Verbose.Get())
 
-			//asyncDpl := display.NewAsync(token, isolation)
-			// if globalCtx.Config.Async.Is(true) {
-			// 	// Switch display to async one
-			// 	Dpl = asyncDpl
-			// }
-
-			// if globalCtx.Config.Async.Is(false) {
 			// Process report all without daemon
 			logger.Trace("Forged context", "ctx", globalCtx)
 			// logger.Info("executing report all in sync (not queueing report)")
 			Dpl.Quiet(globalCtx.Config.Quiet.Is(true))
 
-			// }
+			var asyncExitCode int16
 
-			if globalCtx.Config.Async.Is(true) {
+			// 1- Report all sync suites
+			syncSuites, err := facade.Repo(token, isolation).ListSyncSuites()
+			ProcessGlobalError(globalCtx, err)
+			// fmt.Printf("<<>> SYNC suites count: %d\n", len(syncSuites))
+			if len(syncSuites) > 0 {
+				exitCode, err = reportAllTestSuites(globalCtx)
+				ProcessGlobalError(globalCtx, err)
+			} else {
+				exitCode = 0
+			}
 
+			// 2- Report all async suites
+			asyncSuites, err := facade.Repo(token, isolation).ListAsyncSuites()
+			ProcessGlobalError(globalCtx, err)
+			// fmt.Printf("<<>> ASYNC suites count: %d\n", len(asyncSuites))
+			//if globalCtx.Config.Async.Is(true) {
+			if len(asyncSuites) > 0 {
 				start := time.Now()
 				for globalCtx.Repo.NotReportedTestCount() == 0 {
 					if time.Since(start) > model.WaitAsyncReportTestTimeout {
-						err := fmt.Errorf("no test to report")
+						err := fmt.Errorf("you must perform some test prior to report")
 						ProcessGlobalError(globalCtx, err)
 					}
 					time.Sleep(time.Millisecond)
@@ -482,40 +492,32 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 					errorz.Fatal(err)
 				}
 
-				// if err != nil {
-				// 	errorz.Fatal(err)
-				// }
-
-				// // Daemon must be off or No test remaining in suite queue
-				// globalCtx.Repo.WaitAllEmpty(globalCtx.Config.SuiteTimeout.GetOr(defaultGlobalTimeout)) // FIXME: bad timeout
-				// asyncDpl.WaitDisplayRecorded()
-
 				// always wait
 				// if globalCtx.Config.Wait.Is(true) {
 				wait = func() int16 {
 					// FIXME: bad timeout
-					exitCode, err := globalCtx.Repo.WaitOperationDone(&op, globalCtx.Config.SuiteTimeout.GetOr(defaultGlobalTimeout))
+					asyncExitCode, err = globalCtx.Repo.WaitOperationDone(&op, globalCtx.Config.SuiteTimeout.GetOr(defaultGlobalTimeout))
 					if err != nil {
 						panic(err)
 					}
 					//asyncDpl.StopDisplayAllRecorded()
-					return exitCode
+					return max(exitCode, asyncExitCode)
 				}
-				// } else {
-				// 	exitCode = 0
-				// }
 
 				asyncDpl := asyncdisplay.New(globalCtx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
-				//asyncDpl.StartDisplayAllRecorded(globalCtx.Config.SuiteTimeout.Get())
 
 				err = asyncDpl.TailAllBlocking(globalCtx.Config.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
 				ProcessGlobalError(globalCtx, err)
 
 				daemonIsol = globalCtx.Isolation
 				daemonToken = globalCtx.Token
-			} else {
-				exitCode, err = reportAllTestSuites(globalCtx)
 			}
+			/*
+				} else {
+					exitCode, err = reportAllTestSuites(globalCtx)
+					ProcessGlobalError(globalCtx, err)
+				}
+			*/
 		} else {
 			// Reporting One test suite
 			testSuite := inputConfig.TestSuite.Get()
@@ -552,7 +554,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				start := time.Now()
 				for suiteCtx.Repo.TestCount(testSuite) == 0 {
 					if time.Since(start) > model.WaitAsyncReportTestTimeout {
-						err := fmt.Errorf("no test to report")
+						err := fmt.Errorf("you must perform some test prior to report")
 						ProcessSuiteError(suiteCtx, err)
 					}
 					time.Sleep(time.Millisecond)

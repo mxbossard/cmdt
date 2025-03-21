@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/repo"
 	"mby.fr/cmdtest/service"
+	"mby.fr/utils/collections"
 	"mby.fr/utils/filez"
 	"mby.fr/utils/printz"
 	_ "mby.fr/utils/screen"
@@ -65,7 +67,8 @@ type daemon struct {
 	token, isolation string
 	repo             repo.Repo
 	display          *asyncdisplay.AsyncDisplay
-	openedSuite      string
+	//openedSuite      string
+	openedSuites     []string
 }
 
 func (d *daemon) run() {
@@ -132,17 +135,21 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 	}()
 
 	if op != nil {
+		suite := op.Suite()
 		logger.Debug("DAEMON: unqueued operation.", "kind", op.Kind(), "id", op.Id(), "suite", op.Suite(), "seq", op.Seq())
-		if d.openedSuite == "" {
-			d.openedSuite = op.Suite()
-			logger.Debug("Initializing test suite", "token", d.token, "isolation", d.isolation, "openedSuite", d.openedSuite)
-			ctx := facade.NewSuiteContext(d.token, d.isolation, d.openedSuite, false, model.InitAction, model.Config{})
-			d.display.ClearSuite(ctx)
-			d.display.OpenSuite(ctx)
-			d.display.SuiteTitle(ctx)
-		}
 		switch o := op.(type) {
 		case *model.TestOp:
+			// Automagicaly open suite on first test
+			if !slices.Contains(d.openedSuites, suite) {
+				d.openedSuites = append(d.openedSuites, suite)
+				logger.Debug("Initializing test suite", "token", d.token, "isolation", d.isolation, "openedSuite", suite)
+				ctx := facade.NewSuiteContext(d.token, d.isolation, suite, false, model.InitAction, model.Config{})
+				d.display.ClearSuite(ctx)
+				d.display.OpenSuite(ctx)
+				d.display.SuiteTitle(ctx)
+			} else {
+				 logger.Debug("Test suite already opened", "token", d.token, "isolation", d.isolation, "openedSuite", suite)
+			}
 			// FIXME: must override bad token & isolation inside ReportDefinition !
 			def := o.Definition
 			def.Token = d.token
@@ -193,7 +200,7 @@ func (d *daemon) report(def model.ReportDefinition) (exitCode int16, err error) 
 	for cfg.SuiteStartTime.IsEmpty() {
 		// Wait until suite is started
 		if time.Since(start) > WaitAsyncReportTestTimeout {
-			return 1, fmt.Errorf("no test to report")
+			return 1, fmt.Errorf("you must perform some test prior to report")
 		}
 		time.Sleep(time.Millisecond)
 		cfg, err = d.repo.GetSuiteConfig(def.TestSuite, true)
@@ -213,8 +220,8 @@ func (d *daemon) report(def model.ReportDefinition) (exitCode int16, err error) 
 	}
 
 	exitCode, err = service.ProcessReportDef(def)
-	logger.Debug("Closing test suite", "token", def.Token, "isolation", def.Isolation, "openedSuite", d.openedSuite)
-	d.openedSuite = ""
+	logger.Debug("Closing test suite", "token", def.Token, "isolation", def.Isolation, "openedSuite", def.TestSuite)
+	d.openedSuites = collections.Delete(d.openedSuites, def.TestSuite)
 	return
 }
 
@@ -237,7 +244,7 @@ func (d *daemon) reportAll(def model.ReportDefinition) (exitCode int16) {
 
 	exitCode = service.ProcessReportAllDef(def)
 	logger.Debug("Closing all test suites", "token", def.Token, "isolation", def.Isolation)
-	d.openedSuite = ""
+	d.openedSuites = []string{}
 	//d.display.Clear()
 	return
 }

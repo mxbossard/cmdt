@@ -28,13 +28,14 @@ die() {
 
 #$cmdt @global @silent
 
-rm -rf -- /tmp/cmdt* /tmp/cmdt.log /tmp/daemon.log 2> /dev/null || true
+rm -rf -- /tmp/cmdt* /tmp/cmdt*.log /tmp/daemon*.log 2> /dev/null || true
 
 # Mandatory assertions
 "$scriptDir/assertCmdt.sh" "$cmdt"
 
 
 cannotReinitMsg="cannot erase test suite"
+nothingToReportExpectedStderrMsg="you must perform some test prior to report"
 
 # Clear context
 export -n __CMDT_TOKEN
@@ -45,14 +46,14 @@ $cmdtIn @test=async success/"should pass 1" @stderr= @-- $newCmdt1 @test=main1/t
 $cmdtIn @test=async success/"should pass 2" @stderr= @-- $newCmdt1 @test=main1/t2 sleep 0.2 @verbose=4
 $cmdtIn @test=async success/"should pass 3" @stderr= @-- $newCmdt1 @test=main1/t3 true @verbose=4
 $cmdtIn @test=async success/should report @exit=0 @stderr:"#01" @stderr:"#02" @stderr!:"#04" @stderr:"PASSED" @stderr!:"FAILED" @stderr:"3 success" @stderr!:"failure" @stderr!:"error" @-- $newCmdt0 @verbose @report=main1 @debug=6
-$cmdtIn @report 2>&1 | grep -v "Failures"
+$cmdtIn @report
 
 $cmdtIn @init="async failure"
 $cmdtIn @test=async failure/should init @-- $newCmdt1 @init=main2 @async @verbose=4
 $cmdtIn @test=async failure/"should pass" @stderr= @-- $newCmdt1 @test=main2/t1 true
 $cmdtIn @test=async failure/"should fail" @stderr= @-- $newCmdt1 @test=main2/t2 false
 $cmdtIn @test=async failure/should report @exit=1 @stderr:"#01" @stderr:"#02" @stderr!:"#03" @stderr:"PASSED" @stderr:"FAILED" @stderr:"1 success" @stderr:"1 failure" @stderr:"0 error" @-- $newCmdt0 @verbose @report=main2 @debug=6
-$cmdtIn @report 2>&1 | grep -v "Failures"
+$cmdtIn @report
 
 $cmdtIn @init="sync error" #@verbose=4
 $cmdtIn @test=sync error/should init @-- $newCmdt1 @init=main3 @async=false @verbose=5
@@ -60,7 +61,7 @@ $cmdtIn @test=sync error/should pass @stderr:"#01" @stderr:"PASSED" @-- $newCmdt
 $cmdtIn @test=sync error/should error 1 @fail @stderr:"#02" @stderr:"ERRORED" @stderr:'badRule does not exists' @-- $newCmdt1 @test=main3/t2 true @badRule
 $cmdtIn @test=sync error/should error 2 @fail @stderr:"#03" @stderr:"ERRORED" @-- $newCmdt1 @test=main3/t3 true @before=badCmd
 $cmdtIn @test=sync error/should report @exit=1 @stderr:"1 success" @stderr:"0 failure" @stderr:"2 error" @stderr:"3 test" @-- $newCmdt0 @verbose @report=main3 @debug=6
-$cmdtIn @report 2>&1 | grep -v "Failures"
+$cmdtIn @report
 
 $cmdtIn @init="async error" #@verbose=4
 $cmdtIn @test=async error/should init @-- $newCmdt1 @init=main4 @async @verbose=4
@@ -68,11 +69,10 @@ $cmdtIn @test=async error/should pass @stderr= @-- $newCmdt1 @test=main4/t1 true
 $cmdtIn @test=async error/should error 1 @fail @stderr:'badRule does not exists' @-- $newCmdt1 @test=main4/t2 true @badRule
 $cmdtIn @test=async error/should error 2 @stderr= @-- $newCmdt1 @test=main4/t3 true @before=badCmd
 $cmdtIn @test=async error/should report @exit=1 @stderr:"#01" @stderr!:"#02" @stderr:"#03" @stderr!:"#04" @stderr:"PASSED" @stderr!:"FAILED" @stderr:"ERRORED" @stderr:"1 success" @stderr:"0 failure" @stderr:"2 error" @-- $newCmdt0 @verbose @report=main4 @debug=6
-$cmdtIn @report 2>&1 | grep -v "Failures"
+$cmdtIn @report
 
 
 # FIXME: async report should not fail if no test exist yet. It should fail after a short timeout if no test to report.
-nothingToReportExpectedStderrMsg="no test to report"
 >&2 echo "## Test @report without test"
 $cmdtIn @init=meta0 #@verbose=4
 $cmdtIn @test=meta0/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt0 @report=foo @async #@debug=4
@@ -93,12 +93,16 @@ $cmdtIn @test=meta1/"report without token" @exit=1 @stderr:"3 success" @stderr:"
 tk0=$( $newCmdt0 @init @printToken )
 >&2 echo "token: $tk0"
 $cmdtIn @init=meta2 #@verbose=4
-$cmdtIn @test=meta2/init @-- $newCmdt1 @token=$tk0 @init @async
-$cmdtIn @test=meta2/"with token one" @stderr= @-- $newCmdt1 @token=$tk0 true
-$cmdtIn @test=meta2/"with token two" @stderr= @-- $newCmdt1 @token=$tk0 true
-$cmdtIn @test=meta2/"report without token" @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=main @async
-$cmdtIn @test=meta2/"report all with token" @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @token=$tk0 @report @async
-$cmdt @report 2>&1 | grep -v "Failures"
+$cmdtIn @test=meta2/init @-- $newCmdt1 @token=$tk0 @init @async @verbose=5
+$cmdtIn @test=meta2/"with token 1" @stderr= @-- $newCmdt1 @token=$tk0 @test=meta2_sub_test1 true
+$cmdtIn @test=meta2/"with token 2" @stderr= @-- $newCmdt1 @token=$tk0 @test=meta2_sub_test2 true
+$cmdtIn @test=meta2/"report without token" @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=main 
+$cmdtIn @test=meta2/"report with token" @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @token=$tk0 @report=main
+$cmdtIn @test=meta2/init @-- $newCmdt1 @token=$tk0 @init=master @async @verbose=5
+$cmdtIn @test=meta2/"with token 3" @stderr= @-- $newCmdt1 @token=$tk0 @test=master/meta2_sub2_test3 true
+$cmdtIn @test=meta2/"with token 4" @stderr= @-- $newCmdt1 @token=$tk0 @test=master/meta2_sub2_test4 true
+$cmdtIn @test=meta2/"report all with token" @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @token=$tk0 @report
+$cmdt @report
 
 >&2 echo "## Test exported token"
 eval $( $cmdt @init @exportToken )
@@ -116,7 +120,7 @@ $cmdtIn @test=meta4/ @stderr= @-- $newCmdt1 @test=sub4/ true
 $cmdtIn @test=meta4/ @stderr= @-- $newCmdt1 @test=sub4/ true
 $cmdtIn @test=meta4/ @stderr:"Successfuly ran" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @report=sub4 @async
 $cmdtIn @test=meta4/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @token=$tk0 @report=sub4 @async
-$cmdt @report 2>&1 | grep -v "Failures"
+$cmdt @report 
 
 export -n __CMDT_TOKEN
 

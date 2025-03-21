@@ -65,7 +65,7 @@ $cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#01" @-- $newCmdt1 true @token=$t
 $cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#02" @-- $newCmdt1 true @token=$tk0
 $cmdtIn @test=meta2/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=main
 $cmdtIn @test=meta2/ @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @-- $newCmdt1 @report @token=$tk0
-$cmdt @report 2>&1 | grep -v "Failures"
+$cmdt @report
 
 >&2 echo "## Test exported token"
 # FIXME: test seems bad for now !
@@ -87,7 +87,7 @@ $cmdtIn @test=meta4/ @stderr:"PASSED" @stderr:"#01" @-- $newCmdt1_tk1 @test=sub4
 $cmdtIn @test=meta4/ @stderr:"PASSED" @stderr:"#02" @-- $newCmdt1_tk1 @test=sub4/ true
 $cmdtIn @test=meta4/ @stderr:"Successfuly ran" @-- $newCmdt1_tk1 @report=sub4
 $cmdtIn @test=meta4/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=sub4 @token=$tk0
-$cmdt @report 2>&1 | grep -v "Failures"
+$cmdt @report
 
 export -n __CMDT_TOKEN
 

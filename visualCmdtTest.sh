@@ -90,6 +90,6 @@ for i in $( seq 1 $count ); do
 	$newCmdt1 @test=async_reportall_visual/tD$i @stdout:"endD$i" @-- sh -c "sleep $time; echo endD$i"
 done
 >&2 echo "done tests"
-$newCmdt1 @report @async
+$newCmdt1 @report
 >&2 echo "done report"
 
