@@ -73,10 +73,16 @@ func (d AsyncDisplay) OpenSuite(ctx facade.SuiteContext) {
 	if d.quiet {
 		return
 	}
+
+	err := d.screen.Resync()
+	if err != nil {
+		panic(err)
+	}
+
 	suite := ctx.Config.TestSuite.Get()
 	logger.Info("Opening suite", "suite", suite)
 	session := d.screen.Session(suite, 0)
-	err := session.Start(ctx.Config.SuiteTimeout.Get())
+	err = session.Start(ctx.Config.SuiteTimeout.Get())
 	if err != nil {
 		panic(err)
 	}
@@ -103,12 +109,6 @@ func (d AsyncDisplay) ClearSuite(ctx facade.SuiteContext) {
 	suite := ctx.Config.TestSuite.Get()
 	if d.tailer != nil {
 		err := d.tailer.ClearSession(suite)
-		if err != nil {
-			panic(err)
-		}
-	}
-	if d.screen != nil {
-		err := d.screen.ClearSession(suite)
 		if err != nil {
 			panic(err)
 		}

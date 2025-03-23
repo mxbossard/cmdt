@@ -68,7 +68,7 @@ type daemon struct {
 	repo             repo.Repo
 	display          *asyncdisplay.AsyncDisplay
 	//openedSuite      string
-	openedSuites     []string
+	openedSuites []string
 }
 
 func (d *daemon) run() {
@@ -144,11 +144,11 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 				d.openedSuites = append(d.openedSuites, suite)
 				logger.Debug("Initializing test suite", "token", d.token, "isolation", d.isolation, "openedSuite", suite)
 				ctx := facade.NewSuiteContext(d.token, d.isolation, suite, false, model.InitAction, model.Config{})
-				d.display.ClearSuite(ctx)
+				//d.display.ClearSuite(ctx)
 				d.display.OpenSuite(ctx)
 				d.display.SuiteTitle(ctx)
 			} else {
-				 logger.Debug("Test suite already opened", "token", d.token, "isolation", d.isolation, "openedSuite", suite)
+				logger.Debug("Test suite already opened", "token", d.token, "isolation", d.isolation, "openedSuite", suite)
 			}
 			// FIXME: must override bad token & isolation inside ReportDefinition !
 			def := o.Definition
@@ -289,16 +289,21 @@ func TakeOver() {
 	} else {
 		return
 	}
-
-	zlog.ColoredConfig(slog.Int("pid", os.Getpid()))
-	zlog.SetPart("daemon")
-	zlog.SetDefaultAppendingFileOutput(model.DefaultDebugDaemonLogFilepath)
 	token := os.Args[2]
 	isolation := os.Args[3]
 	debugLevel, err := strconv.Atoi(os.Args[4])
 	if err != nil {
 		panic("bad debug level")
 	}
+
+	zlog.ColoredConfig(slog.Int("pid", os.Getpid()))
+	zlog.SetPart("daemon")
+	var loggingQualifier string
+	if isolation != "" {
+		loggingQualifier = "-" + isolation
+	}
+	loggingFilepath := fmt.Sprintf(model.DefaultDebugDaemonLogFilepath, loggingQualifier)
+	zlog.SetDefaultAppendingFileOutput(loggingFilepath)
 	zlog.SetLogLevelThreshold(slog.Level(debugLevel))
 
 	logger.Debug("daemon prechecks", "token", token, "isolation", isolation, "debugLevel", debugLevel, "args", os.Args[1:])

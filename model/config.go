@@ -57,8 +57,8 @@ const (
 	DoneFilename                  = "done"
 	FlushedFilename               = "flushed"
 	ReportFilename                = "report.log"
-	DefaultDebugLogFilepath       = "/tmp/cmdt.log"
-	DefaultDebugDaemonLogFilepath = "/tmp/daemon-{{.Pid}}.log"
+	DefaultDebugLogFilepath       = "/tmp/cmdt%s.log"
+	DefaultDebugDaemonLogFilepath = "/tmp/daemon%s-{{.Pid}}.log"
 
 	MessageColor = ansi.HiPurple
 	TestColor    = ansi.HiCyan

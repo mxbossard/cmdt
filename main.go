@@ -18,6 +18,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"mby.fr/cmdtest/daemon"
 	"mby.fr/cmdtest/model"
@@ -288,6 +289,19 @@ func RecoverExiting() {
 func main() {
 	//defer RecoverExiting()
 	//fmt.Printf("Args: %v", os.Args)
+
+	for _, arg := range os.Args {
+		//  FIXME: properly get isolation value to configure logging file
+		if strings.HasPrefix(arg, "@isol=") {
+			isolation := strings.TrimLeft(arg, "@isol=")
+			var loggingQualifier string
+			if isolation != "" {
+				loggingQualifier = "-" + isolation
+			}
+			loggingFilepath := fmt.Sprintf(model.DefaultDebugLogFilepath, loggingQualifier)
+			zlog.SetDefaultAppendingFileOutput(loggingFilepath)
+		}
+	}
 
 	daemon.TakeOver()
 
