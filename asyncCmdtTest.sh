@@ -251,7 +251,7 @@ $cmdtIn @test=suite_flow_async/A_test $asyncTestExpected @-- $newCmdt1 @test=sui
 $cmdtIn @test=suite_flow_async/A_report_suite $asyncReportExpected @stderr:tA @-- $newCmdt1 @report=suite_flow_async_sub
 #>&2 echo "A4"
 
-sleepTime=0
+sleepTime=1
 sleep $sleepTime
 $cmdtIn @test=suite_flow_async/B0_reopen $asyncOpenExpected @-- $newCmdt1 @init=suite_flow_async_sub @async=true @verbose=5 @suiteTimeout=2s
 $cmdtIn @test=suite_flow_async/B0_test $asyncTestExpected @-- $newCmdt1 @test=suite_flow_async_sub/tB0z true

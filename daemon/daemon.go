@@ -143,6 +143,7 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 			if !slices.Contains(d.openedSuites, suite) {
 				d.openedSuites = append(d.openedSuites, suite)
 				logger.Debug("Initializing test suite", "token", d.token, "isolation", d.isolation, "openedSuite", suite)
+				fmt.Printf("\n<<>> opening suite: %s ; openedSuites: %s\n", suite, d.openedSuites)
 				ctx := facade.NewSuiteContext(d.token, d.isolation, suite, false, model.InitAction, model.Config{})
 				//d.display.ClearSuite(ctx)
 				d.display.OpenSuite(ctx)
@@ -222,6 +223,7 @@ func (d *daemon) report(def model.ReportDefinition) (exitCode int16, err error) 
 	exitCode, err = service.ProcessReportDef(def)
 	logger.Debug("Closing test suite", "token", def.Token, "isolation", def.Isolation, "openedSuite", def.TestSuite)
 	d.openedSuites = collections.Delete(d.openedSuites, def.TestSuite)
+	fmt.Printf("\n<<>> deleted opened suite: %s ; openedSuites: %s\n", def.TestSuite, d.openedSuites)
 	return
 }
 
