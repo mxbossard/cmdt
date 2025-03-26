@@ -82,7 +82,7 @@ func (d AsyncDisplay) OpenSuite(ctx facade.SuiteContext) {
 	suite := ctx.Config.TestSuite.Get()
 	logger.Info("Opening suite", "suite", suite)
 	session := d.screen.Session(suite, 0)
-	fmt.Printf("\n<<>> opened session: %s\n", session)
+	//fmt.Printf("\n<<>> opened session: %s\n", session)
 	err = session.Start(ctx.Config.SuiteTimeout.Get())
 	if err != nil {
 		panic(err)
@@ -114,6 +114,7 @@ func (d AsyncDisplay) ClearSuite(ctx facade.SuiteContext) {
 			panic(err)
 		}
 	}
+	logger.Info("cleared async suite", "suite", suite)
 }
 
 func (d AsyncDisplay) SuiteTitle(ctx facade.SuiteContext) {
@@ -430,4 +431,31 @@ func New(tmpDir string, init bool, outs printz.Outputs) *AsyncDisplay {
 		d.tailer = screen.NewAsyncScreenTailerWaiting(outs, zcreenTmpDir, 2*time.Second)
 	}()
 	return d
+}
+
+func NewWaitingTailer(tmpDir string, init bool, outs printz.Outputs) *AsyncDisplay {
+	openedTests := make(map[string]display.TestDisplayer, 0)
+	zcreenTmpDir := zcreenTmpDir(tmpDir)
+	logger.Info("Building new async display", "zcreenTmpDir", zcreenTmpDir)
+
+	d := &AsyncDisplay{
+		tmpDir:         zcreenTmpDir,
+		outFormatter:   inout.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", display.TestColor, display.ResetColor)},
+		errFormatter:   inout.PrefixFormatter{Prefix: fmt.Sprintf("%serr%s>", display.ReportColor, display.ResetColor)},
+		verbose:        model.DefaultVerboseLevel,
+		quiet:          false,
+		testDisplayers: openedTests,
+	}
+
+	if init {
+		d.screen = screen.NewAsyncScreen(zcreenTmpDir)
+	}
+	// Tailer should be build later after daemon initialized the screen
+	d.tailer = screen.NewAsyncScreenTailerWaiting(outs, zcreenTmpDir, 2*time.Second)
+	return d
+}
+
+func ClearSuite(tmpDir, name string) error {
+	zcreenTmpDir := zcreenTmpDir(tmpDir)
+	return screen.ClearSession(zcreenTmpDir, name)
 }

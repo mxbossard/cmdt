@@ -201,6 +201,7 @@ func NewGlobalDefaultConfig() Config {
 	}
 }
 
+// Default suite config for initialized suite (@init was used)
 func NewSuiteDefaultConfig() Config {
 	return Config{
 		Async:           utilz.OptionalOf(DefaultInitedAsync),
@@ -212,6 +213,7 @@ func NewSuiteDefaultConfig() Config {
 	}
 }
 
+// Default suite config for non initialized suite (@init not used)
 func NewInitlessSuiteDefaultConfig() Config {
 	return Config{
 		Async:           utilz.OptionalOf(DefaultInitlessAsync),

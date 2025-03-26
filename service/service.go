@@ -50,7 +50,7 @@ func GlobalConfig(ctx facade.GlobalContext) (exitCode int16, err error) {
 	return
 }
 
-func reportAllTestSuites(ctx facade.GlobalContext) (exitCode int16, err error) {
+func reportAllTestSuites(ctx facade.GlobalContext, asyncMode bool) (exitCode int16, err error) {
 	exitCode = 1
 	token := ctx.Token
 	isolation := ctx.Isolation
@@ -61,19 +61,26 @@ func reportAllTestSuites(ctx facade.GlobalContext) (exitCode int16, err error) {
 		return
 	}
 
-	logger.Info("Reporting all suites", "token", token, "suites", testSuites)
+	logger.Info("Reporting all suites", "token", token, "suites", testSuites, "asyncMode", asyncMode)
 
 	var testCount uint16
 	exitCode = 0
 
 	var suiteOutcomes []model.SuiteOutcome
 	var suiteContexts []facade.SuiteContext
+	goodModeSuite := false
 	for _, testSuite := range testSuites {
-		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, model.ReportAction, ctx.Config)
+		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, model.ReportAction, model.Config{})
+		suiteAsync := suiteCtx.Config.Async.Get()
+		if suiteAsync != asyncMode {
+			// Ignore suites in bad async mode
+			continue
+		}
+		goodModeSuite = true
 		count := suiteCtx.Repo.TestCount(testSuite)
 		if count > 0 {
-			suiteContexts = append(suiteContexts, suiteCtx)
 			testCount += count
+			suiteContexts = append(suiteContexts, suiteCtx)
 			var code int16
 			var suiteOutcome model.SuiteOutcome
 			suiteOutcome, code, err = reportTestSuite(suiteCtx)
@@ -86,6 +93,11 @@ func reportAllTestSuites(ctx facade.GlobalContext) (exitCode int16, err error) {
 			}
 			suiteOutcomes = append(suiteOutcomes, suiteOutcome)
 		}
+	}
+
+	if !goodModeSuite {
+		// No suites in supplied async mode => Nothing to report.
+		return
 	}
 
 	if testCount == 0 {
@@ -103,6 +115,7 @@ func reportAllTestSuites(ctx facade.GlobalContext) (exitCode int16, err error) {
 
 		}
 	}
+
 	for _, outcome := range suiteOutcomes {
 		err = ctx.Repo.MarkSuiteReported(outcome.TestSuite, ctx.Config.Keep.GetOr(false))
 		if err != nil {
@@ -114,10 +127,10 @@ func reportAllTestSuites(ctx facade.GlobalContext) (exitCode int16, err error) {
 	return
 }
 
-func ProcessReportAllDef(def model.ReportDefinition) (exitCode int16) {
+func ProcessReportAllDef(def model.ReportDefinition, asyncMode bool) (exitCode int16) {
 	var err error
 	ctx := facade.NewGlobalContext(def.Token, def.Isolation, model.Config{})
-	exitCode, err = reportAllTestSuites(ctx)
+	exitCode, err = reportAllTestSuites(ctx, asyncMode)
 	if err != nil {
 		errorz.Fatal(err)
 	}
@@ -148,9 +161,9 @@ func reportTestSuite(ctx facade.SuiteContext) (suiteOutcome model.SuiteOutcome, 
 		exitCode = 0
 	}
 
+	// FIXME: should not clear test suite in report but in suite opening
 	if !cfg.Keep.Is(true) {
 		err = ctx.Repo.ClearTestSuite(suiteOutcome.TestSuite)
-		logger.Debug("Cleared suite", "suite", suiteOutcome.TestSuite)
 		ProcessSuiteError(ctx, err)
 	}
 
@@ -159,7 +172,8 @@ func reportTestSuite(ctx facade.SuiteContext) (suiteOutcome model.SuiteOutcome, 
 
 func ProcessReportDef(def model.ReportDefinition) (exitCode int16, err error) {
 	//logger.Warn("ProcessReportDef()", "def", def)
-	ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.ReportAction, def.Config)
+	ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.ReportAction, def.Config) // FIXME ? removing def.Config ?
+	//ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.ReportAction, model.Config{}) // FIXME ? removing def.Config ?
 
 	//fmt.Printf("ReportTestSuite ctx suite: %s \n", ctx.Config.TestSuite.Get())
 	suiteOutcome, exitCode, err := reportTestSuite(ctx)
@@ -416,7 +430,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		ProcessSuiteError(suiteCtx, parseArgsErrors.Return())
 		Dpl.SetVerbose(suiteCtx.Config.Verbose.Get())
 		logger.Trace("Forged context", "ctx", suiteCtx)
-		logger.Info("Processing init action", "token", token)
+		logger.Info("Processing init action", "token", token, "suite", testSuite, "async", suiteCtx.Config.Async.Get())
 		Dpl.Quiet(suiteCtx.Config.Quiet.Is(true))
 
 		exitCode, err = cliInitTestSuite(suiteCtx)
@@ -456,7 +470,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			ProcessGlobalError(globalCtx, err)
 			// fmt.Printf("<<>> SYNC suites count: %d\n", len(syncSuites))
 			if len(syncSuites) > 0 {
-				exitCode, err = reportAllTestSuites(globalCtx)
+				exitCode, err = reportAllTestSuites(globalCtx, false)
 				ProcessGlobalError(globalCtx, err)
 			} else {
 				exitCode = 0
@@ -500,6 +514,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 					if err != nil {
 						panic(err)
 					}
+					logger.Info("op done", "opId", op.Id(), "opKind", op.Kind(), "suite", op.TestSuite, "asyncExitCode", asyncExitCode)
 					//asyncDpl.StopDisplayAllRecorded()
 					return max(exitCode, asyncExitCode)
 				}
@@ -508,6 +523,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 
 				err = asyncDpl.TailAllBlocking(globalCtx.Config.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
 				ProcessGlobalError(globalCtx, err)
+				logger.Info("finished async TailAllBlocking", "opId", op.Id())
 
 				daemonIsol = globalCtx.Isolation
 				daemonToken = globalCtx.Token
@@ -592,6 +608,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 
 				err = asyncDpl.TailBlocking(testSuite, suiteCtx.Config.SuiteTimeout.Get())
 				ProcessSuiteError(suiteCtx, err)
+				logger.Info("finished async TailBlocking")
 
 				daemonIsol = suiteCtx.Isolation
 				daemonToken = suiteCtx.Token

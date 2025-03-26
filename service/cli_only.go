@@ -7,7 +7,6 @@ import (
 	"mby.fr/cmdtest/facade"
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/utils"
-	"mby.fr/utils/printz"
 	"mby.fr/utils/utilz"
 )
 
@@ -36,20 +35,21 @@ func cliInitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 		cfg.Token = utilz.OptionalOf(token)
 	}
 
-	// Can erase previous suite if it exists
-	err = ctx.InitSuite()
-	ProcessSuiteError(ctx, err)
-
-	if !cfg.Async.GetOr(model.DefaultAsync) {
+	if !cfg.Async.Get() {
 		Dpl.ClearSuite(ctx)
 		Dpl.OpenSuite(ctx)
 		Dpl.SuiteTitle(ctx)
 	} else {
 		// On async init do not display but attempt to clear session
-		asyncDpl := asyncdisplay.New(ctx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
-		asyncDpl.ClearSuite(ctx)
-		logger.Info("cleared async suite", "suite", ctx.Config.TestSuite.Get())
+		// asyncDpl := asyncdisplay.NewWaitingTailer(ctx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
+		// asyncDpl.ClearSuite(ctx)
+		asyncdisplay.ClearSuite(ctx.Repo.BackingFilepath(), ctx.Config.TestSuite.Get())
 	}
+	logger.Debug("cleared suite cli side", "suite", ctx.Config.TestSuite.Get(), "async", cfg.Async.Get())
+
+	// Can erase previous suite if it exists
+	err = ctx.InitSuite()
+	ProcessSuiteError(ctx, err)
 
 	return
 }

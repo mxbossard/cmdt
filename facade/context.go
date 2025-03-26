@@ -75,7 +75,7 @@ func NewSuiteContext(token, isolation, testSuite string, initless bool, action m
 		GlobalContext: globalCtx,
 		Action:        action,
 	}
-	logger.Debug("Builded Suite context", "suite", testSuite, "token", token, "isolation", isolation)
+	logger.Debug("Builded Suite context", "suite", testSuite, "token", token, "isolation", isolation, "async", suiteCtx.Config.Async.Get(), "suiteCfgAsync", suiteCfg.Async.Get())
 	return suiteCtx
 }
 

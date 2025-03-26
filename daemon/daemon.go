@@ -124,60 +124,62 @@ func (d daemon) unqueue() (op model.Operater, err error) {
 }
 
 func (d *daemon) process(op model.Operater) (ok bool, err error) {
+	if op == nil {
+		return
+	}
+
 	defer func() {
-		if op != nil {
-			//logger.Warn("doning op ...", "op", op)
-			err = d.repo.Done(op)
-			if err != nil {
-				err = fmt.Errorf("unable to done op: [%s] : %w", op, err)
-			}
+		//logger.Warn("doning op ...", "op", op)
+		err = d.repo.Done(op)
+		if err != nil {
+			err = fmt.Errorf("unable to done op: [%s] : %w", op, err)
+			logger.Error(err.Error())
+		} else {
+			logger.Info("op done", "ok", ok, "op", op)
 		}
 	}()
 
-	if op != nil {
-		suite := op.Suite()
-		logger.Debug("DAEMON: unqueued operation.", "kind", op.Kind(), "id", op.Id(), "suite", op.Suite(), "seq", op.Seq())
-		switch o := op.(type) {
-		case *model.TestOp:
-			// Automagicaly open suite on first test
-			if !slices.Contains(d.openedSuites, suite) {
-				d.openedSuites = append(d.openedSuites, suite)
-				logger.Debug("Initializing test suite", "token", d.token, "isolation", d.isolation, "openedSuite", suite)
-				fmt.Printf("\n<<>> opening suite: %s ; openedSuites: %s\n", suite, d.openedSuites)
-				ctx := facade.NewSuiteContext(d.token, d.isolation, suite, false, model.InitAction, model.Config{})
-				//d.display.ClearSuite(ctx)
-				d.display.OpenSuite(ctx)
-				d.display.SuiteTitle(ctx)
-			} else {
-				logger.Debug("Test suite already opened", "token", d.token, "isolation", d.isolation, "openedSuite", suite)
-			}
-			// FIXME: must override bad token & isolation inside ReportDefinition !
-			def := o.Definition
-			def.Token = d.token
-			def.Isolation = d.isolation
-			ec := d.performTest(def)
-			op.SetExitCode(uint16(ec))
-		case *model.ReportOp:
-			// FIXME: must override bad token & isolation inside ReportDefinition !
-			def := o.Definition
-			def.Token = d.token
-			def.Isolation = d.isolation
-			exitCode, err2 := d.report(def)
-			err = err2
-			op.SetExitCode(uint16(exitCode))
-		case *model.ReportAllOp:
-			// FIXME: must override bad token & isolation inside ReportDefinition !
-			def := o.Definition
-			def.Token = d.token
-			def.Isolation = d.isolation
-			exitCode := d.reportAll(def)
-			op.SetExitCode(uint16(exitCode))
-		default:
-			err = fmt.Errorf("unknown operation %T", op)
-			return
+	suite := op.Suite()
+	logger.Info("DAEMON: unqueued operation.", "kind", op.Kind(), "id", op.Id(), "suite", op.Suite(), "seq", op.Seq())
+	switch o := op.(type) {
+	case *model.TestOp:
+		// Automagicaly open suite on first test
+		if !slices.Contains(d.openedSuites, suite) {
+			d.openedSuites = append(d.openedSuites, suite)
+			logger.Debug("Initializing test suite", "token", d.token, "isolation", d.isolation, "openedSuite", suite)
+			//fmt.Printf("\n<<>> opening suite: %s ; openedSuites: %s\n", suite, d.openedSuites)
+			ctx := facade.NewSuiteContext(d.token, d.isolation, suite, false, model.InitAction, model.Config{})
+			d.display.OpenSuite(ctx)
+			d.display.SuiteTitle(ctx)
+		} else {
+			logger.Debug("Test suite already opened", "token", d.token, "isolation", d.isolation, "openedSuite", suite)
 		}
-		ok = true
+		// FIXME: must override bad token & isolation inside ReportDefinition !
+		def := o.Definition
+		def.Token = d.token
+		def.Isolation = d.isolation
+		ec := d.performTest(def)
+		op.SetExitCode(uint16(ec))
+	case *model.ReportOp:
+		// FIXME: must override bad token & isolation inside ReportDefinition !
+		def := o.Definition
+		def.Token = d.token
+		def.Isolation = d.isolation
+		exitCode, err2 := d.report(def)
+		err = err2
+		op.SetExitCode(uint16(exitCode))
+	case *model.ReportAllOp:
+		// FIXME: must override bad token & isolation inside ReportDefinition !
+		def := o.Definition
+		def.Token = d.token
+		def.Isolation = d.isolation
+		exitCode := d.reportAll(def)
+		op.SetExitCode(uint16(exitCode))
+	default:
+		err = fmt.Errorf("unknown operation %T", op)
+		return
 	}
+	ok = true
 	return
 }
 
@@ -223,7 +225,7 @@ func (d *daemon) report(def model.ReportDefinition) (exitCode int16, err error) 
 	exitCode, err = service.ProcessReportDef(def)
 	logger.Debug("Closing test suite", "token", def.Token, "isolation", def.Isolation, "openedSuite", def.TestSuite)
 	d.openedSuites = collections.Delete(d.openedSuites, def.TestSuite)
-	fmt.Printf("\n<<>> deleted opened suite: %s ; openedSuites: %s\n", def.TestSuite, d.openedSuites)
+	//fmt.Printf("\n<<>> deleted opened suite: %s ; openedSuites: %s\n", def.TestSuite, d.openedSuites)
 	return
 }
 
@@ -244,7 +246,7 @@ func (d *daemon) reportAll(def model.ReportDefinition) (exitCode int16) {
 		testCount = d.repo.NotReportedTestCount()
 	}
 
-	exitCode = service.ProcessReportAllDef(def)
+	exitCode = service.ProcessReportAllDef(def, true)
 	logger.Debug("Closing all test suites", "token", def.Token, "isolation", def.Isolation)
 	d.openedSuites = []string{}
 	//d.display.Clear()

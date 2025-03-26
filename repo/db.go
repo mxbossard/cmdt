@@ -13,6 +13,8 @@ import (
 	"mby.fr/utils/zql"
 )
 
+const WaitingOpDoneSleepPeriodInMs = 50
+
 type dbRepo struct {
 	dirpath   string
 	token     string
@@ -107,7 +109,8 @@ func (r dbRepo) NotReportedTestCount() (n uint16) {
 }
 
 func (r dbRepo) InitSuite(cfg model.Config) (err error) {
-	err = r.ClearTestSuite(cfg.TestSuite.Get())
+	suite := cfg.TestSuite.Get()
+	err = r.ClearTestSuite(suite)
 	if err != nil {
 		return
 	}
@@ -116,11 +119,16 @@ func (r dbRepo) InitSuite(cfg model.Config) (err error) {
 	if err != nil {
 		err = fmt.Errorf("unable to init suite: %w", err)
 	}
+	logger.Info("Initialized suite in repo", "suite", suite)
 	return
 }
 
 func (r dbRepo) SaveSuiteConfig(cfg model.Config) (err error) {
 	err = r.suiteDao.SaveSuiteConfig(cfg.TestSuite.Get(), cfg)
+	if err != nil {
+		return
+	}
+	logger.Debug("Saved suite config", "suite", cfg.TestSuite.Get(), "async", cfg.Async.Get())
 	return
 }
 
@@ -137,6 +145,7 @@ func (r dbRepo) GetSuiteConfig(testSuite string, initless bool) (cfg model.Confi
 	}
 	if found != nil {
 		cfg = *found
+		logger.Debug("Loaded suite config from DB.", "suite", testSuite, "async", cfg.Async.Get())
 	} else {
 		// suite config does not exists yet
 		// create a new default one
@@ -148,9 +157,11 @@ func (r dbRepo) GetSuiteConfig(testSuite string, initless bool) (cfg model.Confi
 		if initless {
 			//logger.Warn("Saving new initless config", "testSuite", testSuite)
 			suiteCfg = model.NewInitlessSuiteDefaultConfig()
+			logger.Debug("Built initless default suite config.", "suite", testSuite)
 		} else {
 			//logger.Warn("Saving new inited config", "testSuite", testSuite)
 			suiteCfg = model.NewSuiteDefaultConfig()
+			logger.Debug("Built default suite config.", "suite", testSuite)
 		}
 		suiteCfg.TestSuite.Set(testSuite)
 		suiteCfg.SuiteStartTime.Set(time.Now())
@@ -173,6 +184,10 @@ func (r dbRepo) ClearTestSuite(testSuite string) (err error) {
 		}
 	*/
 	err = r.suiteDao.DeleteSuite(testSuite)
+	if err != nil {
+		return
+	}
+	logger.Info("Cleared suite from repo", "suite", testSuite)
 	return
 }
 
@@ -323,7 +338,7 @@ func (r dbRepo) WaitOperationDone(op model.Operater, timeout time.Duration) (exi
 			// Operater done
 			return
 		}
-		time.Sleep(1 * time.Millisecond)
+		time.Sleep(WaitingOpDoneSleepPeriodInMs * time.Millisecond)
 		logger.Trace("waiting ...", "op", op)
 	}
 	err = errors.New("WaitOperationDone() timed out")

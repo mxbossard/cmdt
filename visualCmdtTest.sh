@@ -79,7 +79,7 @@ done
 $newCmdt1 @report
 >&2 echo "done report"
 
-rm -rf -- /tmp/cmdt*.log /tmp/daemon*.log 2> /dev/null || true
+rm -rf -- /tmp/cmdt*.log 2> /dev/null || true
 >&2 echo
 >&2 echo "## Visual test async report all"
 $newCmdt1 @init=async_reportall_visual @async @verbose=5 @suiteTimeout=$((count/2+2))s

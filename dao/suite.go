@@ -374,12 +374,13 @@ func (d Suite) FindSuiteConfig(testSuite string) (cfg *model.Config, err error) 
 	var serializedConfig []byte
 	var startTime, endTime, seq int64
 	var outcome string
+	var async bool
 	row := d.db.QueryRow(`
-		SELECT s.config, s.startTime, s.endTime, s.outcome, s.seq 
+		SELECT s.config, s.startTime, s.endTime, s.outcome, s.seq, s.async 
 		FROM suite s
 		WHERE name = @suite;
 	`, sql.Named("suite", testSuite))
-	err = row.Scan(&serializedConfig, &startTime, &endTime, &outcome, &seq)
+	err = row.Scan(&serializedConfig, &startTime, &endTime, &outcome, &seq, &async)
 	if err == sql.ErrNoRows {
 		err = nil
 		return
@@ -388,6 +389,7 @@ func (d Suite) FindSuiteConfig(testSuite string) (cfg *model.Config, err error) 
 	}
 	cfg = &model.Config{}
 	err = deserializeConfig(serializedConfig, cfg)
+	cfg.Async.Set(async)
 	return
 }
 
@@ -420,9 +422,11 @@ func (d Suite) SaveSuiteConfig(testSuite string, cfg model.Config) (err error) {
 	}
 	defer d.db.Unlock()
 
+	async := cfg.Async.GetOr(model.DefaultAsync)
+
 	_, err = d.db.Exec(
 		`INSERT OR IGNORE INTO suite(name, config, async) VALUES (@suite, '',  @async);`,
-		sql.Named("suite", testSuite), sql.Named("async", cfg.Async.GetOr(model.DefaultAsync)))
+		sql.Named("suite", testSuite), sql.Named("async", async))
 	if err != nil {
 		return
 	}
@@ -430,16 +434,17 @@ func (d Suite) SaveSuiteConfig(testSuite string, cfg model.Config) (err error) {
 	if cfg.SuiteStartTime.IsPresent() {
 		micros := cfg.SuiteStartTime.Get().UnixMicro()
 		_, err = d.db.Exec(`
-				UPDATE suite SET config = @serCfg, startTime = @startTime
+				UPDATE suite SET config = @serCfg, startTime = @startTime, async = @async
 				WHERE name = @suite;`,
 			sql.Named("suite", testSuite), sql.Named("serCfg", serializedConfig),
-			sql.Named("startTime", micros),
+			sql.Named("startTime", micros), sql.Named("async", async),
 		)
 	} else {
 		_, err = d.db.Exec(`
-				UPDATE suite SET config = @serCfg
+				UPDATE suite SET config = @serCfg, async = @async
 				WHERE name = @suite;`,
 			sql.Named("suite", testSuite), sql.Named("serCfg", serializedConfig),
+			sql.Named("async", async),
 		)
 	}
 	if err != nil {
