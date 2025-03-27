@@ -436,6 +436,30 @@ $cmdtIn @test=test_flow/ @stderr:"#01" @stderr:PASSED @-- $newCmdt1 @test=flow/ 
 $cmdtIn @test=test_flow/ @stderr:"1 success" @-- $newCmdt1 @report=flow
 
 
+>&2 echo "## Test ignore"
+$cmdtIn @init=test_ignore
+$cmdtIn @test=test_ignore/init_suite @-- $newCmdt1 @init=test_ignore_sub
+# following test should fail, but are ignored
+$cmdtIn @test=test_ignore/ @stderr:IGNORED @-- $newCmdt1 @test=test_ignore_sub/ false @ignore
+$cmdtIn @test=test_ignore/ @stderr:IGNORED @-- $newCmdt1 @test=test_ignore_sub/ false @ignore
+$cmdtIn @test=test_ignore/report_suite @stderr:"2 ignored" @-- $newCmdt1 @report=test_ignore_sub
+
+
+>&2 echo "## Test suite ignore"
+$cmdtIn @init=suite_ignore
+$cmdtIn @test=suite_ignore/init_suite @-- $newCmdt1 @init=suite_ignore_sub @ignore
+$cmdtIn @test=suite_ignore/ @stderr= @-- $newCmdt1 @test=suite_ignore_sub/ true
+$cmdtIn @test=suite_ignore/ @stderr= @-- $newCmdt1 @test=suite_ignore_sub/ true
+$cmdtIn @test=suite_ignore/report_suite @stderr:"Timeouted suite" @-- $newCmdt1 @report=suite_ignore_sub
+
+
+>&2 echo "## Test suite timeout"
+$cmdtIn @init=suite_timeout
+$cmdtIn @test=suite_timeout/init_suite @-- $newCmdt1 @init=suite_timeout_sub @suiteTimeout=0.1s
+$cmdtIn @test=suite_timeout/test_sleep @fail @stderr:TIMEOUTED @-- $newCmdt1 @test=suite_timeout_sub/tSleep sleep 1
+$cmdtIn @test=suite_timeout/report_suite @fail @stderr:Timeouted @-- $newCmdt1 @report=suite_timeout_sub
+
+
 >&2 echo "## Test @mock"
 mockCfg1="@mock=ls foo,stdin=,stdout=baz,exit=41"
 mockCfg2="@mock=ls foo,cmd=sh -c 'echo -n baz; exit 42'"

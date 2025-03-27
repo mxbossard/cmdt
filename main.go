@@ -145,6 +145,8 @@ Optims:
 Features:
 - [x] timeouted test must trigger a report failure (with toimout tests count)
 - [x] multiple @stderr or @stdout rules should be aggregated in assertion report
+- [_] ignored suite should be reported as ignored (and suite duration should be positive)
+- [_] suite should timeout after suiteTimeout and be reported as timeouted
 - add @out & @err as alias of @stdout & @stderr
 - add cmdt @version  or cmdt -v or cmdt --version => how to embed version ? git hash ? git tag ?
 - add cmdt @help or cmdt -h or cmdt --help to print basic documentation based on Refactord ules config

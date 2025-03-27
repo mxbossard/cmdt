@@ -21,8 +21,8 @@ import (
 const (
 	SuiteBeginPrinterName   = "__sessionBEGIN__"
 	SuiteEndPrinterName     = "__sessionEND__"
-	RecordedFileFlushPeriod = 20 * time.Millisecond
-	RecordedFileTailPeriod  = 20 * time.Millisecond
+	RecordedFileFlushPeriod = 10 * time.Millisecond
+	RecordedFileTailPeriod  = 10 * time.Millisecond
 )
 
 var (
@@ -96,7 +96,7 @@ func (d AsyncDisplay) OpenSuite(ctx facade.SuiteContext) {
 func (d AsyncDisplay) CloseSuite(ctx facade.SuiteContext) {
 	suite := ctx.Config.TestSuite.Get()
 	session := d.screen.Session(suite, 0)
-	err := session.End()
+	err := session.End(fmt.Sprintf("closing suite: %s", suite))
 	if err != nil {
 		panic(err)
 	}
@@ -124,7 +124,7 @@ func (d AsyncDisplay) SuiteTitle(ctx facade.SuiteContext) {
 		printer := session.Printer(SuiteBeginPrinterName, 0)
 		printer.ColoredErrf(display.MessageColor, "## Test suite [%s] (token: %s)\n", suite, ctx.Token)
 		printer.Flush()
-		session.ClosePrinter(SuiteBeginPrinterName)
+		session.ClosePrinter(SuiteBeginPrinterName, "low verbosity")
 	}
 	err := session.Flush()
 	if err != nil {
@@ -170,7 +170,7 @@ func (d AsyncDisplay) CloseTest(ctx facade.TestContext) {
 
 	// Close properly test display.
 	td.Close()
-	session.ClosePrinter(ctx.TestId())
+	session.ClosePrinter(ctx.TestId(), "closing test")
 }
 
 func (d AsyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
