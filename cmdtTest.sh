@@ -450,7 +450,7 @@ $cmdtIn @init=suite_ignore
 $cmdtIn @test=suite_ignore/init_suite @-- $newCmdt1 @init=suite_ignore_sub @ignore
 $cmdtIn @test=suite_ignore/ @stderr= @-- $newCmdt1 @test=suite_ignore_sub/ true
 $cmdtIn @test=suite_ignore/ @stderr= @-- $newCmdt1 @test=suite_ignore_sub/ true
-$cmdtIn @test=suite_ignore/report_suite @stderr:"Timeouted suite" @-- $newCmdt1 @report=suite_ignore_sub
+$cmdtIn @test=suite_ignore/report_suite @stderr:"Ignored suite" @-- $newCmdt1 @report=suite_ignore_sub
 
 
 >&2 echo "## Test suite timeout"

@@ -285,13 +285,14 @@ type Config struct {
 	Help bool
 
 	// TestSuite only
-	Token     utilz.Optional[string]
-	Isol      utilz.Optional[string]
-	Action    utilz.Optional[Action] `yaml:""`
-	TestSuite utilz.Optional[string] `yaml:""`
-	TestName  utilz.Optional[string] `yaml:""`
-	Async     utilz.Optional[bool]   `yaml:""`
-	Wait      utilz.Optional[bool]   `yaml:""`
+	Token       utilz.Optional[string]
+	Isol        utilz.Optional[string]
+	Action      utilz.Optional[Action] `yaml:""`
+	TestSuite   utilz.Optional[string] `yaml:""`
+	TestName    utilz.Optional[string] `yaml:""`
+	Async       utilz.Optional[bool]   `yaml:""`
+	Wait        utilz.Optional[bool]   `yaml:""`
+	IgnoreSuite utilz.Optional[bool]   `yaml:""`
 
 	Prefix          utilz.Optional[string]        `yaml:""`
 	CmdAndArgs      []string                      `yaml:""`
@@ -360,6 +361,7 @@ func (c *Config) Merge(right Config) {
 	c.TestName.Merge(right.TestName)
 	c.Async.Merge(right.Async)
 	c.Wait.Merge(right.Wait)
+	c.IgnoreSuite.Merge(right.IgnoreSuite)
 
 	c.Prefix.Merge(right.Prefix)
 	c.TooMuchFailures.Merge(right.TooMuchFailures)

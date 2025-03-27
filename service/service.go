@@ -175,12 +175,21 @@ func ProcessReportDef(def model.ReportDefinition) (exitCode int16, err error) {
 	ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.ReportAction, def.Config) // FIXME ? removing def.Config ?
 	//ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.ReportAction, model.Config{}) // FIXME ? removing def.Config ?
 
-	//fmt.Printf("ReportTestSuite ctx suite: %s \n", ctx.Config.TestSuite.Get())
-	suiteOutcome, exitCode, err := reportTestSuite(ctx)
-	if err != nil {
-		return 1, err
+	var suiteOutcome model.SuiteOutcome
+	if ctx.Config.IgnoreSuite.GetOr(false) {
+		suiteOutcome.TestSuite = def.TestSuite
+		suiteOutcome.Outcome = model.IGNORED
+	} else {
+		suiteOutcome, exitCode, err = reportTestSuite(ctx)
+		if err != nil {
+			return 1, err
+		}
 	}
-	//fmt.Printf("ReportTestSuite outcome suite: %s \n", suiteOutcome.TestSuite)
+
+	if suiteOutcome.Duration < 0 {
+		// FIXME: report should save an endTime for suite duration to be saved
+		suiteOutcome.Duration = time.Since(ctx.Config.SuiteStartTime.Get())
+	}
 
 	Dpl.ReportSuite(suiteOutcome)
 	Dpl.CloseSuite(ctx)
@@ -414,6 +423,9 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig)
 		ProcessSuiteError(suiteCtx, err)
 
+		// Store ignore at suite level
+		suiteCtx.Config.IgnoreSuite = suiteCtx.Config.Ignore
+
 		logger.Debug("repo suite status", "testSuite", testSuite, "exists", exists, "reported", reported, "kept", kept)
 
 		if exists {
@@ -621,6 +633,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		}
 	case model.TestAction:
 		testSuite := inputConfig.TestSuite.Get()
+
 		ppid := uint32(utils.ReadEnvPpid())
 		logger.Debug("Executing Test action", "suite", testSuite)
 		testCtx, err := facade.NewTestContext(token, isolation, testSuite, 0, inputConfig, ppid)
@@ -628,6 +641,12 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		if err != nil {
 			Dpl.Errors(err)
 		}
+
+		if testCtx.Config.IgnoreSuite.GetOr(false) {
+			exitCode = 0
+			return
+		}
+
 		//ProcessTestError(testCtx, err)
 
 		testCtx.IncrementTestCount()
