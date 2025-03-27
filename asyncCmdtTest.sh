@@ -296,8 +296,6 @@ $cmdtIn @test=suite_timeout_async/open @stderr= @-- $newCmdt1 @init=suite_timeou
 $cmdtIn @test=suite_timeout_async/test_sleep @stderr= @-- $newCmdt1 @test=suite_timeout_async_sub/sleep sleep 1
 $cmdtIn @test=suite_timeout_async/report_suite @fail @stderr:timeout @-- $newCmdt1 @report=suite_timeout_async_sub
 
-$cmdtIn @report
-
 $cmdtIn @init=suite_flow_sync_then_async
 # sync
 $cmdtIn @test=suite_flow_sync_then_async/A1_open_sync $syncOpenExpected @-- $newCmdt1 @init=suite_flow_sync_then_async_sub @async=false @verbose=5 @suiteTimeout=2s

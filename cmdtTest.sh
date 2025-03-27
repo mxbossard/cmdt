@@ -374,7 +374,6 @@ $cmdtIn @test=interlaced/ @stderr:FAILED @-- $newCmdt1 false @test="testB/"
 $cmdtIn @test=interlaced/ @stderr:PASSED @-- $newCmdt1 true @test="testB/"
 $cmdtIn @test=interlaced/ @stderr:FAILED @-- $newCmdt1 false @test="testA/"
 
-$cmdtIn @init=interlaced
 # should have 1 success 2 failures and 3 ignored
 $cmdtIn @test="interlaced/" @fail @stderr:"1 success" @stderr:"2 failure" @stderr:"3 ignored" @-- $newCmdt1 @report="testA"
 # should have 2 success 1 failure
@@ -451,6 +450,12 @@ $cmdtIn @test=suite_ignore/init_suite @-- $newCmdt1 @init=suite_ignore_sub @igno
 $cmdtIn @test=suite_ignore/ @stderr= @-- $newCmdt1 @test=suite_ignore_sub/ true
 $cmdtIn @test=suite_ignore/ @stderr= @-- $newCmdt1 @test=suite_ignore_sub/ true
 $cmdtIn @test=suite_ignore/report_suite @stderr:"Ignored suite" @-- $newCmdt1 @report=suite_ignore_sub
+
+$cmdtIn @init=suite_ignore2 
+$cmdtIn @test=suite_ignore2/init_suite @-- $newCmdt1 @init=suite_ignore_sub2 @ignore
+$cmdtIn @test=suite_ignore2/ @stderr= @-- $newCmdt1 @test=suite_ignore_sub2/ true
+$cmdtIn @test=suite_ignore2/ @stderr= @-- $newCmdt1 @test=suite_ignore_sub2/ true
+$cmdtIn @test=suite_ignore2/reportall_suite @stderr:"Ignored suite" @-- $newCmdt1 @report
 
 
 >&2 echo "## Test suite timeout"
