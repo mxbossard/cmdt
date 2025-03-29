@@ -1,7 +1,6 @@
 package repo
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -361,7 +360,7 @@ func (r dbRepo) WaitOperationDone(op model.Operater, timeout time.Duration) (exi
 		time.Sleep(WaitingOpDoneSleepPeriodInMs * time.Millisecond)
 		logger.Trace("waiting ...", "op", op)
 	}
-	err = errors.New("WaitOperationDone() timed out")
+	err = fmt.Errorf("WaitOperationDone() for op: %s timed out after %s", op, timeout)
 	return
 }
 
@@ -380,7 +379,7 @@ func (r dbRepo) WaitEmptyQueue(testSuite string, timeout time.Duration) (err err
 		}
 		time.Sleep(1 * time.Millisecond)
 	}
-	err = errors.New("WaitEmptyQueue() timed out")
+	err = fmt.Errorf("WaitEmptyQueue() for suite: %s timed out after %s", testSuite, timeout)
 	return
 }
 
@@ -398,7 +397,7 @@ func (r dbRepo) WaitAllEmpty(timeout time.Duration) (err error) {
 		}
 		time.Sleep(1 * time.Millisecond)
 	}
-	err = errors.New("WaitAllEmpty() timed out")
+	err = fmt.Errorf("WaitAllEmpty() timed out after %s", timeout)
 	return
 }
 

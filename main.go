@@ -95,10 +95,13 @@ import (
 
 Bugs:
 - [x] @exit seems bug it never display the exitCode value ("but got: []")
-- zcreen bug on session reopening :
+- [x] zcreen bug on session reopening :
   - if we end and reopen a session how to tail 2 sessions ?
   - we need to keep session ser & outputs files for tailing to works.
   - ClearSession should be called by tailer only if we want to be sure to not clear not tailed sessions
+- "Global duration" mising on async reportall
+- "Global duration" are not properly reset after reportAll => could display both times (session duration & global duration)
+- allow zcreen to be reopened (needed by daemon restart) => sink should be creatable on existing tmp dir
 - NEW_LINE in outputs are not prefixed by out> nor err>
 - %f outputed on stderr is badly formatted by display : %!f(MISSING)
 - @verbose @debug=0 log some INFO level (maybe daemon only)
@@ -145,7 +148,7 @@ Optims:
 Features:
 - [x] timeouted test must trigger a report failure (with toimout tests count)
 - [x] multiple @stderr or @stdout rules should be aggregated in assertion report
-- [_] ignored suite should be reported as ignored (and suite duration should be positive)
+- [x] ignored suite should be reported as ignored (and suite duration should be positive)
 - [_] suite should timeout after suiteTimeout and be reported as timeouted
 - add @out & @err as alias of @stdout & @stderr
 - add cmdt @version  or cmdt -v or cmdt --version => how to embed version ? git hash ? git tag ?
