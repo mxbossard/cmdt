@@ -7,9 +7,9 @@ import (
 
 	"mby.fr/cmdtest/facade"
 	"mby.fr/cmdtest/model"
-	"mby.fr/utils/ansi"
-	"mby.fr/utils/format"
-	"mby.fr/utils/inout"
+	"mby.fr/utils/anzi"
+	"mby.fr/utils/formatz"
+	"mby.fr/utils/inoutz"
 	"mby.fr/utils/printz"
 )
 
@@ -18,14 +18,14 @@ const (
 )
 
 const (
-	MessageColor = ansi.HiPurple
-	TestColor    = ansi.HiCyan
-	SuccessColor = ansi.BoldGreen
-	FailureColor = ansi.BoldRed
-	ReportColor  = ansi.Yellow
-	WarningColor = ansi.BoldHiYellow
-	ErrorColor   = ansi.Red
-	ResetColor   = ansi.Reset
+	MessageColor = anzi.HiPurple
+	TestColor    = anzi.HiCyan
+	SuccessColor = anzi.BoldGreen
+	FailureColor = anzi.BoldRed
+	ReportColor  = anzi.Yellow
+	WarningColor = anzi.BoldHiYellow
+	ErrorColor   = anzi.Red
+	ResetColor   = anzi.Reset
 )
 
 type Flusher = func() error
@@ -51,8 +51,8 @@ type basicTestDisplayer struct {
 	bufPrinter         printz.Printer
 	bufNotQuietPrinter printz.Printer
 	errors             []error
-	outFormatter       inout.Formatter
-	errFormatter       inout.Formatter
+	outFormatter       inoutz.Formatter
+	errFormatter       inoutz.Formatter
 }
 
 func (d *basicTestDisplayer) title(ctx facade.TestContext) {
@@ -65,11 +65,11 @@ func (d *basicTestDisplayer) title(ctx facade.TestContext) {
 	cfg := ctx.Config
 	timecode := int(time.Since(cfg.SuiteStartTime.Get()).Milliseconds())
 	qualifiedName := TestQualifiedName(ctx, TestColor)
-	qualifiedName = format.TruncateRight(qualifiedName, MaxTestNameLength)
+	qualifiedName = formatz.TruncateRight(qualifiedName, MaxTestNameLength)
 
 	seq := ctx.Seq
 	title := fmt.Sprintf("[%05d] Test %s #%02d... ", timecode, qualifiedName, seq)
-	title = format.PadRight(title, MaxTestNameLength+23)
+	title = formatz.PadRight(title, MaxTestNameLength+23)
 
 	if ctx.Config.Verbose.Get() > model.SHOW_FAILED_OUTS && ctx.Config.Ignore.Is(true) {
 		if ctx.Config.Verbose.Get() >= model.SHOW_FAILED_OUTS {
@@ -184,7 +184,7 @@ func (d basicTestDisplayer) assertionResult(result model.AssertionResult) {
 		d.printer.ColoredErrf(ErrorColor, result.ErrMessage+"\n")
 	}
 
-	assertLabel := format.Sprintf(TestColor, "%s%s", assertPrefix, assertName)
+	assertLabel := formatz.Sprintf(TestColor, "%s%s", assertPrefix, assertName)
 
 	if assertName == "success" || assertName == "fail" {
 		d.printer.Errf("\t%sExpected%s %s\n", hlClr, ResetColor, assertLabel)
@@ -211,7 +211,7 @@ func (d basicTestDisplayer) assertionResult(result model.AssertionResult) {
 			s = strings.ReplaceAll(s, "\n", "\\n")
 			got = s
 
-			stringifiedGot = ansi.TruncateMid(s, 100, "[...]")
+			stringifiedGot = anzi.TruncateMid(s, 100, "[...]")
 		} else {
 			stringifiedGot = fmt.Sprintf("%v", got)
 			//panic(fmt.Sprintf("unable to stringify rule %s value: [%v]", assertName, got))
@@ -263,7 +263,7 @@ func (d basicTestDisplayer) assertionResults(results []model.AssertionResult) {
 			}
 		}
 
-		assertLabel := format.Sprintf(TestColor, "%s%s", assertPrefix, assertName)
+		assertLabel := formatz.Sprintf(TestColor, "%s%s", assertPrefix, assertName)
 
 		for _, result := range ruleResults {
 			expected := result.Expected
@@ -338,7 +338,7 @@ func (d basicTestDisplayer) assertionResults(results []model.AssertionResult) {
 			if s, ok := got.(string); ok {
 				s = strings.ReplaceAll(s, "\n", "\\n")
 				got = s
-				stringifiedGot = ansi.TruncateMid(s, 100, "[...]")
+				stringifiedGot = anzi.TruncateMid(s, 100, "[...]")
 			} else {
 				stringifiedGot = fmt.Sprintf("%v", got)
 				//panic(fmt.Sprintf("unable to stringify rule %s value: [%v]", assertName, got))
@@ -460,7 +460,7 @@ func (d *basicTestDisplayer) Close() {
 	d.opened = false
 }
 
-func NewTestDisplayer(flusher Flusher, ctx facade.TestContext, printer, notQuietPrinter printz.Printer, outFormatter, errFormatter inout.Formatter) *basicTestDisplayer {
+func NewTestDisplayer(flusher Flusher, ctx facade.TestContext, printer, notQuietPrinter printz.Printer, outFormatter, errFormatter inoutz.Formatter) *basicTestDisplayer {
 	bufPrinter := printz.Buffered(printer)
 	bufNotQuietPrinter := printz.Buffered(notQuietPrinter)
 	td := &basicTestDisplayer{

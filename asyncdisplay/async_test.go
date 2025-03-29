@@ -17,7 +17,7 @@ import (
 	"mby.fr/cmdtest/facade"
 	"mby.fr/cmdtest/model"
 	"mby.fr/cmdtest/repo"
-	"mby.fr/utils/ansi"
+	"mby.fr/utils/anzi"
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/printz"
 	"mby.fr/utils/utilz"
@@ -138,7 +138,7 @@ func TestAsyncDisplay_TestTitle(t *testing.T) {
 
 	assert.Empty(t, outW.String())
 	expectedTitlePattern := fmt.Sprintf(`\[\d+\] Test \[%s\]\(on host\)>true #01...\s*UNKNOWN\s*Executing cmd:\s*\[true\]\s*$`, suite)
-	assert.Regexp(t, regexp.MustCompile(expectedTitlePattern), ansi.Unformat(errW.String()))
+	assert.Regexp(t, regexp.MustCompile(expectedTitlePattern), anzi.Unformat(errW.String()))
 
 }
 
@@ -239,7 +239,7 @@ func TestBlockTail(t *testing.T) {
 		display.TestStdoutRegexp(101, 2) +
 		display.TestStdoutRegexp(101, 3) +
 		"$")
-	assert.Regexp(t, outScenarioRegexp, ansi.Unformat(outW.String()))
+	assert.Regexp(t, outScenarioRegexp, anzi.Unformat(outW.String()))
 	// Expect scénario to be oredred test1, test2, test4
 	errScenarioRegexp := regexp.MustCompile("^" +
 		display.SuiteInitRegexp(token, 101) +
@@ -251,7 +251,7 @@ func TestBlockTail(t *testing.T) {
 		display.TestStderrRegexp(101, 3) +
 		display.ReportSuitePattern(101) +
 		"$")
-	assert.Regexp(t, errScenarioRegexp, ansi.Unformat(errW.String()))
+	assert.Regexp(t, errScenarioRegexp, anzi.Unformat(errW.String()))
 
 }
 
@@ -300,7 +300,7 @@ func TestBlockTail_Twice(t *testing.T) {
 	outScenarioRegexp := regexp.MustCompile("^" +
 		display.TestStdoutRegexp(1, 1) +
 		"$")
-	assert.Regexp(t, outScenarioRegexp, ansi.Unformat(outW.String()))
+	assert.Regexp(t, outScenarioRegexp, anzi.Unformat(outW.String()))
 
 	// Expect scénario to be test1
 	errScenarioRegexp := regexp.MustCompile("^" +
@@ -309,7 +309,7 @@ func TestBlockTail_Twice(t *testing.T) {
 		display.TestStderrRegexp(1, 1) +
 		display.ReportSuitePattern(1) +
 		"$")
-	assert.Regexp(t, errScenarioRegexp, ansi.Unformat(errW.String()))
+	assert.Regexp(t, errScenarioRegexp, anzi.Unformat(errW.String()))
 
 	outW.Reset()
 	errW.Reset()
@@ -395,7 +395,7 @@ func TestAsyncFlushThenDisplayThenBlockTail(t *testing.T) {
 		display.TestStdoutRegexp(1, 2) +
 		display.TestStdoutRegexp(1, 3) +
 		"$")
-	assert.Regexp(t, outScenarioRegexp, ansi.Unformat(outW.String()))
+	assert.Regexp(t, outScenarioRegexp, anzi.Unformat(outW.String()))
 
 	// Expect scénario to be oredred test1, test2, test3
 	errScenarioRegexp := regexp.MustCompile("^" +
@@ -408,7 +408,7 @@ func TestAsyncFlushThenDisplayThenBlockTail(t *testing.T) {
 		display.TestStderrRegexp(1, 3) +
 		display.ReportSuitePattern(1) +
 		"$")
-	assert.Regexp(t, errScenarioRegexp, ansi.Unformat(errW.String()))
+	assert.Regexp(t, errScenarioRegexp, anzi.Unformat(errW.String()))
 
 }
 
@@ -485,7 +485,7 @@ func TestBlockTailAll(t *testing.T) {
 		display.TestStdoutRegexp(1, 2) +
 		display.TestStdoutRegexp(1, 3) +
 		"$")
-	assert.Regexp(t, outScenarioRegexp, ansi.Unformat(outW.String()))
+	assert.Regexp(t, outScenarioRegexp, anzi.Unformat(outW.String()))
 
 	errScenarioRegexp := regexp.MustCompile("^" +
 		display.GlobalInitPattern(token) +
@@ -498,7 +498,7 @@ func TestBlockTailAll(t *testing.T) {
 		display.TestStderrRegexp(1, 3) +
 		display.ReportSuitePattern(1) +
 		"$")
-	assert.Regexp(t, errScenarioRegexp, ansi.Unformat(errW.String()))
+	assert.Regexp(t, errScenarioRegexp, anzi.Unformat(errW.String()))
 
 }
 
@@ -580,7 +580,7 @@ func TestAsyncFlushAllThenDisplayThenBlockTailAll(t *testing.T) {
 		display.TestStdoutRegexp(1, 2) +
 		display.TestStdoutRegexp(1, 3) +
 		"$")
-	assert.Regexp(t, outScenarioRegexp, ansi.Unformat(outW.String()))
+	assert.Regexp(t, outScenarioRegexp, anzi.Unformat(outW.String()))
 
 	errScenarioRegexp := regexp.MustCompile("^" +
 		display.GlobalInitPattern(token) +
@@ -593,7 +593,7 @@ func TestAsyncFlushAllThenDisplayThenBlockTailAll(t *testing.T) {
 		display.TestStderrRegexp(1, 3) +
 		display.ReportSuitePattern(1) +
 		"$")
-	assert.Regexp(t, errScenarioRegexp, ansi.Unformat(errW.String()))
+	assert.Regexp(t, errScenarioRegexp, anzi.Unformat(errW.String()))
 
 }
 
@@ -710,7 +710,7 @@ func TestAsyncDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 		display.TestStdoutRegexp(3, 1) +
 		display.TestStdoutRegexp(3, 2) +
 		"$")
-	assert.Regexp(t, outScenarioRegexp, ansi.Unformat(outW.String()))
+	assert.Regexp(t, outScenarioRegexp, anzi.Unformat(outW.String()))
 
 	errScenarioRegexp := regexp.MustCompile("^" +
 		display.GlobalInitPattern(token) +
@@ -737,7 +737,7 @@ func TestAsyncDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 		display.TestStderrRegexp(3, 2) +
 		display.ReportSuitePattern(3) +
 		"$")
-	assert.Regexp(t, errScenarioRegexp, ansi.Unformat(errW.String()))
+	assert.Regexp(t, errScenarioRegexp, anzi.Unformat(errW.String()))
 
 }
 
@@ -865,7 +865,7 @@ func TestAsyncDisplayUsage_AsyncSuitesSerialTests(t *testing.T) {
 		display.TestStdoutRegexp(3, 1) +
 		display.TestStdoutRegexp(3, 2) +
 		"$")
-	assert.Regexp(t, outScenarioRegexp, ansi.Unformat(outW.String()))
+	assert.Regexp(t, outScenarioRegexp, anzi.Unformat(outW.String()))
 
 	errScenarioRegexp := regexp.MustCompile("^" +
 		display.GlobalInitPattern(token) +
@@ -892,7 +892,7 @@ func TestAsyncDisplayUsage_AsyncSuitesSerialTests(t *testing.T) {
 		display.TestStderrRegexp(3, 2) +
 		display.ReportSuitePattern(3) +
 		"$")
-	assert.Regexp(t, errScenarioRegexp, ansi.Unformat(errW.String()))
+	assert.Regexp(t, errScenarioRegexp, anzi.Unformat(errW.String()))
 }
 
 func TestAsyncDisplayUsage_AsyncSuitesAsyncTests(t *testing.T) {
@@ -1020,7 +1020,7 @@ func TestAsyncDisplayUsage_AsyncSuitesAsyncTests(t *testing.T) {
 		display.TestStdoutRegexp(3, 1) +
 		display.TestStdoutRegexp(3, 2) +
 		"$")
-	assert.Regexp(t, outScenarioRegexp, ansi.Unformat(outW.String()))
+	assert.Regexp(t, outScenarioRegexp, anzi.Unformat(outW.String()))
 
 	errScenarioRegexp := regexp.MustCompile("^" +
 		display.GlobalInitPattern(token) +
@@ -1047,5 +1047,5 @@ func TestAsyncDisplayUsage_AsyncSuitesAsyncTests(t *testing.T) {
 		display.TestStderrRegexp(3, 2) +
 		display.ReportSuitePattern(3) +
 		"$")
-	assert.Regexp(t, errScenarioRegexp, ansi.Unformat(errW.String()))
+	assert.Regexp(t, errScenarioRegexp, anzi.Unformat(errW.String()))
 }

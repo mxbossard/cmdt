@@ -281,13 +281,15 @@ func TestListPassedFailedErrored(t *testing.T) {
 	addSuiteWithOutcome(t, dao, "p1", "PASSED", time.Now())
 	addSuiteWithOutcome(t, dao, "f1", "FAILED", time.Now())
 	addSuiteWithOutcome(t, dao, "e1", "ERRORED", time.Now())
+	addSuiteWithOutcome(t, dao, "i1", "IGNORED", time.Now())
 	addSuiteWithOutcome(t, dao, "t1", "TIMEOUT", time.Now())
 	addSuiteWithOutcome(t, dao, "e2", "ERRORED", time.Now())
 	addSuiteWithOutcome(t, dao, "f2", "FAILED", time.Now())
+	addSuiteWithOutcome(t, dao, "i2", "IGNORED", time.Now())
 	addSuiteWithOutcome(t, dao, "p2", "PASSED", time.Now())
 	addSuiteWithOutcome(t, dao, "t2", "TIMEOUT", time.Now())
 
 	suites, err := dao.ListPassedFailedErrored()
 	require.NoError(t, err)
-	assert.Equal(t, []string{"p1", "p2", "f1", "f2", "t1", "t2", "e1", "e2"}, suites)
+	assert.Equal(t, []string{"p1", "p2", "i1", "i2", "t1", "t2", "f1", "f2", "e1", "e2"}, suites)
 }

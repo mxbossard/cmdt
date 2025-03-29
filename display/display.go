@@ -8,9 +8,9 @@ import (
 
 	"mby.fr/cmdtest/facade"
 	"mby.fr/cmdtest/model"
-	"mby.fr/utils/ansi"
-	"mby.fr/utils/format"
-	"mby.fr/utils/inout"
+	"mby.fr/utils/anzi"
+	"mby.fr/utils/formatz"
+	"mby.fr/utils/inoutz"
 	"mby.fr/utils/printz"
 	"mby.fr/utils/zlog"
 )
@@ -53,9 +53,9 @@ type Displayer interface {
 type basicDisplay struct {
 	printer            printz.Printer
 	notQuietPrinter    printz.Printer
-	clearAnsiFormatter inout.Formatter
-	outFormatter       inout.Formatter
-	errFormatter       inout.Formatter
+	clearAnsiFormatter inoutz.Formatter
+	outFormatter       inoutz.Formatter
+	errFormatter       inoutz.Formatter
 	verbose            model.VerboseLevel
 	openedTest         *basicTestDisplayer
 }
@@ -142,7 +142,7 @@ func (d basicDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 	tooMuchCount := outcome.TooMuchCount
 
 	testSuite := outcome.TestSuite
-	testSuiteLabel := format.New(TestColor, testSuite)
+	testSuiteLabel := formatz.New(TestColor, testSuite)
 	testSuiteLabel.LeftPad = padding
 
 	// if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
@@ -284,9 +284,9 @@ func (d *basicDisplay) SetVerbose(level model.VerboseLevel) {
 func New() *basicDisplay {
 	d := &basicDisplay{
 		notQuietPrinter:    printz.NewStandard(),
-		clearAnsiFormatter: inout.AnsiFormatter{AnsiFormat: ansi.Reset},
-		outFormatter:       inout.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", TestColor, ResetColor)},
-		errFormatter:       inout.PrefixFormatter{Prefix: fmt.Sprintf("%serr%s>", ReportColor, ResetColor)},
+		clearAnsiFormatter: inoutz.AnsiFormatter{AnsiFormat: anzi.Reset},
+		outFormatter:       inoutz.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", TestColor, ResetColor)},
+		errFormatter:       inoutz.PrefixFormatter{Prefix: fmt.Sprintf("%serr%s>", ReportColor, ResetColor)},
 		verbose:            model.DefaultVerboseLevel,
 	}
 	d.printer = d.notQuietPrinter

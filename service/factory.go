@@ -11,7 +11,7 @@ import (
 
 	"mby.fr/cmdtest/model"
 	"mby.fr/utils/cmdz"
-	"mby.fr/utils/collections"
+	"mby.fr/utils/collectionz"
 	"mby.fr/utils/errorz"
 	"mby.fr/utils/filez"
 	"mby.fr/utils/utilz"
@@ -332,7 +332,7 @@ func Uint32ValueValidater(min, max uint32) model.Validater[uint32] {
 
 func OperatorValidater[T any](ops ...string) model.Validater[T] {
 	return func(rule model.Rule, v T) (err error) {
-		if !collections.Contains[string](&ops, rule.Op) {
+		if !collectionz.Contains[string](&ops, rule.Op) {
 			err = fmt.Errorf("rule %s%s%s bad operator. Must be one of: [%s]", rule.Prefix, rule.Name, rule.Op, ops)
 		}
 		return
@@ -341,7 +341,7 @@ func OperatorValidater[T any](ops ...string) model.Validater[T] {
 
 func KeywordsValidater[T any](keywords ...string) model.Validater[T] {
 	return func(rule model.Rule, v T) (err error) {
-		if !collections.Contains[string](&keywords, rule.Expected) {
+		if !collectionz.Contains[string](&keywords, rule.Expected) {
 			err = fmt.Errorf("rule %s%s%s bad value. Must be one of: [%s]", rule.Prefix, rule.Name, rule.Expected, keywords)
 		}
 		return
@@ -350,7 +350,7 @@ func KeywordsValidater[T any](keywords ...string) model.Validater[T] {
 
 func NotEmptyForOpValidater[T any](ops ...string) model.Validater[T] {
 	return func(rule model.Rule, v T) (err error) {
-		if collections.Contains[string](&ops, rule.Op) && rule.Expected == "" {
+		if collectionz.Contains[string](&ops, rule.Op) && rule.Expected == "" {
 			err = fmt.Errorf("rule %s%s%s must have a value", rule.Prefix, rule.Name, rule.Op)
 		}
 		return
@@ -1090,11 +1090,11 @@ func ValidateActionRules(action model.Action, rules ...model.Rule) (agg errorz.A
 	for _, r := range rules {
 		ruleKey := ruleKey(r.Name)
 		logger.Trace("checking action rules", "ruleKey", ruleKey, "actionRulesKeys", actionRulesKeys)
-		if collections.Contains[model.RuleKey](&actionRulesKeys, ruleKey) {
+		if collectionz.Contains[model.RuleKey](&actionRulesKeys, ruleKey) {
 			continue
 		}
 		logger.Trace("checking authorized rules", "ruleKey", ruleKey, "authorizedRulesKeys", authorizedRulesKeys)
-		if !collections.Contains[model.RuleKey](&authorizedRulesKeys, ruleKey) {
+		if !collectionz.Contains[model.RuleKey](&authorizedRulesKeys, ruleKey) {
 			agg.Add(fmt.Errorf("you can't use rule: [%s%s] with action: [%s]", r.Prefix, r.Name, action))
 		}
 	}
@@ -1118,7 +1118,7 @@ func ValidateOnceOnlyDefinedRule(rules ...model.Rule) (err error) {
 	}
 
 	for key, matchedRules := range matches {
-		if len(matchedRules) > 1 && !collections.Contains(&multiDefinedRules, key) {
+		if len(matchedRules) > 1 && !collectionz.Contains(&multiDefinedRules, key) {
 			// This rule is defined more than once and shouldnt
 			err = fmt.Errorf("rule: %s is defined more than once", key.Name)
 		}

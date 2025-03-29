@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"mby.fr/cmdtest/model"
-	"mby.fr/utils/collections"
+	"mby.fr/utils/collectionz"
 	"mby.fr/utils/errorz"
 	"mby.fr/utils/zlog"
 )
@@ -89,7 +89,7 @@ func (r ruleRepo) parseArgs(prefix string, args []string) (allMatches []ruleMatc
 	allNoMatchesIntersect := allNoMatches[0]
 	if len(allNoMatches) > 1 {
 		for p := 1; p < len(allNoMatches); p++ {
-			allNoMatchesIntersect = collections.Intersect(&allNoMatchesIntersect, &allNoMatches[p])
+			allNoMatchesIntersect = collectionz.Intersect(&allNoMatchesIntersect, &allNoMatches[p])
 		}
 	}
 
@@ -120,7 +120,7 @@ func (r ruleRepo) parseArgs(prefix string, args []string) (allMatches []ruleMatc
 	// FIXME: Validate each rule found satisfy it's dependency
 	// 1- foreach rule get ruleSet
 	// 2- if ruleset depends on a rule, check the rule is present or add error
-	allMatchesNames := collections.Map(&allMatches, func(rm ruleMatch) string {
+	allMatchesNames := collectionz.Map(&allMatches, func(rm ruleMatch) string {
 		return rm.Name()
 	})
 Exit:
@@ -134,7 +134,7 @@ Exit:
 		}
 		if containingRuleSet != nil && len(containingRuleSet.dependsOn) > 0 {
 			// Verify at least one of depending rule is present
-			dependendingNames := collections.Map(&(containingRuleSet.dependsOn), func(rm ruleMatcher) string {
+			dependendingNames := collectionz.Map(&(containingRuleSet.dependsOn), func(rm ruleMatcher) string {
 				return rm.Name()
 			})
 			for _, dependendingName := range dependendingNames {
@@ -199,7 +199,7 @@ func (r ruleRepo) children(args ...string) (ruleDefs []RuleDef, warns errorz.Agg
 		// List rule children to validate next rule ancestry
 		if len(args) > 1 && p < len(args) {
 			lastRuleChilren, ws, es := r.children(args[p])
-			lastRuleChilrenNames = collections.Map(&lastRuleChilren, func(r RuleDef) string { return r.Name() })
+			lastRuleChilrenNames = collectionz.Map(&lastRuleChilren, func(r RuleDef) string { return r.Name() })
 			warns.Concat(ws)
 			errors.Concat(es)
 		}
@@ -239,7 +239,7 @@ func (r ruleRepo) children(args ...string) (ruleDefs []RuleDef, warns errorz.Agg
 	// 3- List ruleSets dependings on last rule
 	var dependingSets []*ruleSet
 	for _, ruleSet := range r.ruleSets {
-		dependsOnNames := collections.Map(&ruleSet.dependsOn, func(r ruleMatcher) string {
+		dependsOnNames := collectionz.Map(&ruleSet.dependsOn, func(r ruleMatcher) string {
 			return r.Name()
 		})
 		if len(args) == 0 && len(ruleSet.dependsOn) == 0 {

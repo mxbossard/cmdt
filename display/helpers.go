@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"mby.fr/cmdtest/facade"
-	"mby.fr/utils/ansi"
+	"mby.fr/utils/anzi"
 	"mby.fr/utils/printz"
 )
 
@@ -16,7 +16,7 @@ func NormalizeDurationInSec(d time.Duration) (duration string) {
 	return
 }
 
-func TestQualifiedName(ctx facade.TestContext, color ansi.Color) (name string) {
+func TestQualifiedName(ctx facade.TestContext, color anzi.Color) (name string) {
 	cfg := ctx.Config
 	var testName string
 	if cfg.TestName.IsPresent() && !cfg.TestName.Is("") {

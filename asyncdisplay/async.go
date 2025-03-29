@@ -11,10 +11,10 @@ import (
 	"mby.fr/cmdtest/facade"
 	"mby.fr/cmdtest/model"
 	"mby.fr/utils/errorz"
-	"mby.fr/utils/format"
-	"mby.fr/utils/inout"
+	"mby.fr/utils/formatz"
+	"mby.fr/utils/inoutz"
 	"mby.fr/utils/printz"
-	"mby.fr/utils/screen"
+	"mby.fr/utils/zcreen"
 	"mby.fr/utils/zlog"
 )
 
@@ -44,11 +44,11 @@ type AsyncDisplay struct {
 	quiet   bool
 	tmpDir  string
 
-	screen screen.Sink
-	tailer screen.Tailer
+	screen zcreen.Sink
+	tailer zcreen.Tailer
 
-	outFormatter   inout.Formatter
-	errFormatter   inout.Formatter
+	outFormatter   inoutz.Formatter
+	errFormatter   inoutz.Formatter
 	testDisplayers map[string]display.TestDisplayer
 }
 
@@ -183,7 +183,7 @@ func (d AsyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 	tooMuchCount := outcome.TooMuchCount
 
 	testSuite := outcome.TestSuite
-	testSuiteLabel := format.New(display.TestColor, testSuite)
+	testSuiteLabel := formatz.New(display.TestColor, testSuite)
 	testSuiteLabel.LeftPad = padding
 
 	// if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
@@ -225,26 +225,26 @@ func (d AsyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 	duration := outcome.Duration
 	fmtDuration := display.NormalizeDurationInSec(duration)
 	if failedCount == 0 && errorCount == 0 && timeoutCount == 0 {
-		printer.ColoredErrf(display.SuccessColor, "Successfuly ran  [ %s ] test suite in %10s (%3d success)", testSuiteLabel, fmtDuration, passedCount)
+		printer.ColoredErrf(display.SuccessColor, "Successfully ran [ %s ] test suite in %10s (%3d success)", testSuiteLabel, fmtDuration, passedCount)
 		printer.ColoredErrf(display.WarningColor, "%s", ignoredMessage)
 		printer.Errf("\n")
 	} else {
 		//printer.ColoredErrf(display.FailureColor, "Failures running [ %s ] test suite in %10s (%3d success, %3d failures, %3d errors, %3d timeouts on %3d tests)", testSuiteLabel, fmtDuration, passedCount, failedCount, errorCount, timeoutCount, testCount)
 		//printer.ColoredErrf(display.WarningColor, "%s", ignoredMessage)
 		printer.ColoredErrf(display.FailureColor, "Failures running [ %s ] test suite in %10s (%3d success", testSuiteLabel, fmtDuration, passedCount)
-                if failedCount > 0 {
-                        printer.ColoredErrf(display.FailureColor, ", %3d failures", failedCount)
-                }
-                if errorCount > 0 {
-                        printer.ColoredErrf(display.FailureColor, ", %3d errors", errorCount)
-                }
-                if timeoutCount > 0 {
-                        printer.ColoredErrf(display.FailureColor, "%3d timeouts", timeoutCount)
-                }
-                printer.ColoredErrf(display.FailureColor, " on %3d tests)", testCount)
-                if ignoredMessage != "" {
-                        printer.ColoredErrf(display.WarningColor, "%s", ignoredMessage)
-                }
+		if failedCount > 0 {
+			printer.ColoredErrf(display.FailureColor, ", %3d failures", failedCount)
+		}
+		if errorCount > 0 {
+			printer.ColoredErrf(display.FailureColor, ", %3d errors", errorCount)
+		}
+		if timeoutCount > 0 {
+			printer.ColoredErrf(display.FailureColor, "%3d timeouts", timeoutCount)
+		}
+		printer.ColoredErrf(display.FailureColor, " on %3d tests)", testCount)
+		if ignoredMessage != "" {
+			printer.ColoredErrf(display.WarningColor, "%s", ignoredMessage)
+		}
 		printer.Errf("\n")
 		for _, report := range outcome.FailureReports {
 			report = strings.TrimSpace(report)
@@ -430,19 +430,19 @@ func New(tmpDir string, init bool, outs printz.Outputs) *AsyncDisplay {
 
 	d := &AsyncDisplay{
 		tmpDir:         zcreenTmpDir,
-		outFormatter:   inout.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", display.TestColor, display.ResetColor)},
-		errFormatter:   inout.PrefixFormatter{Prefix: fmt.Sprintf("%serr%s>", display.ReportColor, display.ResetColor)},
+		outFormatter:   inoutz.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", display.TestColor, display.ResetColor)},
+		errFormatter:   inoutz.PrefixFormatter{Prefix: fmt.Sprintf("%serr%s>", display.ReportColor, display.ResetColor)},
 		verbose:        model.DefaultVerboseLevel,
 		quiet:          false,
 		testDisplayers: openedTests,
 	}
 
 	if init {
-		d.screen = screen.NewAsyncScreen(zcreenTmpDir)
+		d.screen = zcreen.NewAsyncScreen(zcreenTmpDir)
 	}
 	go func() {
 		// Tailer should be build later after daemon initialized the screen
-		d.tailer = screen.NewAsyncScreenTailerWaiting(outs, zcreenTmpDir, 2*time.Second)
+		d.tailer = zcreen.NewAsyncScreenTailerWaiting(outs, zcreenTmpDir, 2*time.Second)
 	}()
 	return d
 }
@@ -454,22 +454,22 @@ func NewWaitingTailer(tmpDir string, init bool, outs printz.Outputs) *AsyncDispl
 
 	d := &AsyncDisplay{
 		tmpDir:         zcreenTmpDir,
-		outFormatter:   inout.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", display.TestColor, display.ResetColor)},
-		errFormatter:   inout.PrefixFormatter{Prefix: fmt.Sprintf("%serr%s>", display.ReportColor, display.ResetColor)},
+		outFormatter:   inoutz.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", display.TestColor, display.ResetColor)},
+		errFormatter:   inoutz.PrefixFormatter{Prefix: fmt.Sprintf("%serr%s>", display.ReportColor, display.ResetColor)},
 		verbose:        model.DefaultVerboseLevel,
 		quiet:          false,
 		testDisplayers: openedTests,
 	}
 
 	if init {
-		d.screen = screen.NewAsyncScreen(zcreenTmpDir)
+		d.screen = zcreen.NewAsyncScreen(zcreenTmpDir)
 	}
 	// Tailer should be build later after daemon initialized the screen
-	d.tailer = screen.NewAsyncScreenTailerWaiting(outs, zcreenTmpDir, 2*time.Second)
+	d.tailer = zcreen.NewAsyncScreenTailerWaiting(outs, zcreenTmpDir, 2*time.Second)
 	return d
 }
 
 func ClearSuite(tmpDir, name string) error {
 	zcreenTmpDir := zcreenTmpDir(tmpDir)
-	return screen.ClearSession(zcreenTmpDir, name)
+	return zcreen.ClearSession(zcreenTmpDir, name)
 }

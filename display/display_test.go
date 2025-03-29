@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"mby.fr/cmdtest/facade"
 	"mby.fr/cmdtest/model"
-	"mby.fr/utils/ansi"
+	"mby.fr/utils/anzi"
 	"mby.fr/utils/cmdz"
 	"mby.fr/utils/printz"
 )
@@ -39,19 +39,19 @@ func TestDisplay_Stdout(t *testing.T) {
 	d.TestStdout(ctx, "beforeOut\n")
 	d.TestStderr(ctx, "beforeErr\n")
 	// Before stdout & stderr should be printed
-	assert.Equal(t, "beforeOut\n", ansi.Unformat(outW.String()))
-	assert.Equal(t, "beforeErr\n", ansi.Unformat(errW.String()))
+	assert.Equal(t, "beforeOut\n", anzi.Unformat(outW.String()))
+	assert.Equal(t, "beforeErr\n", anzi.Unformat(errW.String()))
 
 	d.TestTitle(ctx)
 	// Title should be printed
-	assert.Equal(t, "beforeOut\n", ansi.Unformat(outW.String()))
-	assert.Regexp(t, `beforeErr\n\[\d+\] Test \[suite\]\(on host\)>true #12...\s*$`, ansi.Unformat(errW.String()))
+	assert.Equal(t, "beforeOut\n", anzi.Unformat(outW.String()))
+	assert.Regexp(t, `beforeErr\n\[\d+\] Test \[suite\]\(on host\)>true #12...\s*$`, anzi.Unformat(errW.String()))
 
 	d.TestStdout(ctx, outMsg)
 	d.TestStderr(ctx, errMsg)
 	// stdout & stderr should not be printed until outcome printed
-	assert.Equal(t, "beforeOut\n", ansi.Unformat(outW.String()))
-	assert.Regexp(t, `beforeErr\n\[\d+\] Test \[suite\]\(on host\)>true #12...\s*$`, ansi.Unformat(errW.String()))
+	assert.Equal(t, "beforeOut\n", anzi.Unformat(outW.String()))
+	assert.Regexp(t, `beforeErr\n\[\d+\] Test \[suite\]\(on host\)>true #12...\s*$`, anzi.Unformat(errW.String()))
 
 	to := model.TestOutcome{
 		TestSignature: model.TestSignature{TestSuite: "suite", Seq: 12},
@@ -65,9 +65,9 @@ func TestDisplay_Stdout(t *testing.T) {
 	// assert.Equal(t, "beforeOut\n", ansi.Unformat(outW.String()))
 	// assert.Equal(t, "beforeErr\n", ansi.Unformat(errW.String()))
 
-	assert.Equal(t, "beforeOut\n"+outMsg, ansi.Unformat(outW.String()))
+	assert.Equal(t, "beforeOut\n"+outMsg, anzi.Unformat(outW.String()))
 	assert.Regexp(t, `beforeErr\n\[\d+\] Test \[suite\]\(on host\)>true #12\.\.\.\s+FAILED \(in 3ms\)\s*\n`+
-		`\s+Executing cmd:\s+\[true\]\s*\n`+errMsg, ansi.Unformat(errW.String()))
+		`\s+Executing cmd:\s+\[true\]\s*\n`+errMsg, anzi.Unformat(errW.String()))
 
 	d.CloseTest(ctx)
 
@@ -79,9 +79,9 @@ func TestDisplay_Stdout(t *testing.T) {
 	// assert.Equal(t, d.outFormatter.Format(outMsg), outW.String())
 	// assert.Equal(t, d.errFormatter.Format(errMsg), errW.String())
 
-	assert.Equal(t, "beforeOut\n"+outMsg, ansi.Unformat(outW.String()))
+	assert.Equal(t, "beforeOut\n"+outMsg, anzi.Unformat(outW.String()))
 	assert.Regexp(t, `beforeErr\n\[\d+\] Test \[suite\]\(on host\)>true #12\.\.\.\s+FAILED \(in 3ms\)\s*\n`+
-		`\s+Executing cmd:\s+\[true\]\s*\n`+errMsg, ansi.Unformat(errW.String()))
+		`\s+Executing cmd:\s+\[true\]\s*\n`+errMsg, anzi.Unformat(errW.String()))
 
 }
 
@@ -111,7 +111,7 @@ func TestDisplay_TestTitle(t *testing.T) {
 
 	assert.Empty(t, outW.String())
 	expectedTitlePattern := `\[\d+\] Test \[suite\]\(on host\)>true #02...\s*`
-	assert.Regexp(t, regexp.MustCompile(expectedTitlePattern), ansi.Unformat(errW.String()))
+	assert.Regexp(t, regexp.MustCompile(expectedTitlePattern), anzi.Unformat(errW.String()))
 
 }
 
@@ -215,7 +215,7 @@ func TestDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 		TestStdoutRegexp(3, 2) +
 		"$")
 	// assert.Empty(t, ansi.Unformat(outW.String()))
-	assert.Regexp(t, outScenarioRegexp, ansi.Unformat(outW.String()))
+	assert.Regexp(t, outScenarioRegexp, anzi.Unformat(outW.String()))
 
 	errScenarioRegexp := regexp.MustCompile("^" +
 		GlobalInitPattern(token) +
@@ -242,6 +242,6 @@ func TestDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 		TestStderrRegexp(3, 2) +
 		ReportSuitePattern(3) +
 		"$")
-	assert.Regexp(t, errScenarioRegexp, ansi.Unformat(errW.String()))
+	assert.Regexp(t, errScenarioRegexp, anzi.Unformat(errW.String()))
 
 }

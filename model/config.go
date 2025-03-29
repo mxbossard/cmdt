@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"mby.fr/utils/ansi"
+	"mby.fr/utils/anzi"
 	"mby.fr/utils/utilz"
 )
 
@@ -60,13 +60,13 @@ const (
 	DefaultDebugLogFilepath       = "/tmp/cmdt%s.log"
 	DefaultDebugDaemonLogFilepath = "/tmp/daemon%s-{{.Pid}}.log"
 
-	MessageColor = ansi.HiPurple
-	TestColor    = ansi.HiCyan
-	SuccessColor = ansi.BoldGreen
-	FailureColor = ansi.BoldRed
-	ReportColor  = ansi.Yellow
-	WarningColor = ansi.BoldHiYellow
-	ErrorColor   = ansi.Red
+	MessageColor = anzi.HiPurple
+	TestColor    = anzi.HiCyan
+	SuccessColor = anzi.BoldGreen
+	FailureColor = anzi.BoldRed
+	ReportColor  = anzi.Yellow
+	WarningColor = anzi.BoldHiYellow
+	ErrorColor   = anzi.Red
 )
 
 const (

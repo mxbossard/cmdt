@@ -11,7 +11,7 @@ import (
 	"mby.fr/cmdtest/model"
 	"mby.fr/utils/errorz"
 	"mby.fr/utils/filez"
-	"mby.fr/utils/format"
+	"mby.fr/utils/formatz"
 	"mby.fr/utils/utilz"
 )
 
@@ -220,7 +220,7 @@ func (r FileRepo) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 	}
 
 	qualifiedName := fmt.Sprintf("[%s]> %s", outcome.TestSuite, outcome.TestName)
-	testTitle := format.PadRight(qualifiedName, 70)
+	testTitle := formatz.PadRight(qualifiedName, 70)
 	switch outcome.Outcome {
 	case model.PASSED:
 		// Nothing to do

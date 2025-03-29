@@ -86,5 +86,5 @@ func TestStderrRegexp(suite, seq int) string {
 }
 
 func ReportSuitePattern(suite int) string {
-	return fmt.Sprintf(`Successfuly ran  \[ suite-%d\s* \] test suite in    [\d.]+ s \(\s*\d+ success\)\s*\n`, suite)
+	return fmt.Sprintf(`Successfully ran \[ suite-%d\s* \] test suite in    [\d.]+ s \(\s*\d+ success\)\s*\n`, suite)
 }

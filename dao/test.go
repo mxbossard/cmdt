@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"mby.fr/cmdtest/model"
-	"mby.fr/utils/collections"
+	"mby.fr/utils/collectionz"
 	"mby.fr/utils/zql"
 )
 
@@ -221,7 +221,7 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 	outcome.IgnoredCount = ignoredCount
 	outcome.Outcome = ocm
 	//outcome.FailureReports = failedAssertionsMessages
-	outcome.TestOutcomes = collections.OrderedValues(testOutcomeBySeq)
+	outcome.TestOutcomes = collectionz.OrderedValues(testOutcomeBySeq)
 
 	return
 }

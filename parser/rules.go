@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"mby.fr/cmdtest/model"
-	"mby.fr/utils/collections"
+	"mby.fr/utils/collectionz"
 	"mby.fr/utils/errorz"
 )
 
@@ -91,7 +91,7 @@ func (r rule[T]) Aliases() (a []string) {
 }
 
 func (r rule[T]) Ops() []string {
-	return collections.Map[*operator[T], string](&r.operators, func(op *operator[T]) string {
+	return collectionz.Map[*operator[T], string](&r.operators, func(op *operator[T]) string {
 		return op.op
 	})
 }
@@ -115,12 +115,12 @@ func (r rule[T]) Check(matches ...ruleMatch) (agg errorz.Aggregated) {
 			matchingRules = append(matchingRules, match.Prefix()+match.Name()+match.Op())
 		}
 	}
-	matchingRules = collections.Deduplicate(&matchingRules)
-	uniqOps := collections.Sub(&r.operators, &r.multiValuedOps)
+	matchingRules = collectionz.Deduplicate(&matchingRules)
+	uniqOps := collectionz.Sub(&r.operators, &r.multiValuedOps)
 	for _, op := range uniqOps {
 		if countByOperatorMap[op.op] > 1 {
 			usedRules := ruleByOperatorMap[op.op]
-			usedRules = collections.Deduplicate(&usedRules)
+			usedRules = collectionz.Deduplicate(&usedRules)
 			err := fmt.Errorf("rule [%s%s] is uniq and cannot be used more than once (like: [%s])", r.name, op.op, strings.Join(usedRules, ", "))
 			agg.Add(err)
 		}
@@ -128,7 +128,7 @@ func (r rule[T]) Check(matches ...ruleMatch) (agg errorz.Aggregated) {
 	for _, op := range r.exclusiveOps {
 		exclusiveCount := countByOperatorMap[op.op]
 		if exclusiveCount > 0 && matchingCount > exclusiveCount {
-			otherOps := collections.Delete(matchingRules, op.op)
+			otherOps := collectionz.Delete(matchingRules, op.op)
 			err := fmt.Errorf("rule [%s%s] is exclusive and cannot be used with other operators (like: [%s])", r.name, op.op, strings.Join(otherOps, ", "))
 			agg.Add(err)
 		}
@@ -345,9 +345,9 @@ func (r ruleSet) Name() string {
 }
 
 func (r ruleSet) Aliases() []string {
-	return collections.Flatten(collections.Map(&r.rules, func(r ruleMatcher) []string {
+	return collectionz.Flatten(collectionz.Map(&r.rules, func(r ruleMatcher) []string {
 		return r.Aliases()
-	}))
+	})...)
 }
 
 func (r ruleSet) Contains(rd RuleDef) bool {
@@ -385,7 +385,7 @@ func (r ruleSet) Check(matches ...ruleMatch) (agg errorz.Aggregated) {
 				matchedRules = append(matchedRules, match.Name())
 			}
 		}
-		matchedRules = collections.Deduplicate(&matchedRules)
+		matchedRules = collectionz.Deduplicate(&matchedRules)
 		if len(matchedRules) > 1 {
 			err := fmt.Errorf("[%s] rules are mutually exclusives", strings.Join(matchedRules, ", "))
 			agg.Add(err)

@@ -11,7 +11,7 @@ import (
 
 	"mby.fr/cmdtest/model"
 	"mby.fr/utils/cmdz"
-	"mby.fr/utils/trust"
+	"mby.fr/utils/truzt"
 	"mby.fr/utils/zlog"
 )
 
@@ -121,7 +121,7 @@ func ForgeContextualToken(token string) (string, error) {
 			return "", fmt.Errorf("cannot find parent process start time: %w", err)
 		}
 		ppidStartTimeStr := fmt.Sprintf("%d", ppidStartTime)
-		token, err = trust.SignStrings(workDirPath, "--", ppidStr, "--", ppidStartTimeStr)
+		token, err = truzt.SignStrings(workDirPath, "--", ppidStr, "--", ppidStartTimeStr)
 		if err != nil {
 			err = fmt.Errorf("cannot hash workspace dir: %w", err)
 			return "", err
