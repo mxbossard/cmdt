@@ -229,8 +229,22 @@ func (d AsyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 		printer.ColoredErrf(display.WarningColor, "%s", ignoredMessage)
 		printer.Errf("\n")
 	} else {
-		printer.ColoredErrf(display.FailureColor, "Failures running [ %s ] test suite in %10s (%3d success, %3d failures, %3d errors, %3d timeouts on %3d tests)", testSuiteLabel, fmtDuration, passedCount, failedCount, errorCount, timeoutCount, testCount)
-		printer.ColoredErrf(display.WarningColor, "%s", ignoredMessage)
+		//printer.ColoredErrf(display.FailureColor, "Failures running [ %s ] test suite in %10s (%3d success, %3d failures, %3d errors, %3d timeouts on %3d tests)", testSuiteLabel, fmtDuration, passedCount, failedCount, errorCount, timeoutCount, testCount)
+		//printer.ColoredErrf(display.WarningColor, "%s", ignoredMessage)
+		printer.ColoredErrf(display.FailureColor, "Failures running [ %s ] test suite in %10s (%3d success", testSuiteLabel, fmtDuration, passedCount)
+                if failedCount > 0 {
+                        printer.ColoredErrf(display.FailureColor, ", %3d failures", failedCount)
+                }
+                if errorCount > 0 {
+                        printer.ColoredErrf(display.FailureColor, ", %3d errors", errorCount)
+                }
+                if timeoutCount > 0 {
+                        printer.ColoredErrf(display.FailureColor, "%3d timeouts", timeoutCount)
+                }
+                printer.ColoredErrf(display.FailureColor, " on %3d tests)", testCount)
+                if ignoredMessage != "" {
+                        printer.ColoredErrf(display.WarningColor, "%s", ignoredMessage)
+                }
 		printer.Errf("\n")
 		for _, report := range outcome.FailureReports {
 			report = strings.TrimSpace(report)

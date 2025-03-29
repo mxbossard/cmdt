@@ -120,6 +120,15 @@ func (r dbRepo) InitSuite(cfg model.Config) (err error) {
 		err = fmt.Errorf("unable to init suite: %w", err)
 	}
 	logger.Info("Initialized suite in repo", "suite", suite)
+
+	if cfg.IgnoreSuite.GetOr(false) {
+		// Ignored suite can save it's outcome
+		outcome := model.SuiteOutcome{}
+		outcome.TestSuite = suite
+		outcome.Outcome = model.IGNORED
+		r.SaveSuiteOutcome(outcome)
+	}
+
 	return
 }
 
@@ -211,6 +220,17 @@ func (r dbRepo) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 	if err != nil {
 		return
 	}
+	//if outcome.Outcome == model.FAILED || outcome.Outcome == model.ERRORED || outcome.Outcome == model.TIMEOUT {
+	if outcome.Outcome != model.IGNORED && outcome.Outcome != model.TIMEOUT {
+		// FIXME: do we need to update the suite outcome on each test outcome ?
+		// FIXME: which outcome to keep ?
+		// An ignored test does not imply an ignored suite
+		err = r.suiteDao.UpdateSuiteOutcome(outcome.TestSuite, outcome.Outcome)
+	}
+	return
+}
+
+func (r dbRepo) SaveSuiteOutcome(outcome model.SuiteOutcome) (err error) {
 	err = r.suiteDao.UpdateSuiteOutcome(outcome.TestSuite, outcome.Outcome)
 	return
 }

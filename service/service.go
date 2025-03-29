@@ -63,7 +63,7 @@ func reportAllTestSuites(ctx facade.GlobalContext, asyncMode bool) (exitCode int
 
 	logger.Info("Reporting all suites", "token", token, "suites", testSuites, "asyncMode", asyncMode)
 
-	var testCount uint16
+	nothingToReport := true
 	exitCode = 0
 
 	var suiteOutcomes []model.SuiteOutcome
@@ -76,10 +76,13 @@ func reportAllTestSuites(ctx facade.GlobalContext, asyncMode bool) (exitCode int
 			// Ignore suites in bad async mode
 			continue
 		}
+		// Override suite Keep config for reportAll which is global
+		suiteCtx.Config.Keep = ctx.Config.Keep
+		suiteIgnored := suiteCtx.Config.IgnoreSuite.GetOr(false)
 		goodModeSuite = true
 		count := suiteCtx.Repo.TestCount(testSuite)
-		if count > 0 {
-			testCount += count
+		if count > 0 || suiteIgnored {
+			nothingToReport = false
 			suiteContexts = append(suiteContexts, suiteCtx)
 			var code int16
 			var suiteOutcome model.SuiteOutcome
@@ -100,7 +103,7 @@ func reportAllTestSuites(ctx facade.GlobalContext, asyncMode bool) (exitCode int
 		return
 	}
 
-	if testCount == 0 {
+	if nothingToReport {
 		err = fmt.Errorf("you must perform some test prior to report all suites")
 		exitCode = 1
 		return
@@ -111,9 +114,6 @@ func reportAllTestSuites(ctx facade.GlobalContext, asyncMode bool) (exitCode int
 
 	for _, suiteCtx := range suiteContexts {
 		Dpl.CloseSuite(suiteCtx)
-		if !suiteCtx.Config.Keep.Is(true) {
-
-		}
 	}
 
 	for _, outcome := range suiteOutcomes {
@@ -142,26 +142,28 @@ func reportTestSuite(ctx facade.SuiteContext) (suiteOutcome model.SuiteOutcome, 
 	cfg := ctx.Config
 	testSuite := cfg.TestSuite.Get()
 	testCount := ctx.Repo.TestCount(testSuite)
+	suiteIgnored := ctx.Config.IgnoreSuite.GetOr(false)
 	logger.Info("Reporting suite", "suite", testSuite, "testCount", testCount)
 
-	if testCount == 0 {
+	if !suiteIgnored && testCount == 0 {
 		err = fmt.Errorf("you must perform some test prior to report: [%s] suite", testSuite)
 		ProcessSuiteError(ctx, err)
 		exitCode = 1
 		return
+	} else {
+		suiteOutcome, err = ctx.Repo.LoadSuiteOutcome(testSuite)
+		if err != nil {
+			ProcessSuiteError(ctx, err)
+			return
+		}
 	}
 
-	suiteOutcome, err = ctx.Repo.LoadSuiteOutcome(testSuite)
-	if err != nil {
-		ProcessSuiteError(ctx, err)
-		return
-	}
-
-	if suiteOutcome.FailedCount == 0 && suiteOutcome.ErroredCount == 0 && suiteOutcome.TimeoutedCount == 0 {
+	if suiteOutcome.Outcome == model.IGNORED || suiteOutcome. Outcome == model.PASSED {
 		exitCode = 0
 	}
 
 	// FIXME: should not clear test suite in report but in suite opening
+	// FIXME: but report suite should report only not reported suite and not all existing suites !
 	if !cfg.Keep.Is(true) {
 		err = ctx.Repo.ClearTestSuite(suiteOutcome.TestSuite)
 		ProcessSuiteError(ctx, err)
@@ -175,15 +177,9 @@ func ProcessReportDef(def model.ReportDefinition) (exitCode int16, err error) {
 	ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.ReportAction, def.Config) // FIXME ? removing def.Config ?
 	//ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.ReportAction, model.Config{}) // FIXME ? removing def.Config ?
 
-	var suiteOutcome model.SuiteOutcome
-	if ctx.Config.IgnoreSuite.GetOr(false) {
-		suiteOutcome.TestSuite = def.TestSuite
-		suiteOutcome.Outcome = model.IGNORED
-	} else {
-		suiteOutcome, exitCode, err = reportTestSuite(ctx)
-		if err != nil {
-			return 1, err
-		}
+	suiteOutcome, exitCode, err := reportTestSuite(ctx)
+	if err != nil {
+		return 1, err
 	}
 
 	if suiteOutcome.Duration < 0 {
@@ -540,12 +536,6 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				daemonIsol = globalCtx.Isolation
 				daemonToken = globalCtx.Token
 			}
-			/*
-				} else {
-					exitCode, err = reportAllTestSuites(globalCtx)
-					ProcessGlobalError(globalCtx, err)
-				}
-			*/
 		} else {
 			// Reporting One test suite
 			testSuite := inputConfig.TestSuite.Get()
@@ -564,17 +554,9 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			}
 			op := model.ReportOperation(testSuite, true, def) // FIXME should not block if test can be run simultaneously
 
-			//asyncDpl := display.NewAsync(token, isolation)
-			// if suiteCtx.Config.Async.Is(true) {
-			// 	// Switch display to async one
-			// 	Dpl = asyncDpl
-			// }
-
-			// if suiteCtx.Config.Async.Is(false) {
 			// Process report without daemon
 			logger.Trace("Forged context", "ctx", suiteCtx)
 			Dpl.Quiet(suiteCtx.Config.Quiet.Is(true))
-			// }
 
 			if suiteCtx.Config.Async.Is(true) {
 				//logger.Info("executing report on async display", "suite", testSuite)

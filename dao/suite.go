@@ -22,13 +22,13 @@ func outcomeOrder(o model.Outcome) int {
 	switch o {
 	case model.PASSED:
 		return 10
-	case model.FAILED:
+	case model.IGNORED:
 		return 20
 	case model.TIMEOUT:
 		return 30
-	case model.ERRORED:
+	case model.FAILED:
 		return 40
-	case model.IGNORED:
+	case model.ERRORED:
 		return 50
 	default:
 		panic("bad outcome")

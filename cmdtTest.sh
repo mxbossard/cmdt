@@ -33,6 +33,8 @@ rm -rf -- /tmp/cmdt* /tmp/cmdt.log /tmp/daemon.log 2> /dev/null || true
 # Mandatory assertions
 "$scriptDir/assertCmdt.sh" "$cmdt"
 
+#"$scriptDir/assertCmdt.sh" "$newCmdt"
+
 
 # Clear context
 export -n __CMDT_TOKEN
@@ -54,7 +56,7 @@ $cmdtIn @test=meta1/"without token one" @stderr:"PASSED" @stderr:"#01" @-- $newC
 $cmdtIn @test=meta1/"without token two" @stderr:"PASSED" @stderr:"#02" @-- $newCmdt1 true #@debug
 $cmdtIn @test=meta1/"command before rule stop" @fail @stderr:"before rule parsing stopper" @-- $newCmdt1 true @-- @success
 $cmdtIn @test=meta1/"rule on 2 args" @stderr:"PASSED" @-- $newCmdt1 @stdout:foo bar @-- echo foo bar
-$cmdtIn @test=meta1/ @exit=1 @stderr:"3 success" @stderr:"0 failure" @stderr:"1 error" @-- $newCmdt0 @report=main
+$cmdtIn @test=meta1/ @exit=1 @stderr:"3 success" @stderr!:"failure" @stderr:"1 error" @-- $newCmdt0 @report=main
 
 >&2 echo "## Test printed token"
 #tk0=$( $cmdt @init @printToken 2> /dev/null )
@@ -79,13 +81,13 @@ newCmdt1_tk1="$newCmdt1 @token=$tk1"
 $cmdtIn @init=meta3 #@ignore
 $cmdtIn @test=meta3/ @stderr:"PASSED" @stderr:"#01" @-- $newCmdt1_tk1 true
 $cmdtIn @test=meta3/ @stderr:"PASSED" @stderr:"#02" @-- $newCmdt1_tk1 true
-$cmdtIn @test=meta3/ @stderr:"Successfuly ran" @-- $newCmdt1_tk1 @report=main
+$cmdtIn @test=meta3/ @stderr:"Successfully ran" @-- $newCmdt1_tk1 @report=main
 $cmdtIn @test=meta3/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=main @token=$tk0
 
 $cmdtIn @init=meta4 #@ignore
 $cmdtIn @test=meta4/ @stderr:"PASSED" @stderr:"#01" @-- $newCmdt1_tk1 @test=sub4/ true
 $cmdtIn @test=meta4/ @stderr:"PASSED" @stderr:"#02" @-- $newCmdt1_tk1 @test=sub4/ true
-$cmdtIn @test=meta4/ @stderr:"Successfuly ran" @-- $newCmdt1_tk1 @report=sub4
+$cmdtIn @test=meta4/ @stderr:"Successfully ran" @-- $newCmdt1_tk1 @report=sub4
 $cmdtIn @test=meta4/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=sub4 @token=$tk0
 $cmdt @report
 
@@ -128,6 +130,29 @@ $cmdtIn @test=reinit/ @-- $newCmdt1 @init=sub3
 $cmdtIn @test=reinit/ @-- $newCmdt1 @test=sub3/ true
 $cmdtIn @test=reinit/ @stderr:"1 success" @-- $newCmdt1 @report=sub3
 
+>&2 echo "## Test Suite re-report and @keep"
+$cmdtIn @init=rereport_and_keep #@verbose=5
+$cmdtIn @test=rereport_and_keep/init1 @-- $newCmdt1 @init=rereport_sub1
+$cmdtIn @test=rereport_and_keep/test1 @-- $newCmdt1 @test=rereport_sub1/test true
+$cmdtIn @test=rereport_and_keep/report1 @stderr:"rereport_sub1" @-- $newCmdt1 @report=rereport_sub1
+$cmdtIn @test=rereport_and_keep/rereport1 @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=rereport_sub1
+
+$cmdtIn @test=rereport_and_keep/init2 @-- $newCmdt1 @init=rereport_sub2
+$cmdtIn @test=rereport_and_keep/test2 @-- $newCmdt1 @test=rereport_sub2/test true
+$cmdtIn @test=rereport_and_keep/reportall2 @stderr:"rereport_sub2" @-- $newCmdt1 @report
+$cmdtIn @test=rereport_and_keep/rereportall2 @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report
+
+$cmdtIn @test=rereport_and_keep/init3 @-- $newCmdt1 @init=rereport_sub3
+$cmdtIn @test=rereport_and_keep/test3 @-- $newCmdt1 @test=rereport_sub3/test true
+$cmdtIn @test=rereport_and_keep/report3_keeping @stderr:"rereport_sub3" @-- $newCmdt1 @report=rereport_sub3 @keep
+$cmdtIn @test=rereport_and_keep/rereport3 @stderr:"rereport_sub3" @-- $newCmdt1 @report=rereport_sub3
+$cmdtIn @test=rereport_and_keep/rerereport3 @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=rereport_sub3
+
+$cmdtIn @test=rereport_and_keep/init4 @-- $newCmdt1 @init=rereport_sub4
+$cmdtIn @test=rereport_and_keep/test4 @-- $newCmdt1 @test=rereport_sub4/test true
+$cmdtIn @test=rereport_and_keep/reportall4_keeping @stderr:"rereport_sub4" @-- $newCmdt1 @report @keep
+$cmdtIn @test=rereport_and_keep/rereportall4 @stderr:"rereport_sub4" @-- $newCmdt1 @report
+$cmdtIn @test=rereport_and_keep/rerereportall4 @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report
 
 >&2 echo "## Test usage"
 $cmdtIn @init=meta
@@ -173,7 +198,7 @@ $cmdtIn @test=outputs_assertions/ @stderr:"#01..." @stderr:"PASSED" @-- $newCmdt
 $cmdtIn @test=outputs_assertions/ @stderr:"#02..." @stderr:"PASSED" @-- $newCmdt0 true @test=t1/
 $cmdtIn @test=outputs_assertions/ @stderr:"#03..." @stderr:"FAILED" @-- $newCmdt0 false @test=t1/
 $cmdtIn @test=outputs_assertions/ @stderr:"#04..." @stderr:"PASSED" @-- $newCmdt0 false @fail @test=t1/
-$cmdtIn @test=outputs_assertions/ @fail @stderr~"/Failures running \[.*t1.*\] test suite .*\(\s*3 success, \s*1 failures, \s*0 errors, \s*0 timeouts on \s*4 tests\)/" @-- $newCmdt0 @report=t1
+$cmdtIn @test=outputs_assertions/ @fail "@stderr~/Failures running \[.*t1.*\] test suite .*\(.*3 success.*, .*1 failures.* .*on \s*4 tests.*\).*/" @-- $newCmdt0 @report=t1
 
 
 >&2 echo "## Test namings"
@@ -187,9 +212,9 @@ $cmdtIn @test=naming/ @stderr~"/Test \[suite1\].*name1 #01.../" @stderr:"PASSED"
 $cmdtIn @test=naming/ @stderr~"/Test \[suite1\].*name2 #02.../" @stderr:"PASSED" @-- $newCmdt1 true @test=suite1/name2
 $cmdtIn @test=naming/ @stderr~"/Test \[suite2\].*/" @stderr:"#01..." @stderr:"PASSED" @-- $newCmdt1 true @test=suite2/
 $cmdtIn @test=naming/ @stderr~"/Test \[suite2\].*/" @stderr:"#02..." @stderr:"PASSED" @-- $newCmdt1 true @test=suite2/
-$cmdtIn @test=naming/ @stderr~"/Successfuly ran  \[.*suite1.*\] test suite/" @-- $newCmdt1  @report=suite1
-$cmdtIn @test=naming/ @stderr~"/Successfuly ran  \[.*suite2.*\] test suite/" @-- $newCmdt1 @report=suite2
-$cmdtIn @test=naming/ @stderr~"/Successfuly ran  \[.*main.*\] test suite/" @-- $newCmdt1 @report=main
+$cmdtIn @test=naming/ @stderr~"/Successfully ran \[.*suite1.*\] test suite/" @-- $newCmdt1  @report=suite1
+$cmdtIn @test=naming/ @stderr~"/Successfully ran \[.*suite2.*\] test suite/" @-- $newCmdt1 @report=suite2
+$cmdtIn @test=naming/ @stderr~"/Successfully ran \[.*main.*\] test suite/" @-- $newCmdt1 @report=main
 
 
 >&2 echo "## Test display verbosity"
@@ -437,29 +462,76 @@ $cmdtIn @test=test_flow/ @stderr:"1 success" @-- $newCmdt1 @report=flow
 
 >&2 echo "## Test ignore"
 $cmdtIn @init=test_ignore
-$cmdtIn @test=test_ignore/init_suite @-- $newCmdt1 @init=test_ignore_sub
+$cmdtIn @test=test_ignore/init_suite @-- $newCmdt1 @init=test_ignore1_sub
 # following test should fail, but are ignored
-$cmdtIn @test=test_ignore/ @stderr:IGNORED @-- $newCmdt1 @test=test_ignore_sub/ false @ignore
-$cmdtIn @test=test_ignore/ @stderr:IGNORED @-- $newCmdt1 @test=test_ignore_sub/ false @ignore
-$cmdtIn @test=test_ignore/report_suite @stderr:"2 ignored" @-- $newCmdt1 @report=test_ignore_sub
+$cmdtIn @test=test_ignore/ @stderr:PASSED @-- $newCmdt1 @test=test_ignore1_sub/ true
+$cmdtIn @test=test_ignore/ @stderr:IGNORED @-- $newCmdt1 @test=test_ignore1_sub/ false @ignore
+$cmdtIn @test=test_ignore/ @stderr:IGNORED @-- $newCmdt1 @test=test_ignore1_sub/ false @ignore
+$cmdtIn @test=test_ignore/report_suite @stderr:"Successfully ran" @stderr:"2 ignored" @stderr:"1 success" @stderr!:"failure" @-- $newCmdt1 @report=test_ignore1_sub
+
+$cmdtIn @test=test_ignore/init_suite @-- $newCmdt1 @init=test_ignore2_sub
+# following test should fail, but are ignored
+$cmdtIn @test=test_ignore/ @stderr:IGNORED @-- $newCmdt1 @test=test_ignore2_sub/ false @ignore
+$cmdtIn @test=test_ignore/ @stderr:PASSED @-- $newCmdt1 @test=test_ignore2_sub/ true
+$cmdtIn @test=test_ignore/ @stderr:FAILED @-- $newCmdt1 @test=test_ignore2_sub/ false
+$cmdtIn @test=test_ignore/ @stderr:IGNORED @-- $newCmdt1 @test=test_ignore2_sub/ false @ignore
+$cmdtIn @test=test_ignore/report_suite @fail @stderr:"Failures running" @stderr:"2 ignored" @stderr:"1 success" @stderr:"1 failure" @-- $newCmdt1 @report=test_ignore2_sub
+
+# Auto inited suite should not be ignored
+$cmdtIn @test=test_ignore/ @stderr:IGNORED @-- $newCmdt1 @test=test_ignore3_sub/ false @ignore
+$cmdtIn @test=test_ignore/ @stderr:PASSED @-- $newCmdt1 @test=test_ignore3_sub/ true
+$cmdtIn @test=test_ignore/ @stderr:IGNORED @-- $newCmdt1 @test=test_ignore3_sub/ false @ignore
+$cmdtIn @test=test_ignore/report_suite @stderr:"Successfully ran" @stderr:"2 ignored" @stderr:"1 success" @stderr!:"failure" @-- $newCmdt1 @report=test_ignore3_sub
+
+$cmdtIn @test=test_ignore/ @stderr:IGNORED @-- $newCmdt1 @test=test_ignore4_sub/ false @ignore
+$cmdtIn @test=test_ignore/report_suite @stderr:"Ignored not ran" @stderr:"1 ignored" @stderr!:"success" @stderr!:"failure" @-- $newCmdt1 @report=test_ignore4_sub
+
+$cmdtIn @test=test_ignore/ @stderr:PASSED @-- $newCmdt1 @test=test_ignore5_sub/ true
+$cmdtIn @test=test_ignore/report_suite @stderr:"Successfully ran" @stderr:"1 success" @stderr!:"ignored" @stderr!:"failure" @-- $newCmdt1 @report=test_ignore5_sub
 
 
 >&2 echo "## Test suite ignore"
-$cmdtIn @init=suite_ignore
-$cmdtIn @test=suite_ignore/init_suite @-- $newCmdt1 @init=suite_ignore_sub @ignore
-$cmdtIn @test=suite_ignore/ @stderr= @-- $newCmdt1 @test=suite_ignore_sub/ true
-$cmdtIn @test=suite_ignore/ @stderr= @-- $newCmdt1 @test=suite_ignore_sub/ true
-$cmdtIn @test=suite_ignore/report_suite @stderr:"Ignored suite" @-- $newCmdt1 @report=suite_ignore_sub
+$cmdtIn @init=suite_ignore1 
+$cmdtIn @test=suite_ignore1/init_suite @-- $newCmdt1 @init=suite_ignore1_sub @ignore
+$cmdtIn @test=suite_ignore1/ @stderr= @-- $newCmdt1 @test=suite_ignore1_sub/ true
+$cmdtIn @test=suite_ignore1/ @stderr= @-- $newCmdt1 @test=suite_ignore1_sub/ true
+$cmdtIn @test=suite_ignore1/report_suite @stderr:"Ignored not ran" @stderr:"suite_ignore1_sub" @-- $newCmdt1 @report=suite_ignore1_sub
+
+newCmdt2="$newCmdt @isol=ignore $params0 $params1"
 
 $cmdtIn @init=suite_ignore2 
-$cmdtIn @test=suite_ignore2/init_suite @-- $newCmdt1 @init=suite_ignore_sub2 @ignore
-$cmdtIn @test=suite_ignore2/ @stderr= @-- $newCmdt1 @test=suite_ignore_sub2/ true
-$cmdtIn @test=suite_ignore2/ @stderr= @-- $newCmdt1 @test=suite_ignore_sub2/ true
-$cmdtIn @test=suite_ignore2/reportall_suite @stderr:"Ignored suite" @-- $newCmdt1 @report
+$cmdtIn @test=suite_ignore2/init_suite @-- $newCmdt2 @init=suite_ignore2_sub @ignore
+$cmdtIn @test=suite_ignore2/ @stderr= @-- $newCmdt2 @test=suite_ignore2_sub/ true
+$cmdtIn @test=suite_ignore2/ @stderr= @-- $newCmdt2 @test=suite_ignore2_sub/ true
+$cmdtIn @test=suite_ignore2/reportall_suite @stderr:"Ignored not ran" @stderr:"suite_ignore2_sub" @stderr!:"suite_ignore1_sub" @-- $newCmdt2 @report
+
+$cmdtIn @init=suite_ignore3
+$cmdtIn @test=suite_ignore3/init_suite @-- $newCmdt2 @init=suite_ignore3_sub @ignore
+$cmdtIn @test=suite_ignore3/ @stderr= @-- $newCmdt2 @test=suite_ignore3_sub/ true
+$cmdtIn @test=suite_ignore3/ @stderr= @-- $newCmdt2 @test=suite_ignore3_sub/ true
+$cmdtIn @test=suite_ignore3/reportall_suite @stderr:"Ignored not ran" @stderr:"suite_ignore3_sub" @stderr!:"suite_ignore1_sub" @stderr!:"suite_ignore2_sub" @-- $newCmdt2 @report
+
+
+>&2 echo "## Test test timeout"
+$cmdtIn @init=test_timeout
+$cmdtIn @test=test_timeout/init_suite @-- $newCmdt1 @init=test_timeout1_sub
+$cmdtIn @test=test_timeout/test_sleep @stderr:TIMEOUT @-- $newCmdt1 @test=test_timeout1_sub/tSleep @timeout=0.1s sleep 1
+$cmdtIn @test=test_timeout/report_suite @fail @stderr:"Failures running" @stderr:"0 success" @stderr:"1 timeout" @stderr!:"error" @stderr!:"failure" @-- $newCmdt1 @report=test_timeout1_sub
+
+$cmdtIn @test=test_timeout/init_suite @-- $newCmdt1 @init=test_timeout2_sub
+$cmdtIn @test=test_timeout/test_sleep @stderr:TIMEOUT @-- $newCmdt1 @test=test_timeout2_sub/tSleep @timeout=0.1s sleep 1
+$cmdtIn @test=test_timeout/test_true @stderr:PASSED @-- $newCmdt1 @test=test_timeout2_sub/ true
+$cmdtIn @test=test_timeout/report_suite @fail @stderr:"Failures running" @stderr:"1 success" @stderr:"1 timeout" @stderr!:"error" @stderr!:"failure" @-- $newCmdt1 @report=test_timeout2_sub
+
+$cmdtIn @test=test_timeout/init_suite @-- $newCmdt1 @init=test_timeout3_sub
+$cmdtIn @test=test_timeout/test_sleep @stderr:TIMEOUT @-- $newCmdt1 @test=test_timeout3_sub/tSleep @timeout=0.1s sleep 1
+$cmdtIn @test=test_timeout/test_true @stderr:PASSED @-- $newCmdt1 @test=test_timeout3_sub/ true
+$cmdtIn @test=test_timeout/test_false @stderr:FAILED @-- $newCmdt1 @test=test_timeout3_sub/ false
+$cmdtIn @test=test_timeout/report_suite @fail @stderr:"Failures running" @stderr:"1 success" @stderr:"1 timeout" @stderr:"1 failure" @stderr!:"error" @-- $newCmdt1 @report=test_timeout3_sub
 
 
 >&2 echo "## Test suite timeout"
-$cmdtIn @init=suite_timeout
+$cmdtIn @init=suite_timeout @ignore
 $cmdtIn @test=suite_timeout/init_suite @-- $newCmdt1 @init=suite_timeout_sub @suiteTimeout=0.1s
 $cmdtIn @test=suite_timeout/test_sleep @fail @stderr:TIMEOUTED @-- $newCmdt1 @test=suite_timeout_sub/tSleep sleep 1
 $cmdtIn @test=suite_timeout/report_suite @fail @stderr:Timeouted @-- $newCmdt1 @report=suite_timeout_sub

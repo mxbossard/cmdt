@@ -156,18 +156,30 @@ func (d basicDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 	duration := outcome.Duration
 	fmtDuration := NormalizeDurationInSec(duration)
 	if outcome.Outcome == model.IGNORED {
-		d.printer.ColoredErrf(WarningColor, "Ignored suite    [ %s ] test suite in %10s", testSuiteLabel, fmtDuration)
+		d.printer.ColoredErrf(WarningColor, "Ignored not ran  [ %s ] test suite !", testSuiteLabel)
 		if ignoredCount > 0 {
 			d.printer.ColoredErrf(WarningColor, "%s", ignoredMessage)
 		}
 		d.printer.Errf("\n")
 	} else if failedCount == 0 && errorCount == 0 && timeoutCount == 0 {
-		d.printer.ColoredErrf(SuccessColor, "Successfuly ran  [ %s ] test suite in %10s (%3d success)", testSuiteLabel, fmtDuration, passedCount)
+		d.printer.ColoredErrf(SuccessColor, "Successfully ran [ %s ] test suite in %10s (%3d success)", testSuiteLabel, fmtDuration, passedCount)
 		d.printer.ColoredErrf(WarningColor, "%s", ignoredMessage)
 		d.printer.Errf("\n")
 	} else {
-		d.printer.ColoredErrf(FailureColor, "Failures running [ %s ] test suite in %10s (%3d success, %3d failures, %3d errors, %3d timeouts on %3d tests)", testSuiteLabel, fmtDuration, passedCount, failedCount, errorCount, timeoutCount, testCount)
-		d.printer.ColoredErrf(WarningColor, "%s", ignoredMessage)
+		d.printer.ColoredErrf(FailureColor, "Failures running [ %s ] test suite in %10s (%3d success", testSuiteLabel, fmtDuration, passedCount)
+		if failedCount > 0 {
+			d.printer.ColoredErrf(FailureColor, ", %3d failures", failedCount)
+		}
+		if errorCount > 0 {
+			d.printer.ColoredErrf(FailureColor, ", %3d errors", errorCount)
+		}
+		if timeoutCount > 0 {
+			d.printer.ColoredErrf(FailureColor, "%3d timeouts", timeoutCount)
+		}
+		d.printer.ColoredErrf(FailureColor, " on %3d tests)", testCount)
+		if ignoredMessage != "" {
+			d.printer.ColoredErrf(WarningColor, "%s", ignoredMessage)
+		}
 		d.printer.Errf("\n")
 		for _, report := range outcome.FailureReports {
 			report = strings.TrimSpace(report)

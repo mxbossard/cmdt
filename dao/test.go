@@ -175,12 +175,13 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 		}
 	}
 
+	var suiteOutcome string
 	row = tx.QueryRow(`
-		SELECT s.startTime, s.endTime
+		SELECT s.startTime, s.endTime, s.outcome
 		FROM suite s
 		WHERE s.name = @suite 
 	`, sql.Named("suite", suite))
-	err = row.Scan(&startTime, &endTime)
+	err = row.Scan(&startTime, &endTime, &suiteOutcome)
 	if err != nil {
 		return
 	}
@@ -192,14 +193,22 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 	testCount := passedCount + failedCount + erroredCount + ignoredCount + timeoutCount
 	duration := time.Duration((endTime - startTime) * 1000)
 	var ocm model.Outcome
-	if testCount == passedCount {
-		ocm = model.PASSED
+	if suiteOutcome == string(model.IGNORED) {
+		// Specific case IGNORED suite outcome is stored in suite outcome column
+		ocm = model.IGNORED
+	} else if suiteOutcome == string(model.TIMEOUT) {
+		// Specific case TIMEOUT suite outcome is stored in suite outcome column
+		ocm = model.TIMEOUT
 	} else if testCount == ignoredCount {
 		ocm = model.IGNORED
+	} else if testCount == passedCount+ignoredCount {
+		ocm = model.PASSED
 	} else if erroredCount > 0 {
 		ocm = model.ERRORED
-	} else {
+	} else if failedCount > 0 || timeoutCount > 0 {
 		ocm = model.FAILED
+	} else {
+		panic(fmt.Sprintf("unknown suite outcome"))
 	}
 
 	outcome.TestSuite = suite

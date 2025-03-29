@@ -51,6 +51,8 @@ type Repo interface {
 	ListAsyncSuites() (suites []string, err error)
 
 	SaveTestOutcome(outcome model.TestOutcome) (err error)
+	
+	SaveSuiteOutcome(outcome model.SuiteOutcome) (err error)
 
 	UpdateLastTestTime(testSuite string)
 
