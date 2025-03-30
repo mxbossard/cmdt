@@ -111,14 +111,14 @@ $cmdtIn @init=meta3
 $cmdtIn @test=meta3/init @-- $newCmdt1 @init @async
 $cmdtIn @test=meta3/ @stderr= @-- $newCmdt1 true
 $cmdtIn @test=meta3/ @stderr= @-- $newCmdt1 true
-$cmdtIn @test=meta3/ @stderr:"Successfuly ran" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @report=main @async
+$cmdtIn @test=meta3/ @stderr:"Successfully ran" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @report=main @async
 $cmdtIn @test=meta3/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @token=$tk0 @report=main @async
 
 $cmdtIn @init=meta4
 $cmdtIn @test=meta4/init @-- $newCmdt1 @init=sub4 @async
 $cmdtIn @test=meta4/ @stderr= @-- $newCmdt1 @test=sub4/ true
 $cmdtIn @test=meta4/ @stderr= @-- $newCmdt1 @test=sub4/ true
-$cmdtIn @test=meta4/ @stderr:"Successfuly ran" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @report=sub4 @async
+$cmdtIn @test=meta4/ @stderr:"Successfully ran" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @report=sub4 @async
 $cmdtIn @test=meta4/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @token=$tk0 @report=sub4 @async
 $cmdt @report 
 
