@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"mby.fr/cmdtest/model"
-	"mby.fr/cmdtest/utils"
+	"github.com/mxbossard/cmdt/model"
+	"github.com/mxbossard/cmdt/utils"
 )
 
 func MockWrapperPath(mockDir string) (path string) {

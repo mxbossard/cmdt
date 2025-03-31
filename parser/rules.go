@@ -5,9 +5,9 @@ import (
 	"slices"
 	"strings"
 
-	"mby.fr/cmdtest/model"
-	"mby.fr/utils/collectionz"
-	"mby.fr/utils/errorz"
+	"github.com/mxbossard/cmdt/model"
+	"github.com/mxbossard/utilz/collectionz"
+	"github.com/mxbossard/utilz/errorz"
 )
 
 /**

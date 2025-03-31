@@ -6,10 +6,10 @@ import (
 	"slices"
 	"strings"
 
-	"mby.fr/cmdtest/model"
-	"mby.fr/utils/collectionz"
-	"mby.fr/utils/errorz"
-	"mby.fr/utils/zlog"
+	"github.com/mxbossard/cmdt/model"
+	"github.com/mxbossard/utilz/collectionz"
+	"github.com/mxbossard/utilz/errorz"
+	"github.com/mxbossard/utilz/zlog"
 )
 
 var (

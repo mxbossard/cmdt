@@ -9,14 +9,14 @@ import (
 	"path/filepath"
 	"strings"
 
-	"mby.fr/cmdtest/mock"
-	"mby.fr/cmdtest/model"
-	"mby.fr/cmdtest/repo"
-	"mby.fr/cmdtest/utils"
-	"mby.fr/utils/cmdz"
-	"mby.fr/utils/errorz"
-	"mby.fr/utils/utilz"
-	"mby.fr/utils/zlog"
+	"github.com/mxbossard/cmdt/mock"
+	"github.com/mxbossard/cmdt/model"
+	"github.com/mxbossard/cmdt/repo"
+	"github.com/mxbossard/cmdt/utils"
+	"github.com/mxbossard/utilz/cmdz"
+	"github.com/mxbossard/utilz/errorz"
+	"github.com/mxbossard/utilz/utilz"
+	"github.com/mxbossard/utilz/zlog"
 )
 
 var logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))

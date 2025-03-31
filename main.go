@@ -20,10 +20,10 @@ import (
 	"os"
 	"strings"
 
-	"mby.fr/cmdtest/daemon"
-	"mby.fr/cmdtest/model"
-	"mby.fr/cmdtest/service"
-	"mby.fr/utils/zlog"
+	"github.com/mxbossard/cmdt/daemon"
+	"github.com/mxbossard/cmdt/model"
+	"github.com/mxbossard/cmdt/service"
+	"github.com/mxbossard/utilz/zlog"
 )
 
 /*

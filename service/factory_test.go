@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"mby.fr/cmdtest/model"
-	"mby.fr/utils/errorz"
+	"github.com/mxbossard/cmdt/model"
+	"github.com/mxbossard/utilz/errorz"
 )
 
 func TestApplyConfig(t *testing.T) {

@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"mby.fr/cmdtest/model"
-	"mby.fr/utils/errorz"
-	"mby.fr/utils/filez"
-	"mby.fr/utils/formatz"
-	"mby.fr/utils/utilz"
+	"github.com/mxbossard/cmdt/model"
+	"github.com/mxbossard/utilz/errorz"
+	"github.com/mxbossard/utilz/filez"
+	"github.com/mxbossard/utilz/formatz"
+	"github.com/mxbossard/utilz/utilz"
 )
 
 type FileRepo struct {

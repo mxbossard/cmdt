@@ -9,9 +9,9 @@ import (
 	_ "modernc.org/sqlite"
 	//_ "github.com/mattn/go-sqlite3"
 
-	"mby.fr/utils/zlog"
-	"mby.fr/utils/zql"
-	"mby.fr/utils/zqlite"
+	"github.com/mxbossard/utilz/zlog"
+	"github.com/mxbossard/utilz/zql"
+	"github.com/mxbossard/utilz/zqlite"
 )
 
 const (

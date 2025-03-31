@@ -13,17 +13,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"mby.fr/cmdtest/display"
-	"mby.fr/cmdtest/facade"
-	"mby.fr/cmdtest/model"
-	"mby.fr/cmdtest/repo"
-	"mby.fr/utils/anzi"
-	"mby.fr/utils/cmdz"
-	"mby.fr/utils/printz"
-	"mby.fr/utils/utilz"
+	"github.com/mxbossard/cmdt/display"
+	"github.com/mxbossard/cmdt/facade"
+	"github.com/mxbossard/cmdt/model"
+	"github.com/mxbossard/cmdt/repo"
+	"github.com/mxbossard/utilz/anzi"
+	"github.com/mxbossard/utilz/cmdz"
+	"github.com/mxbossard/utilz/printz"
+	"github.com/mxbossard/utilz/utilz"
 
-	//"mby.fr/utils/screen"
-	"mby.fr/utils/zlog"
+	//"github.com/mxbossard/utilz/screen"
+	"github.com/mxbossard/utilz/zlog"
 )
 
 func TestMain(m *testing.M) {

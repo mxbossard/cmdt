@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"mby.fr/utils/cmdz"
+	"github.com/mxbossard/utilz/cmdz"
 )
 
 type Action string

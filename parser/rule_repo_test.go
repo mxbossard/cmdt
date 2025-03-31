@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"mby.fr/utils/errorz"
+	"github.com/mxbossard/utilz/errorz"
 )
 
 const badContextUseErrorMsg = "can only be used in context"

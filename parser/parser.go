@@ -1,6 +1,6 @@
 package parser
 
-import "mby.fr/cmdtest/model"
+import "github.com/mxbossard/cmdt/model"
 
 func ParseArgs(args []string) (cfg model.Config, err error) {
 	//TODO

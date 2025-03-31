@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"mby.fr/cmdtest/dao"
-	"mby.fr/cmdtest/model"
-	"mby.fr/utils/errorz"
-	"mby.fr/utils/zql"
+	"github.com/mxbossard/cmdt/dao"
+	"github.com/mxbossard/cmdt/model"
+	"github.com/mxbossard/utilz/errorz"
+	"github.com/mxbossard/utilz/zql"
 )
 
 const WaitingOpDoneSleepPeriodInMs = 50
@@ -200,7 +200,7 @@ func (r dbRepo) ClearTestSuite(testSuite string) (err error) {
 }
 
 func (r dbRepo) ListTestSuites() (suites []string, err error) {
-	suites, err = r.suiteDao.ListPassedFailedErrored()
+	suites, err = r.suiteDao.ListReportablePassedFailedErrored()
 	return
 }
 
@@ -211,6 +211,11 @@ func (r dbRepo) ListSyncSuites() (suites []string, err error) {
 
 func (r dbRepo) ListAsyncSuites() (suites []string, err error) {
 	suites, err = r.suiteDao.ListAsync()
+	return
+}
+
+func (r dbRepo) ListReportedAsyncSuites() (suites []string, err error) {
+	suites, err = r.suiteDao.ListReportedAsync()
 	return
 }
 

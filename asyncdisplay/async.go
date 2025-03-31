@@ -7,15 +7,15 @@ import (
 	"strings"
 	"time"
 
-	"mby.fr/cmdtest/display"
-	"mby.fr/cmdtest/facade"
-	"mby.fr/cmdtest/model"
-	"mby.fr/utils/errorz"
-	"mby.fr/utils/formatz"
-	"mby.fr/utils/inoutz"
-	"mby.fr/utils/printz"
-	"mby.fr/utils/zcreen"
-	"mby.fr/utils/zlog"
+	"github.com/mxbossard/cmdt/display"
+	"github.com/mxbossard/cmdt/facade"
+	"github.com/mxbossard/cmdt/model"
+	"github.com/mxbossard/utilz/errorz"
+	"github.com/mxbossard/utilz/formatz"
+	"github.com/mxbossard/utilz/inoutz"
+	"github.com/mxbossard/utilz/printz"
+	"github.com/mxbossard/utilz/zcreen"
+	"github.com/mxbossard/utilz/zlog"
 )
 
 const (
@@ -294,6 +294,7 @@ func (d AsyncDisplay) ReportAllFooter(globalCtx facade.GlobalContext) {
 		return
 	}
 	printer := d.screen.NotifyPrinter()
+	defer printer.Flush()
 	globalStartTime := globalCtx.Config.GlobalStartTime.Get()
 	globalDuration := model.NormalizeDurationInSec(time.Since(globalStartTime))
 	printer.ColoredErrf(display.MessageColor, "Global duration time: %s\n", globalDuration)

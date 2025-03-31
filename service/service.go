@@ -7,15 +7,15 @@ import (
 	"path/filepath"
 	"time"
 
-	"mby.fr/cmdtest/asyncdisplay"
-	"mby.fr/cmdtest/display"
-	"mby.fr/cmdtest/facade"
-	"mby.fr/cmdtest/model"
-	"mby.fr/cmdtest/utils"
-	"mby.fr/utils/cmdz"
-	"mby.fr/utils/errorz"
-	"mby.fr/utils/printz"
-	"mby.fr/utils/zlog"
+	"github.com/mxbossard/cmdt/asyncdisplay"
+	"github.com/mxbossard/cmdt/display"
+	"github.com/mxbossard/cmdt/facade"
+	"github.com/mxbossard/cmdt/model"
+	"github.com/mxbossard/cmdt/utils"
+	"github.com/mxbossard/utilz/cmdz"
+	"github.com/mxbossard/utilz/errorz"
+	"github.com/mxbossard/utilz/printz"
+	"github.com/mxbossard/utilz/zlog"
 )
 
 var (
@@ -514,6 +514,8 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 					errorz.Fatal(err)
 				}
 
+				asyncDpl := asyncdisplay.New(globalCtx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
+
 				// always wait
 				// if globalCtx.Config.Wait.Is(true) {
 				wait = func() int16 {
@@ -523,11 +525,16 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 						panic(err)
 					}
 					logger.Info("op done", "opId", op.Id(), "opKind", op.Kind(), "suite", op.TestSuite, "asyncExitCode", asyncExitCode)
-					//asyncDpl.StopDisplayAllRecorded()
+
+					// Clear all reported suite async display
+					suites, err := globalCtx.Repo.ListReportedAsyncSuites()
+					ProcessGlobalError(globalCtx, err)
+
+					for _, suite := range suites {
+						asyncdisplay.ClearSuite(globalCtx.Repo.BackingFilepath(), suite)
+					}
 					return max(exitCode, asyncExitCode)
 				}
-
-				asyncDpl := asyncdisplay.New(globalCtx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
 
 				err = asyncDpl.TailAllBlocking(globalCtx.Config.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
 				ProcessGlobalError(globalCtx, err)

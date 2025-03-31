@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"mby.fr/cmdtest/facade"
-	"mby.fr/cmdtest/model"
-	"mby.fr/utils/cmdz"
+	"github.com/mxbossard/cmdt/facade"
+	"github.com/mxbossard/cmdt/model"
+	"github.com/mxbossard/utilz/cmdz"
 )
 
 func DisplaySuite(d Displayer, token, isol string, suite int) {

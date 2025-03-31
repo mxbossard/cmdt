@@ -1,6 +1,6 @@
 package dao
 
-import "mby.fr/utils/zql"
+import "github.com/mxbossard/utilz/zql"
 
 func NewAssertion(db *zql.SynchronizedDB, init bool) (d Assertion, err error) {
 	d.db = db

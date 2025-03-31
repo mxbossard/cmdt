@@ -3,8 +3,8 @@ package dao
 import (
 	"database/sql"
 
-	"mby.fr/cmdtest/model"
-	"mby.fr/utils/zql"
+	"github.com/mxbossard/cmdt/model"
+	"github.com/mxbossard/utilz/zql"
 )
 
 func NewQueue(db *zql.SynchronizedDB, init bool) (d Queue, err error) {

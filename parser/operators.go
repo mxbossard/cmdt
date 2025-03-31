@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"mby.fr/cmdtest/model"
-	"mby.fr/utils/filez"
+	"github.com/mxbossard/cmdt/model"
+	"github.com/mxbossard/utilz/filez"
 )
 
 var authorizedOperators = []string{"", " ", "=", "!=", ":", "!:", "~", "!~", "@=", "@:"}

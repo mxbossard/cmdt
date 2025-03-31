@@ -7,12 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"mby.fr/cmdtest/facade"
-	"mby.fr/cmdtest/mock"
-	"mby.fr/cmdtest/model"
-	"mby.fr/cmdtest/utils"
-	"mby.fr/utils/cmdz"
-	"mby.fr/utils/ctnrz"
+	"github.com/mxbossard/cmdt/facade"
+	"github.com/mxbossard/cmdt/mock"
+	"github.com/mxbossard/cmdt/model"
+	"github.com/mxbossard/cmdt/utils"
+	"github.com/mxbossard/utilz/cmdz"
+	"github.com/mxbossard/utilz/ctnrz"
 )
 
 const ()

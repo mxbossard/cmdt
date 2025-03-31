@@ -8,10 +8,10 @@ import (
 	"regexp"
 	"time"
 
-	"mby.fr/cmdtest/model"
-	"mby.fr/cmdtest/utils"
-	"mby.fr/utils/errorz"
-	"mby.fr/utils/zlog"
+	"github.com/mxbossard/cmdt/model"
+	"github.com/mxbossard/cmdt/utils"
+	"github.com/mxbossard/utilz/errorz"
+	"github.com/mxbossard/utilz/zlog"
 )
 
 const (
@@ -49,6 +49,7 @@ type Repo interface {
 	ListTestSuites() (suites []string, err error)
 	ListSyncSuites() (suites []string, err error)
 	ListAsyncSuites() (suites []string, err error)
+	ListReportedAsyncSuites() (suites []string, err error)
 
 	SaveTestOutcome(outcome model.TestOutcome) (err error)
 	

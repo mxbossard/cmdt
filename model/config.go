@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"mby.fr/utils/anzi"
-	"mby.fr/utils/utilz"
+	"github.com/mxbossard/utilz/anzi"
+	"github.com/mxbossard/utilz/utilz"
 )
 
 const (

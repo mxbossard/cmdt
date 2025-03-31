@@ -6,8 +6,8 @@ import (
 	"encoding/gob"
 	"time"
 
-	"mby.fr/cmdtest/model"
-	"mby.fr/utils/zql"
+	"github.com/mxbossard/cmdt/model"
+	"github.com/mxbossard/utilz/zql"
 )
 
 func NewSuite(db *zql.SynchronizedDB, init bool) (d Suite, err error) {
@@ -295,6 +295,33 @@ func (d Suite) ListPassedFailedErrored() (suites []string, err error) {
 	return
 }
 
+func (d Suite) ListReportablePassedFailedErrored() (suites []string, err error) {
+	p := logger.PerfTimer()
+	defer p.End()
+
+	rows, err := d.db.Query(`
+		SELECT s.name
+		FROM suite s
+		WHERE s.startTime IS NOT NULL
+		    AND s.reported = 0 OR s.kept = 1
+		ORDER BY s.outcomeOrder ASC, s.startTime ASC
+	`) // s.outcome IN ('PASSED', 'FAILED', 'ERRORED') AND
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var suiteName string
+		err = rows.Scan(&suiteName)
+		if err != nil {
+			return
+		}
+		suites = append(suites, suiteName)
+	}
+	return
+}
+
 func (d Suite) ListSync() (suites []string, err error) {
 	p := logger.PerfTimer()
 	defer p.End()
@@ -328,6 +355,31 @@ func (d Suite) ListAsync() (suites []string, err error) {
 		SELECT s.name
 		FROM suite s
 		WHERE name <> '' AND s.startTime IS NOT NULL AND s.async = 1
+	`)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var suiteName string
+		err = rows.Scan(&suiteName)
+		if err != nil {
+			return
+		}
+		suites = append(suites, suiteName)
+	}
+	return
+}
+
+func (d Suite) ListReportedAsync() (suites []string, err error) {
+	p := logger.PerfTimer()
+	defer p.End()
+
+	rows, err := d.db.Query(`
+		SELECT s.name
+		FROM suite s
+		WHERE name <> '' AND s.startTime IS NOT NULL AND s.async = 1 AND s.reported = 1
 	`)
 	if err != nil {
 		return

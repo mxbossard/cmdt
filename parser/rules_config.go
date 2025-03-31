@@ -3,7 +3,7 @@ package parser
 import (
 	"time"
 
-	"mby.fr/cmdtest/model"
+	"github.com/mxbossard/cmdt/model"
 )
 
 var (

@@ -9,10 +9,10 @@ import (
 	"strconv"
 	"strings"
 
-	"mby.fr/cmdtest/model"
-	"mby.fr/utils/cmdz"
-	"mby.fr/utils/truzt"
-	"mby.fr/utils/zlog"
+	"github.com/mxbossard/cmdt/model"
+	"github.com/mxbossard/utilz/cmdz"
+	"github.com/mxbossard/utilz/truzt"
+	"github.com/mxbossard/utilz/zlog"
 )
 
 var logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))

@@ -3,11 +3,11 @@ package service
 import (
 	"fmt"
 
-	"mby.fr/cmdtest/asyncdisplay"
-	"mby.fr/cmdtest/facade"
-	"mby.fr/cmdtest/model"
-	"mby.fr/cmdtest/utils"
-	"mby.fr/utils/utilz"
+	"github.com/mxbossard/cmdt/asyncdisplay"
+	"github.com/mxbossard/cmdt/facade"
+	"github.com/mxbossard/cmdt/model"
+	"github.com/mxbossard/cmdt/utils"
+	"github.com/mxbossard/utilz/utilz"
 )
 
 func cliInitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {

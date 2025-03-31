@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"mby.fr/cmdtest/facade"
-	"mby.fr/utils/anzi"
-	"mby.fr/utils/printz"
+	"github.com/mxbossard/cmdt/facade"
+	"github.com/mxbossard/utilz/anzi"
+	"github.com/mxbossard/utilz/printz"
 )
 
 func NormalizeDurationInSec(d time.Duration) (duration string) {

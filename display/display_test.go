@@ -8,11 +8,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"mby.fr/cmdtest/facade"
-	"mby.fr/cmdtest/model"
-	"mby.fr/utils/anzi"
-	"mby.fr/utils/cmdz"
-	"mby.fr/utils/printz"
+	"github.com/mxbossard/cmdt/facade"
+	"github.com/mxbossard/cmdt/model"
+	"github.com/mxbossard/utilz/anzi"
+	"github.com/mxbossard/utilz/cmdz"
+	"github.com/mxbossard/utilz/printz"
 )
 
 func TestDisplay_Stdout(t *testing.T) {

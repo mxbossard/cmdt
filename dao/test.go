@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"mby.fr/cmdtest/model"
-	"mby.fr/utils/collectionz"
-	"mby.fr/utils/zql"
+	"github.com/mxbossard/cmdt/model"
+	"github.com/mxbossard/utilz/collectionz"
+	"github.com/mxbossard/utilz/zql"
 )
 
 const (

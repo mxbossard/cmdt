@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
-	"mby.fr/cmdtest/model"
-	"mby.fr/utils/cmdz"
-	"mby.fr/utils/collectionz"
-	"mby.fr/utils/errorz"
-	"mby.fr/utils/filez"
-	"mby.fr/utils/utilz"
-	"mby.fr/utils/zlog"
+	"github.com/mxbossard/cmdt/model"
+	"github.com/mxbossard/utilz/cmdz"
+	"github.com/mxbossard/utilz/collectionz"
+	"github.com/mxbossard/utilz/errorz"
+	"github.com/mxbossard/utilz/filez"
+	"github.com/mxbossard/utilz/utilz"
+	"github.com/mxbossard/utilz/zlog"
 )
 
 /*

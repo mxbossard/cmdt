@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"mby.fr/cmdtest/model"
+	"github.com/mxbossard/cmdt/model"
 )
 
 func checkConfig(t *testing.T, eIsol, eToken, eSuite string, before time.Time, actual model.Config) {

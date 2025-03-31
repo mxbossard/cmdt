@@ -1,15 +1,13 @@
-module mby.fr/cmdtest
+module github.com/mxbossard/cmdt
 
 go 1.21.0
 
 toolchain go1.23.1
 
-replace mby.fr/utils => github.com/mxbossard/utilz v0.0.0-20250330222740-72bf8047b6b4
-
 require (
 	github.com/gofrs/flock v0.12.1
+	github.com/mxbossard/utilz v0.1.0
 	github.com/stretchr/testify v1.9.0
-	mby.fr/utils v0.0.0-00010101000000-000000000000
 	modernc.org/sqlite v1.34.5
 )
 

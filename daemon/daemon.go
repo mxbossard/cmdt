@@ -13,16 +13,16 @@ import (
 
 	"github.com/gofrs/flock"
 
-	"mby.fr/cmdtest/asyncdisplay"
-	"mby.fr/cmdtest/facade"
-	"mby.fr/cmdtest/model"
-	"mby.fr/cmdtest/repo"
-	"mby.fr/cmdtest/service"
-	"mby.fr/utils/collectionz"
-	"mby.fr/utils/filez"
-	"mby.fr/utils/printz"
-	_ "mby.fr/utils/zcreen"
-	"mby.fr/utils/zlog"
+	"github.com/mxbossard/cmdt/asyncdisplay"
+	"github.com/mxbossard/cmdt/facade"
+	"github.com/mxbossard/cmdt/model"
+	"github.com/mxbossard/cmdt/repo"
+	"github.com/mxbossard/cmdt/service"
+	"github.com/mxbossard/utilz/collectionz"
+	"github.com/mxbossard/utilz/filez"
+	"github.com/mxbossard/utilz/printz"
+	_ "github.com/mxbossard/utilz/zcreen"
+	"github.com/mxbossard/utilz/zlog"
 )
 
 const (

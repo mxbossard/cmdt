@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"mby.fr/cmdtest/model"
-	"mby.fr/utils/filez"
+	"github.com/mxbossard/cmdt/model"
+	"github.com/mxbossard/utilz/filez"
 )
 
 func initTestDao(t *testing.T, dirpath string) Test {

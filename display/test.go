@@ -5,12 +5,12 @@ import (
 	"strings"
 	"time"
 
-	"mby.fr/cmdtest/facade"
-	"mby.fr/cmdtest/model"
-	"mby.fr/utils/anzi"
-	"mby.fr/utils/formatz"
-	"mby.fr/utils/inoutz"
-	"mby.fr/utils/printz"
+	"github.com/mxbossard/cmdt/facade"
+	"github.com/mxbossard/cmdt/model"
+	"github.com/mxbossard/utilz/anzi"
+	"github.com/mxbossard/utilz/formatz"
+	"github.com/mxbossard/utilz/inoutz"
+	"github.com/mxbossard/utilz/printz"
 )
 
 const (
