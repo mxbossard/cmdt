@@ -8,6 +8,7 @@ import (
 
 	"cmdt/internal/dao"
 	"cmdt/internal/model"
+
 	"github.com/mxbossard/utilz/errorz"
 	"github.com/mxbossard/utilz/zql"
 )
@@ -93,7 +94,9 @@ func (r dbRepo) GetGlobalConfig() (cfg model.Config, err error) {
 		// create a new default one
 		cfg = model.NewGlobalDefaultConfig()
 		cfg.Token.Set(r.token)
-		cfg.GlobalStartTime.Set(time.Now())
+		now := time.Now()
+		cfg.GlobalStartTime.Set(now)
+		cfg.LastReportTime.Set(now)
 		err = r.SaveGlobalConfig(cfg)
 	}
 	return
@@ -248,6 +251,10 @@ func (r dbRepo) UpdateLastTestTime(testSuite string) {
 
 func (r dbRepo) MarkSuiteReported(suite string, kept bool) (err error) {
 	return r.suiteDao.MarkSuiteReported(suite, kept)
+}
+
+func (r dbRepo) MarkReportedAll() (err error) {
+	return r.suiteDao.MarkSuiteReported("", false)
 }
 
 func (r dbRepo) SuiteStatus(suite string) (exists, reported, kept bool, err error) {

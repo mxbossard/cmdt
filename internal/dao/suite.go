@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"cmdt/internal/model"
+
 	"github.com/mxbossard/utilz/zql"
 )
 
@@ -49,6 +50,7 @@ func (d Suite) init() (err error) {
 			seq INTEGER NOT NULL DEFAULT 0,
 			tooMuch INTEGER NOT NULL DEFAULT 0,
 			endTime INTEGER NOT NULL DEFAULT 0,
+			lastReportTime INTEGER NOT NULL DEFAULT 0,
 			outcome TEXT NOT NULL DEFAULT 'Z',
 			outcomeOrder INTEGER DEFAULT 0,
 			reported INTEGER NOT NULL DEFAULT 0,
@@ -232,10 +234,11 @@ func (d Suite) MarkSuiteReported(suite string, kept bool) (err error) {
 	p := logger.PerfTimer("suite", suite, "kept", kept)
 	defer p.End()
 
+	now := time.Now()
 	_, err = d.db.Exec(`
-		UPDATE suite SET reported = 1, kept = ?
+		UPDATE suite SET reported = 1, kept = ?, lastReportTime = ?
 		WHERE name = ?
-	`, kept, suite)
+	`, kept, now.UnixMicro(), suite)
 	return
 }
 
@@ -402,12 +405,13 @@ func (d Suite) FindGlobalConfig() (cfg *model.Config, err error) {
 	defer p.End()
 
 	var serializedConfig []byte
+	var lastReportTime int64
 	row := d.db.QueryRow(`
-		SELECT s.config 
+		SELECT s.config, s.lastReportTime
 		FROM suite s
 		WHERE name = '';
 	`)
-	err = row.Scan(&serializedConfig)
+	err = row.Scan(&serializedConfig, &lastReportTime)
 	if err == sql.ErrNoRows {
 		err = nil
 		return
@@ -416,6 +420,9 @@ func (d Suite) FindGlobalConfig() (cfg *model.Config, err error) {
 	}
 	cfg = &model.Config{}
 	err = deserializeConfig(serializedConfig, cfg)
+	if lastReportTime > 0 {
+		cfg.LastReportTime.Set(time.UnixMicro(lastReportTime))
+	}
 	return
 }
 
@@ -424,15 +431,15 @@ func (d Suite) FindSuiteConfig(testSuite string) (cfg *model.Config, err error) 
 	defer p.End()
 
 	var serializedConfig []byte
-	var startTime, endTime, seq int64
+	var startTime, endTime, lastReportTime, seq int64
 	var outcome string
 	var async bool
 	row := d.db.QueryRow(`
-		SELECT s.config, s.startTime, s.endTime, s.outcome, s.seq, s.async 
+		SELECT s.config, s.startTime, s.endTime, s.lastReportTime, s.outcome, s.seq, s.async
 		FROM suite s
 		WHERE name = @suite;
 	`, sql.Named("suite", testSuite))
-	err = row.Scan(&serializedConfig, &startTime, &endTime, &outcome, &seq, &async)
+	err = row.Scan(&serializedConfig, &startTime, &endTime, &lastReportTime, &outcome, &seq, &async)
 	if err == sql.ErrNoRows {
 		err = nil
 		return
@@ -442,6 +449,9 @@ func (d Suite) FindSuiteConfig(testSuite string) (cfg *model.Config, err error) 
 	cfg = &model.Config{}
 	err = deserializeConfig(serializedConfig, cfg)
 	cfg.Async.Set(async)
+	if lastReportTime > 0 {
+		cfg.LastReportTime.Set(time.UnixMicro(lastReportTime))
+	}
 	return
 }
 

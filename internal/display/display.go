@@ -8,6 +8,7 @@ import (
 
 	"cmdt/internal/facade"
 	"cmdt/internal/model"
+
 	"github.com/mxbossard/utilz/anzi"
 	"github.com/mxbossard/utilz/formatz"
 	"github.com/mxbossard/utilz/inoutz"
@@ -214,8 +215,18 @@ func (d basicDisplay) ReportAllFooter(globalCtx facade.GlobalContext) {
 	defer d.Flush()
 
 	globalStartTime := globalCtx.Config.GlobalStartTime.Get()
+	lastReportTime := globalCtx.Config.LastReportTime.GetOr(globalStartTime)
+	if globalStartTime.After(lastReportTime) {
+		lastReportTime = globalStartTime
+	}
+
+	sessionDuration := model.NormalizeDurationInSec(time.Since(lastReportTime))
 	globalDuration := model.NormalizeDurationInSec(time.Since(globalStartTime))
-	d.printer.ColoredErrf(MessageColor, "Global duration time: %s\n", globalDuration)
+	if sessionDuration == globalDuration {
+		d.printer.ColoredErrf(MessageColor, "Session duration: %s\n", sessionDuration)
+	} else {
+		d.printer.ColoredErrf(MessageColor, "Session duration: %s (global duration: %s)\n", sessionDuration, globalDuration)
+	}
 }
 
 func (d basicDisplay) TooMuchFailures(ctx facade.SuiteContext, testSuite string) {

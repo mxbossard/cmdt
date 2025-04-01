@@ -12,6 +12,7 @@ import (
 	"cmdt/internal/facade"
 	"cmdt/internal/model"
 	"cmdt/internal/utils"
+
 	"github.com/mxbossard/utilz/cmdz"
 	"github.com/mxbossard/utilz/errorz"
 	"github.com/mxbossard/utilz/printz"
@@ -110,20 +111,10 @@ func reportAllTestSuites(ctx facade.GlobalContext, asyncMode bool) (exitCode int
 	}
 
 	Dpl.ReportSuites(suiteOutcomes)
-	Dpl.ReportAllFooter(ctx)
 
 	for _, suiteCtx := range suiteContexts {
 		Dpl.CloseSuite(suiteCtx)
 	}
-
-	/*
-	for _, outcome := range suiteOutcomes {
-		err = ctx.Repo.MarkSuiteReported(outcome.TestSuite, ctx.Config.Keep.GetOr(false))
-		if err != nil {
-			// FIXME: aggregate errors
-			return
-		}
-	}*/
 
 	return
 }
@@ -159,7 +150,7 @@ func reportTestSuite(ctx facade.SuiteContext) (suiteOutcome model.SuiteOutcome, 
 		}
 	}
 
-	if suiteOutcome.Outcome == model.IGNORED || suiteOutcome. Outcome == model.PASSED {
+	if suiteOutcome.Outcome == model.IGNORED || suiteOutcome.Outcome == model.PASSED {
 		exitCode = 0
 	}
 
@@ -190,14 +181,6 @@ func ProcessReportDef(def model.ReportDefinition) (exitCode int16, err error) {
 
 	Dpl.ReportSuite(suiteOutcome)
 	Dpl.CloseSuite(ctx)
-
-	/*
-	if !ctx.Config.Keep.Is(true) {
-		//Dpl.ClearSuite(ctx)
-	}
-
-	err = ctx.Repo.MarkSuiteReported(ctx.Config.TestSuite.Get(), ctx.Config.Keep.GetOr(false))
-	*/
 
 	return
 }
@@ -281,14 +264,11 @@ func performTest(testDef model.TestDefinition) (exitCode int16, err error) {
 }
 
 func ProcessTestDef(testDef model.TestDefinition) (exitCode int16) {
-	//token := testDef.Token
 	testSuite := testDef.TestSuite
 	testCfg := testDef.Config
 	testCtx, err := facade.NewTestContext2(testDef)
 
 	Dpl.Quiet(testCfg.Quiet.Is(true))
-	// Dpl.OpenTest(testCtx)
-	//defer Dpl.CloseTest(testCtx)
 
 	ProcessTestError(testCtx, err)
 
@@ -557,6 +537,11 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				}
 
 			}
+
+			Dpl.ReportAllFooter(globalCtx)
+			err = globalCtx.Repo.MarkReportedAll()
+			ProcessGlobalError(globalCtx, err)
+
 		} else {
 			// Reporting One test suite
 			testSuite := inputConfig.TestSuite.Get()

@@ -10,6 +10,7 @@ import (
 
 	"cmdt/internal/model"
 	"cmdt/internal/utils"
+
 	"github.com/mxbossard/utilz/errorz"
 	"github.com/mxbossard/utilz/zlog"
 )
@@ -52,7 +53,7 @@ type Repo interface {
 	ListReportedAsyncSuites() (suites []string, err error)
 
 	SaveTestOutcome(outcome model.TestOutcome) (err error)
-	
+
 	SaveSuiteOutcome(outcome model.SuiteOutcome) (err error)
 
 	UpdateLastTestTime(testSuite string)
@@ -60,6 +61,7 @@ type Repo interface {
 	LoadSuiteOutcome(testSuite string) (outcome model.SuiteOutcome, err error)
 
 	MarkSuiteReported(suite string, kept bool) (err error)
+	MarkReportedAll() (err error)
 
 	SuiteStatus(suite string) (exists, reported, kept bool, err error)
 

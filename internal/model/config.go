@@ -297,6 +297,7 @@ type Config struct {
 	Prefix          utilz.Optional[string]        `yaml:""`
 	CmdAndArgs      []string                      `yaml:""`
 	GlobalStartTime utilz.Optional[time.Time]     `yaml:""`
+	LastReportTime  utilz.Optional[time.Time]     `yaml:""`
 	SuiteStartTime  utilz.Optional[time.Time]     `yaml:""`
 	TooMuchFailures utilz.Optional[int32]         `yaml:""`
 	LastTestTime    utilz.Optional[time.Time]     `yaml:""`
@@ -366,6 +367,7 @@ func (c *Config) Merge(right Config) {
 	c.Prefix.Merge(right.Prefix)
 	c.TooMuchFailures.Merge(right.TooMuchFailures)
 	c.GlobalStartTime.Merge(right.GlobalStartTime)
+	c.LastReportTime.Merge(right.LastReportTime)
 	c.SuiteStartTime.Merge(right.SuiteStartTime)
 	c.LastTestTime.Merge(right.LastTestTime)
 	c.SuiteTimeout.Merge(right.SuiteTimeout)
