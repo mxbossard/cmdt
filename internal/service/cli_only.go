@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"cmdt/internal/asyncdisplay"
+	"cmdt/internal/display"
 	"cmdt/internal/facade"
 	"cmdt/internal/model"
 	"cmdt/internal/utils"
@@ -36,7 +37,7 @@ func cliInitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	}
 
 	if !cfg.Async.Get() {
-		Dpl.ClearSuite(ctx)
+		Dpl.ClearSuite(cfg.TestSuite.Get())
 		Dpl.OpenSuite(ctx)
 		Dpl.SuiteTitle(ctx)
 	} else {
@@ -51,3 +52,15 @@ func cliInitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 
 	return
 }
+
+func cliAfterSuiteReport(token, isolation, suite string, dpl display.Displayer) (err error) {
+	rep := facade.Repo(token, isolation)
+	err = rep.MarkSuiteReported(suite, false)
+
+	if err != nil {
+		return
+	}
+	dpl.ClearSuite(suite)
+	return
+}
+

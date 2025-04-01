@@ -131,7 +131,7 @@ $cmdtIn @test=reinit/ @-- $newCmdt1 @test=sub3/ true
 $cmdtIn @test=reinit/ @stderr:"1 success" @-- $newCmdt1 @report=sub3
 
 >&2 echo "## Test Suite re-report and @keep"
-$cmdtIn @init=rereport_and_keep #@verbose=5
+$cmdtIn @init=rereport_and_keep @ignore #@verbose=5
 $cmdtIn @test=rereport_and_keep/init1 @-- $newCmdt1 @init=rereport_sub1
 $cmdtIn @test=rereport_and_keep/test1 @-- $newCmdt1 @test=rereport_sub1/test true
 $cmdtIn @test=rereport_and_keep/report1 @stderr:"rereport_sub1" @-- $newCmdt1 @report=rereport_sub1
@@ -153,6 +153,16 @@ $cmdtIn @test=rereport_and_keep/test4 @-- $newCmdt1 @test=rereport_sub4/test tru
 $cmdtIn @test=rereport_and_keep/reportall4_keeping @stderr:"rereport_sub4" @-- $newCmdt1 @report @keep
 $cmdtIn @test=rereport_and_keep/rereportall4 @stderr:"rereport_sub4" @-- $newCmdt1 @report
 $cmdtIn @test=rereport_and_keep/rerereportall4 @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report
+
+>&2 echo "## Test Suite re-report"
+$cmdtIn @init=re-report #@verbose=5
+$cmdtIn @test=re-report/init1 @-- $newCmdt1 @init=re-report_sub1 @verbose=5
+$cmdtIn @test=re-report/test1 @-- $newCmdt1 @test=re-report_sub1/testTrue true
+$cmdtIn @test=re-report/report1 @stderr:"re-report_sub1" @stderr!:"testTrue" @-- $newCmdt1 @report=re-report_sub1
+$cmdtIn @test=re-report/report2 @stderr:"re-report_sub1" @stderr!:"testTrue" @-- $newCmdt1 @report=re-report_sub1
+$cmdtIn @test=re-report/reportAll1 @stderr:"re-report_sub1" @stderr!:"testTrue" @-- $newCmdt1 @report
+$cmdtIn @test=re-report/reportAll2 @stderr:"re-report_sub1" @stderr!:"testTrue" @-- $newCmdt1 @report
+
 
 >&2 echo "## Test usage"
 $cmdtIn @init=meta

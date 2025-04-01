@@ -116,13 +116,14 @@ func reportAllTestSuites(ctx facade.GlobalContext, asyncMode bool) (exitCode int
 		Dpl.CloseSuite(suiteCtx)
 	}
 
+	/*
 	for _, outcome := range suiteOutcomes {
 		err = ctx.Repo.MarkSuiteReported(outcome.TestSuite, ctx.Config.Keep.GetOr(false))
 		if err != nil {
 			// FIXME: aggregate errors
 			return
 		}
-	}
+	}*/
 
 	return
 }
@@ -189,11 +190,14 @@ func ProcessReportDef(def model.ReportDefinition) (exitCode int16, err error) {
 
 	Dpl.ReportSuite(suiteOutcome)
 	Dpl.CloseSuite(ctx)
+
+	/*
 	if !ctx.Config.Keep.Is(true) {
 		//Dpl.ClearSuite(ctx)
 	}
 
 	err = ctx.Repo.MarkSuiteReported(ctx.Config.TestSuite.Get(), ctx.Config.Keep.GetOr(false))
+	*/
 
 	return
 }
@@ -484,6 +488,11 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				exitCode = 0
 			}
 
+			for _, suite := range syncSuites {
+				err = cliAfterSuiteReport(globalCtx.Token, globalCtx.Isolation, suite, Dpl)
+				ProcessGlobalError(globalCtx, err)
+			}
+
 			// 2- Report all async suites
 			asyncSuites, err := facade.Repo(token, isolation).ListAsyncSuites()
 			ProcessGlobalError(globalCtx, err)
@@ -542,6 +551,11 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 
 				daemonIsol = globalCtx.Isolation
 				daemonToken = globalCtx.Token
+				for _, suite := range asyncSuites {
+					err = cliAfterSuiteReport(daemonToken, daemonIsol, suite, asyncDpl)
+					ProcessGlobalError(globalCtx, err)
+				}
+
 			}
 		} else {
 			// Reporting One test suite
@@ -600,7 +614,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 						if err != nil {
 							panic(err)
 						}
-						asyncDpl.ClearSuite(suiteCtx)
+						//asyncDpl.ClearSuite(suiteCtx)
 						return exitCode
 					}
 				} else {
@@ -613,10 +627,15 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 
 				daemonIsol = suiteCtx.Isolation
 				daemonToken = suiteCtx.Token
+				err = cliAfterSuiteReport(daemonToken, daemonIsol, testSuite, asyncDpl)
+				ProcessSuiteError(suiteCtx, err)
+
 			} else {
 				logger.Info("executing report in sync", "suite", testSuite)
 				exitCode, err = ProcessReportDef(def)
 				suiteCtx.Repo.Done(&op)
+				err = cliAfterSuiteReport(suiteCtx.Token, suiteCtx.Isolation, testSuite, Dpl)
+				ProcessSuiteError(suiteCtx, err)
 			}
 
 		}

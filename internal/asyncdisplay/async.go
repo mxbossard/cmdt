@@ -106,15 +106,15 @@ func (d AsyncDisplay) CloseSuite(ctx facade.SuiteContext) {
 	}
 }
 
-func (d AsyncDisplay) ClearSuite(ctx facade.SuiteContext) {
-	suite := ctx.Config.TestSuite.Get()
+func (d AsyncDisplay) ClearSuite(name string) {
 	if d.tailer != nil {
-		err := d.tailer.ClearSession(suite)
+		err := d.tailer.ClearSession(name)
 		if err != nil {
 			panic(err)
 		}
 	}
-	logger.Info("cleared async suite", "suite", suite)
+	zcreen.ClearSession(d.tmpDir, name)
+	logger.Info("cleared async suite", "suite", name)
 }
 
 func (d AsyncDisplay) SuiteTitle(ctx facade.SuiteContext) {
