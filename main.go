@@ -20,9 +20,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mxbossard/cmdt/daemon"
-	"github.com/mxbossard/cmdt/model"
-	"github.com/mxbossard/cmdt/service"
+	"cmdt/internal/daemon"
+	"cmdt/internal/model"
+	"cmdt/internal/service"
 	"github.com/mxbossard/utilz/zlog"
 )
 

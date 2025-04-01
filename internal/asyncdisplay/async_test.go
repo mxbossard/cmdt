@@ -1,0 +1,1051 @@
+package asyncdisplay
+
+import (
+	"fmt"
+	"os"
+
+	//"path/filepath"
+	"regexp"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"cmdt/internal/display"
+	"cmdt/internal/facade"
+	"cmdt/internal/model"
+	"cmdt/internal/repo"
+	"github.com/mxbossard/utilz/anzi"
+	"github.com/mxbossard/utilz/cmdz"
+	"github.com/mxbossard/utilz/printz"
+	"github.com/mxbossard/utilz/utilz"
+
+	//"github.com/mxbossard/utilz/screen"
+	"github.com/mxbossard/utilz/zlog"
+)
+
+func TestMain(m *testing.M) {
+	// test context initialization here
+	zlog.ColoredConfig()
+	//zlog.SetLogLevelThreshold(zlog.LevelPerf)
+	zlog.PerfTimerStartAsTrace(false)
+	os.Exit(m.Run())
+}
+
+func TestAsyncDisplay_TestStdout(t *testing.T) {
+	//t.Skip()
+	token := "foo1"
+	isol := "bar1"
+	suite := "suite1"
+	var err error
+
+	err = repo.ClearWorkDirectory(token, isol)
+	require.NoError(t, err)
+
+	tmpDir := "/tmp/asyncdisplay.foo1002"
+	err = os.RemoveAll(tmpDir)
+	require.NoError(t, err)
+
+	outW := &strings.Builder{}
+	errW := &strings.Builder{}
+	outs := printz.NewOutputs(outW, errW)
+	d := New(tmpDir, true, outs)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	sctx := facade.NewSuiteContext(token, isol, suite, false, model.InitAction, model.Config{Timeout: utilz.OptionalOf[time.Duration](time.Second)})
+	d.OpenSuite(sctx)
+
+	// Writing async
+	outMsg := "stdout\n"
+	errMsg := "stderr\n"
+	ctx, err := facade.NewTestContext(token, isol, suite, 1, model.Config{}, uint32(42))
+	require.NoError(t, err)
+	ctx.Config.Verbose.Set(model.SHOW_ALL)
+	ctx.CmdExec = cmdz.Cmd("true")
+	td := d.OpenTest(ctx)
+	td.Stdout(outMsg)
+	td.Stderr(errMsg)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	d.AsyncFlush(suite, 20*time.Millisecond)
+	d.CloseSuite(sctx)
+	err = d.TailBlocking(suite, 20*time.Millisecond)
+	require.NoError(t, err)
+
+	assert.Equal(t, outMsg, outW.String())
+	assert.Equal(t, errMsg, errW.String())
+
+	outW.Reset()
+	errW.Reset()
+
+	// why AsyncFlushAll should not re flush already flushed suites
+	d.AsyncFlushAll(20 * time.Millisecond)
+	err = d.TailAllBlocking(20 * time.Millisecond)
+	require.NoError(t, err)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+}
+
+func TestAsyncDisplay_TestTitle(t *testing.T) {
+	//t.Skip()
+	token := "foo2"
+	isol := "bar2"
+	suite := "suite2"
+	var err error
+
+	err = repo.ClearWorkDirectory(token, isol)
+	require.NoError(t, err)
+
+	tmpDir := "/tmp/asyncdisplay.foo2002"
+	err = os.RemoveAll(tmpDir)
+	require.NoError(t, err)
+
+	outW := &strings.Builder{}
+	errW := &strings.Builder{}
+	outs := printz.NewOutputs(outW, errW)
+	d := New(tmpDir, true, outs)
+
+	sctx := facade.NewSuiteContext(token, isol, suite, false, model.InitAction, model.Config{})
+	d.OpenSuite(sctx)
+
+	d.AsyncFlushAll(2 * time.Millisecond)
+	err = d.TailAllBlocking(2 * time.Millisecond)
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "timeout")
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	ctx, err := facade.NewTestContext(token, isol, suite, 1, model.Config{}, 42)
+	require.NoError(t, err)
+	ctx.CmdExec = cmdz.Cmd("true")
+
+	td := d.OpenTest(ctx)
+	td.Title()
+	td.Close()
+	d.CloseSuite(sctx)
+
+	d.AsyncFlushAll(10 * time.Millisecond)
+	err = d.TailAllBlocking(10 * time.Millisecond)
+	require.NoError(t, err)
+
+	assert.Empty(t, outW.String())
+	expectedTitlePattern := fmt.Sprintf(`\[\d+\] Test \[%s\]\(on host\)>true #01...\s*UNKNOWN\s*Executing cmd:\s*\[true\]\s*$`, suite)
+	assert.Regexp(t, regexp.MustCompile(expectedTitlePattern), anzi.Unformat(errW.String()))
+
+}
+
+func TestBlockTail(t *testing.T) {
+	//t.Skip()
+	token := "foo10"
+	isol := "bar10"
+	var err error
+
+	err = repo.ClearWorkDirectory(token, isol)
+	require.NoError(t, err)
+
+	tmpDir := "/tmp/asyncdisplay.foo3002"
+	err = os.RemoveAll(tmpDir)
+	require.NoError(t, err)
+
+	outW := &strings.Builder{}
+	errW := &strings.Builder{}
+	outs := printz.NewOutputs(outW, errW)
+	d := New(tmpDir, true, outs)
+	d.SetVerbose(model.SHOW_ALL)
+
+	// Replace stdPrinter std outputs by 2 string builders
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	// Scénario: Writing on 3 suites in sync with test ran serial
+	// 100- Init suite101
+	// 110- Test suite101 #1
+	// 111- Test suite101 #1 out>
+	// 112- Test suite101 #1 err>
+	// 120- Test suite101 #2
+	// 121- Test suite101 #2 out>
+	// 122- Test suite101 #2 err>
+	// 130- Test suite101 #3
+	// 131- Test suite101 #3 out>
+	// 132- Test suite101 #3 err>
+	// 170- Report suite101
+
+	// Start 3 tests async/unordered
+	display.DisplaySuite(d, token, isol, 101) // 100- Init suite1
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	// Simulate outputs sent disordered
+	td := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 101, 1)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	display.DisplayTestOut(t, td, 101, 1)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	display.DisplayTestErr(t, td, 101, 1)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	display.DisplayEndTest(t, td, 101, 1)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	td = display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 101, 3)
+	display.DisplayTestOut(t, td, 101, 3)
+	display.DisplayTestErr(t, td, 101, 3)
+	display.DisplayEndTest(t, td, 101, 3)
+
+	td = display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 101, 2)
+	display.DisplayTestOut(t, td, 101, 2)
+	display.DisplayTestErr(t, td, 101, 2)
+	display.DisplayEndTest(t, td, 101, 2)
+
+	display.DisplayReport(d, 101)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	d.AsyncFlush("suite-101", 20*time.Millisecond)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	display.CloseSuite(d, 101, token, isol)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	err = d.TailBlocking("suite-101", 20*time.Millisecond)
+	require.NoError(t, err)
+
+	outScenarioRegexp := regexp.MustCompile("^" +
+		display.TestStdoutRegexp(101, 1) +
+		display.TestStdoutRegexp(101, 2) +
+		display.TestStdoutRegexp(101, 3) +
+		"$")
+	assert.Regexp(t, outScenarioRegexp, anzi.Unformat(outW.String()))
+	// Expect scénario to be oredred test1, test2, test4
+	errScenarioRegexp := regexp.MustCompile("^" +
+		display.SuiteInitRegexp(token, 101) +
+		display.TestTitleRegexp(101, 1) +
+		display.TestStderrRegexp(101, 1) +
+		display.TestTitleRegexp(101, 2) +
+		display.TestStderrRegexp(101, 2) +
+		display.TestTitleRegexp(101, 3) +
+		display.TestStderrRegexp(101, 3) +
+		display.ReportSuitePattern(101) +
+		"$")
+	assert.Regexp(t, errScenarioRegexp, anzi.Unformat(errW.String()))
+
+}
+
+func TestBlockTail_Twice(t *testing.T) {
+	//t.Skip()
+	token := "foo12"
+	isol := "bar12"
+	var err error
+
+	err = repo.ClearWorkDirectory(token, isol)
+	require.NoError(t, err)
+
+	tmpDir := "/tmp/asyncdisplay.foo4002"
+	err = os.RemoveAll(tmpDir)
+	require.NoError(t, err)
+
+	outW := &strings.Builder{}
+	errW := &strings.Builder{}
+	outs := printz.NewOutputs(outW, errW)
+	d := New(tmpDir, true, outs)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	// Start 1 test in one suite
+	display.DisplaySuite(d, token, isol, 1) // 100- Init suite1
+
+	td := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 1, 1)
+	display.DisplayTestOut(t, td, 1, 1)
+	display.DisplayTestErr(t, td, 1, 1)
+	display.DisplayEndTest(t, td, 1, 1)
+
+	display.DisplayReport(d, 1)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	require.NoError(t, err)
+	d.AsyncFlush("suite-1", 20*time.Millisecond)
+
+	display.CloseSuite(d, 1, token, isol)
+
+	err = d.TailBlocking("suite-1", 20*time.Millisecond)
+	require.NoError(t, err)
+
+	outScenarioRegexp := regexp.MustCompile("^" +
+		display.TestStdoutRegexp(1, 1) +
+		"$")
+	assert.Regexp(t, outScenarioRegexp, anzi.Unformat(outW.String()))
+
+	// Expect scénario to be test1
+	errScenarioRegexp := regexp.MustCompile("^" +
+		display.SuiteInitRegexp(token, 1) +
+		display.TestTitleRegexp(1, 1) +
+		display.TestStderrRegexp(1, 1) +
+		display.ReportSuitePattern(1) +
+		"$")
+	assert.Regexp(t, errScenarioRegexp, anzi.Unformat(errW.String()))
+
+	outW.Reset()
+	errW.Reset()
+
+	// Start another test in reinited suite
+	assert.Panics(t, func() {
+		display.DisplaySuite(d, token, isol, 1) // 100- Init suite1
+	})
+
+}
+
+func TestAsyncFlushThenDisplayThenBlockTail(t *testing.T) {
+	//t.Skip()
+	token := "foo20"
+	isol := "bar20"
+	var err error
+
+	err = repo.ClearWorkDirectory(token, isol)
+	require.NoError(t, err)
+
+	tmpDir := "/tmp/asyncdisplay.foo5002"
+	err = os.RemoveAll(tmpDir)
+	require.NoError(t, err)
+
+	outW := &strings.Builder{}
+	errW := &strings.Builder{}
+	outs := printz.NewOutputs(outW, errW)
+	d := New(tmpDir, true, outs)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	// Scénario: Writing on 3 suites in sync with test ran serial
+	// 100- Init suite1
+	// 110- Test suite1 #1
+	// 111- Test suite1 #1 out>
+	// 112- Test suite1 #1 err>
+	// 120- Test suite1 #2
+	// 121- Test suite1 #2 out>
+	// 122- Test suite1 #2 err>
+	// 130- Test suite1 #3
+	// 131- Test suite1 #3 out>
+	// 132- Test suite1 #3 err>
+	// 170- Report suite1
+
+	// Start 3 tests async/unordered
+	display.DisplaySuite(d, token, isol, 1) // 100- Init suite1
+
+	// Simulate outputs sent disordered
+	td := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 1, 1)
+	display.DisplayTestOut(t, td, 1, 1)
+	display.DisplayTestErr(t, td, 1, 1)
+	display.DisplayEndTest(t, td, 1, 1)
+
+	d.AsyncFlush("suite-1", 20*time.Millisecond)
+
+	time.Sleep(10 * time.Millisecond)
+
+	td = display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 1, 3)
+	display.DisplayTestOut(t, td, 1, 3)
+	display.DisplayTestErr(t, td, 1, 3)
+	display.DisplayEndTest(t, td, 1, 3)
+
+	time.Sleep(10 * time.Millisecond)
+
+	td = display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 1, 2)
+	display.DisplayTestOut(t, td, 1, 2)
+	display.DisplayTestErr(t, td, 1, 2)
+	display.DisplayEndTest(t, td, 1, 2)
+
+	display.DisplayReport(d, 1)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	display.CloseSuite(d, 1, token, isol)
+
+	err = d.TailBlocking("suite-1", 20*time.Millisecond)
+	require.NoError(t, err)
+
+	outScenarioRegexp := regexp.MustCompile("^" +
+		display.TestStdoutRegexp(1, 1) +
+		display.TestStdoutRegexp(1, 2) +
+		display.TestStdoutRegexp(1, 3) +
+		"$")
+	assert.Regexp(t, outScenarioRegexp, anzi.Unformat(outW.String()))
+
+	// Expect scénario to be oredred test1, test2, test3
+	errScenarioRegexp := regexp.MustCompile("^" +
+		display.SuiteInitRegexp(token, 1) +
+		display.TestTitleRegexp(1, 1) +
+		display.TestStderrRegexp(1, 1) +
+		display.TestTitleRegexp(1, 2) +
+		display.TestStderrRegexp(1, 2) +
+		display.TestTitleRegexp(1, 3) +
+		display.TestStderrRegexp(1, 3) +
+		display.ReportSuitePattern(1) +
+		"$")
+	assert.Regexp(t, errScenarioRegexp, anzi.Unformat(errW.String()))
+
+}
+
+func TestBlockTailAll(t *testing.T) {
+	//t.Skip()
+	token := "foo30"
+	isol := "bar30"
+	var err error
+
+	err = repo.ClearWorkDirectory(token, isol)
+	require.NoError(t, err)
+
+	tmpDir := "/tmp/asyncdisplay.foo6002"
+	err = os.RemoveAll(tmpDir)
+	require.NoError(t, err)
+
+	outW := &strings.Builder{}
+	errW := &strings.Builder{}
+	outs := printz.NewOutputs(outW, errW)
+	d := New(tmpDir, true, outs)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	// Scénario: Writing on 3 suites in sync with test ran serial
+	// 000- Start with Global
+	// 100- Init suite1
+	// 110- Test suite1 #1
+	// 111- Test suite1 #1 out>
+	// 112- Test suite1 #1 err>
+	// 120- Test suite1 #2
+	// 121- Test suite1 #2 out>
+	// 122- Test suite1 #2 err>
+	// 130- Test suite1 #3
+	// 131- Test suite1 #3 out>
+	// 132- Test suite1 #3 err>
+	// 170- Report suite1
+
+	gctx := facade.NewGlobalContext(token, isol, model.Config{})
+	d.Global(gctx)
+
+	// Start 3 tests async/unordered
+	display.DisplaySuite(d, token, isol, 1) // 100- Init suite1
+
+	// Simulate outputs sent disordered
+	td := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 1, 1)
+	display.DisplayTestOut(t, td, 1, 1)
+	display.DisplayTestErr(t, td, 1, 1)
+	display.DisplayEndTest(t, td, 1, 1)
+
+	td = display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 1, 3)
+	display.DisplayTestOut(t, td, 1, 3)
+	display.DisplayTestErr(t, td, 1, 3)
+	display.DisplayEndTest(t, td, 1, 3)
+
+	td = display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 1, 2)
+	display.DisplayTestOut(t, td, 1, 2)
+	display.DisplayTestErr(t, td, 1, 2)
+	display.DisplayEndTest(t, td, 1, 2)
+
+	display.DisplayReport(d, 1)
+	display.CloseSuite(d, 1, token, isol)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	d.AsyncFlushAll(20 * time.Millisecond)
+	err = d.TailAllBlocking(20 * time.Millisecond)
+	require.NoError(t, err)
+
+	// Expect scénario to be oredred test1, test2, test3
+	outScenarioRegexp := regexp.MustCompile("^" +
+		display.TestStdoutRegexp(1, 1) +
+		display.TestStdoutRegexp(1, 2) +
+		display.TestStdoutRegexp(1, 3) +
+		"$")
+	assert.Regexp(t, outScenarioRegexp, anzi.Unformat(outW.String()))
+
+	errScenarioRegexp := regexp.MustCompile("^" +
+		display.GlobalInitPattern(token) +
+		display.SuiteInitRegexp(token, 1) +
+		display.TestTitleRegexp(1, 1) +
+		display.TestStderrRegexp(1, 1) +
+		display.TestTitleRegexp(1, 2) +
+		display.TestStderrRegexp(1, 2) +
+		display.TestTitleRegexp(1, 3) +
+		display.TestStderrRegexp(1, 3) +
+		display.ReportSuitePattern(1) +
+		"$")
+	assert.Regexp(t, errScenarioRegexp, anzi.Unformat(errW.String()))
+
+}
+
+func TestAsyncFlushAllThenDisplayThenBlockTailAll(t *testing.T) {
+	//t.Skip()
+	token := "foo40"
+	isol := "bar40"
+	var err error
+
+	err = repo.ClearWorkDirectory(token, isol)
+	require.NoError(t, err)
+
+	tmpDir := "/tmp/asyncdisplay.foo7002"
+	err = os.RemoveAll(tmpDir)
+	require.NoError(t, err)
+
+	outW := &strings.Builder{}
+	errW := &strings.Builder{}
+	outs := printz.NewOutputs(outW, errW)
+	d := New(tmpDir, true, outs)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	// Scénario: Writing async on 3 suites with test ran serial
+	// 000- Start with Global
+	// 100- Init suite1
+	// 110- Test suite1 #1
+	// 111- Test suite1 #1 out>
+	// 112- Test suite1 #1 err>
+	// 120- Test suite1 #2
+	// 121- Test suite1 #2 out>
+	// 122- Test suite1 #2 err>
+	// 130- Test suite1 #3
+	// 131- Test suite1 #3 out>
+	// 132- Test suite1 #3 err>
+	// 170- Report suite1
+
+	gctx := facade.NewGlobalContext(token, isol, model.Config{})
+	d.Global(gctx)
+
+	// Start 3 tests async/unordered
+	display.DisplaySuite(d, token, isol, 1) // 100- Init suite1
+	td1 := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 1, 1)
+	td3 := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 1, 3)
+	td2 := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 1, 2)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	d.AsyncFlushAll(50 * time.Millisecond)
+
+	// Simulate outputs sent disordered
+	display.DisplayTestOut(t, td1, 1, 1)
+	display.DisplayTestErr(t, td1, 1, 1)
+	display.DisplayEndTest(t, td1, 1, 1)
+
+	time.Sleep(10 * time.Millisecond)
+
+	display.DisplayTestOut(t, td3, 1, 3)
+	display.DisplayTestErr(t, td3, 1, 3)
+	display.DisplayEndTest(t, td3, 1, 3)
+
+	time.Sleep(10 * time.Millisecond)
+
+	display.DisplayTestOut(t, td2, 1, 2)
+	display.DisplayTestErr(t, td2, 1, 2)
+	display.DisplayEndTest(t, td2, 1, 2)
+
+	display.DisplayReport(d, 1)
+	display.CloseSuite(d, 1, token, isol)
+
+	err = d.TailAllBlocking(20 * time.Millisecond)
+	require.NoError(t, err)
+
+	// Expect scénario to be oredred test1, test2, test3
+	outScenarioRegexp := regexp.MustCompile("^" +
+		display.TestStdoutRegexp(1, 1) +
+		display.TestStdoutRegexp(1, 2) +
+		display.TestStdoutRegexp(1, 3) +
+		"$")
+	assert.Regexp(t, outScenarioRegexp, anzi.Unformat(outW.String()))
+
+	errScenarioRegexp := regexp.MustCompile("^" +
+		display.GlobalInitPattern(token) +
+		display.SuiteInitRegexp(token, 1) +
+		display.TestTitleRegexp(1, 1) +
+		display.TestStderrRegexp(1, 1) +
+		display.TestTitleRegexp(1, 2) +
+		display.TestStderrRegexp(1, 2) +
+		display.TestTitleRegexp(1, 3) +
+		display.TestStderrRegexp(1, 3) +
+		display.ReportSuitePattern(1) +
+		"$")
+	assert.Regexp(t, errScenarioRegexp, anzi.Unformat(errW.String()))
+
+}
+
+func TestAsyncDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
+	//t.Skip()
+	token := "foo50"
+	isol := "bar50"
+	var err error
+
+	err = repo.ClearWorkDirectory(token, isol)
+	require.NoError(t, err)
+
+	tmpDir := "/tmp/asyncdisplay.foo8002"
+	err = os.RemoveAll(tmpDir)
+	require.NoError(t, err)
+
+	outW := &strings.Builder{}
+	errW := &strings.Builder{}
+	outs := printz.NewOutputs(outW, errW)
+	d := New(tmpDir, true, outs)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	// Scénario: Writing async on 3 suites with test ran serial
+	// 000- Start with Global
+	// 100- Init suite1
+	// 110- Test suite1 #1
+	// 111- Test suite1 #1 out>
+	// 112- Test suite1 #1 err>
+	// 120- Test suite1 #2
+	// 121- Test suite1 #2 out>
+	// 122- Test suite1 #2 err>
+	// 130- Test suite1 #3
+	// 131- Test suite1 #3 out>
+	// 132- Test suite1 #3 err>
+	// 170- Report suite1
+	// 200- Init suite2
+	// 210- Test suite2 #1
+	// 211- Test suite2 #1 out>
+	// 212- Test suite2 #1 err>
+	// 220- Test suite2 #2
+	// 221- Test suite2 #2 out>
+	// 222- Test suite2 #2 err>
+	// 270- Report suite2
+	// 300- Init suite3
+	// 310- Test suite3 #1
+	// 311- Test suite3 #1 out>
+	// 312- Test suite3 #1 err>
+	// 320- Test suite3 #2
+	// 321- Test suite3 #2 out>
+	// 322- Test suite3 #2 err>
+	// 370- Report suite3
+
+	gctx := facade.NewGlobalContext(token, isol, model.Config{})
+	d.Global(gctx)
+
+	display.DisplaySuite(d, token, isol, 1) // 100- Init suite1
+	td := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 1, 1)
+	display.DisplayTestOut(t, td, 1, 1)
+	display.DisplayTestErr(t, td, 1, 1)
+	display.DisplayEndTest(t, td, 1, 1)
+
+	td = display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 1, 2)
+	display.DisplayTestOut(t, td, 1, 2)
+	display.DisplayTestErr(t, td, 1, 2)
+	display.DisplayEndTest(t, td, 1, 2)
+	td = display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 1, 3)
+	display.DisplayTestOut(t, td, 1, 3)
+	display.DisplayTestErr(t, td, 1, 3)
+	display.DisplayEndTest(t, td, 1, 3)
+	display.DisplayReport(d, 1)
+	display.CloseSuite(d, 1, token, isol)
+
+	display.DisplaySuite(d, token, isol, 2) // 200- Init suite2
+	td = display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 2, 1)
+	display.DisplayTestOut(t, td, 2, 1)
+	display.DisplayTestErr(t, td, 2, 1)
+	display.DisplayEndTest(t, td, 2, 1)
+	td = display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 2, 2)
+	display.DisplayTestOut(t, td, 2, 2)
+	display.DisplayTestErr(t, td, 2, 2)
+	display.DisplayEndTest(t, td, 2, 2)
+	display.DisplayReport(d, 2)
+	display.CloseSuite(d, 2, token, isol)
+
+	display.DisplaySuite(d, token, isol, 3) // 300- Init suite3
+	td = display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 3, 1)
+	display.DisplayTestOut(t, td, 3, 1)
+	display.DisplayTestErr(t, td, 3, 1)
+	display.DisplayEndTest(t, td, 3, 1)
+	td = display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 3, 2)
+	display.DisplayTestOut(t, td, 3, 2)
+	display.DisplayTestErr(t, td, 3, 2)
+	display.DisplayEndTest(t, td, 3, 2)
+	display.DisplayReport(d, 3)
+	display.CloseSuite(d, 3, token, isol)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	d.AsyncFlushAll(20 * time.Millisecond)
+	err = d.TailAllBlocking(20 * time.Millisecond)
+	require.NoError(t, err)
+
+	outScenarioRegexp := regexp.MustCompile("^" +
+		display.TestStdoutRegexp(1, 1) +
+		display.TestStdoutRegexp(1, 2) +
+		display.TestStdoutRegexp(1, 3) +
+
+		display.TestStdoutRegexp(2, 1) +
+		display.TestStdoutRegexp(2, 2) +
+
+		display.TestStdoutRegexp(3, 1) +
+		display.TestStdoutRegexp(3, 2) +
+		"$")
+	assert.Regexp(t, outScenarioRegexp, anzi.Unformat(outW.String()))
+
+	errScenarioRegexp := regexp.MustCompile("^" +
+		display.GlobalInitPattern(token) +
+		display.SuiteInitRegexp(token, 1) +
+		display.TestTitleRegexp(1, 1) +
+		display.TestStderrRegexp(1, 1) +
+		display.TestTitleRegexp(1, 2) +
+		display.TestStderrRegexp(1, 2) +
+		display.TestTitleRegexp(1, 3) +
+		display.TestStderrRegexp(1, 3) +
+		display.ReportSuitePattern(1) +
+
+		display.SuiteInitRegexp(token, 2) +
+		display.TestTitleRegexp(2, 1) +
+		display.TestStderrRegexp(2, 1) +
+		display.TestTitleRegexp(2, 2) +
+		display.TestStderrRegexp(2, 2) +
+		display.ReportSuitePattern(2) +
+
+		display.SuiteInitRegexp(token, 3) +
+		display.TestTitleRegexp(3, 1) +
+		display.TestStderrRegexp(3, 1) +
+		display.TestTitleRegexp(3, 2) +
+		display.TestStderrRegexp(3, 2) +
+		display.ReportSuitePattern(3) +
+		"$")
+	assert.Regexp(t, errScenarioRegexp, anzi.Unformat(errW.String()))
+
+}
+
+func TestAsyncDisplayUsage_AsyncSuitesSerialTests(t *testing.T) {
+	//t.Skip()
+	token := "foo60"
+	isol := "bar60"
+
+	var err error
+	err = repo.ClearWorkDirectory(token, isol)
+	require.NoError(t, err)
+
+	tmpDir := "/tmp/asyncdisplay.foo9002"
+	err = os.RemoveAll(tmpDir)
+	require.NoError(t, err)
+
+	outW := &strings.Builder{}
+	errW := &strings.Builder{}
+	outs := printz.NewOutputs(outW, errW)
+	d := New(tmpDir, true, outs)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	// Scénario: Writing async on 3 suites with test ran serial
+	// 000- Start with Global
+	// 100- Init suite1
+	// 110- Test suite1 #1
+	// 111- Test suite1 #1 out>
+	// 112- Test suite1 #1 err>
+	// 200- Init suite2
+	// 300- Init suite3
+	// 310- Test suite3 #1
+	// 311- Test suite3 #1 out>
+	// 120- Test suite1 #2
+	// 210- Test suite2 #1
+	// 121- Test suite1 #2 out>
+	// 122- Test suite1 #2 err>
+	// 211- Test suite2 #1 out>
+	// 212- Test suite2 #1 err>
+	// 220- Test suite2 #2
+	// 312- Test suite3 #1 err>
+	// 221- Test suite2 #2 out>
+	// 222- Test suite2 #2 err>
+	// 270- Report suite2
+	// 130- Test suite1 #3
+	// 131- Test suite1 #3 out>
+	// 132- Test suite1 #3 err>
+	// 170- Report suite1
+	// 320- Test suite3 #2
+	// 321- Test suite3 #2 out>
+	// 322- Test suite3 #2 err>
+	// 370- Report suite3
+
+	gctx := facade.NewGlobalContext(token, isol, model.Config{})
+	d.Global(gctx)
+
+	display.DisplaySuite(d, token, isol, 1) // 100- Init suite1
+
+	td11 := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 1, 1) // 110- Test suite1 #1
+	display.DisplayTestOut(t, td11, 1, 1)                                // 111- Test suite1 #1 out>
+	display.DisplayTestErr(t, td11, 1, 1)                                // 112- Test suite1 #1 err>
+	display.DisplayEndTest(t, td11, 1, 1)
+
+	display.DisplaySuite(d, token, isol, 2) // 200- Init suite2
+	display.DisplaySuite(d, token, isol, 3) // 300- Init suite3
+
+	td31 := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 3, 1) // 310- Test suite3 #1
+	display.DisplayTestOut(t, td31, 3, 1)                                // 311- Test suite3 #1 out>
+
+	td12 := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 1, 2) // 120- Test suite1 #2
+	td21 := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 2, 1) // 210- Test suite2 #1
+
+	display.DisplayTestOut(t, td12, 1, 2) // 121- Test suite1 #2 out>
+	display.DisplayTestErr(t, td12, 1, 2) // 122- Test suite1 #2 err>
+	display.DisplayEndTest(t, td12, 1, 2)
+
+	display.DisplayTestOut(t, td21, 2, 1) // 211- Test suite2 #1 out>
+	display.DisplayTestErr(t, td21, 2, 1) // 212- Test suite2 #1 err>
+	display.DisplayEndTest(t, td21, 2, 1)
+
+	td22 := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 2, 2) // 220- Test suite2 #2
+
+	display.DisplayTestErr(t, td31, 3, 1) // 312- Test suite3 #1 err>
+	display.DisplayEndTest(t, td31, 3, 1)
+
+	display.DisplayTestOut(t, td22, 2, 2) // 221- Test suite2 #2 out>
+	display.DisplayTestErr(t, td22, 2, 2) // 222- Test suite2 #2 err>
+	display.DisplayEndTest(t, td22, 2, 2)
+
+	display.DisplayReport(d, 2) // 270- Report suite2
+	display.CloseSuite(d, 2, token, isol)
+
+	td13 := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 1, 3) // 130- Test suite1 #3
+	display.DisplayTestOut(t, td13, 1, 3)                                // 131- Test suite1 #3 out>
+	display.DisplayTestErr(t, td13, 1, 3)                                // 132- Test suite1 #3 err>
+	display.DisplayEndTest(t, td13, 1, 3)
+
+	display.DisplayReport(d, 1) // 170- Report suite1
+	display.CloseSuite(d, 1, token, isol)
+
+	td32 := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 3, 2) // 320- Test suite3 #2
+	display.DisplayTestOut(t, td32, 3, 2)                                // 321- Test suite3 #2 out>
+	display.DisplayTestErr(t, td32, 3, 2)                                // 322- Test suite3 #2 err>
+	display.DisplayEndTest(t, td32, 3, 2)
+
+	display.DisplayReport(d, 3) // 370- Report suite3
+	display.CloseSuite(d, 3, token, isol)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	d.AsyncFlushAll(20 * time.Millisecond)
+	err = d.TailAllBlocking(20 * time.Millisecond)
+	require.NoError(t, err)
+
+	outScenarioRegexp := regexp.MustCompile("^" +
+		display.TestStdoutRegexp(1, 1) +
+		display.TestStdoutRegexp(1, 2) +
+		display.TestStdoutRegexp(1, 3) +
+
+		display.TestStdoutRegexp(2, 1) +
+		display.TestStdoutRegexp(2, 2) +
+
+		display.TestStdoutRegexp(3, 1) +
+		display.TestStdoutRegexp(3, 2) +
+		"$")
+	assert.Regexp(t, outScenarioRegexp, anzi.Unformat(outW.String()))
+
+	errScenarioRegexp := regexp.MustCompile("^" +
+		display.GlobalInitPattern(token) +
+		display.SuiteInitRegexp(token, 1) +
+		display.TestTitleRegexp(1, 1) +
+		display.TestStderrRegexp(1, 1) +
+		display.TestTitleRegexp(1, 2) +
+		display.TestStderrRegexp(1, 2) +
+		display.TestTitleRegexp(1, 3) +
+		display.TestStderrRegexp(1, 3) +
+		display.ReportSuitePattern(1) +
+
+		display.SuiteInitRegexp(token, 2) +
+		display.TestTitleRegexp(2, 1) +
+		display.TestStderrRegexp(2, 1) +
+		display.TestTitleRegexp(2, 2) +
+		display.TestStderrRegexp(2, 2) +
+		display.ReportSuitePattern(2) +
+
+		display.SuiteInitRegexp(token, 3) +
+		display.TestTitleRegexp(3, 1) +
+		display.TestStderrRegexp(3, 1) +
+		display.TestTitleRegexp(3, 2) +
+		display.TestStderrRegexp(3, 2) +
+		display.ReportSuitePattern(3) +
+		"$")
+	assert.Regexp(t, errScenarioRegexp, anzi.Unformat(errW.String()))
+}
+
+func TestAsyncDisplayUsage_AsyncSuitesAsyncTests(t *testing.T) {
+	//t.Skip()
+	token := "foo70"
+	isol := "bar70"
+
+	var err error
+	err = repo.ClearWorkDirectory(token, isol)
+	require.NoError(t, err)
+
+	tmpDir := "/tmp/asyncdisplay.bar1002"
+	err = os.RemoveAll(tmpDir)
+	require.NoError(t, err)
+
+	outW := &strings.Builder{}
+	errW := &strings.Builder{}
+	outs := printz.NewOutputs(outW, errW)
+	d := New(tmpDir, true, outs)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	// Scénario: Writing async on 3 suites with tests ran async too
+	// 000- Start with Global
+	// 100- Init suite1
+	// 110- Test suite1 #1
+	// 120- Test suite1 #2
+	// 111- Test suite1 #1 out>
+	// 121- Test suite1 #2 out>
+	// 122- Test suite1 #2 err>
+	// 112- Test suite1 #1 err>
+	// 200- Init suite2
+	// 300- Init suite3
+	// 310- Test suite3 #1
+	// 311- Test suite3 #1 out>
+	// 210- Test suite2 #1
+	// 211- Test suite2 #1 out>
+	// 220- Test suite2 #2
+	// 221- Test suite2 #2 out>
+	// 212- Test suite2 #1 err>
+	// 222- Test suite2 #2 err>
+	// 270- Report suite2
+	// 130- Test suite1 #3
+	// 131- Test suite1 #3 out>
+	// 132- Test suite1 #3 err>
+	// 170- Report suite1
+	// 320- Test suite3 #2
+	// 312- Test suite3 #1 err>
+	// 321- Test suite3 #2 out>
+	// 322- Test suite3 #2 err>
+	// 370- Report suite3
+
+	gctx := facade.NewGlobalContext(token, isol, model.Config{})
+	d.Global(gctx)
+
+	display.DisplaySuite(d, token, isol, 1) // 100- Init suite1
+
+	td11 := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 1, 1) // 110- Test suite1 #1
+	td12 := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 1, 2) // 120- Test suite1 #2
+
+	display.DisplayTestOut(t, td11, 1, 1) // 111- Test suite1 #1 out>
+
+	display.DisplayTestOut(t, td12, 1, 2) // 121- Test suite1 #2 out>
+	display.DisplayTestErr(t, td12, 1, 2) // 122- Test suite1 #2 err>
+	display.DisplayEndTest(t, td12, 1, 2)
+
+	display.DisplayTestErr(t, td11, 1, 1) // 112- Test suite1 #1 err>
+	display.DisplayEndTest(t, td11, 1, 1)
+
+	display.DisplaySuite(d, token, isol, 2) // 200- Init suite2
+	display.DisplaySuite(d, token, isol, 3) // 300- Init suite3
+
+	td31 := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 3, 1) // 310- Test suite3 #1
+	display.DisplayTestOut(t, td31, 3, 1)                                // 311- Test suite3 #1 out>
+
+	td21 := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 2, 1) // 210- Test suite2 #1
+	display.DisplayTestOut(t, td21, 2, 1)                                // 211- Test suite2 #1 out>
+
+	td22 := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 2, 2) // 220- Test suite2 #2
+	display.DisplayTestOut(t, td22, 2, 2)                                // 221- Test suite2 #2 out>
+
+	display.DisplayTestErr(t, td21, 2, 1) // 212- Test suite2 #1 err>
+	display.DisplayEndTest(t, td21, 2, 1)
+
+	display.DisplayTestErr(t, td22, 2, 2) // 222- Test suite2 #2 err>
+	display.DisplayEndTest(t, td22, 2, 2)
+	display.DisplayReport(d, 2) // 270- Report suite2
+	display.CloseSuite(d, 2, token, isol)
+
+	td13 := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 1, 3) // 130- Test suite1 #3
+	display.DisplayTestOut(t, td13, 1, 3)                                // 131- Test suite1 #3 out>
+	display.DisplayTestErr(t, td13, 1, 3)                                // 132- Test suite1 #3 err>
+	display.DisplayEndTest(t, td13, 1, 3)
+	display.DisplayReport(d, 1) // 170- Report suite1
+	display.CloseSuite(d, 1, token, isol)
+
+	td32 := display.DisplayOpenTitleOutcomeTest(t, d, token, isol, 3, 2) // 320- Test suite3 #2
+
+	display.DisplayTestErr(t, td31, 3, 1) // 312- Test suite3 #1 err>
+	display.DisplayEndTest(t, td31, 3, 1)
+
+	display.DisplayTestOut(t, td32, 3, 2) // 321- Test suite3 #2 out>
+	display.DisplayTestErr(t, td32, 3, 2) // 322- Test suite3 #2 err>
+	display.DisplayEndTest(t, td32, 3, 2)
+
+	display.DisplayReport(d, 3) // 370- Report suite3
+	display.CloseSuite(d, 3, token, isol)
+
+	assert.Empty(t, outW.String())
+	assert.Empty(t, errW.String())
+
+	d.AsyncFlushAll(20 * time.Millisecond)
+	err = d.TailAllBlocking(20 * time.Millisecond)
+	require.NoError(t, err)
+
+	outScenarioRegexp := regexp.MustCompile("^" +
+		display.TestStdoutRegexp(1, 1) +
+		display.TestStdoutRegexp(1, 2) +
+		display.TestStdoutRegexp(1, 3) +
+
+		display.TestStdoutRegexp(2, 1) +
+		display.TestStdoutRegexp(2, 2) +
+
+		display.TestStdoutRegexp(3, 1) +
+		display.TestStdoutRegexp(3, 2) +
+		"$")
+	assert.Regexp(t, outScenarioRegexp, anzi.Unformat(outW.String()))
+
+	errScenarioRegexp := regexp.MustCompile("^" +
+		display.GlobalInitPattern(token) +
+		display.SuiteInitRegexp(token, 1) +
+		display.TestTitleRegexp(1, 1) +
+		display.TestStderrRegexp(1, 1) +
+		display.TestTitleRegexp(1, 2) +
+		display.TestStderrRegexp(1, 2) +
+		display.TestTitleRegexp(1, 3) +
+		display.TestStderrRegexp(1, 3) +
+		display.ReportSuitePattern(1) +
+
+		display.SuiteInitRegexp(token, 2) +
+		display.TestTitleRegexp(2, 1) +
+		display.TestStderrRegexp(2, 1) +
+		display.TestTitleRegexp(2, 2) +
+		display.TestStderrRegexp(2, 2) +
+		display.ReportSuitePattern(2) +
+
+		display.SuiteInitRegexp(token, 3) +
+		display.TestTitleRegexp(3, 1) +
+		display.TestStderrRegexp(3, 1) +
+		display.TestTitleRegexp(3, 2) +
+		display.TestStderrRegexp(3, 2) +
+		display.ReportSuitePattern(3) +
+		"$")
+	assert.Regexp(t, errScenarioRegexp, anzi.Unformat(errW.String()))
+}

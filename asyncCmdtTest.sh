@@ -31,7 +31,7 @@ die() {
 rm -rf -- /tmp/cmdt* /tmp/cmdt*.log /tmp/daemon*.log 2> /dev/null || true
 
 # Mandatory assertions
-"$scriptDir/assertCmdt.sh" "$cmdt"
+"$scriptDir/checkCmdt.sh" "$cmdt"
 
 
 cannotReinitMsg="cannot erase test suite"

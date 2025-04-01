@@ -1,4 +1,4 @@
-module github.com/mxbossard/cmdt
+module cmdt
 
 go 1.21.0
 
