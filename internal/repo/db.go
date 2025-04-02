@@ -112,7 +112,7 @@ func (r dbRepo) NotReportedTestCount() (n uint16) {
 
 func (r dbRepo) InitSuite(cfg model.Config) (err error) {
 	suite := cfg.TestSuite.Get()
-	err = r.ClearTestSuite(suite)
+	err = r.ClearSuite(suite)
 	if err != nil {
 		return
 	}
@@ -182,7 +182,7 @@ func (r dbRepo) GetSuiteConfig(testSuite string, initless bool) (cfg model.Confi
 	return
 }
 
-func (r dbRepo) ClearTestSuite(testSuite string) (err error) {
+func (r dbRepo) ClearSuite(testSuite string) (err error) {
 	err = r.testDao.DeleteTestsOfSuite(testSuite)
 	if err != nil {
 		return
@@ -202,8 +202,13 @@ func (r dbRepo) ClearTestSuite(testSuite string) (err error) {
 	return
 }
 
-func (r dbRepo) ListTestSuites() (suites []string, err error) {
+func (r dbRepo) ListReportableSuites() (suites []string, err error) {
 	suites, err = r.suiteDao.ListReportablePassedFailedErrored()
+	return
+}
+
+func (r dbRepo) ListAllSuites() (suites []string, err error) {
+	suites, err = r.suiteDao.ListPassedFailedErrored()
 	return
 }
 

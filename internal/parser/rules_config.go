@@ -22,10 +22,10 @@ var (
 	report = buildRule("report", ops(noOp[string](), equalSuiteName),
 		mutater(func(cfg *model.Config, op string, val string) {
 			if op == "=" {
-				cfg.ReportAll.Set(false)
+				cfg.GlobalReport.Set(false)
 				cfg.TestSuite.Set(val)
 			} else {
-				cfg.ReportAll.Set(true)
+				cfg.GlobalReport.Set(true)
 			}
 		}),
 		"r")

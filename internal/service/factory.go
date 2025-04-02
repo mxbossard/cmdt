@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"cmdt/internal/model"
+
 	"github.com/mxbossard/utilz/cmdz"
 	"github.com/mxbossard/utilz/collectionz"
 	"github.com/mxbossard/utilz/errorz"
@@ -513,7 +514,7 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 			if suiteName != "" {
 				c.TestSuite.Set(suiteName)
 			} else {
-				c.ReportAll.Set(true)
+				c.GlobalReport.Set(true)
 				//c.TestSuite.Clear()
 			}
 		case "test":
@@ -586,6 +587,8 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 			c.Isol, err = TranslateOptional(rule, DummyMapper, OperatorValidater[string]("="), NotEmptyValidater[string])
 		case "keep":
 			c.Keep, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
+		case "all":
+			c.ReportAll, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
 		case "parallel":
 		case "quiet":
 			c.Quiet, err = TranslateOptional(rule, BoolMapper, BooleanValidater)

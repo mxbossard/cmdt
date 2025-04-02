@@ -18,6 +18,7 @@ import (
 	"cmdt/internal/model"
 	"cmdt/internal/repo"
 	"cmdt/internal/service"
+
 	"github.com/mxbossard/utilz/collectionz"
 	"github.com/mxbossard/utilz/filez"
 	"github.com/mxbossard/utilz/printz"
@@ -246,7 +247,7 @@ func (d *daemon) reportAll(def model.ReportDefinition) (exitCode int16) {
 		testCount = d.repo.NotReportedTestCount()
 	}
 
-	exitCode = service.ProcessReportAllDef(def, true)
+	exitCode = service.ProcessGlobalReportDef(def, true)
 	logger.Debug("Closing all test suites", "token", def.Token, "isolation", def.Isolation)
 	d.openedSuites = []string{}
 	//d.display.Clear()

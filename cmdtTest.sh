@@ -79,10 +79,11 @@ newCmdt1_tk1="$newCmdt1 @token=$tk1"
 
 #tk=$( $cmdt0 @init @printToken )
 $cmdtIn @init=meta3 #@ignore
-$cmdtIn @test=meta3/ @stderr:"PASSED" @stderr:"#01" @-- $newCmdt1_tk1 true
-$cmdtIn @test=meta3/ @stderr:"PASSED" @stderr:"#02" @-- $newCmdt1_tk1 true
-$cmdtIn @test=meta3/ @stderr:"Successfully ran" @-- $newCmdt1_tk1 @report=main
-$cmdtIn @test=meta3/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=main @token=$tk0
+$cmdtIn @test=meta3/test1 @stderr:"PASSED" @stderr:"#01" @-- $newCmdt1_tk1 true
+$cmdtIn @test=meta3/test2 @stderr:"PASSED" @stderr:"#02" @-- $newCmdt1_tk1 true
+$cmdtIn @test=meta3/report @stderr:"Successfully ran" @stderr:"main" @-- $newCmdt1_tk1 @report=main
+$cmdtIn @test=meta3/report_other_token @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=main @token=empty_token
+#$cmdtIn @test=meta3/report2 @stderr:"Successfully ran" @stderr:"main" @-- $newCmdt1 @report=main @token=$tk0
 
 $cmdtIn @init=meta4 #@ignore
 $cmdtIn @test=meta4/ @stderr:"PASSED" @stderr:"#01" @-- $newCmdt1_tk1 @test=sub4/ true
@@ -154,14 +155,25 @@ $cmdtIn @test=rereport_and_keep/reportall4_keeping @stderr:"rereport_sub4" @-- $
 $cmdtIn @test=rereport_and_keep/rereportall4 @stderr:"rereport_sub4" @-- $newCmdt1 @report
 $cmdtIn @test=rereport_and_keep/rerereportall4 @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report
 
->&2 echo "## Test Suite re-report"
-$cmdtIn @init=re-report #@verbose=5
-$cmdtIn @test=re-report/init1 @-- $newCmdt1 @init=re-report_sub1 @verbose=5
-$cmdtIn @test=re-report/test1 @-- $newCmdt1 @test=re-report_sub1/testTrue true
-$cmdtIn @test=re-report/report1 @stderr:"re-report_sub1" @stderr!:"testTrue" @-- $newCmdt1 @report=re-report_sub1
-$cmdtIn @test=re-report/report2 @stderr:"re-report_sub1" @stderr!:"testTrue" @-- $newCmdt1 @report=re-report_sub1
-$cmdtIn @test=re-report/reportAll1 @stderr:"re-report_sub1" @stderr!:"testTrue" @-- $newCmdt1 @report
-$cmdtIn @test=re-report/reportAll2 @stderr:"re-report_sub1" @stderr!:"testTrue" @-- $newCmdt1 @report
+
+>&2 echo "## Test Suite re-report v2"
+$cmdtIn @init=re-report-v2 #@verbose=5
+$cmdtIn @test=re-report-v2/init1 @-- $newCmdt1 @init=re-report-v2_sub1 @verbose=5
+$cmdtIn @test=re-report-v2/test1 @-- $newCmdt1 @test=re-report-v2_sub1/testTrue true
+$cmdtIn @test=re-report-v2/report-suite1a @stderr:"re-report-v2_sub1" @stderr!:"testTrue" @-- $newCmdt1 @report=re-report-v2_sub1
+$cmdtIn @test=re-report-v2/report-suite1b @stderr:"re-report-v2_sub1" @stderr!:"testTrue" @-- $newCmdt1 @report=re-report-v2_sub1
+$cmdtIn @test=re-report-v2/report-global1a @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report
+$cmdtIn @test=re-report-v2/report-global-@all1a @stderr:"re-report-v2_sub1" @stderr:"Session duration" @stderr!:"testTrue" @-- $newCmdt1 @report @all
+$cmdtIn @test=re-report-v2/report-global1b @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report
+$cmdtIn @test=re-report-v2/report-global-@all1b @stderr:"re-report-v2_sub1" @stderr:"Session duration" @stderr!:"testTrue" @-- $newCmdt1 @report @all
+$cmdtIn @test=re-report-v2/report-suite1c @stderr:"re-report-v2_sub1" @stderr!:"Session duration" @stderr!:"testTrue" @-- $newCmdt1 @report=re-report-v2_sub1
+
+$cmdtIn @test=re-report-v2/init2 @-- $newCmdt1 @init=re-report-v2_sub2 @verbose=5
+$cmdtIn @test=re-report-v2/test2 @-- $newCmdt1 @test=re-report-v2_sub2/testTrue true
+$cmdtIn @test=re-report-v2/report-global2a @stderr:"re-report-v2_sub2" @stderr:"Session duration" @stderr!:"testTrue" @-- $newCmdt1 @report
+$cmdtIn @test=re-report-v2/report-global2b @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report
+$cmdtIn @test=re-report-v2/report-global-@all2a @stderr:"re-report-v2_sub2" @stderr:"Session duration" @stderr!:"testTrue" @-- $newCmdt1 @report @all
+$cmdtIn @test=re-report-v2/report-suite1a @stderr:"re-report-v2_sub2" @stderr!:"testTrue" @-- $newCmdt1 @report=re-report-v2_sub2
 
 
 >&2 echo "## Test usage"
@@ -214,6 +226,7 @@ $cmdtIn @test=outputs_assertions/ @fail "@stderr~/Failures running \[.*t1.*\] te
 >&2 echo "## Test namings"
 $cmdt @init=main 2> /dev/null
 $cmdtIn @init=naming
+$cmdtIn @test=naming/init @-- $newCmdt1 @init
 $cmdtIn @test=naming/ @stderr~"/Test \[main\].*name1 #01.../" @stderr:"PASSED" @-- $newCmdt1 true @test=name1
 $cmdtIn @test=naming/ @stderr~"/Test \[main\].*name2 #02.../" @stderr:"PASSED" @-- $newCmdt1 true @test=name2
 $cmdtIn @test=naming/ @stderr~"/Test \[main\].*/" @stderr:"true" @stderr:"#03..." @stderr:"PASSED" @-- $newCmdt1 true
@@ -466,6 +479,7 @@ $cmdtIn @test=test_flow/ @fail @stderr:"you can't use rule:" @-- $newCmdt1 @test
 $cmdtIn @test=test_flow/ @stderr:"#04" @stderr:ERROR @-- $newCmdt1 @test=flow/ doNotExists @stderr:"not executed" # Should error because of not executable
 $cmdtIn @test=test_flow/ @stderr:"#05" @stderr:PASSED @-- $newCmdt1 @test=flow/ true
 $cmdtIn @test=test_flow/ @fail @stderr:"3 success" @stderr:"2 error" @-- $newCmdt1 @report=flow
+$cmdtIn @test=test_flow/ @-- $newCmdt1 @init=flow
 $cmdtIn @test=test_flow/ @stderr:"#01" @stderr:PASSED @-- $newCmdt1 @test=flow/ true
 $cmdtIn @test=test_flow/ @stderr:"1 success" @-- $newCmdt1 @report=flow
 
@@ -646,6 +660,7 @@ testFile="/tmp/thisFileDoesNotExistsYet.txt"
 testFile2="/tmp/thisFileDoesNotExistsYet2.txt"
 rm -f @-- "$testFile" "$testFile2" 2> /dev/null || true
 $cmdtIn @init=before_after
+$cmdtIn @test=before_after/init @-- $newCmdt1 @init
 $cmdtIn @test=before_after/ @stderr:PASSED @-- $newCmdt1 ls "$testFile" @fail
 $cmdtIn @test=before_after/ @stderr:PASSED @-- $newCmdt1 ls "$testFile" @before="touch $testFile"
 $cmdtIn @test=before_after/ @stderr:PASSED @-- $newCmdt1 ls "$testFile"
@@ -658,6 +673,7 @@ $cmdtIn @test=before_after/ @-- $newCmdt1 @report=main
 
 >&2 echo "## Test @container"
 $cmdtIn @init=container #@keepOutputs #@debug=4 #@ignore #@keepOutputs
+$cmdtIn @test=container/init @-- $newCmdt1 @init
 $cmdtIn @test=container/run_off_container @stderr:PASSED @-- $newCmdt1 sh -c "cat --help 2>&1 | head -1" @stdout!:BusyBox
 $cmdtIn @test=container/run_in_container @stderr:PASSED @-- $newCmdt1 @container sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox
 $cmdtIn @test=container/ @stderr:PASSED @-- $newCmdt1 @container true
@@ -679,6 +695,7 @@ token="$__CMDT_TOKEN"
 export -n __CMDT_TOKEN
 
 $cmdtIn @init=container_wo_token #@keepOutputs #@ignore #@keepOutputs
+$cmdtIn @test=container_wo_token/init @-- $newCmdt1 @init
 $cmdtIn @test=container_wo_token/run_in_container @stderr:PASSED @-- $newCmdt1 @container sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox
 $cmdtIn @test=container_wo_token/ @stderr:PASSED @-- $newCmdt1 @container true
 $cmdtIn @test=container_wo_token/ @stderr:PASSED @-- $newCmdt1 @container @fail false
@@ -695,6 +712,7 @@ hostFile="/tmp/thisFileExistsOnHost.txt"
 rm -f @-- "$testFile" 2> /dev/null || true
 touch "$hostFile"
 $cmdtIn @init=ephemeralContainer #@keepOutputs #@ignore #@keepOutputs
+$cmdtIn @test=ephemeralContainer/init @-- $newCmdt1 @init
 $cmdtIn @test=ephemeralContainer/run_in_container @stderr:PASSED @-- $newCmdt1 @container sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox #check run inside container
 $cmdtIn @test=ephemeralContainer/ @stderr:PASSED @-- $newCmdt1 ls "$hostFile" @stdout:"$hostFile" # file exists on host
 $cmdtIn @test=ephemeralContainer/ @stderr:PASSED @-- $newCmdt1 ls "$testFile" @fail @stdout= @stderr:"$testFile" # file should not exist on host

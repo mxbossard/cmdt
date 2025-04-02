@@ -45,9 +45,10 @@ type Repo interface {
 
 	GetSuiteConfig(testSuite string, initless bool) (cfg model.Config, err error)
 
-	ClearTestSuite(testSuite string) (err error)
+	ClearSuite(testSuite string) (err error)
 
-	ListTestSuites() (suites []string, err error)
+	ListReportableSuites() (suites []string, err error)
+	ListAllSuites() (suites []string, err error)
 	ListSyncSuites() (suites []string, err error)
 	ListAsyncSuites() (suites []string, err error)
 	ListReportedAsyncSuites() (suites []string, err error)

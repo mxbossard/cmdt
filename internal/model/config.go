@@ -24,6 +24,7 @@ const (
 	DefaultInitedWait           = false
 	DefaultInitlessAsync        = false
 	DefaultInitlessWait         = true
+	DefaultReportAll            = false
 	StartDebugLevel             = WARN
 	DefaultDebugLevel           = DEBUG
 	DefaultTooMuchFailures      = 3
@@ -136,6 +137,7 @@ var (
 
 	ReportConfigs = []RuleDefinition{
 		ruleDef("keep", "", "="),
+		ruleDef("all", ""),
 	}
 
 	SyncConfigs = []RuleDefinition{
@@ -184,6 +186,7 @@ func NewGlobalDefaultConfig() Config {
 		Prefix:            utilz.OptionalOf(DefaultRulePrefix),
 		Async:             utilz.OptionalOf(DefaultAsync),
 		Wait:              utilz.OptionalOf(DefaultWait),
+		ReportAll:         utilz.OptionalOf(DefaultReportAll),
 		GlobalStartTime:   utilz.OptionalOf(time.Now()),
 		ForkCount:         utilz.OptionalOf(uint16(1)),
 		Ignore:            utilz.OptionalOf(false),
@@ -309,6 +312,7 @@ type Config struct {
 	// Test or TestSuite
 	PrintToken    utilz.Optional[bool]          `yaml:"-"`
 	ExportToken   utilz.Optional[bool]          `yaml:"-"`
+	GlobalReport  utilz.Optional[bool]          `yaml:"-"`
 	ReportAll     utilz.Optional[bool]          `yaml:"-"`
 	Keep          utilz.Optional[bool]          `yaml:""`
 	Verbose       utilz.Optional[VerboseLevel]  `yaml:""`
@@ -384,6 +388,7 @@ func (c *Config) Merge(right Config) {
 
 	c.PrintToken.Merge(right.PrintToken)
 	c.ExportToken.Merge(right.ExportToken)
+	c.GlobalReport.Merge(right.GlobalReport)
 	c.ReportAll.Merge(right.ReportAll)
 	c.Keep.Merge(right.Keep)
 	c.Quiet.Merge(right.Quiet)
