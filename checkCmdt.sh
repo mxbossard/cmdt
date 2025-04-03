@@ -116,8 +116,9 @@ assertions() {
 	>&2 echo "## re reporting should succeed"
 	rc=0
 	$cmdt @report=should_succeed > "$of" 2>&1 || rc=$?
-	test "$rc" -eq 1 || addError "re reporting should_succeed should exit=1"
-	grep "you must perform" "$of" || addError "reporting no test should log a message"
+	test "$rc" -eq 0 || addError "re reporting should_succeed should exit=0"
+	#grep "you must perform" "$of" || addError "reporting no test should log a message"
+	grep "28 success" "$of" || addError "reporting should_succeed bad success count"
 
 	>&2 echo "## reporting should_ignore"
 	rc=0

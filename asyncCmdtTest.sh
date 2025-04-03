@@ -4,7 +4,6 @@ scriptDir=$( dirname $( readlink -f $0 ) )
 
 . $scriptDir/buildCmdt.sh
 newCmdt="$BUILT_CMDT_BIN"
-ls -lh "$newCmdt"
 
 # Trusted cmdt to works
 cmdt="cmdt"

@@ -17,6 +17,7 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o "$BUILT_CMDT_BIN" -tags netgo 
 
 cd - > /dev/null
 
+ls -lh "$BUILT_CMDT_BIN"
 >&2 echo "Built $BUILT_CMDT_BIN cmdt binary."
 >&2 echo
 

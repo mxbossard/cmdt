@@ -713,7 +713,7 @@ func BuildAssertion(cfg model.Config, ruleExpr string) (ok bool, assertion model
 			if err != nil {
 				return
 			}
-			assertion.Expected = regexpPattern.String()
+			//assertion.Expected = regexpPattern.String()
 			assertion.Asserter = func(cmd cmdz.Executer) (res model.AssertionResult, err error) {
 				res.Value = cmd.StdoutRecord()
 				if assertion.Rule.Op == "~" {
@@ -755,7 +755,7 @@ func BuildAssertion(cfg model.Config, ruleExpr string) (ok bool, assertion model
 			if err != nil {
 				return
 			}
-			assertion.Expected = regexpPattern.String()
+			//assertion.Expected = regexpPattern.String()
 			assertion.Asserter = func(cmd cmdz.Executer) (res model.AssertionResult, err error) {
 				res.Value = cmd.StderrRecord()
 				if assertion.Rule.Op == "~" {

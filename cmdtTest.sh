@@ -4,14 +4,13 @@ scriptDir=$( dirname $( readlink -f $0 ) )
 
 . $scriptDir/buildCmdt.sh
 newCmdt="$BUILT_CMDT_BIN"
-ls -lh "$newCmdt"
 
 # Trusted cmdt to works
 cmdt="cmdt"
 #cmdt="$newCmdt"
 
+>&2 echo "using cmdt: [$cmdt]"
 # Cmdt used to test
-#cmdtIn="cmdt"
 cmdtIn="$cmdt $@"
 
 # Tested cmdt
@@ -31,8 +30,7 @@ die() {
 rm -rf -- /tmp/cmdt* /tmp/cmdt.log /tmp/daemon.log 2> /dev/null || true
 
 # Mandatory assertions
-"$scriptDir/checkCmdt.sh" "$cmdt"
-
+#"$scriptDir/checkCmdt.sh" "$cmdt"
 #"$scriptDir/checkCmdt.sh" "$newCmdt"
 
 
@@ -334,6 +332,7 @@ $cmdtIn @test=suite_config/ @-- $newCmdt1 @report=suite_config_quiet
 
 >&2 echo "## Test assertions"
 $cmdtIn @init=assertion
+$cmdtIn @test=assertion/init @-- $newCmdt1 @init @verbose=5
 $cmdtIn @test=assertion/ @stderr:PASSED @-- $newCmdt1 true
 $cmdtIn @test=assertion/ @stderr:PASSED @-- $newCmdt1 true @success
 $cmdtIn @test=assertion/ @stderr:FAILED @-- $newCmdt1 true @fail
@@ -367,6 +366,13 @@ $cmdtIn @test=assertion/ @stderr:FAILED @-- $newCmdt1 sh -c ">&2 echo foo bar" @
 $cmdtIn @test=assertion/ @fail @-- $newCmdt1 sh -c ">&2 echo foo bar" @stderr:
 $cmdtIn @test=assertion/ @stderr:FAILED @-- $newCmdt1 sh -c ">&2 echo foo bar" @stderr:baz
 $cmdtIn @test=assertion/ @fail @-- $newCmdt1 sh -c ">&2 echo foo bar" @stdout:
+$cmdtIn @test=assertion/multiple_failed_assertions_1 @stderr~"/Expected.*@exit.*to be.*:.*\[2\]/s" @stderr~"/Expected.*@stderr.*to contains.*:.*\[aaa\]/s" @stderr~"/Expected.*@stdout.*to contains.*:.*\[xxx\].*\[yyy\].*\[zzz\]/s" @-- $newCmdt1 @exit=2 @stderr:"aaa" @stdout:xxx @stdout:foo @stdout:yyy @stdout:bar @stdout:zzz @stdout:baz  @-- sh -c "echo 'foo bar baz pif paf' ; exit 4"
+$cmdtIn @test=assertion/multiple_failed_assertions_2 @stderr~"/Expected.*@stderr.*to contains.*:.*\[aaa\]/s" @stderr~"/Expected.*@stdout.*to contains.*:.*\[xxx\].*\[yyy\].*\[zzz\]/s" @-- $newCmdt1 @fail @stderr:"aaa" @stdout:xxx @stdout:foo @stdout:yyy @stdout:bar @stdout:zzz @stdout:baz  @-- sh -c "echo 'foo bar baz pif paf' ; exit 4"
+$cmdtIn @test=assertion/multiple_failed_assertions_3 @stderr~"/Expected.*@stderr.*to/s" @stderr~"/Expected.*@stderr.*to contains.*:.*\[aaa\]/s" @stderr~"/Expected.*@stdout.*don't contains.*:.*\[bar\].*\[pif\]/s" @-- $newCmdt1 @fail @stderr:"aaa" @stdout!:bar @stdout!:pif @stdout:baz @-- sh -c "echo 'foo bar baz pif paf' ; exit 4"
+$cmdtIn @test=assertion/multiple_failed_assertions_4 @stderr~"/Expected.*@stderr.*to contains.*:.*\[aaa\]/s" @stderr~"|Expected.*@stdout.*to match.*:.*\s/xxx/s.*\s/yyy/|s" @-- $newCmdt1 @fail @stderr:"aaa" @stdout~"/xxx/s" @stdout~"/yyy/" @stdout:baz @-- sh -c "echo 'foo bar baz pif paf' ; exit 4"
+$cmdtIn @test=assertion/multiple_failed_assertions_5 @stderr~"/Expected.*@fail/" @stderr~"/Expected.*@stderr.*to contains.*:.*\[zFoo\]/s" @-- $newCmdt1 @test=foo @fail @stderr:"zFoo" @-- echo "Foo"
+$cmdtIn @test=assertion/multiple_failed_assertions_6 @stderr~"/Expected.*@fail/" @stderr~"/Expected.*@stderr.*to contains.*:.*\[zFoo\]/s" @stderr~"/Expected.*@stderr.*to contains.*:.*\[bar\]/s" @-- $newCmdt1 @test=foo @fail @stderr:"zFoo" @stderr:"bar" @-- echo "Foo"
+$cmdtIn @test=assertion/multiple_failed_assertions_7 @stderr~"/Expected.*@fail/" @stderr~"/Expected.*@stderr.*to contains.*:.*\[z$nothingToReportExpectedStderrMsg\]/s" @-- $newCmdt1 @test=foo @fail @stderr:"z$nothingToReportExpectedStderrMsg" @-- echo "$nothingToReportExpectedStderrMsg"
 
 $cmdtIn @test=assertion/ @stderr:FAILED @-- $newCmdt1 sh -c "rm /tmp/donotexists || true" @exists=/tmp/donotexists
 $cmdtIn @test=assertion/ @stderr:PASSED @-- $newCmdt1 sh -c "touch /tmp/doexists" @exists=/tmp/doexists

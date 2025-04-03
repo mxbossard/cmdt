@@ -13,6 +13,7 @@ import (
 	"cmdt/internal/model"
 	"cmdt/internal/repo"
 	"cmdt/internal/utils"
+
 	"github.com/mxbossard/utilz/cmdz"
 	"github.com/mxbossard/utilz/errorz"
 	"github.com/mxbossard/utilz/utilz"
@@ -359,6 +360,7 @@ func (c TestContext) AssertCmdExecBlocking(seq uint16, assertions []model.Assert
 		}
 		c.IncrementErroredCount()
 	} else {
+		logger.Debug("Asserting command execution ...", "seq", seq, "assertions", assertions)
 		outcome.ExitCode = int16(exitCode)
 
 		var failedResults []model.AssertionResult
@@ -384,6 +386,7 @@ func (c TestContext) AssertCmdExecBlocking(seq uint16, assertions []model.Assert
 			outcome.Outcome = model.FAILED
 			c.IncrementFailedCount()
 		}
+		logger.Info("Asserted command execution", "seq", seq, "outcome", outcome.Outcome, "failedResults", failedResults)
 	}
 
 	err = c.Repo.SaveTestOutcome(outcome)

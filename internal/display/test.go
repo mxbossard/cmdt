@@ -7,6 +7,7 @@ import (
 
 	"cmdt/internal/facade"
 	"cmdt/internal/model"
+
 	"github.com/mxbossard/utilz/anzi"
 	"github.com/mxbossard/utilz/formatz"
 	"github.com/mxbossard/utilz/inoutz"
@@ -157,9 +158,6 @@ func (d *basicTestDisplayer) Outcome(outcome model.TestOutcome) {
 	}
 
 	if len(outcome.AssertionResults) > 0 {
-		// for _, asseriontResult := range outcome.AssertionResults {
-		// 	d.assertionResult(asseriontResult)
-		// }
 		d.assertionResults(outcome.AssertionResults)
 	}
 
@@ -170,76 +168,12 @@ func (d *basicTestDisplayer) Outcome(outcome model.TestOutcome) {
 	}
 }
 
-func (d basicTestDisplayer) assertionResult(result model.AssertionResult) {
-	defer d.flush()
-	hlClr := ReportColor
-	//log.Printf("failedResult: %v\n", result)
-	assertPrefix := result.Rule.Prefix
-	assertName := result.Rule.Name
-	assertOp := result.Rule.Op
-	expected := result.Rule.Expected
-	got := result.Value
-
-	if result.ErrMessage != "" {
-		d.printer.ColoredErrf(ErrorColor, result.ErrMessage+"\n")
-	}
-
-	assertLabel := formatz.Sprintf(TestColor, "%s%s", assertPrefix, assertName)
-
-	if assertName == "success" || assertName == "fail" {
-		d.printer.Errf("\t%sExpected%s %s\n", hlClr, ResetColor, assertLabel)
-		//d.Stdout(cmd.StdoutRecord())
-		//d.Stderr(cmd.StderrRecord())
-		/*
-			if cmd.StderrRecord() != "" {
-				d.printer.Errf("sdterr> %s\n", cmd.StderrRecord())
-			}
-		*/
-		return
-	} else if assertName == "cmd" {
-		d.printer.Errf("\t%sExpected%s %s=%s to succeed\n", hlClr, ResetColor, assertLabel, expected)
-		return
-	} else if assertName == "exists" {
-		d.printer.Errf("\t%sExpected%s file %s=%s file to exists\n", hlClr, ResetColor, assertLabel, expected)
-		return
-	}
-
-	var stringifiedGot string
-	if !result.Success {
-		expected = strings.ReplaceAll(expected, "\n", "\\n")
-		if s, ok := got.(string); ok {
-			s = strings.ReplaceAll(s, "\n", "\\n")
-			got = s
-
-			stringifiedGot = anzi.TruncateMid(s, 100, "[...]")
-		} else {
-			stringifiedGot = fmt.Sprintf("%v", got)
-			//panic(fmt.Sprintf("unable to stringify rule %s value: [%v]", assertName, got))
-		}
-
-		if assertOp == "=" || assertOp == "@=" {
-			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto be%s:\t\t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, assertLabel, hlClr, ResetColor, expected, hlClr, ResetColor, stringifiedGot)
-		} else if assertOp == ":" || assertOp == "@:" {
-			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto contains%s:\t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, assertLabel, hlClr, ResetColor, expected, hlClr, ResetColor, stringifiedGot)
-		} else if assertOp == "!:" {
-			d.printer.Errf("\t%sExpected%s %s \n\t%sdon't contains%s:\t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, assertLabel, hlClr, ResetColor, expected, hlClr, ResetColor, stringifiedGot)
-		} else if assertOp == "~" {
-			d.printer.Errf("\t%sExpected%s %s \n\t\t%sto match%s:\t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, assertLabel, hlClr, ResetColor, expected, hlClr, ResetColor, stringifiedGot)
-		} else if assertOp == "!~" {
-			d.printer.Errf("\t%sExpected%s %s \n\t\t%sdon't match%s:\t[%s]\n\t\t%sbut got%s: \t[%v]\n", hlClr, ResetColor, assertLabel, hlClr, ResetColor, expected, hlClr, ResetColor, stringifiedGot)
-		}
-	} else {
-		d.printer.Errf("assertion %s%s%s failed\n", assertLabel, assertOp, expected)
-	}
-}
-
 func (d basicTestDisplayer) assertionResults(results []model.AssertionResult) {
 	defer d.flush()
 
 	// Sort results grouped by types
 	resultsMap := make(map[string][]model.AssertionResult)
 	for _, result := range results {
-		// key := fmt.Sprintf("%s-%s", result.Name, result.Op)
 		key := result.Name
 		col, ok := resultsMap[key]
 		if !ok {
@@ -255,7 +189,6 @@ func (d basicTestDisplayer) assertionResults(results []model.AssertionResult) {
 		//log.Printf("failedResult: %v\n", result)
 		assertPrefix := ruleResults[0].Prefix
 		assertName := ruleResults[0].Name
-		//assertOp := ruleResults[0].Op
 
 		for _, result := range ruleResults {
 			if result.ErrMessage != "" {
@@ -269,20 +202,10 @@ func (d basicTestDisplayer) assertionResults(results []model.AssertionResult) {
 			expected := result.Expected
 			if assertName == "success" || assertName == "fail" {
 				d.printer.Errf("\t%sExpected%s %s\n", hlClr, ResetColor, assertLabel)
-				//d.Stdout(cmd.StdoutRecord())
-				//d.Stderr(cmd.StderrRecord())
-				/*
-					if cmd.StderrRecord() != "" {
-						d.printer.Errf("sdterr> %s\n", cmd.StderrRecord())
-					}
-				*/
-				return
 			} else if assertName == "cmd" {
 				d.printer.Errf("\t%sExpected%s %s=%s to succeed\n", hlClr, ResetColor, assertLabel, expected)
-				return
 			} else if assertName == "exists" {
 				d.printer.Errf("\t%sExpected%s file %s=%s file to exists\n", hlClr, ResetColor, assertLabel, expected)
-				return
 			}
 		}
 
@@ -297,19 +220,6 @@ func (d basicTestDisplayer) assertionResults(results []model.AssertionResult) {
 				if firstError {
 					firstError = false
 					printButGot = true
-					/*
-						if assertOp == "=" || assertOp == "@=" {
-							d.printer.Errf("\t%sExpected%s %s \n\t\t%sto be%s:", hlClr, ResetColor, assertLabel, hlClr, ResetColor)
-						} else if assertOp == ":" || assertOp == "@:" {
-							d.printer.Errf("\t%sExpected%s %s \n\t\t%sto contains%s:", hlClr, ResetColor, assertLabel, hlClr, ResetColor)
-						} else if assertOp == "!:" {
-							d.printer.Errf("\t%sExpected%s %s \n\t\t%sdon't contains%s:", hlClr, ResetColor, assertLabel, hlClr, ResetColor)
-						} else if assertOp == "~" {
-							d.printer.Errf("\t%sExpected%s %s \n\t\t%sto match%s:", hlClr, ResetColor, assertLabel, hlClr, ResetColor)
-						} else if assertOp == "!~" {
-							d.printer.Errf("\t%sExpected%s %s \n\t\t%sdon't match%s:", hlClr, ResetColor, assertLabel, hlClr, ResetColor)
-						}
-					*/
 					d.printer.Errf("\t%sExpected%s %s", hlClr, ResetColor, assertLabel)
 				}
 				if lastOperator != assertOp {
@@ -326,7 +236,12 @@ func (d basicTestDisplayer) assertionResults(results []model.AssertionResult) {
 					}
 				}
 				lastOperator = assertOp
-				d.printer.Errf("\t[%s]", expected)
+				if assertOp == "~" || assertOp == "!~" {
+					d.printer.Errf("\t%s", expected)
+				} else {
+					d.printer.Errf("\t[%s]", expected)
+				}
+
 			} else {
 				d.printer.Errf("assertion %s%s%s failed\n", assertLabel, assertOp, expected)
 			}
