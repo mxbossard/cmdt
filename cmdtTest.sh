@@ -156,6 +156,7 @@ $cmdtIn @test=rereport_and_keep/rerereportall4 @fail @stderr:"$nothingToReportEx
 
 >&2 echo "## Test Suite re-report v2"
 $cmdtIn @init=re-report-v2 #@verbose=5
+# report suite, report global, report @all, re-report
 $cmdtIn @test=re-report-v2/init1 @-- $newCmdt1 @init=re-report-v2_sub1 @verbose=5
 $cmdtIn @test=re-report-v2/test1 @-- $newCmdt1 @test=re-report-v2_sub1/testTrue true
 $cmdtIn @test=re-report-v2/report-suite1a @stderr:"re-report-v2_sub1" @stderr!:"testTrue" @-- $newCmdt1 @report=re-report-v2_sub1
@@ -166,12 +167,22 @@ $cmdtIn @test=re-report-v2/report-global1b @fail @stderr:"$nothingToReportExpect
 $cmdtIn @test=re-report-v2/report-global-@all1b @stderr:"re-report-v2_sub1" @stderr:"Session duration" @stderr!:"testTrue" @-- $newCmdt1 @report @all
 $cmdtIn @test=re-report-v2/report-suite1c @stderr:"re-report-v2_sub1" @stderr!:"Session duration" @stderr!:"testTrue" @-- $newCmdt1 @report=re-report-v2_sub1
 
+# report global, report all, report suite
 $cmdtIn @test=re-report-v2/init2 @-- $newCmdt1 @init=re-report-v2_sub2 @verbose=5
 $cmdtIn @test=re-report-v2/test2 @-- $newCmdt1 @test=re-report-v2_sub2/testTrue true
 $cmdtIn @test=re-report-v2/report-global2a @stderr:"re-report-v2_sub2" @stderr:"Session duration" @stderr!:"testTrue" @-- $newCmdt1 @report
 $cmdtIn @test=re-report-v2/report-global2b @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report
 $cmdtIn @test=re-report-v2/report-global-@all2a @stderr:"re-report-v2_sub2" @stderr:"Session duration" @stderr!:"testTrue" @-- $newCmdt1 @report @all
 $cmdtIn @test=re-report-v2/report-suite1a @stderr:"re-report-v2_sub2" @stderr!:"testTrue" @-- $newCmdt1 @report=re-report-v2_sub2
+
+# report then continue testing
+$cmdtIn @test=re-report-v2/init3 @-- $newCmdt1 @init=re-report-v2_sub3 @verbose=5
+$cmdtIn @test=re-report-v2/test3a @stderr:"#01" @-- $newCmdt1 @test=re-report-v2_sub3/testTrue true
+$cmdtIn @test=re-report-v2/report-global3a @stderr:"re-report-v2_sub3" @stderr:"Session duration" @stderr!:"testTrue" @stderr:"1 success" @-- $newCmdt1 @report
+$cmdtIn @test=re-report-v2/report-global3b @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report
+$cmdtIn @test=re-report-v2/test3b @stderr:"#02" @-- $newCmdt1 @test=re-report-v2_sub3/testTrue true
+$cmdtIn @test=re-report-v2/report-global3c @stderr:"re-report-v2_sub3" @stderr:"Session duration" @stderr!:"testTrue" @stderr:"2 success" @-- $newCmdt1 @report
+$cmdtIn @test=re-report-v2/report-global3d @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report
 
 
 >&2 echo "## Test usage"

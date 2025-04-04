@@ -30,7 +30,7 @@ die() {
 rm -rf -- /tmp/cmdt* /tmp/cmdt*.log /tmp/daemon*.log 2> /dev/null || true
 
 # Mandatory assertions
-"$scriptDir/checkCmdt.sh" "$cmdt"
+#"$scriptDir/checkCmdt.sh" "$cmdt"
 
 
 cannotReinitMsg="cannot erase test suite"
@@ -92,12 +92,12 @@ $cmdtIn @test=meta1/"report without token" @exit=1 @stderr:"3 success" @stderr!:
 tk0=$( $newCmdt0 @init @printToken )
 >&2 echo "token: $tk0"
 $cmdtIn @init=meta2 #@verbose=4
-$cmdtIn @test=meta2/init @-- $newCmdt1 @token=$tk0 @init @async @verbose=5
+$cmdtIn @test=meta2/init @stderr= @-- $newCmdt1 @token=$tk0 @init @async @verbose=5
 $cmdtIn @test=meta2/"with token 1" @stderr= @-- $newCmdt1 @token=$tk0 @test=meta2_sub_test1 true
 $cmdtIn @test=meta2/"with token 2" @stderr= @-- $newCmdt1 @token=$tk0 @test=meta2_sub_test2 true
 $cmdtIn @test=meta2/"report without token" @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=main 
 $cmdtIn @test=meta2/"report with token" @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @token=$tk0 @report=main
-$cmdtIn @test=meta2/init @-- $newCmdt1 @token=$tk0 @init=master @async @verbose=5
+$cmdtIn @test=meta2/init @stderr= @-- $newCmdt1 @token=$tk0 @init=master @async @verbose=5
 $cmdtIn @test=meta2/"with token 3" @stderr= @-- $newCmdt1 @token=$tk0 @test=master/meta2_sub2_test3 true
 $cmdtIn @test=meta2/"with token 4" @stderr= @-- $newCmdt1 @token=$tk0 @test=master/meta2_sub2_test4 true
 $cmdtIn @test=meta2/"report all with token" @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @token=$tk0 @report

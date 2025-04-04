@@ -112,9 +112,14 @@ func (r dbRepo) NotReportedTestCount() (n uint16) {
 
 func (r dbRepo) InitSuite(cfg model.Config) (err error) {
 	suite := cfg.TestSuite.Get()
-	err = r.ClearSuite(suite)
-	if err != nil {
-		return
+
+	n := r.TestCount(suite)
+	if n > 0 {
+		err = r.ClearSuite(suite)
+		if err != nil {
+			return
+		}
+		fmt.Fprintf(os.Stderr, "Cleared suite: [%s] (contained %d tests)\n", suite, n)
 	}
 
 	err = r.SaveSuiteConfig(cfg)
@@ -198,6 +203,7 @@ func (r dbRepo) ClearSuite(testSuite string) (err error) {
 	if err != nil {
 		return
 	}
+
 	logger.Info("Cleared suite from repo", "suite", testSuite)
 	return
 }
@@ -238,7 +244,12 @@ func (r dbRepo) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 		// FIXME: which outcome to keep ?
 		// An ignored test does not imply an ignored suite
 		err = r.suiteDao.UpdateSuiteOutcome(outcome.TestSuite, outcome.Outcome)
+		if err != nil {
+			return
+		}
 	}
+
+	err = r.suiteDao.MarkSuiteReported(outcome.TestSuite, false, false)
 	return
 }
 
@@ -255,11 +266,11 @@ func (r dbRepo) UpdateLastTestTime(testSuite string) {
 }
 
 func (r dbRepo) MarkSuiteReported(suite string, kept bool) (err error) {
-	return r.suiteDao.MarkSuiteReported(suite, kept)
+	return r.suiteDao.MarkSuiteReported(suite, true, kept)
 }
 
 func (r dbRepo) MarkReportedAll() (err error) {
-	return r.suiteDao.MarkSuiteReported("", false)
+	return r.suiteDao.MarkSuiteReported("", true, false)
 }
 
 func (r dbRepo) SuiteStatus(suite string) (exists, reported, kept bool, err error) {

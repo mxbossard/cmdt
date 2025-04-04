@@ -104,13 +104,13 @@ func globalReport(ctx facade.GlobalContext, asyncMode bool) (exitCode int16, err
 		}
 	}
 
-	if nothingToReport {
-		err = fmt.Errorf("you must perform some test prior to report all suites")
+	if len(testSuites) > 0 && !goodModeSuite {
+		// No suites in supplied async mode => Nothing to report.
 		return
 	}
 
-	if !goodModeSuite {
-		// No suites in supplied async mode => Nothing to report.
+	if nothingToReport {
+		err = fmt.Errorf("you must perform some test prior to report all suites")
 		return
 	}
 
@@ -510,7 +510,6 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				asyncDpl := asyncdisplay.New(globalCtx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
 
 				// always wait
-				// if globalCtx.Config.Wait.Is(true) {
 				wait = func() int16 {
 					// FIXME: bad timeout
 					asyncExitCode, err = globalCtx.Repo.WaitOperationDone(&op, globalCtx.Config.SuiteTimeout.GetOr(defaultGlobalTimeout))
@@ -539,7 +538,6 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 					err = cliAfterSuiteReport(daemonToken, daemonIsol, suite, asyncDpl)
 					ProcessGlobalError(globalCtx, err)
 				}
-
 			}
 
 			Dpl.ReportAllFooter(globalCtx)

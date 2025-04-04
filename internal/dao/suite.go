@@ -230,15 +230,15 @@ func (d Suite) UpdateSuiteOutcome(suite string, outcome model.Outcome) (err erro
 	return
 }
 
-func (d Suite) MarkSuiteReported(suite string, kept bool) (err error) {
+func (d Suite) MarkSuiteReported(suite string, reported, kept bool) (err error) {
 	p := logger.PerfTimer("suite", suite, "kept", kept)
 	defer p.End()
 
 	now := time.Now()
 	_, err = d.db.Exec(`
-		UPDATE suite SET reported = 1, kept = ?, lastReportTime = ?
+		UPDATE suite SET reported = ?, kept = ?, lastReportTime = ?
 		WHERE name = ?
-	`, kept, now.UnixMicro(), suite)
+	`, reported, kept, now.UnixMicro(), suite)
 	return
 }
 
@@ -279,7 +279,7 @@ func (d Suite) ListPassedFailedErrored() (suites []string, err error) {
 	rows, err := d.db.Query(`
 		SELECT s.name
 		FROM suite s
-		WHERE s.startTime IS NOT NULL
+		WHERE s.name <> '' AND s.startTime IS NOT NULL
 		ORDER BY s.outcomeOrder ASC, s.startTime ASC
 	`) // s.outcome IN ('PASSED', 'FAILED', 'ERRORED') AND
 	if err != nil {
@@ -305,7 +305,7 @@ func (d Suite) ListReportablePassedFailedErrored() (suites []string, err error) 
 	rows, err := d.db.Query(`
 		SELECT s.name
 		FROM suite s
-		WHERE s.startTime IS NOT NULL
+		WHERE s.name <> '' AND s.startTime IS NOT NULL
 		    AND s.reported = 0 OR s.kept = 1
 		ORDER BY s.outcomeOrder ASC, s.startTime ASC
 	`) // s.outcome IN ('PASSED', 'FAILED', 'ERRORED') AND
@@ -332,7 +332,7 @@ func (d Suite) ListSync() (suites []string, err error) {
 	rows, err := d.db.Query(`
 		SELECT s.name
 		FROM suite s
-		WHERE name <> '' AND s.startTime IS NOT NULL AND s.async = 0
+		WHERE s.name <> '' AND s.startTime IS NOT NULL AND s.async = 0
 	`)
 	if err != nil {
 		return
@@ -357,7 +357,7 @@ func (d Suite) ListAsync() (suites []string, err error) {
 	rows, err := d.db.Query(`
 		SELECT s.name
 		FROM suite s
-		WHERE name <> '' AND s.startTime IS NOT NULL AND s.async = 1
+		WHERE s.name <> '' AND s.startTime IS NOT NULL AND s.async = 1
 	`)
 	if err != nil {
 		return
@@ -382,7 +382,7 @@ func (d Suite) ListReportedAsync() (suites []string, err error) {
 	rows, err := d.db.Query(`
 		SELECT s.name
 		FROM suite s
-		WHERE name <> '' AND s.startTime IS NOT NULL AND s.async = 1 AND s.reported = 1
+		WHERE s.name <> '' AND s.startTime IS NOT NULL AND s.async = 1 AND s.reported = 1
 	`)
 	if err != nil {
 		return
@@ -409,7 +409,7 @@ func (d Suite) FindGlobalConfig() (cfg *model.Config, err error) {
 	row := d.db.QueryRow(`
 		SELECT s.config, s.lastReportTime
 		FROM suite s
-		WHERE name = '';
+		WHERE s.name = '';
 	`)
 	err = row.Scan(&serializedConfig, &lastReportTime)
 	if err == sql.ErrNoRows {
@@ -437,7 +437,7 @@ func (d Suite) FindSuiteConfig(testSuite string) (cfg *model.Config, err error) 
 	row := d.db.QueryRow(`
 		SELECT s.config, s.startTime, s.endTime, s.lastReportTime, s.outcome, s.seq, s.async
 		FROM suite s
-		WHERE name = @suite;
+		WHERE s.name = @suite;
 	`, sql.Named("suite", testSuite))
 	err = row.Scan(&serializedConfig, &startTime, &endTime, &lastReportTime, &outcome, &seq, &async)
 	if err == sql.ErrNoRows {
