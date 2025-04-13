@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"testing"
 
+	"cmdt/internal/model"
+
+	"github.com/mxbossard/utilz/errorz"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"cmdt/internal/model"
-	"github.com/mxbossard/utilz/errorz"
 )
 
 func TestApplyConfig(t *testing.T) {
@@ -90,7 +91,7 @@ func TestBuildAssertion(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, "stdout", assertion.Name)
 	assert.Equal(t, "~", assertion.Op)
-	assert.Equal(t, "(?i)baz", assertion.Expected)
+	assert.Equal(t, "/baz/i", assertion.Expected)
 
 	_, assertion, err = BuildAssertion(cfg, "@stdout~/baz")
 	assert.Error(t, err)
