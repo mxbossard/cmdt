@@ -37,8 +37,6 @@ type Repo interface {
 
 	GetGlobalConfig() (cfg model.Config, err error)
 
-	NotReportedTestCount() (n uint16)
-
 	InitSuite(cfg model.Config) (err error)
 
 	SaveSuiteConfig(cfg model.Config) (err error)
@@ -48,6 +46,7 @@ type Repo interface {
 	ClearSuite(testSuite string) (err error)
 
 	ListReportableSuites() (suites []string, err error)
+	ListReportableSuitesByMode(asyncMode, all bool) (suites []string, err error)
 	ListAllSuites() (suites []string, err error)
 	ListSyncSuites() (suites []string, err error)
 	ListAsyncSuites() (suites []string, err error)
@@ -62,13 +61,16 @@ type Repo interface {
 	LoadSuiteOutcome(testSuite string) (outcome model.SuiteOutcome, err error)
 
 	MarkSuiteReported(suite string, kept bool) (err error)
-	MarkReportedAll() (err error)
+	MarkSuitesReported(all bool) (err error)
 
 	SuiteStatus(suite string) (exists, reported, kept bool, err error)
 
 	IncrementSuiteSeq(testSuite, name string) (n uint16)
 
+	NotReportedTestCount() (n uint16)
 	TestCount(testSuite string) (n uint16)
+	ToReportTestCountByMode(asyncMode, all bool) (n uint16)
+	ToReportTestCountBySuiteAndMode(testSuite string, asyncMode, all bool) (n uint16)
 
 	PassedCount(testSuite string) (n uint16)
 
@@ -79,6 +81,8 @@ type Repo interface {
 	ErroredCount(testSuite string) (n uint16)
 
 	TooMuchCount(testSuite string) (n uint16)
+
+	IgnoredSuiteCount(reportAll bool) (n uint16)
 
 	QueueOperation(op model.Operater) (err error)
 

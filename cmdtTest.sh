@@ -33,6 +33,7 @@ rm -rf -- /tmp/cmdt* /tmp/cmdt.log /tmp/daemon.log 2> /dev/null || true
 #"$scriptDir/checkCmdt.sh" "$cmdt"
 #"$scriptDir/checkCmdt.sh" "$newCmdt"
 
+ignoreContainers="@ignore"
 
 # Clear context
 export -n __CMDT_TOKEN
@@ -689,7 +690,7 @@ $cmdtIn @test=before_after/ @-- $newCmdt1 @report=main
 
 
 >&2 echo "## Test @container"
-$cmdtIn @init=container #@keepOutputs #@debug=4 #@ignore #@keepOutputs
+$cmdtIn @init=container $ignoreContainers #@keepOutputs #@debug=4 #@ignore #@keepOutputs
 $cmdtIn @test=container/init @-- $newCmdt1 @init
 $cmdtIn @test=container/run_off_container @stderr:PASSED @-- $newCmdt1 sh -c "cat --help 2>&1 | head -1" @stdout!:BusyBox
 $cmdtIn @test=container/run_in_container @stderr:PASSED @-- $newCmdt1 @container sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox
@@ -711,7 +712,7 @@ $cmdtIn @test=container/ @fail @-- $newCmdt1 @report=main
 token="$__CMDT_TOKEN"
 export -n __CMDT_TOKEN
 
-$cmdtIn @init=container_wo_token #@keepOutputs #@ignore #@keepOutputs
+$cmdtIn @init=container_wo_token $ignoreContainers #@keepOutputs #@ignore #@keepOutputs
 $cmdtIn @test=container_wo_token/init @-- $newCmdt1 @init
 $cmdtIn @test=container_wo_token/run_in_container @stderr:PASSED @-- $newCmdt1 @container sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox
 $cmdtIn @test=container_wo_token/ @stderr:PASSED @-- $newCmdt1 @container true
@@ -728,7 +729,7 @@ testFile="/tmp/thisFileDoesNotExistsYet.txt"
 hostFile="/tmp/thisFileExistsOnHost.txt"
 rm -f @-- "$testFile" 2> /dev/null || true
 touch "$hostFile"
-$cmdtIn @init=ephemeralContainer #@keepOutputs #@ignore #@keepOutputs
+$cmdtIn @init=ephemeralContainer $ignoreContainers #@keepOutputs #@ignore #@keepOutputs
 $cmdtIn @test=ephemeralContainer/init @-- $newCmdt1 @init
 $cmdtIn @test=ephemeralContainer/run_in_container @stderr:PASSED @-- $newCmdt1 @container sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox #check run inside container
 $cmdtIn @test=ephemeralContainer/ @stderr:PASSED @-- $newCmdt1 ls "$hostFile" @stdout:"$hostFile" # file exists on host
@@ -741,7 +742,7 @@ $cmdtIn @test=ephemeralContainer/ @stderr:PASSED @-- $newCmdt1 @container ls "$h
 $cmdtIn @test=ephemeralContainer/ @stderr:PASSED @-- $newCmdt1 ls "$testFile" @fail @stdout= @stderr:"$testFile" # file should not exist on host
 $cmdtIn @test=ephemeralContainer/ @-- $newCmdt1 @report=main
 
-$cmdtIn @init=suiteContainer #@verbose=4 #@keepOutputs
+$cmdtIn @init=suiteContainer $ignoreContainers #@verbose=4 #@keepOutputs
 $cmdtIn @test=suiteContainer/ @-- $newCmdt1 @init=sub @container # container should live the test suite
 $cmdtIn @test=suiteContainer/run_in_container @stderr:PASSED @-- $newCmdt1 @test=sub/ sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox #check run inside container
 $cmdtIn @test=suiteContainer/ @stderr:PASSED @-- $newCmdt1 @test=sub/ ls "$testFile" @fail @stdout= @stderr:"$testFile" # file should not exist in suite container
@@ -753,7 +754,7 @@ $cmdtIn @test=suiteContainer/ @stderr:PASSED @-- $newCmdt1 @test=sub/ ls "$testF
 $cmdtIn @test=suiteContainer/ @stderr:PASSED @-- $newCmdt1 @test=sub/ ls "$testFile" @stdout:"$testFile" @debug=0 # file should exist in suite container
 $cmdtIn @test=suiteContainer/ @-- $newCmdt1 @report=sub
 
-$cmdtIn @init=dirtyContainer #@keepOutputs
+$cmdtIn @init=dirtyContainer $ignoreContainers #@keepOutputs
 $cmdtIn @test=dirtyContainer/ @-- $newCmdt1 @init=sub @container # container should live the test suite
 $cmdtIn @test=dirtyContainer/run_in_container @stderr:PASSED @-- $newCmdt1 @test=sub/ sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox #check run inside container
 $cmdtIn @test=dirtyContainer/ @stderr:PASSED @-- $newCmdt1 @test=sub/ ls "$testFile" @fail @stderr:"$testFile" # file should not exist in container
@@ -770,7 +771,7 @@ $cmdtIn @test=dirtyContainer/ @stderr:PASSED @-- $newCmdt1 @test=sub/ ls "$hostF
 $cmdtIn @test=dirtyContainer/ @stderr:PASSED @-- $newCmdt1 @test=sub/ ls "$testFile" @fail @dirtyContainer=beforeTest # file should not exist in fresh container
 $cmdtIn @test=dirtyContainer/ @-- $newCmdt1 @report=sub
 
-$cmdtIn @init=testContainer #@keepOutputs
+$cmdtIn @init=testContainer $ignoreContainers #@keepOutputs
 $cmdtIn @test=testContainer/ @-- $newCmdt1 @init=sub @container @dirtyContainer=beforeTest # container should live for each test
 $cmdtIn @test=testContainer/run_in_container @stderr:PASSED @-- $newCmdt1 @test=sub/ sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox #check run inside container
 $cmdtIn @test=testContainer/ @stderr:PASSED @-- $newCmdt1 @test=sub/ ls "$testFile" @fail @stderr:"$testFile" # file should not exist in container

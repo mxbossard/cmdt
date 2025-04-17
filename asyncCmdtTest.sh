@@ -100,7 +100,7 @@ $cmdtIn @test=meta2/"report with token" @stderr:"2 success" @stderr!:"failure" @
 $cmdtIn @test=meta2/init @stderr= @-- $newCmdt1 @token=$tk0 @init=master @async @verbose=5
 $cmdtIn @test=meta2/"with token 3" @stderr= @-- $newCmdt1 @token=$tk0 @test=master/meta2_sub2_test3 true
 $cmdtIn @test=meta2/"with token 4" @stderr= @-- $newCmdt1 @token=$tk0 @test=master/meta2_sub2_test4 true
-$cmdtIn @test=meta2/"report all with token" @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @token=$tk0 @report
+$cmdtIn @test=meta2/"global report with token" @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @token=$tk0 @report
 $cmdt @report
 
 >&2 echo "## Test exported token"

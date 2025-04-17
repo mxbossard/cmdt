@@ -2,8 +2,10 @@ package dao
 
 import (
 	"database/sql"
+	"errors"
 
 	"cmdt/internal/model"
+
 	"github.com/mxbossard/utilz/zql"
 )
 
@@ -34,6 +36,7 @@ func (d Queue) init() (err error) {
 			op BLOB NOT NULL,
 			unqueued INTEGER NOT NULL,
 			exitCode INTEGER,
+			error TEXT,
 			block INTEGER,
 			FOREIGN KEY(suite) REFERENCES suite_queue(name)
 		);
@@ -63,8 +66,8 @@ func (d Queue) QueueOperater(op model.Operater) (err error) {
 
 	res, err := tx.Exec(`
 		INSERT OR IGNORE INTO suite_queue(name, open) VALUES (@suite, 0);
-		INSERT INTO operation_queue(suite, op, unqueued, block, exitCode) 
-			VALUES (@suite, @opBlob, 0, @block, NULL);
+		INSERT INTO operation_queue(suite, op, unqueued, block, exitCode, error) 
+			VALUES (@suite, @opBlob, 0, @block, NULL, NULL);
 		`, sql.Named("suite", op.Suite()), sql.Named("opBlob", b), sql.Named("block", op.Block())) // OR IGNORE
 	if err != nil {
 		return
@@ -86,17 +89,22 @@ func (d Queue) QueueOperater(op model.Operater) (err error) {
 }
 
 func (d Queue) IsOperationsDone(op model.Operater) (done bool, exitCode int16, err error) {
+	var errMsg string
 	row := d.db.QueryRow(`
-		SELECT q.exitCode 
+		SELECT q.exitCode, COALESCE(q.error, '')
 		FROM operation_queue q
 		WHERE q.id = @opId AND q.exitCode IS NOT NULL;
 	`, sql.Named("opId", op.Id()))
-	err = row.Scan(&exitCode)
+	err = row.Scan(&exitCode, &errMsg)
 	if err == sql.ErrNoRows {
 		err = nil
 		return
 	} else if err != nil {
 		return
+	}
+
+	if errMsg != "" {
+		err = errors.New(errMsg)
 	}
 	done = true
 	return
@@ -174,7 +182,12 @@ func (d Queue) Done(op model.Operater) (err error) {
 		return
 	}
 
-	_, err = tx.Exec(`UPDATE operation_queue SET exitCode = ? WHERE id = ?;`, op.ExitCode(), op.Id())
+	var errMsg *string
+	if op.Err() != nil {
+		msg := op.Err().Error()
+		errMsg = &msg
+	}
+	_, err = tx.Exec(`UPDATE operation_queue SET exitCode = ?, error = ? WHERE id = ?;`, op.ExitCode(), errMsg, op.Id())
 	if err != nil {
 		return
 	}

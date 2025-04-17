@@ -20,6 +20,8 @@ type Operater interface {
 	Block() bool
 	ExitCode() uint16
 	SetExitCode(uint16)
+	Err() error
+	SetErr(error)
 	Id() uint16
 	SetId(uint16)
 	String() string
@@ -32,6 +34,7 @@ type OperationBase struct {
 	Sequence  uint16
 	Blocking  bool
 	exit      uint16
+	err       error
 	id        uint16
 }
 
@@ -57,6 +60,14 @@ func (o OperationBase) ExitCode() uint16 {
 
 func (o *OperationBase) SetExitCode(code uint16) {
 	o.exit = code
+}
+
+func (o OperationBase) Err() error {
+	return o.err
+}
+
+func (o *OperationBase) SetErr(err error) {
+	o.err = err
 }
 
 func (o OperationBase) Id() uint16 {

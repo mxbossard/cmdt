@@ -55,7 +55,8 @@ func (d Suite) init() (err error) {
 			outcomeOrder INTEGER DEFAULT 0,
 			reported INTEGER NOT NULL DEFAULT 0,
 			kept INTEGER NOT NULL DEFAULT 0,
-			async INTEGER NOT NULL DEFAULT 0
+			async INTEGER NOT NULL DEFAULT 0,
+			ignored INTEGER NOT NULL DEFAULT 0
 		);
 	`)
 	count, _ := res.RowsAffected()
@@ -158,12 +159,58 @@ func (d Suite) IncrementTooMuchCount(suite string) (seq uint16, err error) {
 func (d Suite) NotReportedTestCount() (n uint16, err error) {
 	p := logger.PerfTimer()
 	defer p.End()
-
+	// FIXME: not sure not reported test count works properly testing s.outcome
 	row := d.db.QueryRow(`
 		SELECT coalesce(sum(s.seq), 0)
 		FROM suite s
 		WHERE s.outcome <> 'Z'
 	`)
+	err = row.Scan(&n)
+	return
+}
+
+func (d Suite) ToReportTestCountByMode(asyncMode, all bool) (n uint16, err error) {
+	p := logger.PerfTimer()
+	defer p.End("asyncMode", asyncMode, "all", all, "n", n)
+
+	var row *sql.Row
+	if all {
+		row = d.db.QueryRow(`
+			SELECT coalesce(sum(s.seq), 0)
+			FROM suite s
+			WHERE s.async = ?
+		`, asyncMode)
+	} else {
+		row = d.db.QueryRow(`
+			SELECT coalesce(sum(s.seq), 0)
+			FROM suite s
+			WHERE s.reported = 0 AND s.async = ?
+		`, asyncMode)
+	}
+
+	err = row.Scan(&n)
+	return
+}
+
+func (d Suite) ToReportTestCountBySuiteAndMode(testSuite string, asyncMode, all bool) (n uint16, err error) {
+	p := logger.PerfTimer()
+	defer p.End("testSuite", testSuite, "asyncMode", asyncMode, "all", all, "n", n)
+
+	var row *sql.Row
+	if all {
+		row = d.db.QueryRow(`
+			SELECT coalesce(sum(s.seq), 0)
+			FROM suite s
+			WHERE s.name = ? AND s.async = ?
+		`, testSuite, asyncMode)
+	} else {
+		row = d.db.QueryRow(`
+			SELECT coalesce(sum(s.seq), 0)
+			FROM suite s
+			WHERE s.name = ? AND s.reported = 0 AND s.async = ?
+		`, testSuite, asyncMode)
+	}
+
 	err = row.Scan(&n)
 	return
 }
@@ -242,6 +289,24 @@ func (d Suite) MarkSuiteReported(suite string, reported, kept bool) (err error) 
 	return
 }
 
+func (d Suite) MarkSuitesReported(all bool) (err error) {
+	p := logger.PerfTimer()
+	defer p.End()
+
+	now := time.Now()
+	if all {
+		_, err = d.db.Exec(`
+				UPDATE suite SET reported = 1, lastReportTime = ?
+			`, now.UnixMicro())
+	} else {
+		_, err = d.db.Exec(`
+				UPDATE suite SET reported = 1, lastReportTime = ?
+				WHERE reported = 0
+			`, now.UnixMicro())
+	}
+	return
+}
+
 func (d Suite) IsSuiteReported(suite string) (exists, reported, kept bool, err error) {
 	p := logger.PerfTimer("suite", suite)
 	defer p.End()
@@ -300,15 +365,54 @@ func (d Suite) ListPassedFailedErrored() (suites []string, err error) {
 
 func (d Suite) ListReportablePassedFailedErrored() (suites []string, err error) {
 	p := logger.PerfTimer()
-	defer p.End()
+	defer p.End("suites", suites)
 
 	rows, err := d.db.Query(`
 		SELECT s.name
 		FROM suite s
-		WHERE s.name <> '' AND s.startTime IS NOT NULL
-		    AND s.reported = 0 OR s.kept = 1
+		WHERE s.startTime IS NOT NULL
+		    AND (s.reported = 0 OR s.kept = 1)
 		ORDER BY s.outcomeOrder ASC, s.startTime ASC
 	`) // s.outcome IN ('PASSED', 'FAILED', 'ERRORED') AND
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var suiteName string
+		err = rows.Scan(&suiteName)
+		if err != nil {
+			return
+		}
+		suites = append(suites, suiteName)
+	}
+	return
+}
+
+func (d Suite) ListReportablePassedFailedErroredByMode(asyncMode, all bool) (suites []string, err error) {
+	p := logger.PerfTimer()
+	defer p.End("asyncMode", asyncMode, "all", all, "suites", suites)
+
+	var rows *sql.Rows
+	if all {
+		rows, err = d.db.Query(`
+			SELECT s.name
+			FROM suite s
+			WHERE s.startTime IS NOT NULL
+				AND s.async = ?
+			ORDER BY s.outcomeOrder ASC, s.startTime ASC
+		`, asyncMode) // s.outcome IN ('PASSED', 'FAILED', 'ERRORED') AND
+	} else {
+		rows, err = d.db.Query(`
+			SELECT s.name
+			FROM suite s
+			WHERE s.startTime IS NOT NULL
+				AND s.async = ? AND (s.reported = 0 OR s.kept = 1)
+			ORDER BY s.outcomeOrder ASC, s.startTime ASC
+		`, asyncMode) // s.outcome IN ('PASSED', 'FAILED', 'ERRORED') AND
+	}
+
 	if err != nil {
 		return
 	}
@@ -400,6 +504,28 @@ func (d Suite) ListReportedAsync() (suites []string, err error) {
 	return
 }
 
+func (d Suite) IgnoredSuiteCount(reportAll bool) (n uint16, err error) {
+	p := logger.PerfTimer()
+	defer p.End("reportAll", reportAll, "n", n)
+
+	var row *sql.Row
+	if reportAll {
+		row = d.db.QueryRow(`
+				SELECT count(*)
+				FROM suite s
+				WHERE s.ignored = 1
+			`)
+	} else {
+		row = d.db.QueryRow(`
+				SELECT count(*)
+				FROM suite s
+				WHERE s.ignored = 1 AND s.reported = 0
+			`)
+	}
+	err = row.Scan(&n)
+	return
+}
+
 func (d Suite) FindGlobalConfig() (cfg *model.Config, err error) {
 	p := logger.PerfTimer()
 	defer p.End()
@@ -485,10 +611,11 @@ func (d Suite) SaveSuiteConfig(testSuite string, cfg model.Config) (err error) {
 	defer d.db.Unlock()
 
 	async := cfg.Async.GetOr(model.DefaultAsync)
+	ignored := cfg.IgnoreSuite.GetOr(false)
 
 	_, err = d.db.Exec(
-		`INSERT OR IGNORE INTO suite(name, config, async) VALUES (@suite, '',  @async);`,
-		sql.Named("suite", testSuite), sql.Named("async", async))
+		`INSERT OR IGNORE INTO suite(name, config, async, ignored) VALUES (@suite, '',  @async, @ignored);`,
+		sql.Named("suite", testSuite), sql.Named("async", async), sql.Named("ignored", ignored))
 	if err != nil {
 		return
 	}
@@ -496,17 +623,17 @@ func (d Suite) SaveSuiteConfig(testSuite string, cfg model.Config) (err error) {
 	if cfg.SuiteStartTime.IsPresent() {
 		micros := cfg.SuiteStartTime.Get().UnixMicro()
 		_, err = d.db.Exec(`
-				UPDATE suite SET config = @serCfg, startTime = @startTime, async = @async
+				UPDATE suite SET config = @serCfg, startTime = @startTime, async = @async, ignored = @ignored
 				WHERE name = @suite;`,
 			sql.Named("suite", testSuite), sql.Named("serCfg", serializedConfig),
-			sql.Named("startTime", micros), sql.Named("async", async),
+			sql.Named("startTime", micros), sql.Named("async", async), sql.Named("ignored", ignored),
 		)
 	} else {
 		_, err = d.db.Exec(`
-				UPDATE suite SET config = @serCfg, async = @async
+				UPDATE suite SET config = @serCfg, async = @async, ignored = @ignored
 				WHERE name = @suite;`,
 			sql.Named("suite", testSuite), sql.Named("serCfg", serializedConfig),
-			sql.Named("async", async),
+			sql.Named("async", async), sql.Named("ignored", ignored),
 		)
 	}
 	if err != nil {

@@ -67,13 +67,13 @@ $newCmdt1 @report=async_visual
 >&2 echo "done report"
 
 >&2 echo
->&2 echo "## Visual test in sync report all"
-$newCmdt1 @init=sync_reportall_visual @verbose=5 @suiteTimeout=$((count/2+2))s
+>&2 echo "## Visual test in sync global report"
+$newCmdt1 @init=sync_global_report_visual @verbose=5 @suiteTimeout=$((count/2+2))s
 >&2 echo "Launching tests ..."
 for i in $( seq 1 $count ); do
 	>&2 echo -n "$i "
 	time=$( echo "scale=1;$i/20 + 0.13" | bc )
-	$newCmdt1 @test=sync_reportall_visual/tC$i @stdout:"endC$i" @-- sh -c "sleep $time; echo endC$i"
+	$newCmdt1 @test=sync_global_report_visual/tC$i @stdout:"endC$i" @-- sh -c "sleep $time; echo endC$i"
 done
 >&2 echo "done tests"
 $newCmdt1 @report
@@ -81,35 +81,35 @@ $newCmdt1 @report
 
 #rm -rf -- /tmp/cmdt*.log 2> /dev/null || true
 >&2 echo
->&2 echo "## Visual test async report all"
-$newCmdt1 @init=async_reportall_visual @async @verbose=5 @suiteTimeout=$((count/2+2))s
+>&2 echo "## Visual test async global report"
+$newCmdt1 @init=async_global_report_visual @async @verbose=5 @suiteTimeout=$((count/2+2))s
 >&2 echo "Launching tests ..."
 for i in $( seq 1 $count ); do
 	>&2 echo -n "$i "
 	time=$( echo "scale=1;$i/20 + 0.14" | bc )
-	$newCmdt1 @test=async_reportall_visual/tD$i @stdout:"endD$i" @-- sh -c "sleep $time; echo endD$i"
+	$newCmdt1 @test=async_global_report_visual/tD$i @stdout:"endD$i" @-- sh -c "sleep $time; echo endD$i"
 done
 >&2 echo "done tests"
 $newCmdt1 @report
 >&2 echo "done report"
 
 >&2 echo
->&2 echo "## Visual test async & sync report all"
-$newCmdt1 @init=async_reportall_async_and_sync_visual @async @verbose=5 @suiteTimeout=$((count/2+2))s
+>&2 echo "## Visual test async & sync global report"
+$newCmdt1 @init=async_global_report_async_and_sync_visual @async @verbose=5 @suiteTimeout=$((count/2+2))s
 >&2 echo "Launching async tests ..."
 for i in $( seq 1 $count ); do
 	>&2 echo -n "$i "
 	time=$( echo "scale=1;$i/20 + 0.15" | bc )
-	$newCmdt1 @test=async_reportall_async_and_sync_visual/tE$i @stdout:"endD$i" @-- sh -c "sleep $time; echo endD$i"
+	$newCmdt1 @test=async_global_report_async_and_sync_visual/tE$i @stdout:"endD$i" @-- sh -c "sleep $time; echo endD$i"
 done
 >&2 echo
 >&2 echo "done async tests"
-$newCmdt1 @init=sync_reportall_async_and_sync_visual @async=false @verbose=5 @suiteTimeout=$((count/2+2))s
+$newCmdt1 @init=sync_global_report_async_and_sync_visual @async=false @verbose=5 @suiteTimeout=$((count/2+2))s
 >&2 echo "Launching sync tests ..."
 for i in $( seq 1 $count ); do
 	>&2 echo -n "$i "
 	time=$( echo "scale=1;$i/20 + 0.16" | bc )
-	$newCmdt1 @test=sync_reportall_async_and_sync_visual/tF$i @stdout:"endD$i" @-- sh -c "sleep $time; echo endD$i"
+	$newCmdt1 @test=sync_global_report_async_and_sync_visual/tF$i @stdout:"endD$i" @-- sh -c "sleep $time; echo endD$i"
 done
 >&2 echo
 >&2 echo "done sync tests"

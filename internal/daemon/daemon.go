@@ -167,15 +167,16 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 		def.Token = d.token
 		def.Isolation = d.isolation
 		exitCode, err2 := d.report(def)
-		err = err2
 		op.SetExitCode(uint16(exitCode))
+		op.SetErr(err2)
 	case *model.ReportAllOp:
 		// FIXME: must override bad token & isolation inside ReportDefinition !
 		def := o.Definition
 		def.Token = d.token
 		def.Isolation = d.isolation
-		exitCode := d.reportAll(def)
+		exitCode, err2 := d.reportAll(def)
 		op.SetExitCode(uint16(exitCode))
+		op.SetErr(err2)
 	default:
 		err = fmt.Errorf("unknown operation %T", op)
 		return
@@ -230,7 +231,7 @@ func (d *daemon) report(def model.ReportDefinition) (exitCode int16, err error) 
 	return
 }
 
-func (d *daemon) reportAll(def model.ReportDefinition) (exitCode int16) {
+func (d *daemon) reportAll(def model.ReportDefinition) (exitCode int16, err error) {
 	perf := logger.PerfTimer()
 	defer perf.End()
 
@@ -238,16 +239,17 @@ func (d *daemon) reportAll(def model.ReportDefinition) (exitCode int16) {
 
 	// Wait for some test until suite timeout
 	testCount := d.repo.NotReportedTestCount()
+	// FIXME: should not need to wait for test count > 0
 	for testCount == 0 {
-		if time.Since(start) > def.Config.Timeout.Get() {
+		if time.Since(start) > WaitAsyncReportTestTimeout {
 			// FIXME: why not return an error ?
-			return 1
+			return 1, fmt.Errorf("timeouted waiting for test")
 		}
 		time.Sleep(time.Millisecond)
 		testCount = d.repo.NotReportedTestCount()
 	}
 
-	exitCode = service.ProcessGlobalReportDef(def, true)
+	exitCode, err = service.ProcessGlobalReportDef(def, true)
 	logger.Debug("Closing all test suites", "token", def.Token, "isolation", def.Isolation)
 	d.openedSuites = []string{}
 	//d.display.Clear()

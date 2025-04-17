@@ -58,11 +58,12 @@ func globalReport(ctx facade.GlobalContext, asyncMode bool) (exitCode int16, err
 	all := ctx.Config.ReportAll.Get()
 
 	var testSuites []string
-	if all {
-		testSuites, err = ctx.Repo.ListAllSuites()
-	} else {
-		testSuites, err = ctx.Repo.ListReportableSuites()
-	}
+	// if all {
+	// 	testSuites, err = ctx.Repo.ListAllSuites()
+	// } else {
+	// 	testSuites, err = ctx.Repo.ListReportableSuites()
+	// }
+	testSuites, err = ctx.Repo.ListReportableSuitesByMode(asyncMode, all)
 	if err != nil {
 		return
 	}
@@ -86,7 +87,7 @@ func globalReport(ctx facade.GlobalContext, asyncMode bool) (exitCode int16, err
 		suiteCtx.Config.Keep = ctx.Config.Keep
 		suiteIgnored := suiteCtx.Config.IgnoreSuite.GetOr(false)
 		goodModeSuite = true
-		count := suiteCtx.Repo.TestCount(testSuite)
+		count := suiteCtx.Repo.ToReportTestCountBySuiteAndMode(testSuite, asyncMode, all)
 		if count > 0 || suiteIgnored {
 			nothingToReport = false
 			suiteContexts = append(suiteContexts, suiteCtx)
@@ -123,13 +124,9 @@ func globalReport(ctx facade.GlobalContext, asyncMode bool) (exitCode int16, err
 	return
 }
 
-func ProcessGlobalReportDef(def model.ReportDefinition, asyncMode bool) (exitCode int16) {
-	var err error
+func ProcessGlobalReportDef(def model.ReportDefinition, asyncMode bool) (exitCode int16, err error) {
 	ctx := facade.NewGlobalContext(def.Token, def.Isolation, model.Config{})
 	exitCode, err = globalReport(ctx, asyncMode)
-	if err != nil {
-		errorz.Fatal(err)
-	}
 	return
 }
 
@@ -409,6 +406,10 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 
 		// Store ignore at suite level
 		suiteCtx.Config.IgnoreSuite = suiteCtx.Config.Ignore
+		if suiteCtx.Config.IgnoreSuite.GetOr(false) {
+			// Ignored suite should not be async
+			suiteCtx.Config.Async.Set(false)
+		}
 
 		logger.Debug("repo suite status", "testSuite", testSuite, "exists", exists, "reported", reported, "kept", kept)
 
@@ -451,97 +452,111 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				errorz.Fatal(parseArgsErrors)
 			}
 			globalCtx := facade.NewGlobalContext(token, isolation, inputConfig)
-
-			Dpl.SetVerbose(globalCtx.Config.Verbose.Get())
+			globalCfg := globalCtx.Config
+			Dpl.SetVerbose(globalCfg.Verbose.Get())
+			rep := facade.Repo(token, isolation)
 
 			// Process report all without daemon
 			logger.Trace("Forged context", "ctx", globalCtx)
 			// logger.Info("executing report all in sync (not queueing report)")
-			Dpl.Quiet(globalCtx.Config.Quiet.Is(true))
+			Dpl.Quiet(globalCfg.Quiet.Is(true))
 
 			var asyncExitCode int16
 
-			// 1- Report all sync suites
-			syncSuites, err := facade.Repo(token, isolation).ListSyncSuites()
-			ProcessGlobalError(globalCtx, err)
-			// fmt.Printf("<<>> SYNC suites count: %d\n", len(syncSuites))
-			// if len(syncSuites) > 0 {
-			exitCode, err = globalReport(globalCtx, false)
-			ProcessGlobalError(globalCtx, err)
-			// } else {
-			// 	exitCode = 0
-			// }
+			ignoredSuiteCount := rep.IgnoredSuiteCount(globalCfg.ReportAll.Get())
 
-			for _, suite := range syncSuites {
-				err = cliAfterSuiteReport(globalCtx.Token, globalCtx.Isolation, suite, Dpl)
+			// 1- Report all sync suites
+			toReportSyncTestCount := rep.ToReportTestCountByMode(false, globalCfg.ReportAll.GetOr(model.DefaultReportAll))
+			if ignoredSuiteCount+toReportSyncTestCount > 0 {
+				syncSuites, err := rep.ListSyncSuites()
 				ProcessGlobalError(globalCtx, err)
+				exitCode, err = globalReport(globalCtx, false)
+				ProcessGlobalError(globalCtx, err)
+				for _, suite := range syncSuites {
+					err = cliAfterSuiteReport(globalCtx.Token, globalCtx.Isolation, suite, Dpl)
+					ProcessGlobalError(globalCtx, err)
+				}
+			} else {
+				exitCode = 0
 			}
 
 			// 2- Report all async suites
-			asyncSuites, err := facade.Repo(token, isolation).ListAsyncSuites()
-			ProcessGlobalError(globalCtx, err)
-			// fmt.Printf("<<>> ASYNC suites count: %d\n", len(asyncSuites))
-			//if globalCtx.Config.Async.Is(true) {
-			if len(asyncSuites) > 0 {
-				start := time.Now()
-				for globalCtx.Repo.NotReportedTestCount() == 0 {
-					if time.Since(start) > model.WaitAsyncReportTestTimeout {
-						err := fmt.Errorf("you must perform some test prior to report")
+			toReportAsyncTestCount := rep.ToReportTestCountByMode(true, globalCfg.ReportAll.GetOr(model.DefaultReportAll))
+			if toReportAsyncTestCount > 0 {
+
+				asyncSuites, err := rep.ListAsyncSuites()
+				ProcessGlobalError(globalCtx, err)
+				// fmt.Printf("<<>> ASYNC suites count: %d\n", len(asyncSuites))
+				//if globalCtx.Config.Async.Is(true) {
+				if len(asyncSuites) > 0 {
+					start := time.Now()
+					for globalCtx.Repo.NotReportedTestCount() == 0 {
+						if time.Since(start) > model.WaitAsyncReportTestTimeout {
+							err := fmt.Errorf("you must perform some test prior to report")
+							ProcessGlobalError(globalCtx, err)
+						}
+						time.Sleep(time.Millisecond)
+					}
+
+					// Delegate report all processing to daemon
+					//logger.Info("executing report all on async display")
+					logger.Info("executing report all (queueing report)")
+					def := model.ReportDefinition{
+						Token:     token,
+						Isolation: isolation,
+						//TestSuite: "__global",
+						Config: globalCtx.Config,
+					}
+					op := model.ReportAllOperation(true, def) // FIXME should not block if test can be run simultaneously
+					err = globalCtx.Repo.QueueOperation(&op)
+					if err != nil {
+						errorz.Fatal(err)
+					}
+
+					asyncDpl := asyncdisplay.New(globalCtx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
+
+					// always wait
+					// if globalCtx.Config.Wait.Is(true) {
+					wait = func() int16 {
+						// FIXME: bad timeout
+						asyncExitCode, err = globalCtx.Repo.WaitOperationDone(&op, globalCtx.Config.SuiteTimeout.GetOr(defaultGlobalTimeout))
+						if err != nil {
+							//panic(err)
+							Dpl.Errors(err)
+						}
+						logger.Info("op done", "opId", op.Id(), "opKind", op.Kind(), "suite", op.TestSuite, "asyncExitCode", asyncExitCode)
+						// Clear all reported suite async display
+						suites, err := globalCtx.Repo.ListReportedAsyncSuites()
+						ProcessGlobalError(globalCtx, err)
+
+						for _, suite := range suites {
+							asyncdisplay.ClearSuite(globalCtx.Repo.BackingFilepath(), suite)
+						}
+						return max(exitCode, asyncExitCode)
+					}
+
+					err = asyncDpl.TailAllBlocking(globalCtx.Config.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
+					ProcessGlobalError(globalCtx, err)
+					logger.Info("finished async TailAllBlocking", "opId", op.Id())
+
+					daemonIsol = globalCtx.Isolation
+					daemonToken = globalCtx.Token
+					for _, suite := range asyncSuites {
+						err = cliAfterSuiteReport(daemonToken, daemonIsol, suite, asyncDpl)
 						ProcessGlobalError(globalCtx, err)
 					}
-					time.Sleep(time.Millisecond)
-				}
 
-				// Delegate report all processing to daemon
-				//logger.Info("executing report all on async display")
-				logger.Info("executing report all (queueing report)")
-				def := model.ReportDefinition{
-					Token:     token,
-					Isolation: isolation,
-					//TestSuite: "__global",
-					Config: globalCtx.Config,
-				}
-				op := model.ReportAllOperation(true, def) // FIXME should not block if test can be run simultaneously
-				err = globalCtx.Repo.QueueOperation(&op)
-				if err != nil {
-					errorz.Fatal(err)
-				}
-
-				asyncDpl := asyncdisplay.New(globalCtx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
-
-				// always wait
-				wait = func() int16 {
-					// FIXME: bad timeout
-					asyncExitCode, err = globalCtx.Repo.WaitOperationDone(&op, globalCtx.Config.SuiteTimeout.GetOr(defaultGlobalTimeout))
-					if err != nil {
-						panic(err)
-					}
-					logger.Info("op done", "opId", op.Id(), "opKind", op.Kind(), "suite", op.TestSuite, "asyncExitCode", asyncExitCode)
-
-					// Clear all reported suite async display
-					suites, err := globalCtx.Repo.ListReportedAsyncSuites()
-					ProcessGlobalError(globalCtx, err)
-
-					for _, suite := range suites {
-						asyncdisplay.ClearSuite(globalCtx.Repo.BackingFilepath(), suite)
-					}
-					return max(exitCode, asyncExitCode)
-				}
-
-				err = asyncDpl.TailAllBlocking(globalCtx.Config.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
-				ProcessGlobalError(globalCtx, err)
-				logger.Info("finished async TailAllBlocking", "opId", op.Id())
-
-				daemonIsol = globalCtx.Isolation
-				daemonToken = globalCtx.Token
-				for _, suite := range asyncSuites {
-					err = cliAfterSuiteReport(daemonToken, daemonIsol, suite, asyncDpl)
-					ProcessGlobalError(globalCtx, err)
 				}
 			}
 
+			if ignoredSuiteCount+toReportSyncTestCount+toReportAsyncTestCount == 0 {
+				exitCode = 1
+				err := fmt.Errorf("you must perform some test prior to report globaly")
+				ProcessGlobalError(globalCtx, err)
+			}
+
 			Dpl.ReportAllFooter(globalCtx)
-			err = globalCtx.Repo.MarkReportedAll()
+			err = globalCtx.Repo.MarkSuitesReported(globalCfg.ReportAll.Get())
 			ProcessGlobalError(globalCtx, err)
 
 		} else {
@@ -599,7 +614,8 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 						defer pt.End()
 						exitCode, err = suiteCtx.Repo.WaitOperationDone(&op, suiteCtx.Config.SuiteTimeout.Get())
 						if err != nil {
-							panic(err)
+							//panic(err)
+							Dpl.Errors(err)
 						}
 						//asyncDpl.ClearSuite(suiteCtx)
 						return exitCode
@@ -690,7 +706,8 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				wait = func() int16 {
 					exitCode, err := testCtx.Repo.WaitOperationDone(&testOp, testCfg.SuiteTimeout.Get())
 					if err != nil {
-						panic(err)
+						//panic(err)
+						Dpl.Errors(err)
 					}
 					return exitCode
 				}

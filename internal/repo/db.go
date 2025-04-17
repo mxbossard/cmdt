@@ -102,14 +102,6 @@ func (r dbRepo) GetGlobalConfig() (cfg model.Config, err error) {
 	return
 }
 
-func (r dbRepo) NotReportedTestCount() (n uint16) {
-	n, err := r.suiteDao.NotReportedTestCount()
-	if err != nil {
-		errorz.Fatal(err)
-	}
-	return
-}
-
 func (r dbRepo) InitSuite(cfg model.Config) (err error) {
 	suite := cfg.TestSuite.Get()
 
@@ -213,6 +205,11 @@ func (r dbRepo) ListReportableSuites() (suites []string, err error) {
 	return
 }
 
+func (r dbRepo) ListReportableSuitesByMode(asyncMode, all bool) (suites []string, err error) {
+	suites, err = r.suiteDao.ListReportablePassedFailedErroredByMode(asyncMode, all)
+	return
+}
+
 func (r dbRepo) ListAllSuites() (suites []string, err error) {
 	suites, err = r.suiteDao.ListPassedFailedErrored()
 	return
@@ -230,6 +227,14 @@ func (r dbRepo) ListAsyncSuites() (suites []string, err error) {
 
 func (r dbRepo) ListReportedAsyncSuites() (suites []string, err error) {
 	suites, err = r.suiteDao.ListReportedAsync()
+	return
+}
+
+func (r dbRepo) IgnoredSuiteCount(reportAll bool) (n uint16) {
+	n, err := r.suiteDao.IgnoredSuiteCount(reportAll)
+	if err != nil {
+		errorz.Fatal(err)
+	}
 	return
 }
 
@@ -269,8 +274,8 @@ func (r dbRepo) MarkSuiteReported(suite string, kept bool) (err error) {
 	return r.suiteDao.MarkSuiteReported(suite, true, kept)
 }
 
-func (r dbRepo) MarkReportedAll() (err error) {
-	return r.suiteDao.MarkSuiteReported("", true, false)
+func (r dbRepo) MarkSuitesReported(all bool) (err error) {
+	return r.suiteDao.MarkSuitesReported(all)
 }
 
 func (r dbRepo) SuiteStatus(suite string) (exists, reported, kept bool, err error) {
@@ -301,8 +306,32 @@ func (r dbRepo) IncrementSuiteSeq(testSuite, name string) (n uint16) {
 	return
 }
 
+func (r dbRepo) NotReportedTestCount() (n uint16) {
+	n, err := r.suiteDao.NotReportedTestCount()
+	if err != nil {
+		errorz.Fatal(err)
+	}
+	return
+}
+
 func (r dbRepo) TestCount(testSuite string) (n uint16) {
 	n, err := r.suiteDao.TestCount(testSuite)
+	if err != nil {
+		errorz.Fatal(err)
+	}
+	return
+}
+
+func (r dbRepo) ToReportTestCountByMode(asyncMode, all bool) (n uint16) {
+	n, err := r.suiteDao.ToReportTestCountByMode(asyncMode, all)
+	if err != nil {
+		errorz.Fatal(err)
+	}
+	return
+}
+
+func (r dbRepo) ToReportTestCountBySuiteAndMode(testSuite string, asyncMode, all bool) (n uint16) {
+	n, err := r.suiteDao.ToReportTestCountBySuiteAndMode(testSuite, asyncMode, all)
 	if err != nil {
 		errorz.Fatal(err)
 	}
