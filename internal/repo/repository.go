@@ -111,6 +111,7 @@ func New(token, isolation string) (repo dbRepo) {
 		errorz.Fatal(err)
 	}
 
+	//fmt.Printf("\n<<>> Built repo ; token: %s ; isol: %s\n", token, isolation)
 	return
 }
 

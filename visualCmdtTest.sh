@@ -47,8 +47,9 @@ for i in $( seq 1 $count ); do
 	time=$( echo "scale=1;$i/20 + 0.11" | bc )
 	$newCmdt1 @test=sync_visual/tA$i @stdout:"endA$i" @-- sh -c "sleep $time; echo endA$i"
 done
+$newCmdt1 @test=sync_visual/tFail @-- sh -c "exit 2"
 >&2 echo "done tests"
-$newCmdt1 @report=sync_visual
+$newCmdt1 @report=sync_visual || true
 >&2 echo "done report"
 
 rm -rf -- /tmp/cmdt* /tmp/cmdt*.log /tmp/daemon*.log 2> /dev/null || true
@@ -62,8 +63,9 @@ for i in $( seq 1 $count ); do
 	time=$( echo "scale=1;$i/20 + 0.12" | bc )
 	$newCmdt1 @test=async_visual/tB$i @stdout:"endB$i" @-- sh -c "sleep $time; echo endB$i"
 done
+$newCmdt1 @test=async_visual/tFail @-- sh -c "exit 2"
 >&2 echo "done tests"
-$newCmdt1 @report=async_visual
+$newCmdt1 @report=async_visual || true
 >&2 echo "done report"
 
 >&2 echo

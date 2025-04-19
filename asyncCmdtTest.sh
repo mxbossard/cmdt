@@ -90,7 +90,7 @@ $cmdtIn @test=meta1/"report without token" @exit=1 @stderr:"3 success" @stderr!:
 
 >&2 echo "## Test printed token"
 tk0=$( $newCmdt0 @init @printToken )
->&2 echo "token: $tk0"
+>&2 echo "printed token: $tk0"
 $cmdtIn @init=meta2 #@verbose=4
 $cmdtIn @test=meta2/init @stderr= @-- $newCmdt1 @token=$tk0 @init @async @verbose=5
 $cmdtIn @test=meta2/"with token 1" @stderr= @-- $newCmdt1 @token=$tk0 @test=meta2_sub_test1 true
@@ -105,15 +105,15 @@ $cmdt @report
 
 >&2 echo "## Test exported token"
 eval $( $cmdt @init @exportToken )
->&2 echo "token: $__CMDT_TOKEN"
-$cmdtIn @init=meta3 
+>&2 echo "exported token: $__CMDT_TOKEN"
+$cmdtIn @init=meta3 #@ignore
 $cmdtIn @test=meta3/init @-- $newCmdt1 @init @async
 $cmdtIn @test=meta3/ @stderr= @-- $newCmdt1 true
 $cmdtIn @test=meta3/ @stderr= @-- $newCmdt1 true
 $cmdtIn @test=meta3/ @stderr:"Successfully ran" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @report=main @async
 $cmdtIn @test=meta3/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @token=$tk0 @report=main @async
 
-$cmdtIn @init=meta4
+$cmdtIn @init=meta4 #@ignore
 $cmdtIn @test=meta4/init @-- $newCmdt1 @init=sub4 @async
 $cmdtIn @test=meta4/ @stderr= @-- $newCmdt1 @test=sub4/ true
 $cmdtIn @test=meta4/ @stderr= @-- $newCmdt1 @test=sub4/ true

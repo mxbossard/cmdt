@@ -355,7 +355,9 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 	defaultCfg := model.NewGlobalDefaultConfig()
 	envToken := utils.ReadEnvToken()
 	if envToken != "" {
-		envCtx := facade.NewGlobalContext(envToken, "", defaultCfg)
+		// With token in env catch isolation from args quickly
+		isol := utils.IsolationFromArgs(allArgs)
+		envCtx := facade.NewGlobalContext(envToken, isol, defaultCfg)
 		defaultCfg = envCtx.Config
 	}
 	rulePrefix := defaultCfg.Prefix.Get()

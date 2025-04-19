@@ -681,7 +681,7 @@ func BuildAssertion(cfg model.Config, ruleExpr string) (ok bool, assertion model
 			return
 		}
 		assertion.Asserter = func(cmd cmdz.Executer) (res model.AssertionResult, err error) {
-			res.Value = ""
+			res.Value = cmd.ExitCode()
 			res.Success = cmd.ExitCode() == 0
 			return
 		}
@@ -691,7 +691,7 @@ func BuildAssertion(cfg model.Config, ruleExpr string) (ok bool, assertion model
 			return
 		}
 		assertion.Asserter = func(cmd cmdz.Executer) (res model.AssertionResult, err error) {
-			res.Value = ""
+			res.Value = cmd.ExitCode()
 			res.Success = cmd.ExitCode() > 0
 			return
 		}

@@ -198,21 +198,26 @@ func (d basicTestDisplayer) assertionResults(results []model.AssertionResult) {
 
 		assertLabel := formatz.Sprintf(TestColor, "%s%s", assertPrefix, assertName)
 
+		var remainingResults []model.AssertionResult
 		for _, result := range ruleResults {
 			expected := result.Expected
 			if assertName == "success" || assertName == "fail" {
-				d.printer.Errf("\t%sExpected%s %s\n", hlClr, ResetColor, assertLabel)
+				exitStatus := result.Value.(int)
+				d.printer.Errf("\t%sExpected%s %s \tbut exit status is [%d]\n", hlClr, ResetColor, assertLabel, exitStatus)
 			} else if assertName == "cmd" {
-				d.printer.Errf("\t%sExpected%s %s=%s to succeed\n", hlClr, ResetColor, assertLabel, expected)
+				exitStatus := result.Value.(int)
+				d.printer.Errf("\t%sExpected%s %s=%s to succeed \t but exit status is [%d]\n", hlClr, ResetColor, assertLabel, expected, exitStatus)
 			} else if assertName == "exists" {
 				d.printer.Errf("\t%sExpected%s file %s=%s file to exists\n", hlClr, ResetColor, assertLabel, expected)
+			} else {
+				remainingResults = append(remainingResults, result)
 			}
 		}
 
 		firstError := true
 		lastOperator := ""
 		printButGot := false
-		for _, result := range ruleResults {
+		for _, result := range remainingResults {
 			assertOp := result.Op
 			expected := result.Expected
 			expected = strings.ReplaceAll(expected, "\n", "\\n")

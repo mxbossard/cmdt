@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"cmdt/internal/model"
+
 	"github.com/mxbossard/utilz/cmdz"
 	"github.com/mxbossard/utilz/truzt"
 	"github.com/mxbossard/utilz/zlog"
@@ -131,6 +132,18 @@ func ForgeContextualToken(token string) (string, error) {
 	}
 
 	return token, nil
+}
+
+func IsolationFromArgs(args []string) string {
+	// FIXME: catch isolation only with default isolation Rule & default Prefix.
+	var value string
+	for _, arg := range args {
+		if strings.HasPrefix(arg, model.DefaultRulePrefix+"isol=") {
+			splitted := strings.Split(arg, "=")
+			value = splitted[1]
+		}
+	}
+	return value
 }
 
 func IsolatedToken(token, isolation string) string {
