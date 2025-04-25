@@ -583,7 +583,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			logger.Trace("Forged context", "ctx", suiteCtx)
 			Dpl.Quiet(suiteCtx.Config.Quiet.Is(true))
 
-			if suiteCtx.Config.Async.Is(true) {
+			if suiteCtx.Config.Async.Is(true) && !suiteCtx.Config.Reported.Is(true) {
 				//logger.Info("executing report on async display", "suite", testSuite)
 
 				start := time.Now()
@@ -690,6 +690,9 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			exitCode = ProcessMalDefinedTest(testDef, parseArgsErrors.Return())
 			return
 		}
+
+		err = testCtx.Repo.MarkSuiteReported(testSuite, false)
+		ProcessTestError(testCtx, err)
 
 		logger.Debug("Test definition", "token", token, "isolation", isolation, "suite", testSuite, "seq", seq)
 		if !testCfg.Async.Is(true) {

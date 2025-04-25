@@ -108,17 +108,19 @@ eval $( $cmdt @init @exportToken )
 >&2 echo "exported token: $__CMDT_TOKEN"
 $cmdtIn @init=meta3 #@ignore
 $cmdtIn @test=meta3/init @-- $newCmdt1 @init @async
-$cmdtIn @test=meta3/ @stderr= @-- $newCmdt1 true
-$cmdtIn @test=meta3/ @stderr= @-- $newCmdt1 true
-$cmdtIn @test=meta3/ @stderr:"Successfully ran" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @report=main @async
-$cmdtIn @test=meta3/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @token=$tk0 @report=main @async
+$cmdtIn @test=meta3/test1 @stderr= @-- $newCmdt1 true
+$cmdtIn @test=meta3/test2 @stderr= @-- $newCmdt1 true
+$cmdtIn @test=meta3/report1 @stderr:"Successfully ran" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @report=main
+$cmdtIn @test=meta3/report2 @stderr:"Successfully ran" @stderr!:"error" @stderr!:"#01" @stderr!:"#02" @stderr!:"#03" @-- $newCmdt1 @report=main
+$cmdtIn @test=meta3/report_other_token @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=main @token=empty_token
 
 $cmdtIn @init=meta4 #@ignore
 $cmdtIn @test=meta4/init @-- $newCmdt1 @init=sub4 @async
-$cmdtIn @test=meta4/ @stderr= @-- $newCmdt1 @test=sub4/ true
-$cmdtIn @test=meta4/ @stderr= @-- $newCmdt1 @test=sub4/ true
-$cmdtIn @test=meta4/ @stderr:"Successfully ran" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @report=sub4 @async
-$cmdtIn @test=meta4/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @token=$tk0 @report=sub4 @async
+$cmdtIn @test=meta4/test1 @stderr= @-- $newCmdt1 @test=sub4/ true
+$cmdtIn @test=meta4/test2 @stderr= @-- $newCmdt1 @test=sub4/ true
+$cmdtIn @test=meta4/report1 @stderr:"Successfully ran" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @report=sub4
+$cmdtIn @test=meta4/report2 @stderr:"Successfully ran" @stderr!:"error" @stderr!:"#01" @stderr!:"#02" @stderr!:"#03" @-- $newCmdt1 @report=sub4
+$cmdtIn @test=meta4/report_other_token @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @token=$tk0 @report=sub4
 $cmdt @report 
 
 export -n __CMDT_TOKEN
@@ -217,9 +219,11 @@ $cmdtIn @test=double_suite_init_async/open3_after_test @fail @stderr:"$cannotRei
 ## Flow test
 
 syncOpenExpected="$noPanic @stderr:Test suite ["
+syncReOpenExpected="$noPanic @stderr:Cleared suite:"
 syncTestExpected="$noPanic @stderr:#01 @stderr!:#02"
 syncReportExpected="$noPanic @stderr:1 success"
 asyncOpenExpected="@stderr="
+asyncReOpenExpected="@stderr:Cleared suite:"
 #asyncTestExpected="$noPanic @stderr!:#01 @stderr!:#02"
 asyncTestExpected="@stderr="
 asyncReportExpected="$noPanic @stderr:Test suite [ @stderr:#01 @stderr!:#02 @stderr:1 success"
@@ -233,20 +237,20 @@ $cmdtIn @test=suite_flow_sync/B0_test $syncTestExpected @stderr:tB0z @stderr!:tA
 $cmdtIn @test=suite_flow_sync/B0_report_suite $syncReportExpected @stderr!:tB0z @stderr!:tA @-- $newCmdt1 @report=suite_flow_sync_sub
 
 for i in $( seq 1 5 ); do
-	$cmdtIn @test=suite_flow_sync/B${i}_reopen $syncOpenExpected @-- $newCmdt1 @init=suite_flow_sync_sub @async=false @verbose=5 @suiteTimeout=2s
+	$cmdtIn @test=suite_flow_sync/B${i}_reopen $syncReOpenExpected @-- $newCmdt1 @init=suite_flow_sync_sub @async=false @verbose=5 @suiteTimeout=2s
 	$cmdtIn @test=suite_flow_sync/B${i}_test $syncTestExpected @stderr:tB${i}z @-- $newCmdt1 @test=suite_flow_sync_sub/tB${i}z true
 	$cmdtIn @test=suite_flow_sync/B${i}_report_suite $syncReportExpected @stderr!:tB${i}z @-- $newCmdt1 @report=suite_flow_sync_sub
 done
 
-$cmdtIn @test=suite_flow_sync/C_reopen $syncOpenExpected @-- $newCmdt1 @init=suite_flow_sync_sub @async=false @verbose=5 @suiteTimeout=2s
+$cmdtIn @test=suite_flow_sync/C_reopen $syncReOpenExpected @-- $newCmdt1 @init=suite_flow_sync_sub @async=false @verbose=5 @suiteTimeout=2s
 $cmdtIn @test=suite_flow_sync/C_test $syncTestExpected @stderr:tC @-- $newCmdt1 @test=suite_flow_sync_sub/tC true
-$cmdtIn @test=suite_flow_sync/C_report_all $syncReportExpected @stderr!:tA @stderr!:tB @stderr!:tC @-- $newCmdt1 @report
-$cmdtIn @test=suite_flow_sync/D_reopen $syncOpenExpected @-- $newCmdt1 @init=suite_flow_sync_sub @async=false @verbose=5 @suiteTimeout=2s
+$cmdtIn @test=suite_flow_sync/C_global_report $syncReportExpected @stderr!:tA @stderr!:tB @stderr!:tC @-- $newCmdt1 @report
+$cmdtIn @test=suite_flow_sync/D_reopen $syncReOpenExpected @-- $newCmdt1 @init=suite_flow_sync_sub @async=false @verbose=5 @suiteTimeout=2s
 $cmdtIn @test=suite_flow_sync/D_test $syncTestExpected @stderr:tD @-- $newCmdt1 @test=suite_flow_sync_sub/tD true
 $cmdtIn @test=suite_flow_sync/D_report_suite $syncReportExpected @stderr!:tA @stderr!:tB @stderr!:tC @stderr!:tD @-- $newCmdt1 @report=suite_flow_sync_sub
-$cmdtIn @test=suite_flow_sync/E_reopen $syncOpenExpected @-- $newCmdt1 @init=suite_flow_sync_sub @async=false @verbose=5 @suiteTimeout=2s
+$cmdtIn @test=suite_flow_sync/E_reopen $syncReOpenExpected @-- $newCmdt1 @init=suite_flow_sync_sub @async=false @verbose=5 @suiteTimeout=2s
 $cmdtIn @test=suite_flow_sync/E_test $syncTestExpected @stderr:tE @-- $newCmdt1 @test=suite_flow_sync_sub/tE true
-$cmdtIn @test=suite_flow_sync/E_report_all $syncReportExpected @stderr!:tA @stderr!:tB @stderr!:tC @stderr!:tD @stderr!:tE @-- $newCmdt1 @report
+$cmdtIn @test=suite_flow_sync/E_global_report $syncReportExpected @stderr!:tA @stderr!:tB @stderr!:tC @stderr!:tD @stderr!:tE @-- $newCmdt1 @report
 
 $cmdtIn @init=suite_flow_async
 $cmdtIn @test=suite_flow_async/A_open $asyncOpenExpected @-- $newCmdt1 @init=suite_flow_async_sub @async=true @verbose=5 @suiteTimeout=2s
@@ -255,32 +259,32 @@ $cmdtIn @test=suite_flow_async/A_report_suite $asyncReportExpected @stderr:tA @-
 
 sleepTime=0
 sleep $sleepTime
-$cmdtIn @test=suite_flow_async/B0_reopen $asyncOpenExpected @-- $newCmdt1 @init=suite_flow_async_sub @async=true @verbose=5 @suiteTimeout=2s
+$cmdtIn @test=suite_flow_async/B0_reopen $asyncReOpenExpected @-- $newCmdt1 @init=suite_flow_async_sub @async=true @verbose=5 @suiteTimeout=2s
 $cmdtIn @test=suite_flow_async/B0_test $asyncTestExpected @-- $newCmdt1 @test=suite_flow_async_sub/tB0z true
 $cmdtIn @test=suite_flow_async/B0_report_suite $asyncReportExpected @stderr:tB0z @stderr!:tA @-- $newCmdt1 @report=suite_flow_async_sub
 
 for i in $( seq 1 5 ); do
 	sleep $sleepTime
-	$cmdtIn @test=suite_flow_async/B${i}_reopen $asyncOpenExpected @-- $newCmdt1 @init=suite_flow_async_sub @async=true @verbose=5 @suiteTimeout=2s
+	$cmdtIn @test=suite_flow_async/B${i}_reopen $asyncReOpenExpected @-- $newCmdt1 @init=suite_flow_async_sub @async=true @verbose=5 @suiteTimeout=2s
 	$cmdtIn @test=suite_flow_async/B${i}_test $asyncTestExpected @-- $newCmdt1 @test=suite_flow_async_sub/tB${i}z true
 	$cmdtIn @test=suite_flow_async/B${i}_report_suite $asyncReportExpected @stderr:tB${i}z @stderr!:t1 @stderr!=t2 @-- $newCmdt1 @report=suite_flow_async_sub
 done
 
 #$cmdtIn @report
 
-$cmdtIn @test=suite_flow_async/C_reopen $asyncOpenExpected @-- $newCmdt1 @init=suite_flow_async_sub @async=true @verbose=5 @suiteTimeout=2s
+$cmdtIn @test=suite_flow_async/C_reopen $asyncReOpenExpected @-- $newCmdt1 @init=suite_flow_async_sub @async=true @verbose=5 @suiteTimeout=2s
 $cmdtIn @test=suite_flow_async/C_test $asyncTestExpected @-- $newCmdt1 @test=suite_flow_async_sub/tC true
-$cmdtIn @test=suite_flow_async/C_report_all $asyncReportExpected @stderr:tC @stderr!:tA @stderr!:tB @-- $newCmdt1 @report
+$cmdtIn @test=suite_flow_async/C_global_report $asyncReportExpected @stderr:tC @stderr!:tA @stderr!:tB @-- $newCmdt1 @report
 #$cmdtIn @test=suite_flow_async/C_report $asyncReportExpected @stderr:tC @stderr!:tA @stderr!:tB @-- $newCmdt1 @report=suite_flow_async_sub
 
 #$cmdtIn @report
 
-$cmdtIn @test=suite_flow_async/D_reopen $asyncOpenExpected @-- $newCmdt1 @init=suite_flow_async_sub @async=true @verbose=5 @suiteTimeout=2s
+$cmdtIn @test=suite_flow_async/D_reopen $asyncReOpenExpected @-- $newCmdt1 @init=suite_flow_async_sub @async=true @verbose=5 @suiteTimeout=2s
 $cmdtIn @test=suite_flow_async/D_test $asyncTestExpected @-- $newCmdt1 @test=suite_flow_async_sub/tD true
 $cmdtIn @test=suite_flow_async/D_report_suite $asyncReportExpected @stderr:tD @stderr!:tA @stderr!:tB @stderr!:tC @-- $newCmdt1 @report=suite_flow_async_sub
-$cmdtIn @test=suite_flow_async/E_reopen $asyncOpenExpected @-- $newCmdt1 @init=suite_flow_async_sub @async=true @verbose=5 @suiteTimeout=2s
+$cmdtIn @test=suite_flow_async/E_reopen $asyncReOpenExpected @-- $newCmdt1 @init=suite_flow_async_sub @async=true @verbose=5 @suiteTimeout=2s
 $cmdtIn @test=suite_flow_async/E_test $asyncTestExpected @-- $newCmdt1 @test=suite_flow_async_sub/tE true
-$cmdtIn @test=suite_flow_async/E_report_all $asyncReportExpected @stderr:tE @stderr!:tA @stderr!:tB @stderr!:tC @stderr!:tD @-- $newCmdt1 @report
+$cmdtIn @test=suite_flow_async/E_global_report $asyncReportExpected @stderr:tE @stderr!:tA @stderr!:tB @stderr!:tC @stderr!:tD @-- $newCmdt1 @report
 
 $cmdtIn @report
 

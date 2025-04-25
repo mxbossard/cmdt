@@ -8,6 +8,7 @@ import (
 	"cmdt/internal/facade"
 	"cmdt/internal/model"
 	"cmdt/internal/utils"
+
 	"github.com/mxbossard/utilz/utilz"
 )
 
@@ -55,7 +56,7 @@ func cliInitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 
 func cliAfterSuiteReport(token, isolation, suite string, dpl display.Displayer) (err error) {
 	rep := facade.Repo(token, isolation)
-	err = rep.MarkSuiteReported(suite, false)
+	err = rep.MarkSuiteReported(suite, true)
 
 	if err != nil {
 		return
@@ -63,4 +64,3 @@ func cliAfterSuiteReport(token, isolation, suite string, dpl display.Displayer) 
 	dpl.ClearSuite(suite)
 	return
 }
-

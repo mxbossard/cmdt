@@ -69,26 +69,26 @@ $cmdtIn @test=meta2/ @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @--
 $cmdt @report
 
 >&2 echo "## Test exported token"
-# FIXME: test seems bad for now !
 eval $( $newCmdt0 @init @exportToken )
 >&2 echo "token: $__CMDT_TOKEN"
 
-tk1=$( $newCmdt0 @init @printToken )
-newCmdt1_tk1="$newCmdt1 @token=$tk1"
-
 #tk=$( $cmdt0 @init @printToken )
 $cmdtIn @init=meta3 #@ignore
-$cmdtIn @test=meta3/test1 @stderr:"PASSED" @stderr:"#01" @-- $newCmdt1_tk1 true
-$cmdtIn @test=meta3/test2 @stderr:"PASSED" @stderr:"#02" @-- $newCmdt1_tk1 true
-$cmdtIn @test=meta3/report @stderr:"Successfully ran" @stderr:"main" @-- $newCmdt1_tk1 @report=main
+$cmdtIn @test=meta3/init @-- $newCmdt1 @init
+$cmdtIn @test=meta3/test1 @stderr:"PASSED" @stderr:"#01" @-- $newCmdt1 true
+$cmdtIn @test=meta3/test2 @stderr:"PASSED" @stderr:"#02" @-- $newCmdt1 true
+$cmdtIn @test=meta3/report1 @stderr:"Successfully ran" @stderr:"main" @-- $newCmdt1 @report=main
+$cmdtIn @test=meta3/report2 @stderr:"Successfully ran" @stderr:"main" @-- $newCmdt1 @report=main
 $cmdtIn @test=meta3/report_other_token @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=main @token=empty_token
 #$cmdtIn @test=meta3/report2 @stderr:"Successfully ran" @stderr:"main" @-- $newCmdt1 @report=main @token=$tk0
 
 $cmdtIn @init=meta4 #@ignore
-$cmdtIn @test=meta4/ @stderr:"PASSED" @stderr:"#01" @-- $newCmdt1_tk1 @test=sub4/ true
-$cmdtIn @test=meta4/ @stderr:"PASSED" @stderr:"#02" @-- $newCmdt1_tk1 @test=sub4/ true
-$cmdtIn @test=meta4/ @stderr:"Successfully ran" @-- $newCmdt1_tk1 @report=sub4
-$cmdtIn @test=meta4/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=sub4 @token=$tk0
+$cmdtIn @test=meta4/init @-- $newCmdt1 @init=sub4
+$cmdtIn @test=meta4/test1 @stderr:"PASSED" @stderr:"#01" @-- $newCmdt1 @test=sub4/ true
+$cmdtIn @test=meta4/test2 @stderr:"PASSED" @stderr:"#02" @-- $newCmdt1 @test=sub4/ true
+$cmdtIn @test=meta4/report1 @stderr:"Successfully ran" @-- $newCmdt1 @report=sub4
+$cmdtIn @test=meta4/report2 @stderr:"Successfully ran" @-- $newCmdt1 @report=sub4
+$cmdtIn @test=meta4/report_other_token @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=sub4 @token=$tk0
 $cmdt @report
 
 export -n __CMDT_TOKEN

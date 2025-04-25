@@ -254,7 +254,7 @@ func (r dbRepo) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 		}
 	}
 
-	err = r.suiteDao.MarkSuiteReported(outcome.TestSuite, false, false)
+	//err = r.suiteDao.MarkSuiteReported(outcome.TestSuite, false, false)
 	return
 }
 
@@ -270,8 +270,8 @@ func (r dbRepo) UpdateLastTestTime(testSuite string) {
 	}
 }
 
-func (r dbRepo) MarkSuiteReported(suite string, kept bool) (err error) {
-	return r.suiteDao.MarkSuiteReported(suite, true, kept)
+func (r dbRepo) MarkSuiteReported(suite string, reported bool) (err error) {
+	return r.suiteDao.MarkSuiteReported(suite, reported)
 }
 
 func (r dbRepo) MarkSuitesReported(all bool) (err error) {
