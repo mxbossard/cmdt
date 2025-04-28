@@ -204,6 +204,10 @@ func (d basicTestDisplayer) assertionResults(results []model.AssertionResult) {
 			if assertName == "success" || assertName == "fail" {
 				exitStatus := result.Value.(int)
 				d.printer.Errf("\t%sExpected%s %s \tbut exit status is [%d]\n", hlClr, ResetColor, assertLabel, exitStatus)
+			} else if assertName == "exit" {
+				exitStatus := result.Value.(int)
+				expectedValue := ruleResults[0].Rule.Expected
+				d.printer.Errf("\t%sExpected%s %s=%s \tbut exit status is [%d]\n", hlClr, ResetColor, assertLabel, expectedValue, exitStatus)
 			} else if assertName == "cmd" {
 				exitStatus := result.Value.(int)
 				d.printer.Errf("\t%sExpected%s %s=%s to succeed \t but exit status is [%d]\n", hlClr, ResetColor, assertLabel, expected, exitStatus)
