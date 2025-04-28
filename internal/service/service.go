@@ -71,11 +71,11 @@ func globalReport(ctx facade.GlobalContext, asyncMode bool) (exitCode int16, err
 	logger.Info("Global reporting suites", "token", token, "all", all, "asyncMode", asyncMode, "suites", testSuites)
 
 	nothingToReport := true
-	exitCode = 1
 
 	var suiteOutcomes []model.SuiteOutcome
 	var suiteContexts []facade.SuiteContext
 	goodModeSuite := false
+	reportPassed := true
 	for _, testSuite := range testSuites {
 		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, model.ReportAction, model.Config{})
 		suiteAsync := suiteCtx.Config.Async.Get()
@@ -96,12 +96,16 @@ func globalReport(ctx facade.GlobalContext, asyncMode bool) (exitCode int16, err
 			suiteOutcome, code, err = reportTestSuite(suiteCtx)
 			if err != nil {
 				// FIXME: aggregate errors
+				exitCode = 1
 				return
 			}
 			if code != 0 {
 				exitCode = code
 			}
 			suiteOutcomes = append(suiteOutcomes, suiteOutcome)
+			if suiteOutcome.Outcome != model.IGNORED && suiteOutcome.Outcome != model.PASSED {
+				reportPassed = false
+			}
 		}
 	}
 
@@ -120,7 +124,10 @@ func globalReport(ctx facade.GlobalContext, asyncMode bool) (exitCode int16, err
 	for _, suiteCtx := range suiteContexts {
 		Dpl.CloseSuite(suiteCtx)
 	}
-	exitCode = 0
+
+	if reportPassed {
+		exitCode = 0
+	}
 	return
 }
 
@@ -517,6 +524,17 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 
 					asyncDpl := asyncdisplay.New(globalCtx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
 
+					err = asyncDpl.TailAllBlocking(globalCtx.Config.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
+					ProcessGlobalError(globalCtx, err)
+					logger.Info("finished async TailAllBlocking", "opId", op.Id())
+
+					daemonIsol = globalCtx.Isolation
+					daemonToken = globalCtx.Token
+					for _, suite := range asyncSuites {
+						err = cliAfterSuiteReport(daemonToken, daemonIsol, suite, asyncDpl)
+						ProcessGlobalError(globalCtx, err)
+					}
+
 					// always wait
 					// if globalCtx.Config.Wait.Is(true) {
 					wait = func() int16 {
@@ -534,18 +552,8 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 						for _, suite := range suites {
 							asyncdisplay.ClearSuite(globalCtx.Repo.BackingFilepath(), suite)
 						}
+						fmt.Printf("\n<<>> exitCode: %d ; asyncExitCode: %d\n", exitCode, asyncExitCode)
 						return max(exitCode, asyncExitCode)
-					}
-
-					err = asyncDpl.TailAllBlocking(globalCtx.Config.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
-					ProcessGlobalError(globalCtx, err)
-					logger.Info("finished async TailAllBlocking", "opId", op.Id())
-
-					daemonIsol = globalCtx.Isolation
-					daemonToken = globalCtx.Token
-					for _, suite := range asyncSuites {
-						err = cliAfterSuiteReport(daemonToken, daemonIsol, suite, asyncDpl)
-						ProcessGlobalError(globalCtx, err)
 					}
 
 				}

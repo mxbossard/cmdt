@@ -89,6 +89,7 @@ func (d Queue) QueueOperater(op model.Operater) (err error) {
 }
 
 func (d Queue) IsOperationsDone(op model.Operater) (done bool, exitCode int16, err error) {
+	exitCode = -1
 	var errMsg string
 	row := d.db.QueryRow(`
 		SELECT q.exitCode, COALESCE(q.error, '')
