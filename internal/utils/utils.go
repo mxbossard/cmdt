@@ -136,9 +136,13 @@ func ForgeContextualToken(token string) (string, error) {
 
 func IsolationFromArgs(args []string) string {
 	// FIXME: catch isolation only with default isolation Rule & default Prefix.
+	prefix := model.DefaultRulePrefix
 	var value string
 	for _, arg := range args {
-		if strings.HasPrefix(arg, model.DefaultRulePrefix+"isol=") {
+		if arg == prefix+model.RuleParsingStopper {
+			break
+		}
+		if strings.HasPrefix(arg, prefix+"isol=") {
 			splitted := strings.Split(arg, "=")
 			value = splitted[1]
 		}

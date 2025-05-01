@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"cmdt/internal/model"
+
 	"github.com/mxbossard/utilz/errorz"
 	"github.com/mxbossard/utilz/filez"
 	"github.com/mxbossard/utilz/formatz"
@@ -339,7 +340,7 @@ func (r FileRepo) Done(op model.Operater) (err error) {
 	return
 }
 
-func (r FileRepo) WaitOperationDone(op model.Operater, timeout time.Duration) (exitCode int16, err error) {
+func (r FileRepo) WaitOperationDone(op model.Operater, timeout time.Duration) (exitCode int16, opErr, err error) {
 	return r.dbRepo.WaitOperationDone(op, timeout)
 }
 

@@ -6,10 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"cmdt/internal/model"
+
+	"github.com/mxbossard/utilz/filez"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"cmdt/internal/model"
-	"github.com/mxbossard/utilz/filez"
 )
 
 func initSuiteDao(t *testing.T, dirpath string) Suite {
@@ -289,7 +290,7 @@ func TestListPassedFailedErrored(t *testing.T) {
 	addSuiteWithOutcome(t, dao, "p2", "PASSED", time.Now())
 	addSuiteWithOutcome(t, dao, "t2", "TIMEOUT", time.Now())
 
-	suites, err := dao.ListPassedFailedErrored()
+	suites, err := dao.ListOrdered()
 	require.NoError(t, err)
 	assert.Equal(t, []string{"p1", "p2", "i1", "i2", "t1", "t2", "f1", "f2", "e1", "e2"}, suites)
 }

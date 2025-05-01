@@ -90,7 +90,7 @@ type Repo interface {
 
 	Done(op model.Operater) (err error)
 
-	WaitOperationDone(op model.Operater, timeout time.Duration) (exitCode int16, err error)
+	WaitOperationDone(op model.Operater, timeout time.Duration) (exitCode int16, opErr, err error)
 
 	WaitEmptyQueue(testSuite string, timeout time.Duration) (err error)
 

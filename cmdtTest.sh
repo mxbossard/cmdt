@@ -378,7 +378,7 @@ $cmdtIn @test=assertion/ @stderr:FAILED @-- $newCmdt1 sh -c ">&2 echo foo bar" @
 $cmdtIn @test=assertion/ @fail @-- $newCmdt1 sh -c ">&2 echo foo bar" @stderr:
 $cmdtIn @test=assertion/ @stderr:FAILED @-- $newCmdt1 sh -c ">&2 echo foo bar" @stderr:baz
 $cmdtIn @test=assertion/ @fail @-- $newCmdt1 sh -c ">&2 echo foo bar" @stdout:
-$cmdtIn @test=assertion/multiple_failed_assertions_1 @stderr~"/Expected.*@exit.*to be.*:.*\[2\]/s" @stderr~"/Expected.*@stderr.*to contains.*:.*\[aaa\]/s" @stderr~"/Expected.*@stdout.*to contains.*:.*\[xxx\].*\[yyy\].*\[zzz\]/s" @-- $newCmdt1 @exit=2 @stderr:"aaa" @stdout:xxx @stdout:foo @stdout:yyy @stdout:bar @stdout:zzz @stdout:baz  @-- sh -c "echo 'foo bar baz pif paf' ; exit 4"
+$cmdtIn @test=assertion/multiple_failed_assertions_1 @stderr~"/Expected.*@exit.*=\d.*but exit status is \[4\]/s" @stderr~"/Expected.*@stderr.*to contains.*:.*\[aaa\]/s" @stderr~"/Expected.*@stdout.*to contains.*:.*\[xxx\].*\[yyy\].*\[zzz\]/s" @-- $newCmdt1 @exit=2 @stderr:"aaa" @stdout:xxx @stdout:foo @stdout:yyy @stdout:bar @stdout:zzz @stdout:baz  @-- sh -c "echo 'foo bar baz pif paf' ; exit 4"
 $cmdtIn @test=assertion/multiple_failed_assertions_2 @stderr~"/Expected.*@stderr.*to contains.*:.*\[aaa\]/s" @stderr~"/Expected.*@stdout.*to contains.*:.*\[xxx\].*\[yyy\].*\[zzz\]/s" @-- $newCmdt1 @fail @stderr:"aaa" @stdout:xxx @stdout:foo @stdout:yyy @stdout:bar @stdout:zzz @stdout:baz  @-- sh -c "echo 'foo bar baz pif paf' ; exit 4"
 $cmdtIn @test=assertion/multiple_failed_assertions_3 @stderr~"/Expected.*@stderr.*to/s" @stderr~"/Expected.*@stderr.*to contains.*:.*\[aaa\]/s" @stderr~"/Expected.*@stdout.*don't contains.*:.*\[bar\].*\[pif\]/s" @-- $newCmdt1 @fail @stderr:"aaa" @stdout!:bar @stdout!:pif @stdout:baz @-- sh -c "echo 'foo bar baz pif paf' ; exit 4"
 $cmdtIn @test=assertion/multiple_failed_assertions_4 @stderr~"/Expected.*@stderr.*to contains.*:.*\[aaa\]/s" @stderr~"|Expected.*@stdout.*to match.*:.*\s/xxx/s.*\s/yyy/|s" @-- $newCmdt1 @fail @stderr:"aaa" @stdout~"/xxx/s" @stdout~"/yyy/" @stdout:baz @-- sh -c "echo 'foo bar baz pif paf' ; exit 4"
@@ -545,13 +545,13 @@ $cmdtIn @init=suite_ignore2
 $cmdtIn @test=suite_ignore2/init_suite @-- $newCmdt2 @init=suite_ignore2_sub @ignore
 $cmdtIn @test=suite_ignore2/ @stderr= @-- $newCmdt2 @test=suite_ignore2_sub/ true
 $cmdtIn @test=suite_ignore2/ @stderr= @-- $newCmdt2 @test=suite_ignore2_sub/ true
-$cmdtIn @test=suite_ignore2/reportall_suite @stderr:"Ignored not ran" @stderr:"suite_ignore2_sub" @stderr!:"suite_ignore1_sub" @-- $newCmdt2 @report
+$cmdtIn @test=suite_ignore2/global_report @stderr:"Ignored not ran" @stderr:"suite_ignore2_sub" @stderr!:"suite_ignore1_sub" @-- $newCmdt2 @report
 
 $cmdtIn @init=suite_ignore3
 $cmdtIn @test=suite_ignore3/init_suite @-- $newCmdt2 @init=suite_ignore3_sub @ignore
 $cmdtIn @test=suite_ignore3/ @stderr= @-- $newCmdt2 @test=suite_ignore3_sub/ true
 $cmdtIn @test=suite_ignore3/ @stderr= @-- $newCmdt2 @test=suite_ignore3_sub/ true
-$cmdtIn @test=suite_ignore3/reportall_suite @stderr:"Ignored not ran" @stderr:"suite_ignore3_sub" @stderr!:"suite_ignore1_sub" @stderr!:"suite_ignore2_sub" @-- $newCmdt2 @report
+$cmdtIn @test=suite_ignore3/global_report @stderr:"Ignored not ran" @stderr:"suite_ignore3_sub" @stderr!:"suite_ignore1_sub" @stderr!:"suite_ignore2_sub" @-- $newCmdt2 @report
 
 
 >&2 echo "## Test test timeout"

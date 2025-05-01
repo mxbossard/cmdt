@@ -53,7 +53,7 @@ func (d Suite) init() (err error) {
 			lastReportTime INTEGER NOT NULL DEFAULT 0,
 			outcome TEXT NOT NULL DEFAULT 'Z',
 			outcomeOrder INTEGER DEFAULT 0,
-			reported INTEGER NOT NULL DEFAULT 0,
+			reportedCount INTEGER NULL DEFAULT NULL,
 			kept INTEGER NOT NULL DEFAULT 0,
 			async INTEGER NOT NULL DEFAULT 0,
 			ignored INTEGER NOT NULL DEFAULT 0
@@ -182,9 +182,9 @@ func (d Suite) ToReportTestCountByMode(asyncMode, all bool) (n uint16, err error
 		`, asyncMode)
 	} else {
 		row = d.db.QueryRow(`
-			SELECT coalesce(sum(s.seq), 0)
+			SELECT coalesce(sum(s.seq), 0) - coalesce(sum(s.reportedCount), 0)
 			FROM suite s
-			WHERE s.reported = 0 AND s.async = ?
+			WHERE s.async = ?
 		`, asyncMode)
 	}
 
@@ -199,15 +199,15 @@ func (d Suite) ToReportTestCountBySuiteAndMode(testSuite string, asyncMode, all 
 	var row *sql.Row
 	if all {
 		row = d.db.QueryRow(`
-			SELECT coalesce(sum(s.seq), 0)
+			SELECT coalesce(s.seq, 0)
 			FROM suite s
 			WHERE s.name = ? AND s.async = ?
 		`, testSuite, asyncMode)
 	} else {
 		row = d.db.QueryRow(`
-			SELECT coalesce(sum(s.seq), 0)
+			SELECT coalesce(s.seq, 0) - coalesce(s.reportedCount, 0)
 			FROM suite s
-			WHERE s.name = ? AND s.reported = 0 AND s.async = ?
+			WHERE s.name = ? AND s.async = ?
 		`, testSuite, asyncMode)
 	}
 
@@ -220,7 +220,7 @@ func (d Suite) TestCount(suite string) (n uint16, err error) {
 	defer p.End("n", n)
 
 	row := d.db.QueryRow(`
-		SELECT coalesce(max(s.seq), 0)
+		SELECT coalesce(s.seq, 0)
 		FROM suite s
 		WHERE s.name = @suite
 	`, sql.Named("suite", suite))
@@ -284,15 +284,24 @@ func (d Suite) MarkSuiteReported(suite string, reported bool) (err error) {
 	if reported {
 		now := time.Now()
 		_, err = d.db.Exec(`
-			UPDATE suite SET reported = ?, lastReportTime = ?
-			WHERE name = ?
-		`, reported, now.UnixMicro(), suite)
+			UPDATE suite SET reportedCount = (
+					SELECT coalesce(max(s.seq), 0)
+					FROM suite s
+					WHERE s.name = @suite
+				), lastReportTime = @now
+			WHERE name = @suite
+		`, sql.Named("suite", suite), sql.Named("now", now.UnixMicro()))
 	} else {
+		// Nothing to do with reportedCount
 		// When marking a suite not reported, mark global scope not reported as well
-		_, err = d.db.Exec(`
-			UPDATE suite SET reported = ?
-			WHERE name = ? OR name = ''
-		`, reported, suite)
+		// _, err = d.db.Exec(`
+		// 	UPDATE suite SET reportedCount = (
+		// 			SELECT coalesce(max(s.seq), 0)
+		// 			FROM suite s
+		// 			WHERE s.name = ?
+		// 		)
+		// 	WHERE name = ? OR name = ''
+		// `, reported, suite)
 	}
 	return
 }
@@ -302,17 +311,25 @@ func (d Suite) MarkSuitesReported(all bool) (err error) {
 	defer p.End()
 
 	now := time.Now()
-	if all {
-		_, err = d.db.Exec(`
-				UPDATE suite SET reported = 1, lastReportTime = ?
-			`, now.UnixMicro())
-	} else {
-		// Whene Marking not reported suites reported, mark global scope as well
-		_, err = d.db.Exec(`
-				UPDATE suite SET reported = 1, lastReportTime = ?
-				WHERE reported = 0 OR name = ''
-			`, now.UnixMicro())
-	}
+	// Update all reportedCount with seq except for global row
+	_, err = d.db.Exec(`
+		UPDATE suite SET reportedCount = coalesce(seq, 0), lastReportTime = ?
+		WHERE name <> ''
+	`, now.UnixMicro())
+
+	/*
+		if all {
+			_, err = d.db.Exec(`
+					UPDATE suite SET reported = 1, lastReportTime = ?
+				`, now.UnixMicro())
+		} else {
+			// Whene Marking not reported suites reported, mark global scope as well
+			_, err = d.db.Exec(`
+					UPDATE suite SET reported = 1, lastReportTime = ?
+					WHERE reported = 0 OR name = ''
+				`, now.UnixMicro())
+		}
+	*/
 	return
 }
 
@@ -321,7 +338,7 @@ func (d Suite) IsSuiteReported(suite string) (exists, reported, kept bool, err e
 	defer p.End()
 
 	row := d.db.QueryRow(`
-		SELECT s.reported, s.kept
+		SELECT coalesce(s.reportedCount, 0) = coalesce(s.seq, 0), s.kept
 		FROM suite s
 		WHERE s.name = @suite
 	`, sql.Named("suite", suite))
@@ -346,7 +363,7 @@ func (d Suite) DeleteSuite(suite string) (err error) {
 	return
 }
 
-func (d Suite) ListPassedFailedErrored() (suites []string, err error) {
+func (d Suite) ListOrdered() (suites []string, err error) {
 	p := logger.PerfTimer()
 	defer p.End()
 
@@ -372,7 +389,7 @@ func (d Suite) ListPassedFailedErrored() (suites []string, err error) {
 	return
 }
 
-func (d Suite) ListReportablePassedFailedErrored() (suites []string, err error) {
+func (d Suite) ListReportableOrdered() (suites []string, err error) {
 	p := logger.PerfTimer()
 	defer p.End("suites", suites)
 
@@ -380,7 +397,7 @@ func (d Suite) ListReportablePassedFailedErrored() (suites []string, err error) 
 		SELECT s.name
 		FROM suite s
 		WHERE s.startTime IS NOT NULL
-		    AND (s.reported = 0 OR s.kept = 1)
+		    AND (coalesce(s.reportedCount, 0) <> coalesce(s.seq, 0) OR s.kept = 1)
 		ORDER BY s.outcomeOrder ASC, s.startTime ASC
 	`) // s.outcome IN ('PASSED', 'FAILED', 'ERRORED') AND
 	if err != nil {
@@ -399,7 +416,7 @@ func (d Suite) ListReportablePassedFailedErrored() (suites []string, err error) 
 	return
 }
 
-func (d Suite) ListReportablePassedFailedErroredByMode(asyncMode, all bool) (suites []string, err error) {
+func (d Suite) ListReportableOrderedByMode(asyncMode, all bool) (suites []string, err error) {
 	p := logger.PerfTimer()
 	defer p.End("asyncMode", asyncMode, "all", all, "suites", suites)
 
@@ -417,7 +434,8 @@ func (d Suite) ListReportablePassedFailedErroredByMode(asyncMode, all bool) (sui
 			SELECT s.name
 			FROM suite s
 			WHERE s.startTime IS NOT NULL
-				AND s.async = ? AND (s.reported = 0 OR s.kept = 1)
+				AND s.async = ? 
+				AND (s.reportedCount IS NULL OR s.reportedCount <> s.seq OR s.kept = 1)
 			ORDER BY s.outcomeOrder ASC, s.startTime ASC
 		`, asyncMode) // s.outcome IN ('PASSED', 'FAILED', 'ERRORED') AND
 	}
@@ -495,7 +513,7 @@ func (d Suite) ListReportedAsync() (suites []string, err error) {
 	rows, err := d.db.Query(`
 		SELECT s.name
 		FROM suite s
-		WHERE s.name <> '' AND s.startTime IS NOT NULL AND s.async = 1 AND s.reported = 1
+		WHERE s.name <> '' AND s.startTime IS NOT NULL AND s.async = 1 AND coalesce(s.reportedCount, 0) = coalesce(s.seq, 0)
 	`)
 	if err != nil {
 		return
@@ -528,8 +546,8 @@ func (d Suite) IgnoredSuiteCount(reportAll bool) (n uint16, err error) {
 		row = d.db.QueryRow(`
 				SELECT count(*)
 				FROM suite s
-				WHERE s.ignored = 1 AND s.reported = 0
-			`)
+				WHERE s.ignored = 1
+			`) //  AND (s.reportedCount IS NULL OR coalesce(s.reportedCount, 0) <> coalesce(s.seq, 0))
 	}
 	err = row.Scan(&n)
 	return
@@ -543,7 +561,7 @@ func (d Suite) FindGlobalConfig() (cfg *model.Config, err error) {
 	var reported bool
 	var lastReportTime int64
 	row := d.db.QueryRow(`
-		SELECT s.config, s.reported, s.lastReportTime
+		SELECT s.config, coalesce(s.reportedCount, 0) = coalesce(s.seq, 0), s.lastReportTime
 		FROM suite s
 		WHERE s.name = '';
 	`)
@@ -568,16 +586,19 @@ func (d Suite) FindSuiteConfig(testSuite string) (cfg *model.Config, err error) 
 	defer p.End()
 
 	var serializedConfig []byte
-	var reported bool
+	var reported, ignored bool
 	var startTime, endTime, lastReportTime, seq int64
 	var outcome string
 	var async bool
 	row := d.db.QueryRow(`
-		SELECT s.config, s.startTime, s.endTime, s.reported, s.lastReportTime, s.outcome, s.seq, s.async
+		SELECT s.config, s.startTime, s.endTime, 
+			coalesce(s.reportedCount, 0) = coalesce(s.seq, 0), 
+			s.lastReportTime, s.outcome, s.seq, s.async, s.ignored
 		FROM suite s
 		WHERE s.name = @suite;
 	`, sql.Named("suite", testSuite))
-	err = row.Scan(&serializedConfig, &startTime, &endTime, &reported, &lastReportTime, &outcome, &seq, &async)
+	err = row.Scan(&serializedConfig, &startTime, &endTime, &reported, &lastReportTime,
+		&outcome, &seq, &async, &ignored)
 	if err == sql.ErrNoRows {
 		err = nil
 		return
@@ -627,7 +648,7 @@ func (d Suite) SaveSuiteConfig(testSuite string, cfg model.Config) (err error) {
 	ignored := cfg.IgnoreSuite.GetOr(false)
 
 	_, err = d.db.Exec(
-		`INSERT OR IGNORE INTO suite(name, config, async, ignored) VALUES (@suite, '',  @async, @ignored);`,
+		`INSERT OR IGNORE INTO suite(name, config, async, ignored) VALUES (@suite, '', @async, @ignored);`,
 		sql.Named("suite", testSuite), sql.Named("async", async), sql.Named("ignored", ignored))
 	if err != nil {
 		return

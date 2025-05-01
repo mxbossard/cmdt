@@ -115,7 +115,8 @@ func globalReport(ctx facade.GlobalContext, asyncMode bool) (exitCode int16, err
 	}
 
 	if nothingToReport {
-		err = fmt.Errorf("you must perform some test prior to report all suites")
+		allSuites, _ := ctx.Repo.ListAllSuites()
+		err = fmt.Errorf("you must perform some test prior to report all suites (testSuites: %s ; asyncMode: %v ; allSuites: %s)", testSuites, asyncMode, allSuites)
 		return
 	}
 
@@ -539,10 +540,13 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 					// if globalCtx.Config.Wait.Is(true) {
 					wait = func() int16 {
 						// FIXME: bad timeout
-						asyncExitCode, err = globalCtx.Repo.WaitOperationDone(&op, globalCtx.Config.SuiteTimeout.GetOr(defaultGlobalTimeout))
+						var opErr error
+						asyncExitCode, opErr, err = globalCtx.Repo.WaitOperationDone(&op, globalCtx.Config.SuiteTimeout.GetOr(defaultGlobalTimeout))
 						if err != nil {
 							//panic(err)
 							Dpl.Errors(err)
+						} else if opErr != nil {
+							Dpl.Errors(fmt.Errorf("daemon error: %w", opErr))
 						}
 						logger.Info("op done", "opId", op.Id(), "opKind", op.Kind(), "suite", op.TestSuite, "asyncExitCode", asyncExitCode)
 						// Clear all reported suite async display
@@ -552,7 +556,6 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 						for _, suite := range suites {
 							asyncdisplay.ClearSuite(globalCtx.Repo.BackingFilepath(), suite)
 						}
-						fmt.Printf("\n<<>> exitCode: %d ; asyncExitCode: %d\n", exitCode, asyncExitCode)
 						return max(exitCode, asyncExitCode)
 					}
 
@@ -622,10 +625,13 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 						// FIXME: bad timeout
 						pt := logger.QualifiedPerfTimer("waiting report done ...", "suite", testSuite)
 						defer pt.End()
-						exitCode, err = suiteCtx.Repo.WaitOperationDone(&op, suiteCtx.Config.SuiteTimeout.Get())
+						var opErr error
+						exitCode, opErr, err = suiteCtx.Repo.WaitOperationDone(&op, suiteCtx.Config.SuiteTimeout.Get())
 						if err != nil {
 							//panic(err)
 							Dpl.Errors(err)
+						} else if opErr != nil {
+							Dpl.Errors(fmt.Errorf("daemon error: %w", opErr))
 						}
 						//asyncDpl.ClearSuite(suiteCtx)
 						return exitCode
@@ -646,6 +652,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			} else {
 				logger.Info("executing report in sync", "suite", testSuite)
 				exitCode, err = ProcessReportDef(def)
+				ProcessSuiteError(suiteCtx, err)
 				suiteCtx.Repo.Done(&op)
 				err = cliAfterSuiteReport(suiteCtx.Token, suiteCtx.Isolation, testSuite, Dpl)
 				ProcessSuiteError(suiteCtx, err)
@@ -709,6 +716,9 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			logger.Info("executing test in sync (not queueing test)", "suite", testSuite, "seq", seq)
 			exitCode = ProcessTestDef(testDef)
 		} else {
+			// Init suite config in repo if necessary
+			//facade.NewSuiteContext(token, isolation, testSuite, true, action, model.Config{Async: utilz.OptionalOf(true)})
+
 			// Delegate test processing to daemon
 			logger.Info("executing test async (queueing test)", "suite", testSuite, "seq", seq)
 			testOp := model.TestOperation(testSuite, seq, true, testDef) // FIXME should not block if test can be run simultaneously
@@ -717,10 +727,12 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 
 			if testCfg.Wait.Is(true) {
 				wait = func() int16 {
-					exitCode, err := testCtx.Repo.WaitOperationDone(&testOp, testCfg.SuiteTimeout.Get())
+					exitCode, opErr, err := testCtx.Repo.WaitOperationDone(&testOp, testCfg.SuiteTimeout.Get())
 					if err != nil {
 						//panic(err)
 						Dpl.Errors(err)
+					} else if opErr != nil {
+						Dpl.Errors(fmt.Errorf("daemon error: %w", opErr))
 					}
 					return exitCode
 				}

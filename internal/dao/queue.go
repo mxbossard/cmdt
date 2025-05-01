@@ -88,7 +88,7 @@ func (d Queue) QueueOperater(op model.Operater) (err error) {
 	return
 }
 
-func (d Queue) IsOperationsDone(op model.Operater) (done bool, exitCode int16, err error) {
+func (d Queue) IsOperationsDone(op model.Operater) (done bool, exitCode int16, opErr, err error) {
 	exitCode = -1
 	var errMsg string
 	row := d.db.QueryRow(`
@@ -105,7 +105,7 @@ func (d Queue) IsOperationsDone(op model.Operater) (done bool, exitCode int16, e
 	}
 
 	if errMsg != "" {
-		err = errors.New(errMsg)
+		opErr = errors.New(errMsg)
 	}
 	done = true
 	return

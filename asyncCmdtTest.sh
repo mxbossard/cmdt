@@ -252,9 +252,15 @@ $cmdtIn @test=suite_flow_sync/B0_test $syncTestExpected @stderr:tB0z @stderr!:tA
 $cmdtIn @test=suite_flow_sync/B0_report_suite $syncReportExpected @stderr!:tB0z @stderr!:tA @-- $newCmdt1 @report=suite_flow_sync_sub
 
 for i in $( seq 1 5 ); do
-	$cmdtIn @test=suite_flow_sync/B${i}_reopen $syncReOpenExpected @-- $newCmdt1 @init=suite_flow_sync_sub @async=false @verbose=5 @suiteTimeout=2s
-	$cmdtIn @test=suite_flow_sync/B${i}_test $syncTestExpected @stderr:tB${i}z @-- $newCmdt1 @test=suite_flow_sync_sub/tB${i}z true
-	$cmdtIn @test=suite_flow_sync/B${i}_report_suite $syncReportExpected @stderr!:tB${i}z @-- $newCmdt1 @report=suite_flow_sync_sub
+	$cmdtIn @test=suite_flow_sync/B${i}a_reopen $syncReOpenExpected @-- $newCmdt1 @init=suite_flow_sync_sub @async=false @verbose=5 @suiteTimeout=2s
+	$cmdtIn @test=suite_flow_sync/B${i}a_test $syncTestExpected @stderr:tB${i}z @-- $newCmdt1 @test=suite_flow_sync_sub/tB${i}z true
+	$cmdtIn @test=suite_flow_sync/B${i}a_report_suite $syncReportExpected @stderr!:tB${i}z @-- $newCmdt1 @report=suite_flow_sync_sub
+done
+
+for i in $( seq 1 5 ); do
+	$cmdtIn @test=suite_flow_sync/B${i}b_reopen $syncReOpenExpected @-- $newCmdt1 @init=suite_flow_sync_sub @async=false @verbose=5 @suiteTimeout=2s
+	$cmdtIn @test=suite_flow_sync/B${i}b_test $syncTestExpected @stderr:tB${i}z @-- $newCmdt1 @test=suite_flow_sync_sub/tB${i}z true
+	$cmdtIn @test=suite_flow_sync/B${i}b_global_report $syncReportExpected @stderr!:tB${i}z @-- $newCmdt1 @report
 done
 
 $cmdtIn @test=suite_flow_sync/C_reopen $syncReOpenExpected @-- $newCmdt1 @init=suite_flow_sync_sub @async=false @verbose=5 @suiteTimeout=2s
@@ -280,9 +286,17 @@ $cmdtIn @test=suite_flow_async/B0_report_suite $asyncReportExpected @stderr:tB0z
 
 for i in $( seq 1 5 ); do
 	sleep $sleepTime
-	$cmdtIn @test=suite_flow_async/B${i}_reopen $asyncReOpenExpected @-- $newCmdt1 @init=suite_flow_async_sub @async=true @verbose=5 @suiteTimeout=2s
-	$cmdtIn @test=suite_flow_async/B${i}_test $asyncTestExpected @-- $newCmdt1 @test=suite_flow_async_sub/tB${i}z true
-	$cmdtIn @test=suite_flow_async/B${i}_report_suite $asyncReportExpected @stderr:tB${i}z @stderr!:t1 @stderr!=t2 @-- $newCmdt1 @report=suite_flow_async_sub
+	$cmdtIn @test=suite_flow_async/B${i}a_reopen $asyncReOpenExpected @-- $newCmdt1 @init=suite_flow_async_sub @async=true @verbose=5 @suiteTimeout=2s
+	$cmdtIn @test=suite_flow_async/B${i}a_test $asyncTestExpected @-- $newCmdt1 @test=suite_flow_async_sub/tB${i}z true
+	$cmdtIn @test=suite_flow_async/B${i}a_report_suite $asyncReportExpected @stderr:tB${i}z @stderr!:t1 @stderr!=t2 @-- $newCmdt1 @report=suite_flow_async_sub
+done
+
+for i in $( seq 1 5 ); do
+	sleep $sleepTime
+	$cmdtIn @test=suite_flow_async/B${i}b_reopen $asyncReOpenExpected @-- $newCmdt1 @init=suite_flow_async_sub @async=true @verbose=5 @suiteTimeout=2s
+	$cmdtIn @test=suite_flow_async/B${i}b_test $asyncTestExpected @-- $newCmdt1 @test=suite_flow_async_sub/tB${i}z true
+	$cmdtIn @test=suite_flow_async/B${i}b_global_report $asyncReportExpected @stderr:tB${i}z @stderr!:t1 @stderr!=t2 @-- $newCmdt1 @report
+	exit 1
 done
 
 $cmdtIn @test=suite_flow_async/C_reopen $asyncReOpenExpected @-- $newCmdt1 @init=suite_flow_async_sub @async=true @verbose=5 @suiteTimeout=2s
