@@ -44,17 +44,17 @@ $cmdtIn @test=async success/should init @-- $newCmdt1 @init=main1 @async @verbos
 $cmdtIn @test=async success/"should pass 1" @stderr= @-- $newCmdt1 @test=main1/t1 true @verbose=4
 $cmdtIn @test=async success/"should pass 2" @stderr= @-- $newCmdt1 @test=main1/t2 sleep 0.2 @verbose=4
 $cmdtIn @test=async success/"should pass 3" @stderr= @-- $newCmdt1 @test=main1/t3 true @verbose=4
-$cmdtIn @test=async success/should report @exit=0 @stderr:"#01" @stderr:"#02" @stderr!:"#04" @stderr:"PASSED" @stderr!:"FAILED" @stderr:"3 success" @stderr!:"failure" @stderr!:"error" @-- $newCmdt0 @verbose @report=main1 @debug=6
+$cmdtIn @test=async success/should report @exit=0 @stderr:"#01" @stderr:"#02" @stderr!:"#04" @stderr:"PASSED" @stderr!:"FAILED" @stderr:"3 success" @stderr!:"failure" @stderr!:"error" @-- $newCmdt0 @verbose @report=main1 @debug=5
 $cmdtIn @report
 
 $cmdtIn @init="async failure"
 $cmdtIn @test=async failure/should init @-- $newCmdt1 @init=main2 @async @verbose=4
 $cmdtIn @test=async failure/"should pass" @stderr= @-- $newCmdt1 @test=main2/t1 true
 $cmdtIn @test=async failure/"should fail" @stderr= @-- $newCmdt1 @test=main2/t2 false
-$cmdtIn @test=async failure/should report @exit=1 @stderr:"#01" @stderr:"#02" @stderr!:"#03" @stderr:"PASSED" @stderr:"FAILED" @stderr:"1 success" @stderr:"1 failure" @stderr!:"error" @-- $newCmdt0 @verbose @report=main2 @debug=6
+$cmdtIn @test=async failure/should report @exit=1 @stderr:"#01" @stderr:"#02" @stderr!:"#03" @stderr:"PASSED" @stderr:"FAILED" @stderr:"1 success" @stderr:"1 failure" @stderr!:"error" @-- $newCmdt0 @verbose @report=main2 @debug=5
 #$cmdtIn @test=async failure/should init @-- $newCmdt1 @init=main2b @async @verbose=4
 #$cmdtIn @test=async failure/"should fail 2" @stderr= @-- $newCmdt1 @test=main2b/t2 false
-#$cmdtIn @test=async failure/should global report a failure @exit=1 @stderr:"1 failure" @stderr!:"error" @-- $newCmdt0 @verbose @report @debug=6
+#$cmdtIn @test=async failure/should global report a failure @exit=1 @stderr:"1 failure" @stderr!:"error" @-- $newCmdt0 @verbose @report @debug=5
 $cmdtIn @report
 
 $cmdtIn @init="sync error" #@verbose=4
@@ -62,7 +62,7 @@ $cmdtIn @test=sync error/should init @-- $newCmdt1 @init=main3 @async=false @ver
 $cmdtIn @test=sync error/should pass @stderr:"#01" @stderr:"PASSED" @-- $newCmdt1 @test=main3/t1 true
 $cmdtIn @test=sync error/should error 1 @fail @stderr:"#02" @stderr:"ERRORED" @stderr:'badRule does not exists' @-- $newCmdt1 @test=main3/t2 true @badRule
 $cmdtIn @test=sync error/should error 2 @fail @stderr:"#03" @stderr:"ERRORED" @-- $newCmdt1 @test=main3/t3 true @before=badCmd
-$cmdtIn @test=sync error/should report @exit=1 @stderr:"1 success" @stderr!:"failure" @stderr:"2 error" @stderr:"3 test" @-- $newCmdt0 @verbose @report=main3 @debug=6
+$cmdtIn @test=sync error/should report @exit=1 @stderr:"1 success" @stderr!:"failure" @stderr:"2 error" @stderr:"3 test" @-- $newCmdt0 @verbose @report=main3 @debug=5
 $cmdtIn @report
 
 $cmdtIn @init="async error" #@verbose=4
@@ -70,7 +70,7 @@ $cmdtIn @test=async error/should init @-- $newCmdt1 @init=main4 @async @verbose=
 $cmdtIn @test=async error/should pass @stderr= @-- $newCmdt1 @test=main4/t1 true
 $cmdtIn @test=async error/should error 1 @fail @stderr:'badRule does not exists' @-- $newCmdt1 @test=main4/t2 true @badRule
 $cmdtIn @test=async error/should error 2 @stderr= @-- $newCmdt1 @test=main4/t3 true @before=badCmd
-$cmdtIn @test=async error/should report @exit=1 @stderr:"#01" @stderr!:"#02" @stderr:"#03" @stderr!:"#04" @stderr:"PASSED" @stderr!:"FAILED" @stderr:"ERRORED" @stderr:"1 success" @stderr!:"failure" @stderr:"2 error" @-- $newCmdt0 @verbose @report=main4 @debug=6
+$cmdtIn @test=async error/should report @exit=1 @stderr:"#01" @stderr!:"#02" @stderr:"#03" @stderr!:"#04" @stderr:"PASSED" @stderr!:"FAILED" @stderr:"ERRORED" @stderr:"1 success" @stderr!:"failure" @stderr:"2 error" @-- $newCmdt0 @verbose @report=main4 @debug=5
 $cmdtIn @report
 
 
@@ -295,8 +295,8 @@ for i in $( seq 1 5 ); do
 	sleep $sleepTime
 	$cmdtIn @test=suite_flow_async/B${i}b_reopen $asyncReOpenExpected @-- $newCmdt1 @init=suite_flow_async_sub @async=true @verbose=5 @suiteTimeout=2s
 	$cmdtIn @test=suite_flow_async/B${i}b_test $asyncTestExpected @-- $newCmdt1 @test=suite_flow_async_sub/tB${i}z true
+	#$cmdtIn @test=suite_flow_async/B${i}a_report_suite $asyncReportExpected @stderr:tB${i}z @stderr!:t1 @stderr!=t2 @-- $newCmdt1 @report=suite_flow_async_sub
 	$cmdtIn @test=suite_flow_async/B${i}b_global_report $asyncReportExpected @stderr:tB${i}z @stderr!:t1 @stderr!=t2 @-- $newCmdt1 @report
-	exit 1
 done
 
 $cmdtIn @test=suite_flow_async/C_reopen $asyncReOpenExpected @-- $newCmdt1 @init=suite_flow_async_sub @async=true @verbose=5 @suiteTimeout=2s

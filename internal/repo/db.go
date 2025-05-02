@@ -299,15 +299,17 @@ func (r dbRepo) UpdateLastTestTime(testSuite string) {
 	}
 }
 
-func (r dbRepo) MarkSuiteReported(suite string, reported bool) (err error) {
-	err = r.suiteDao.MarkSuiteReported(suite, reported)
+func (r dbRepo) MarkSuiteReported(suite string) (err error) {
+	err = r.suiteDao.MarkSuiteReported(suite)
 	err = r.wrap(err)
+	logger.Infof("Suite: [%s] was marked reported", suite)
 	return
 }
 
-func (r dbRepo) MarkSuitesReported(all bool) (err error) {
-	err = r.suiteDao.MarkSuitesReported(all)
+func (r dbRepo) MarkSuitesReported() (err error) {
+	err = r.suiteDao.MarkSuitesReported()
 	err = r.wrap(err)
+	logger.Infof("All suites were marked reported")
 	return
 }
 
@@ -349,6 +351,7 @@ func (r dbRepo) NotReportedTestCount() (n uint16) {
 		err = r.wrap(err)
 		errorz.Fatal(err)
 	}
+	logger.Debugf("Not reported global test count: %d", n)
 	return
 }
 
@@ -358,6 +361,7 @@ func (r dbRepo) TestCount(testSuite string) (n uint16) {
 		err = r.wrap(err)
 		errorz.Fatal(err)
 	}
+	logger.Debugf("Not reported test count: %d", n)
 	return
 }
 

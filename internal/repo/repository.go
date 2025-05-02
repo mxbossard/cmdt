@@ -60,8 +60,8 @@ type Repo interface {
 
 	LoadSuiteOutcome(testSuite string) (outcome model.SuiteOutcome, err error)
 
-	MarkSuiteReported(suite string, reported bool) (err error)
-	MarkSuitesReported(all bool) (err error)
+	MarkSuiteReported(suite string) (err error)
+	MarkSuitesReported() (err error)
 
 	SuiteStatus(suite string) (exists, reported, kept bool, err error)
 

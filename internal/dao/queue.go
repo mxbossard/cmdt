@@ -324,7 +324,7 @@ func (d Queue) UnqueueOperater() (op model.Operater, err error) {
 		electedSuite = openedNotBlockingSuites[0]
 	}
 
-	logger.Debug("UnqueueOperater() 1", "electedSuite", electedSuite)
+	logger.Trace("UnqueueOperater() 1", "electedSuite", electedSuite)
 
 	if electedSuite == "" {
 		// Select first closed suite
@@ -349,7 +349,7 @@ func (d Queue) UnqueueOperater() (op model.Operater, err error) {
 		}
 	}
 
-	logger.Debug("UnqueueOperater() 2", "electedSuite", electedSuite)
+	logger.Trace("UnqueueOperater() 2", "electedSuite", electedSuite)
 
 	tx, err := d.db.Begin()
 	if err != nil {
@@ -368,7 +368,7 @@ func (d Queue) UnqueueOperater() (op model.Operater, err error) {
 		return
 	}
 	if op == nil {
-		logger.Debug("UnqueueOperater() no operation found")
+		logger.Trace("UnqueueOperater() no operation found")
 		return
 	}
 	opId := op.Id()

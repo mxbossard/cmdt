@@ -174,7 +174,7 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 		def := o.Definition
 		def.Token = d.token
 		def.Isolation = d.isolation
-		exitCode, err2 := d.reportAll(def)
+		exitCode, err2 := d.globalReport(def)
 		op.SetExitCode(uint16(exitCode))
 		op.SetErr(err2)
 	default:
@@ -214,11 +214,12 @@ func (d *daemon) report(def model.ReportDefinition) (exitCode int16, err error) 
 		}
 	}
 
-	// Wait for some test until suite timeout
-	testCount := d.repo.TestCount(def.TestSuite)
+	// Wait for some test to report until suite timeout
+	// FIXME: Daemon never report @all ?
+	testCount := d.repo.ToReportTestCountBySuiteAndMode(def.TestSuite, true, false)
 	for testCount == 0 {
 		if time.Since(start) > cfg.SuiteTimeout.Get() {
-			return 1, fmt.Errorf("reached suite timeout")
+			return 1, fmt.Errorf("timeouted suite report waiting for test")
 		}
 		time.Sleep(time.Millisecond)
 		testCount = d.repo.TestCount(def.TestSuite)
@@ -231,19 +232,21 @@ func (d *daemon) report(def model.ReportDefinition) (exitCode int16, err error) 
 	return
 }
 
-func (d *daemon) reportAll(def model.ReportDefinition) (exitCode int16, err error) {
+func (d *daemon) globalReport(def model.ReportDefinition) (exitCode int16, err error) {
 	perf := logger.PerfTimer()
 	defer perf.End()
 
 	start := time.Now()
 
-	// Wait for some test until suite timeout
-	testCount := d.repo.NotReportedTestCount()
+	// Wait for some test to report until suite timeout.
+	// FIXME: Daemon never report @all ?
+	testCount := d.repo.ToReportTestCountByMode(true, false)
+
 	// FIXME: should not need to wait for test count > 0
 	for testCount == 0 {
 		if time.Since(start) > WaitAsyncReportTestTimeout {
 			// FIXME: why not return an error ?
-			return 1, fmt.Errorf("timeouted waiting for test")
+			return 1, fmt.Errorf("timeouted global report waiting for test")
 		}
 		time.Sleep(time.Millisecond)
 		testCount = d.repo.NotReportedTestCount()

@@ -161,10 +161,9 @@ func (d Suite) NotReportedTestCount() (n uint16, err error) {
 	defer p.End()
 	// FIXME: not sure not reported test count works properly testing s.outcome
 	row := d.db.QueryRow(`
-		SELECT coalesce(sum(s.seq), 0)
+		SELECT coalesce(sum(s.seq), 0) - coalesce(sum(s.reportedCount), 0)
 		FROM suite s
-		WHERE s.outcome <> 'Z'
-	`)
+	`) // WHERE s.outcome <> 'Z'
 	err = row.Scan(&n)
 	return
 }
@@ -277,36 +276,24 @@ func (d Suite) UpdateSuiteOutcome(suite string, outcome model.Outcome) (err erro
 	return
 }
 
-func (d Suite) MarkSuiteReported(suite string, reported bool) (err error) {
+func (d Suite) MarkSuiteReported(suite string) (err error) {
 	p := logger.PerfTimer("suite", suite)
 	defer p.End()
 
-	if reported {
-		now := time.Now()
-		_, err = d.db.Exec(`
-			UPDATE suite SET reportedCount = (
-					SELECT coalesce(max(s.seq), 0)
-					FROM suite s
-					WHERE s.name = @suite
-				), lastReportTime = @now
-			WHERE name = @suite
-		`, sql.Named("suite", suite), sql.Named("now", now.UnixMicro()))
-	} else {
-		// Nothing to do with reportedCount
-		// When marking a suite not reported, mark global scope not reported as well
-		// _, err = d.db.Exec(`
-		// 	UPDATE suite SET reportedCount = (
-		// 			SELECT coalesce(max(s.seq), 0)
-		// 			FROM suite s
-		// 			WHERE s.name = ?
-		// 		)
-		// 	WHERE name = ? OR name = ''
-		// `, reported, suite)
-	}
+	now := time.Now()
+	_, err = d.db.Exec(`
+		UPDATE suite SET reportedCount = (
+				SELECT coalesce(max(s.seq), 0)
+				FROM suite s
+				WHERE s.name = @suite
+			), lastReportTime = @now
+		WHERE name = @suite
+	`, sql.Named("suite", suite), sql.Named("now", now.UnixMicro()))
+
 	return
 }
 
-func (d Suite) MarkSuitesReported(all bool) (err error) {
+func (d Suite) MarkSuitesReported() (err error) {
 	p := logger.PerfTimer()
 	defer p.End()
 
@@ -314,22 +301,8 @@ func (d Suite) MarkSuitesReported(all bool) (err error) {
 	// Update all reportedCount with seq except for global row
 	_, err = d.db.Exec(`
 		UPDATE suite SET reportedCount = coalesce(seq, 0), lastReportTime = ?
-		WHERE name <> ''
 	`, now.UnixMicro())
 
-	/*
-		if all {
-			_, err = d.db.Exec(`
-					UPDATE suite SET reported = 1, lastReportTime = ?
-				`, now.UnixMicro())
-		} else {
-			// Whene Marking not reported suites reported, mark global scope as well
-			_, err = d.db.Exec(`
-					UPDATE suite SET reported = 1, lastReportTime = ?
-					WHERE reported = 0 OR name = ''
-				`, now.UnixMicro())
-		}
-	*/
 	return
 }
 
@@ -372,7 +345,7 @@ func (d Suite) ListOrdered() (suites []string, err error) {
 		FROM suite s
 		WHERE s.name <> '' AND s.startTime IS NOT NULL
 		ORDER BY s.outcomeOrder ASC, s.startTime ASC
-	`) // s.outcome IN ('PASSED', 'FAILED', 'ERRORED') AND
+	`)
 	if err != nil {
 		return
 	}
@@ -399,7 +372,7 @@ func (d Suite) ListReportableOrdered() (suites []string, err error) {
 		WHERE s.startTime IS NOT NULL
 		    AND (coalesce(s.reportedCount, 0) <> coalesce(s.seq, 0) OR s.kept = 1)
 		ORDER BY s.outcomeOrder ASC, s.startTime ASC
-	`) // s.outcome IN ('PASSED', 'FAILED', 'ERRORED') AND
+	`)
 	if err != nil {
 		return
 	}
@@ -428,7 +401,7 @@ func (d Suite) ListReportableOrderedByMode(asyncMode, all bool) (suites []string
 			WHERE s.startTime IS NOT NULL
 				AND s.async = ?
 			ORDER BY s.outcomeOrder ASC, s.startTime ASC
-		`, asyncMode) // s.outcome IN ('PASSED', 'FAILED', 'ERRORED') AND
+		`, asyncMode)
 	} else {
 		rows, err = d.db.Query(`
 			SELECT s.name
@@ -437,7 +410,7 @@ func (d Suite) ListReportableOrderedByMode(asyncMode, all bool) (suites []string
 				AND s.async = ? 
 				AND (s.reportedCount IS NULL OR s.reportedCount <> s.seq OR s.kept = 1)
 			ORDER BY s.outcomeOrder ASC, s.startTime ASC
-		`, asyncMode) // s.outcome IN ('PASSED', 'FAILED', 'ERRORED') AND
+		`, asyncMode)
 	}
 
 	if err != nil {

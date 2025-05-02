@@ -524,17 +524,8 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 					}
 
 					asyncDpl := asyncdisplay.New(globalCtx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
-
-					err = asyncDpl.TailAllBlocking(globalCtx.Config.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
-					ProcessGlobalError(globalCtx, err)
-					logger.Info("finished async TailAllBlocking", "opId", op.Id())
-
 					daemonIsol = globalCtx.Isolation
 					daemonToken = globalCtx.Token
-					for _, suite := range asyncSuites {
-						err = cliAfterSuiteReport(daemonToken, daemonIsol, suite, asyncDpl)
-						ProcessGlobalError(globalCtx, err)
-					}
 
 					// always wait
 					// if globalCtx.Config.Wait.Is(true) {
@@ -549,6 +540,15 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 							Dpl.Errors(fmt.Errorf("daemon error: %w", opErr))
 						}
 						logger.Info("op done", "opId", op.Id(), "opKind", op.Kind(), "suite", op.TestSuite, "asyncExitCode", asyncExitCode)
+
+						for _, suite := range asyncSuites {
+							err = cliAfterSuiteReport(daemonToken, daemonIsol, suite, asyncDpl)
+							ProcessGlobalError(globalCtx, err)
+						}
+
+						err = globalCtx.Repo.MarkSuitesReported()
+						ProcessGlobalError(globalCtx, err)
+
 						// Clear all reported suite async display
 						suites, err := globalCtx.Repo.ListReportedAsyncSuites()
 						ProcessGlobalError(globalCtx, err)
@@ -559,6 +559,10 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 						return max(exitCode, asyncExitCode)
 					}
 
+					// FIXME: Waiting for zcreen tail but daemon could not be launched !
+					err = asyncDpl.TailAllBlocking(globalCtx.Config.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
+					ProcessGlobalError(globalCtx, err)
+					logger.Info("finished async TailAllBlocking", "opId", op.Id())
 				}
 			}
 
@@ -569,8 +573,6 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			}
 
 			Dpl.ReportAllFooter(globalCtx)
-			err = globalCtx.Repo.MarkSuitesReported(globalCfg.ReportAll.Get())
-			ProcessGlobalError(globalCtx, err)
 
 		} else {
 			// Reporting One test suite
@@ -619,6 +621,8 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				ProcessSuiteError(suiteCtx, err)
 
 				asyncDpl := asyncdisplay.New(suiteCtx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
+				daemonIsol = suiteCtx.Isolation
+				daemonToken = suiteCtx.Token
 
 				if suiteCtx.Config.Wait.Is(true) {
 					wait = func() int16 {
@@ -633,6 +637,10 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 						} else if opErr != nil {
 							Dpl.Errors(fmt.Errorf("daemon error: %w", opErr))
 						}
+
+						err = cliAfterSuiteReport(daemonToken, daemonIsol, testSuite, asyncDpl)
+						ProcessSuiteError(suiteCtx, err)
+
 						//asyncDpl.ClearSuite(suiteCtx)
 						return exitCode
 					}
@@ -640,14 +648,10 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 					exitCode = 0
 				}
 
+				// FIXME: Waiting for zcreen tail but daemon could not be launched !
 				err = asyncDpl.TailBlocking(testSuite, suiteCtx.Config.SuiteTimeout.Get())
 				ProcessSuiteError(suiteCtx, err)
 				logger.Info("finished async TailBlocking")
-
-				daemonIsol = suiteCtx.Isolation
-				daemonToken = suiteCtx.Token
-				err = cliAfterSuiteReport(daemonToken, daemonIsol, testSuite, asyncDpl)
-				ProcessSuiteError(suiteCtx, err)
 
 			} else {
 				logger.Info("executing report in sync", "suite", testSuite)
@@ -705,9 +709,6 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			exitCode = ProcessMalDefinedTest(testDef, parseArgsErrors.Return())
 			return
 		}
-
-		err = testCtx.Repo.MarkSuiteReported(testSuite, false)
-		ProcessTestError(testCtx, err)
 
 		logger.Debug("Test definition", "token", token, "isolation", isolation, "suite", testSuite, "seq", seq)
 		if !testCfg.Async.Is(true) {
