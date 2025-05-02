@@ -10,6 +10,7 @@ import (
 	"cmdt/internal/display"
 	"cmdt/internal/facade"
 	"cmdt/internal/model"
+
 	"github.com/mxbossard/utilz/errorz"
 	"github.com/mxbossard/utilz/formatz"
 	"github.com/mxbossard/utilz/inoutz"
@@ -407,6 +408,18 @@ func (d *AsyncDisplay) TailAllBlocking(timeout time.Duration) error {
 	updatedTimeout := timeout - time.Since(startTime)
 	logger.Debug("TailAllBlocking ...")
 	return d.tailer.TailAllBlocking(updatedTimeout)
+}
+
+func (d *AsyncDisplay) TailSuppliedBlocking(suites []string, timeout time.Duration) error {
+	// Wait for tailer to be started
+	startTime := time.Now()
+	err := d.WaitForTailerInit(timeout)
+	if err != nil {
+		return err
+	}
+	updatedTimeout := timeout - time.Since(startTime)
+	logger.Debug("TailSuppliedBlocking ...")
+	return d.tailer.TailSuppliedBlocking(suites, updatedTimeout)
 }
 
 func (d *AsyncDisplay) WaitForTailerInit(timeout time.Duration) error {

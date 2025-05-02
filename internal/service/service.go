@@ -560,7 +560,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 					}
 
 					// FIXME: Waiting for zcreen tail but daemon could not be launched !
-					err = asyncDpl.TailAllBlocking(globalCtx.Config.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
+					err = asyncDpl.TailSuppliedBlocking(asyncSuites, globalCtx.Config.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
 					ProcessGlobalError(globalCtx, err)
 					logger.Info("finished async TailAllBlocking", "opId", op.Id())
 				}

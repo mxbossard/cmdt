@@ -6,7 +6,7 @@ toolchain go1.23.1
 
 require (
 	github.com/gofrs/flock v0.12.1
-	github.com/mxbossard/utilz v0.1.0
+	github.com/mxbossard/utilz v0.1.1
 	github.com/stretchr/testify v1.9.0
 	modernc.org/sqlite v1.34.5
 )
