@@ -169,6 +169,7 @@ func (r dbRepo) GetSuiteConfig(testSuite string, initless bool) (cfg model.Confi
 	}
 	if found != nil {
 		cfg = *found
+		cfg.TestSuite.Set(testSuite)
 		logger.Debug("Loaded suite config from DB.", "suite", testSuite, "async", cfg.Async.Get())
 	} else {
 		// suite config does not exists yet

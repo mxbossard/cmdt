@@ -80,6 +80,9 @@ done
 >&2 echo "done tests"
 $newCmdt1 @report
 >&2 echo "done report"
+$newCmdt1 @report @all
+>&2 echo "done report @all"
+
 
 #rm -rf -- /tmp/cmdt*.log 2> /dev/null || true
 >&2 echo
@@ -94,6 +97,9 @@ done
 >&2 echo "done tests"
 $newCmdt1 @report
 >&2 echo "done report"
+$newCmdt1 @report @all
+>&2 echo "done report @all"
+
 
 >&2 echo
 >&2 echo "## Visual test async & sync global report"
@@ -117,4 +123,7 @@ done
 >&2 echo "done sync tests"
 $newCmdt1 @report
 >&2 echo "done report"
+
+$newCmdt1 @report @all
+>&2 echo "done report @all"
 

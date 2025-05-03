@@ -19,17 +19,20 @@ sleepRandom() {
 	>&2 echo
 }
 
+n=1
 runRandomScript() {
 	k=$(( RANDOM % ${#SCRIPTS[@]} ))
 	randomScript=${SCRIPTS[k]}
 	>&2 echo
-	>&2 echo "---------- Running script ($k): [$randomScript] ... ----------"
+	>&2 echo "---------- Running script ($k): [$randomScript] (#$n started since $SECONDS sec) ... ----------"
 	bash -e -c "$randomScript"
 	rc=$?
 	>&2 echo "> RC=$rc"
+	n=$(( n + 1 ))
 	return $rc
 }
 
+SECONDS=0
 while runRandomScript; do
 	sleepRandom 5 10	
 done

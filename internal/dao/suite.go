@@ -172,20 +172,11 @@ func (d Suite) ToReportTestCountByMode(asyncMode, all bool) (n uint16, err error
 	p := logger.PerfTimer()
 	defer p.End("asyncMode", asyncMode, "all", all, "n", n)
 
-	var row *sql.Row
-	if all {
-		row = d.db.QueryRow(`
-			SELECT coalesce(sum(s.seq), 0)
-			FROM suite s
-			WHERE s.async = ?
-		`, asyncMode)
-	} else {
-		row = d.db.QueryRow(`
-			SELECT coalesce(sum(s.seq), 0) - coalesce(sum(s.reportedCount), 0)
-			FROM suite s
-			WHERE s.async = ?
-		`, asyncMode)
-	}
+	row := d.db.QueryRow(`
+		SELECT coalesce(sum(s.seq), 0) - coalesce(sum(s.reportedCount), 0)
+		FROM suite s
+		WHERE s.async = ?
+	`, asyncMode)
 
 	err = row.Scan(&n)
 	return
@@ -195,20 +186,11 @@ func (d Suite) ToReportTestCountBySuiteAndMode(testSuite string, asyncMode, all 
 	p := logger.PerfTimer()
 	defer p.End("testSuite", testSuite, "asyncMode", asyncMode, "all", all, "n", n)
 
-	var row *sql.Row
-	if all {
-		row = d.db.QueryRow(`
-			SELECT coalesce(s.seq, 0)
-			FROM suite s
-			WHERE s.name = ? AND s.async = ?
-		`, testSuite, asyncMode)
-	} else {
-		row = d.db.QueryRow(`
-			SELECT coalesce(s.seq, 0) - coalesce(s.reportedCount, 0)
-			FROM suite s
-			WHERE s.name = ? AND s.async = ?
-		`, testSuite, asyncMode)
-	}
+	row := d.db.QueryRow(`
+		SELECT coalesce(s.seq, 0) - coalesce(s.reportedCount, 0)
+		FROM suite s
+		WHERE s.name = ? AND s.async = ?
+	`, testSuite, asyncMode)
 
 	err = row.Scan(&n)
 	return
@@ -371,6 +353,7 @@ func (d Suite) ListReportableOrdered() (suites []string, err error) {
 		FROM suite s
 		WHERE s.startTime IS NOT NULL
 		    AND (coalesce(s.reportedCount, 0) <> coalesce(s.seq, 0) OR s.kept = 1)
+			AND s.name <> ''
 		ORDER BY s.outcomeOrder ASC, s.startTime ASC
 	`)
 	if err != nil {
@@ -400,6 +383,7 @@ func (d Suite) ListReportableOrderedByMode(asyncMode, all bool) (suites []string
 			FROM suite s
 			WHERE s.startTime IS NOT NULL
 				AND s.async = ?
+				AND s.name <> ''
 			ORDER BY s.outcomeOrder ASC, s.startTime ASC
 		`, asyncMode)
 	} else {
@@ -408,6 +392,7 @@ func (d Suite) ListReportableOrderedByMode(asyncMode, all bool) (suites []string
 			FROM suite s
 			WHERE s.startTime IS NOT NULL
 				AND s.async = ? 
+				AND s.name <> ''
 				AND (s.reportedCount IS NULL OR s.reportedCount <> s.seq OR s.kept = 1)
 			ORDER BY s.outcomeOrder ASC, s.startTime ASC
 		`, asyncMode)
