@@ -466,6 +466,13 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			Dpl.SetVerbose(globalCfg.Verbose.Get())
 			rep := facade.Repo(token, isolation)
 
+			wait = func() int16 {
+				err = globalCtx.Repo.MarkSuitesReported()
+				ProcessGlobalError(globalCtx, err)
+
+				return exitCode
+			}
+
 			// Process report all without daemon
 			logger.Trace("Forged context", "ctx", globalCtx)
 			// logger.Info("executing report all in sync (not queueing report)")
@@ -528,6 +535,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 					daemonToken = globalCtx.Token
 
 					// always wait
+					// Replace wait func for async processing
 					// if globalCtx.Config.Wait.Is(true) {
 					wait = func() int16 {
 						// FIXME: bad timeout
@@ -572,6 +580,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				ProcessGlobalError(globalCtx, err)
 			}
 
+			// Display report all footer before wait is called and then before suites are marked reported for accurate timings
 			Dpl.ReportAllFooter(globalCtx)
 
 		} else {
