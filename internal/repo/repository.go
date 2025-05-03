@@ -63,7 +63,7 @@ type Repo interface {
 	MarkSuiteReported(suite string) (err error)
 	MarkSuitesReported() (err error)
 
-	SuiteStatus(suite string) (exists, reported, kept bool, err error)
+	SuiteStatus(suite string) (exists, reported bool, err error)
 
 	IncrementSuiteSeq(testSuite, name string) (n uint16)
 

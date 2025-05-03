@@ -3,9 +3,9 @@ package parser
 import (
 	"testing"
 
+	"github.com/mxbossard/utilz/errorz"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/mxbossard/utilz/errorz"
 )
 
 const badContextUseErrorMsg = "can only be used in context"
@@ -405,7 +405,7 @@ func TestChilds(t *testing.T) {
 	assert.NoError(t, warns.Return())
 	assert.Len(t, ruleDefs, len(rsReportConfig.rules)+len(rsVerbosity.rules))
 
-	args = []string{"report", "keep"}
+	args = []string{"report", "all"}
 	ruleDefs, warns, errors = repo.children(args...)
 	assert.NoError(t, errors.Return())
 	assert.NoError(t, warns.Return())
@@ -457,7 +457,7 @@ func TestChilds(t *testing.T) {
 	assert.NoError(t, warns.Return())
 	assert.Len(t, ruleDefs, 0)
 
-	args = []string{"suite", "keep"}
+	args = []string{"suite", "ignore"}
 	// should return an error because keepReport rule is not a valid child of suite rule
 	ruleDefs, warns, errors = repo.children(args...)
 	assert.Error(t, errors.Return())

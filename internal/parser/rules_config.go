@@ -135,7 +135,7 @@ var (
 		"dirty_container")
 
 	// REPORT CONFIG
-	keepReport = buildRule("keep", ops(noOp[bool]()), nil)
+	reportAll = buildRule("all", ops(noOp[bool]()), nil)
 
 	// WHERE ?
 	//parallel = buildRule("parallel", nil)
@@ -174,7 +174,7 @@ var (
 		failuresLimit, beforeSuite, afterSuite), nil)
 	rsTestConfig = buildRS("testConfig", rules(global, suite, test), rules(wait, ignore, keepStdout, keepStderr,
 		keepOutputs, timeout, runCount, mock, before, after, container, dirtyContainer), nil)
-	rsReportConfig        = buildRS("reportConfig", rules(report), rules(keepReport), nil)
+	rsReportConfig        = buildRS("reportConfig", rules(report), rules(reportAll), nil)
 	rsOutcomeAssertions   = buildMERS("outcomeAssertions", rules(test), rules(success, failure, exit), success)
 	rsStackableAssertions = buildRS("stackableAssertions", rules(test), rules(stdout, stderr, cmd, exists), nil)
 )

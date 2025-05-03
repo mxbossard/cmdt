@@ -314,8 +314,8 @@ func (r dbRepo) MarkSuitesReported() (err error) {
 	return
 }
 
-func (r dbRepo) SuiteStatus(suite string) (exists, reported, kept bool, err error) {
-	exists, reported, kept, err = r.suiteDao.IsSuiteReported(suite)
+func (r dbRepo) SuiteStatus(suite string) (exists, reported bool, err error) {
+	exists, reported, err = r.suiteDao.IsSuiteReported(suite)
 	err = r.wrap(err)
 	return
 }

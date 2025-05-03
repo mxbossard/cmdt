@@ -54,7 +54,6 @@ func (d Suite) init() (err error) {
 			outcome TEXT NOT NULL DEFAULT 'Z',
 			outcomeOrder INTEGER DEFAULT 0,
 			reportedCount INTEGER NULL DEFAULT NULL,
-			kept INTEGER NOT NULL DEFAULT 0,
 			async INTEGER NOT NULL DEFAULT 0,
 			ignored INTEGER NOT NULL DEFAULT 0
 		);
@@ -288,19 +287,19 @@ func (d Suite) MarkSuitesReported() (err error) {
 	return
 }
 
-func (d Suite) IsSuiteReported(suite string) (exists, reported, kept bool, err error) {
+func (d Suite) IsSuiteReported(suite string) (exists, reported bool, err error) {
 	p := logger.PerfTimer("suite", suite)
 	defer p.End()
 
 	row := d.db.QueryRow(`
-		SELECT coalesce(s.reportedCount, 0) = coalesce(s.seq, 0), s.kept
+		SELECT coalesce(s.reportedCount, 0) = coalesce(s.seq, 0)
 		FROM suite s
 		WHERE s.name = @suite
 	`, sql.Named("suite", suite))
-	err = row.Scan(&reported, &kept)
+	err = row.Scan(&reported)
 	if err == sql.ErrNoRows {
 		// Suite do not exists
-		return false, false, false, nil
+		return false, false, nil
 	} else {
 		exists = true
 	}
@@ -352,7 +351,7 @@ func (d Suite) ListReportableOrdered() (suites []string, err error) {
 		SELECT s.name
 		FROM suite s
 		WHERE s.startTime IS NOT NULL
-		    AND (coalesce(s.reportedCount, 0) <> coalesce(s.seq, 0) OR s.kept = 1)
+		    AND (coalesce(s.reportedCount, 0) <> coalesce(s.seq, 0))
 			AND s.name <> ''
 		ORDER BY s.outcomeOrder ASC, s.startTime ASC
 	`)
@@ -393,7 +392,7 @@ func (d Suite) ListReportableOrderedByMode(asyncMode, all bool) (suites []string
 			WHERE s.startTime IS NOT NULL
 				AND s.async = ? 
 				AND s.name <> ''
-				AND (s.reportedCount IS NULL OR s.reportedCount <> s.seq OR s.kept = 1)
+				AND (s.reportedCount IS NULL OR s.reportedCount <> s.seq)
 			ORDER BY s.outcomeOrder ASC, s.startTime ASC
 		`, asyncMode)
 	}

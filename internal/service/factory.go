@@ -585,8 +585,6 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 			}
 		case "isol":
 			c.Isol, err = TranslateOptional(rule, DummyMapper, OperatorValidater[string]("="), NotEmptyValidater[string])
-		case "keep":
-			c.Keep, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
 		case "all":
 			c.ReportAll, err = TranslateOptional(rule, BoolMapper, BooleanValidater)
 		case "parallel":

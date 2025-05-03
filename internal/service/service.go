@@ -84,7 +84,6 @@ func globalReport(ctx facade.GlobalContext, asyncMode bool) (exitCode int16, err
 			continue
 		}
 		// Override suite Keep config for reportAll which is global
-		suiteCtx.Config.Keep = ctx.Config.Keep
 		suiteIgnored := suiteCtx.Config.IgnoreSuite.GetOr(false)
 		goodModeSuite = true
 		count := suiteCtx.Repo.ToReportTestCountBySuiteAndMode(testSuite, asyncMode, all)
@@ -409,7 +408,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 
 		// Check if suite exists and it's status
 		rep := facade.Repo(token, isolation)
-		exists, reported, kept, err := rep.SuiteStatus(testSuite)
+		exists, reported, err := rep.SuiteStatus(testSuite)
 
 		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig)
 		ProcessSuiteError(suiteCtx, err)
@@ -421,15 +420,12 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			suiteCtx.Config.Async.Set(false)
 		}
 
-		logger.Debug("repo suite status", "testSuite", testSuite, "exists", exists, "reported", reported, "kept", kept)
+		logger.Debug("repo suite status", "testSuite", testSuite, "exists", exists, "reported", reported)
 
 		if exists {
 			n := rep.TestCount(testSuite)
 			if n > 0 && !reported {
 				err = fmt.Errorf("cannot erase test suite: [%s] which contains %d test(s) not reported yet", testSuite, n)
-				ProcessSuiteError(suiteCtx, err)
-			} else if n > 0 && kept {
-				err = fmt.Errorf("cannot erase test suite: [%s] which must be kept", testSuite)
 				ProcessSuiteError(suiteCtx, err)
 			}
 		}

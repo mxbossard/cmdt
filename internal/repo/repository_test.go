@@ -5,9 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"cmdt/internal/model"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"cmdt/internal/model"
 )
 
 func checkConfig(t *testing.T, eIsol, eToken, eSuite string, before time.Time, actual model.Config) {
@@ -26,7 +27,6 @@ func compareConfig(t *testing.T, expected, actual model.Config) {
 	assert.True(t, expected.Wait.Equal(actual.Wait), "bad Wait")
 	assert.True(t, expected.Debug.Equal(actual.Debug), "bad Debug")
 	assert.True(t, expected.Verbose.Equal(actual.Verbose), "bad Verbose")
-	assert.True(t, expected.Keep.Equal(actual.Keep), "bad Keep")
 	assert.True(t, expected.Prefix.Equal(actual.Prefix), "bad Prefix")
 }
 

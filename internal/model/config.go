@@ -136,7 +136,7 @@ var (
 	}
 
 	ReportConfigs = []RuleDefinition{
-		ruleDef("keep", "", "="),
+		//ruleDef("keep", "", "="),
 		ruleDef("all", ""),
 	}
 
@@ -315,7 +315,6 @@ type Config struct {
 	ExportToken   utilz.Optional[bool]          `yaml:"-"`
 	GlobalReport  utilz.Optional[bool]          `yaml:"-"`
 	ReportAll     utilz.Optional[bool]          `yaml:"-"`
-	Keep          utilz.Optional[bool]          `yaml:""`
 	Verbose       utilz.Optional[VerboseLevel]  `yaml:""`
 	Debug         utilz.Optional[DebugLevel]    `yaml:""`
 	Quiet         utilz.Optional[bool]          `yaml:""`
@@ -392,7 +391,7 @@ func (c *Config) Merge(right Config) {
 	c.ExportToken.Merge(right.ExportToken)
 	c.GlobalReport.Merge(right.GlobalReport)
 	c.ReportAll.Merge(right.ReportAll)
-	c.Keep.Merge(right.Keep)
+	//c.Keep.Merge(right.Keep)
 	c.Quiet.Merge(right.Quiet)
 	c.Ignore.Merge(right.Ignore)
 	c.StopOnFailure.Merge(right.StopOnFailure)

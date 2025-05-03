@@ -44,7 +44,6 @@ func compareConfig(t *testing.T, expected, actual model.Config) {
 	assert.True(t, expected.Wait.Equal(actual.Wait), "bad Wait")
 	assert.True(t, expected.Debug.Equal(actual.Debug), "bad Debug")
 	assert.True(t, expected.Verbose.Equal(actual.Verbose), "bad Verbose")
-	assert.True(t, expected.Keep.Equal(actual.Keep), "bad Keep")
 	assert.True(t, expected.Prefix.Equal(actual.Prefix), "bad Prefix")
 
 	require.True(t, actual.Async.IsPresent(), "Async empty")
