@@ -498,7 +498,21 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				exitCode = 0
 			}
 
-			// 2- Report all async suites
+			// 2- Report All already reported async suites
+			reportedAsyncSuites, err := rep.ListReportedAsyncSuites()
+			ProcessGlobalError(globalCtx, err)
+			if reportAll && len(reportedAsyncSuites) > 0 {
+				// Report All async suites already reported
+
+				exitCode, err = globalReport(globalCtx, true)
+				ProcessGlobalError(globalCtx, err)
+				for _, suite := range reportedAsyncSuites {
+					err = cliAfterSuiteReport(globalCtx.Token, globalCtx.Isolation, suite, Dpl)
+					ProcessGlobalError(globalCtx, err)
+				}
+			}
+
+			// 3- Global report async suites which are not reported yet
 			toReportAsyncTestCount := rep.ToReportTestCountByMode(true, reportAll)
 			if toReportAsyncTestCount > 0 {
 				if len(asyncSuites) > 0 {

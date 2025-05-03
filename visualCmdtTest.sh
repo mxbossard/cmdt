@@ -80,7 +80,7 @@ done
 >&2 echo "done tests"
 $newCmdt1 @report
 >&2 echo "done report"
-$newCmdt1 @report @all
+$newCmdt1 @report @all || true
 >&2 echo "done report @all"
 
 
@@ -97,7 +97,7 @@ done
 >&2 echo "done tests"
 $newCmdt1 @report
 >&2 echo "done report"
-$newCmdt1 @report @all
+$newCmdt1 @report @all || true
 >&2 echo "done report @all"
 
 
@@ -124,6 +124,6 @@ done
 $newCmdt1 @report
 >&2 echo "done report"
 
-$newCmdt1 @report @all
+$newCmdt1 @report @all || true
 >&2 echo "done report @all"
 
