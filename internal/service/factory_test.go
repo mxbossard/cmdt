@@ -43,7 +43,7 @@ func TestApplyConfig(t *testing.T) {
 	require.True(t, cfg.ForkCount.IsPresent())
 	assert.Equal(t, expectedFork, cfg.ForkCount.Get())
 
-	expectedFork = uint16(7)
+	expectedFork = uint16(47)
 	ok, _, err = ApplyConfig(&cfg, fmt.Sprintf("@fork=%d", expectedFork))
 	assert.Error(t, err)
 	assert.True(t, ok)

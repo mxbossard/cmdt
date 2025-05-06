@@ -1,6 +1,17 @@
 package fork
 
-import "cmdt/internal/model"
+import (
+	"cmdt/internal/model"
+	"sync"
+	"time"
+)
+
+const (
+	workerInactivityTimeout      = 1 * time.Millisecond
+	workerSleepPeriod            = 1 * time.Microsecond
+	schedulerQueueElectionPeriod = 1 * time.Microsecond
+	schedulerMaxWorker           = 20
+)
 
 /*
 
@@ -33,26 +44,45 @@ import "cmdt/internal/model"
 */
 
 func QueueTestDef(testDef model.TestDefinition) (err error) {
-	err = instance()
+	sched, err = instance()
 	if err != nil {
 		return err
 	}
 
+	suite := testDef.TestSuite
+	forkCount := int(testDef.Config.ForkCount.Get())
+	work := func() {
+		// TODO
+	}
+	_, err = sched.schedule(suite, forkCount, work)
+	return
+}
+
+func ClearSuite(suite string) (err error) {
+	sched, err = instance()
+	if err != nil {
+		return err
+	}
+
+	err = sched.clearSuite(suite)
 	return
 }
 
 var sched *scheduler
 
-func instance() (err error) {
+func instance() (*scheduler, error) {
 	if sched != nil {
-		return
+		return sched, nil
 	}
 
 	sched = &scheduler{
 		suiteQueues: make(map[string]suiteQueue),
-		maxRunners:  0,
+		maxWorkers:  schedulerMaxWorker,
 	}
-	return
+
+	go sched.run()
+
+	return sched, nil
 }
 
 /*
@@ -71,50 +101,138 @@ func instance() (err error) {
 - 3- Scheduler maintain a meta pool of max fork size
 */
 
+type work func()
+
+type task struct {
+	work work
+	done chan bool
+}
+
 type suiteQueue struct {
-	priority   int
-	runnerPool chan bool
-	queue      []model.TestDefinition
-	done       []model.TestDefinition
+	priority    int
+	forkCount   int
+	workerCount int
+	//runnerPool  chan bool
+	// queue      collectionz.Queue[model.TestDefinition]
+	// done       []model.TestDefinition
+	tasks chan task
+	//done  chan model.TestDefinition
+	quit chan bool
 }
 
 type scheduler struct {
+	sync.Mutex
 	suiteQueues map[string]suiteQueue
-	maxRunners  int
+	maxWorkers  int
+	workerCount int
 }
 
-func (s *scheduler) update(testDef model.TestDefinition) (err error) {
-	forkCount := int(testDef.Config.ForkCount.Get())
-	q, ok := s.suiteQueues[testDef.TestSuite]
+func (s *scheduler) clearSuite(suite string) (err error) {
+	q, ok := s.suiteQueues[suite]
+	if ok {
+		// stop suite workers
+		//q.quit <- true
+		close(q.tasks)
+		//close(q.done)
+		delete(s.suiteQueues, suite)
+	}
+	return
+}
+
+func (s *scheduler) schedule(suite string, forkCount int, w work) (chan bool, error) {
+	s.Lock()
+	defer s.Unlock()
+
+	q, ok := s.suiteQueues[suite]
 	if !ok {
 		q = suiteQueue{
-			priority:   1,
-			runnerPool: make(chan bool, forkCount),
+			priority:  1,
+			forkCount: forkCount,
+			//runnerPool: make(chan bool, forkCount),
+			tasks: make(chan task, 128),
+			//done:  make(chan model.TestDefinition, 128),
+			quit: make(chan bool),
 		}
 	}
 
-	q.queue = append(q.queue, testDef)
-	s.suiteQueues[testDef.TestSuite] = q
-	s.maxRunners = max(s.maxRunners, forkCount)
-	return
+	t := task{
+		work: w,
+		done: make(chan bool, 1),
+	}
+	q.tasks <- t
+	s.suiteQueues[suite] = q
+	s.maxWorkers = max(s.maxWorkers, forkCount)
+	return t.done, nil
+}
+
+func (s *scheduler) worker(q *suiteQueue) {
+	q.workerCount++
+	s.workerCount++
+
+	touched := time.Now()
+End:
+	for {
+		if time.Since(touched) > workerInactivityTimeout {
+			// Quit worker after inactivity timeout
+			break End
+		}
+
+		select {
+		case task, ok := <-q.tasks:
+			if !ok {
+				// Channel was closed => terminate the worker
+				break End
+			}
+			task.work()
+			task.done <- true
+			// FIXME: is done chan needed ?
+			//q.done <- task
+			touched = time.Now()
+
+		//case <- q.quit:
+		//	break End
+
+		default:
+			time.Sleep(workerSleepPeriod)
+		}
+	}
+	q.workerCount--
+	s.workerCount--
 }
 
 func (s *scheduler) run() (err error) {
 	for {
-		// 1- Check for runner availability
-
-		// 2- Elect highest priority queue which can be dequed and ran
+		// 1- Elect highest priority queue which can be dequed with missing worker
+		var electedQueue *suiteQueue
+		s.Lock()
 		for suite, q := range s.suiteQueues {
 			_ = suite
-			_ = q
+			if len(q.tasks) > 0 && q.workerCount < q.forkCount {
+				// q is electable
+				if electedQueue == nil || q.priority < electedQueue.priority {
+					electedQueue = &q
+				}
+			}
+		}
+		s.Unlock()
+
+		if electedQueue != nil {
+			// 2- Check for worker availability and launch worker if possible
+			if s.workerCount < s.maxWorkers {
+				// spawn a worker
+				go s.worker(electedQueue)
+			}
 		}
 
-		// 3- Dequeue elected suite and launch test
-
+		time.Sleep(schedulerQueueElectionPeriod)
 	}
-	return
 }
 
-func (s scheduler) forkTest(testDef model.TestDefinition) (err error) {
-	return
-}
+/*
+- @fork=N => N workers
+- @maxFork => limit global number of forks
+- scheduler in charge of spawning suite q workers
+- 1 task chan by suite q
+
+
+*/
