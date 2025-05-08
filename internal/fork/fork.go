@@ -2,15 +2,20 @@ package fork
 
 import (
 	"cmdt/internal/model"
+	"cmdt/internal/service"
+	"fmt"
 	"sync"
 	"time"
+
+	"github.com/mxbossard/utilz/collectionz"
 )
 
 const (
-	workerInactivityTimeout      = 1 * time.Millisecond
+	workerInactivityTimeout      = 10 * time.Millisecond
 	workerSleepPeriod            = 1 * time.Microsecond
 	schedulerQueueElectionPeriod = 1 * time.Microsecond
-	schedulerMaxWorker           = 20
+	schedulerMaxWorker           = 50
+	waitQueueCompleteSleepPeriod = 1 * time.Millisecond
 )
 
 /*
@@ -43,7 +48,7 @@ const (
 - Do not queue async report for simplicity sake => report always in sync
 */
 
-func QueueTestDef(testDef model.TestDefinition) (err error) {
+func QueueTestDef(testDef model.TestDefinition, op *model.TestOp) (err error) {
 	sched, err = instance()
 	if err != nil {
 		return err
@@ -52,19 +57,50 @@ func QueueTestDef(testDef model.TestDefinition) (err error) {
 	suite := testDef.TestSuite
 	forkCount := int(testDef.Config.ForkCount.Get())
 	work := func() {
-		// TODO
+		exitCode := service.ProcessTestDef(testDef)
+		op.SetExitCode(uint16(exitCode))
 	}
 	_, err = sched.schedule(suite, forkCount, work)
 	return
 }
 
-func ClearSuite(suite string) (err error) {
+func QueueOperation0(op *model.Operater) (err error) {
 	sched, err = instance()
 	if err != nil {
 		return err
 	}
 
-	err = sched.clearSuite(suite)
+	// TODO ?
+	return
+}
+
+func WaitQueueComplete(name string) (err error) {
+	sched, err = instance()
+	if err != nil {
+		return err
+	}
+
+	err = sched.waitQueueComplete(name)
+	return
+}
+
+func WaitAllQueuesComplete() (err error) {
+	sched, err = instance()
+	if err != nil {
+		return err
+	}
+
+	err = sched.waitAllQueuesComplete()
+	return
+}
+
+func ClearQueue(name string) (err error) {
+	sched, err = instance()
+	if err != nil {
+		return err
+	}
+
+	err = sched.clearSuite(name)
 	return
 }
 
@@ -76,8 +112,8 @@ func instance() (*scheduler, error) {
 	}
 
 	sched = &scheduler{
-		suiteQueues: make(map[string]suiteQueue),
-		maxWorkers:  schedulerMaxWorker,
+		queues:     make(map[string]*queue),
+		maxWorkers: schedulerMaxWorker,
 	}
 
 	go sched.run()
@@ -108,67 +144,109 @@ type task struct {
 	done chan bool
 }
 
-type suiteQueue struct {
+type queue struct {
+	name        string
 	priority    int
 	forkCount   int
 	workerCount int
-	//runnerPool  chan bool
-	// queue      collectionz.Queue[model.TestDefinition]
-	// done       []model.TestDefinition
-	tasks chan task
-	//done  chan model.TestDefinition
-	quit chan bool
+	tasks       chan task
+	quit        chan bool
+	enable      bool
+	scheduled   int
+	done        int
 }
 
 type scheduler struct {
 	sync.Mutex
-	suiteQueues map[string]suiteQueue
+	queues      map[string]*queue
 	maxWorkers  int
 	workerCount int
 }
 
 func (s *scheduler) clearSuite(suite string) (err error) {
-	q, ok := s.suiteQueues[suite]
+	q, ok := s.queues[suite]
 	if ok {
 		// stop suite workers
 		//q.quit <- true
 		close(q.tasks)
 		//close(q.done)
-		delete(s.suiteQueues, suite)
+		s.Lock()
+		delete(s.queues, suite)
+		s.Unlock()
 	}
 	return
 }
 
-func (s *scheduler) schedule(suite string, forkCount int, w work) (chan bool, error) {
+func (s *scheduler) schedule(queueName string, forkCount int, w work) (chan bool, error) {
 	s.Lock()
 	defer s.Unlock()
 
-	q, ok := s.suiteQueues[suite]
+	q, ok := s.queues[queueName]
 	if !ok {
-		q = suiteQueue{
+		q = &queue{
+			name:      queueName,
 			priority:  1,
 			forkCount: forkCount,
 			//runnerPool: make(chan bool, forkCount),
 			tasks: make(chan task, 128),
 			//done:  make(chan model.TestDefinition, 128),
-			quit: make(chan bool),
+			quit:   make(chan bool),
+			enable: true,
 		}
+	}
+
+	if !q.enable {
+		err := fmt.Errorf("cannot schedule work on disabled queue: %s", queueName)
+		return nil, err
 	}
 
 	t := task{
 		work: w,
 		done: make(chan bool, 1),
 	}
+	q.scheduled++
 	q.tasks <- t
-	s.suiteQueues[suite] = q
+	s.queues[queueName] = q
 	s.maxWorkers = max(s.maxWorkers, forkCount)
 	return t.done, nil
 }
 
-func (s *scheduler) worker(q *suiteQueue) {
-	q.workerCount++
-	s.workerCount++
+func (s *scheduler) waitQueueComplete(queueName string) (err error) {
+	s.Lock()
+	q, ok := s.queues[queueName]
+	s.Unlock()
+	if !ok {
+		return
+	}
 
+	// Disable q => should not add more tasks
+	q.enable = false
+
+	for q.done != q.scheduled {
+		time.Sleep(waitQueueCompleteSleepPeriod)
+	}
+
+	// fmt.Printf("queue: %s completed %d/%d tasks (worker count: %d)\n", queueName, q.done, q.scheduled, q.workerCount)
+
+	return
+}
+
+func (s *scheduler) waitAllQueuesComplete() (err error) {
+	s.Lock()
+	queues := collectionz.Keys(s.queues)
+	s.Unlock()
+
+	for _, q := range queues {
+		err = s.waitQueueComplete(q)
+		if err != nil {
+			return err
+		}
+	}
+
+	return
+}
+
+func (s *scheduler) worker(q *queue) {
 	touched := time.Now()
 End:
 	for {
@@ -185,6 +263,7 @@ End:
 			}
 			task.work()
 			task.done <- true
+			q.done++
 			// FIXME: is done chan needed ?
 			//q.done <- task
 			touched = time.Now()
@@ -203,27 +282,30 @@ End:
 func (s *scheduler) run() (err error) {
 	for {
 		// 1- Elect highest priority queue which can be dequed with missing worker
-		var electedQueue *suiteQueue
+		var electedQueue *queue
 		s.Lock()
-		for suite, q := range s.suiteQueues {
+		for suite, q := range s.queues {
 			_ = suite
 			if len(q.tasks) > 0 && q.workerCount < q.forkCount {
 				// q is electable
 				if electedQueue == nil || q.priority < electedQueue.priority {
-					electedQueue = &q
+					electedQueue = q
 				}
 			}
 		}
-		s.Unlock()
 
 		if electedQueue != nil {
 			// 2- Check for worker availability and launch worker if possible
 			if s.workerCount < s.maxWorkers {
 				// spawn a worker
+				electedQueue.workerCount++
+				s.workerCount++
 				go s.worker(electedQueue)
+				// fmt.Printf("Started a new worker for queue: %s (worker count: %d)\n", electedQueue.name, electedQueue.workerCount)
 			}
 		}
 
+		s.Unlock()
 		time.Sleep(schedulerQueueElectionPeriod)
 	}
 }

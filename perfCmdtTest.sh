@@ -56,34 +56,45 @@ $cmdt1 @test=perf/sleep_0.1 sleep 0.1
 $cmdt1 @report
 
 
->&2 echo "## test @fork=1"
-$cmdt1 @init=fork1 @verbose=4 @fork=1
+>&2 echo "## test @async=false @fork=1"
+$cmdt1 @init=fork1_sync @verbose=3 @async=false @fork=1
 
-for i in $( seq 0 9 ); do
-	$cmdt1 @test=fork1/sleep_0.1_$i sleep 0.01
+for i in $( seq 0 29 ); do
+	$cmdt1 @test=fork1_sync/sleep_0.1_$i sleep 0.01
 done
-
->&2 echo "## test @fork=2"
-$cmdt1 @init=fork2 @verbose=4 @fork=2
-
-for i in $( seq 0 9 ); do
-	$cmdt1 @test=fork2/sleep_0.1_$i sleep 0.01
-done
-
->&2 echo "## test @fork=5"
-$cmdt1 @init=fork5 @verbose=4 @fork=5
-
-#$cmdt1 @test=fork/echo_foo echo foo
-for i in $( seq 0 9 ); do
-	$cmdt1 @test=fork5/sleep_0.1_$i sleep 0.01
-done
-
->&2 echo "## test @fork=20"
-$cmdt1 @init=fork20 @verbose=4 @fork=20
-
-for i in $( seq 0 9 ); do
-	$cmdt1 @test=fork20/sleep_0.1_$i sleep 0.01
-done
-
 $cmdt1 @report
 
+>&2 echo "## test @async @fork=1"
+$cmdt1 @init=fork1_async @verbose=3 @async @fork=1
+
+for i in $( seq 0 29 ); do
+	$cmdt1 @test=fork1_async/sleep_0.1_$i sleep 0.01
+done
+$cmdt1 @report
+
+>&2 echo "## test @fork=2"
+$cmdt1 @init=fork2 @verbose=3 @fork=2
+
+for i in $( seq 0 29 ); do
+	$cmdt1 @test=fork2/sleep_0.1_$i sleep 0.01
+done
+$cmdt1 @report
+
+>&2 echo "## test @fork=5"
+$cmdt1 @init=fork5 @verbose=3 @fork=5
+
+#$cmdt1 @test=fork/echo_foo echo foo
+for i in $( seq 0 29 ); do
+	$cmdt1 @test=fork5/sleep_0.1_$i sleep 0.01
+done
+$cmdt1 @report
+
+>&2 echo "## test @fork=20"
+$cmdt1 @init=fork20 @verbose=3 @fork=20
+
+for i in $( seq 0 29 ); do
+	$cmdt1 @test=fork20/sleep_0.1_$i sleep 0.01
+done
+$cmdt1 @report
+
+$cmdt1 @report @all

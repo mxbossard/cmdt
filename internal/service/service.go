@@ -413,6 +413,11 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig)
 		ProcessSuiteError(suiteCtx, err)
 
+		if suiteCtx.Config.ForkCount.GetOr(1) > 1 {
+			// Forked suite MUST be async
+			suiteCtx.Config.Async.Set(true)
+		}
+
 		// Store ignore at suite level
 		suiteCtx.Config.IgnoreSuite = suiteCtx.Config.Ignore
 		if suiteCtx.Config.IgnoreSuite.GetOr(false) {

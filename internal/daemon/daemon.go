@@ -15,6 +15,7 @@ import (
 
 	"cmdt/internal/asyncdisplay"
 	"cmdt/internal/facade"
+	"cmdt/internal/fork"
 	"cmdt/internal/model"
 	"cmdt/internal/repo"
 	"cmdt/internal/service"
@@ -152,6 +153,7 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 			ctx := facade.NewSuiteContext(d.token, d.isolation, suite, false, model.InitAction, model.Config{})
 			d.display.OpenSuite(ctx)
 			d.display.SuiteTitle(ctx)
+			fork.ClearQueue(suite)
 		} else {
 			logger.Debug("Test suite already opened", "token", d.token, "isolation", d.isolation, "openedSuite", suite)
 		}
@@ -159,13 +161,19 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 		def := o.Definition
 		def.Token = d.token
 		def.Isolation = d.isolation
-		ec := d.performTest(def)
-		op.SetExitCode(uint16(ec))
+
+		// exitCode := service.ProcessTestDef(def)
+		// o.SetExitCode(uint16(exitCode))
+		fork.QueueTestDef(def, o)
+
 	case *model.ReportOp:
 		// FIXME: must override bad token & isolation inside ReportDefinition !
 		def := o.Definition
 		def.Token = d.token
 		def.Isolation = d.isolation
+
+		fork.WaitQueueComplete(def.TestSuite)
+
 		exitCode, err2 := d.report(def)
 		op.SetExitCode(uint16(exitCode))
 		op.SetErr(err2)
@@ -174,6 +182,9 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 		def := o.Definition
 		def.Token = d.token
 		def.Isolation = d.isolation
+
+		fork.WaitAllQueuesComplete()
+
 		exitCode, err2 := d.globalReport(def)
 		op.SetExitCode(uint16(exitCode))
 		op.SetErr(err2)
@@ -185,7 +196,7 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 	return
 }
 
-func (d *daemon) performTest(testDef model.TestDefinition) (exitCode int16) {
+func (d *daemon) performTest0(testDef model.TestDefinition) (exitCode int16) {
 	perf := logger.PerfTimer()
 	defer perf.End()
 	exitCode = service.ProcessTestDef(testDef)

@@ -6,7 +6,7 @@ scriptDir=$( dirname $( readlink -f $0 ) )
 newCmdt="$BUILT_CMDT_BIN"
 
 # Trusted cmdt to works
-cmdt="cmdt"
+cmdt="${CMDT_BIN:-cmdt}"
 #cmdt="$newCmdt"
 
 >&2 echo "using cmdt: [$cmdt]"
@@ -19,6 +19,8 @@ params1="@verbose @failuresLimit=-1" # Default verbose show passed test + perfor
 
 newCmdt0="$newCmdt @isol=tested $params0"
 newCmdt1="$newCmdt @isol=tested $params0 $params1"
+
+forkCfg="${CMDT_FORK_CFG}"
 
 die() {
 	>&2 echo "$1"
@@ -43,14 +45,14 @@ cannotReinitMsg="cannot erase test suite"
 nothingToReportExpectedStderrMsg="you must perform some test prior to report"
 
 >&2 echo "## Test @report without test"
-$cmdtIn @init=meta0 #@verbose=4
+$cmdtIn $forkCfg @init=meta0 #@verbose=4
 $cmdtIn @test=meta0/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt0 @report=foo #@debug=4
 $cmdtIn @test=meta0/ @stderr= @-- $newCmdt0 @init=foo #@debug=4
 $cmdtIn @test=meta0/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt0 @report=foo #@debug=4
 $cmdtIn @test=meta0/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt0 @report #@debug=4
 
 >&2 echo "## Meta1 test context not shared without token"
-$cmdtIn @init=meta1 #@verbose=4
+$cmdtIn $forkCfg @init=meta1 #@verbose=4
 $cmdtIn @test=meta1/"without token one" @stderr:"PASSED" @stderr:"#01" @-- $newCmdt1 true #@debug
 $cmdtIn @test=meta1/"without token two" @stderr:"PASSED" @stderr:"#02" @-- $newCmdt1 true #@debug
 $cmdtIn @test=meta1/"command before rule stop" @fail @stderr:"before rule parsing stopper" @-- $newCmdt1 true @-- @success
@@ -61,7 +63,7 @@ $cmdtIn @test=meta1/ @exit=1 @stderr:"3 success" @stderr!:"failure" @stderr:"1 e
 #tk0=$( $cmdt @init @printToken 2> /dev/null )
 tk0=$( $newCmdt0 @init @printToken )
 >&2 echo "token: $tk0"
-$cmdtIn @init=meta2 #@verbose=4
+$cmdtIn $forkCfg @init=meta2 #@verbose=4
 $cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#01" @-- $newCmdt1 true @token=$tk0
 $cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#02" @-- $newCmdt1 true @token=$tk0
 $cmdtIn @test=meta2/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=main
@@ -73,7 +75,7 @@ eval $( $newCmdt0 @init @exportToken )
 >&2 echo "token: $__CMDT_TOKEN"
 
 #tk=$( $cmdt0 @init @printToken )
-$cmdtIn @init=meta3 #@ignore
+$cmdtIn $forkCfg @init=meta3 #@ignore
 $cmdtIn @test=meta3/init @-- $newCmdt1 @init
 $cmdtIn @test=meta3/test1 @stderr:"PASSED" @stderr:"#01" @-- $newCmdt1 true
 $cmdtIn @test=meta3/test2 @stderr:"PASSED" @stderr:"#02" @-- $newCmdt1 true
@@ -82,7 +84,7 @@ $cmdtIn @test=meta3/report2 @stderr:"Successfully ran" @stderr:"main" @-- $newCm
 $cmdtIn @test=meta3/report_other_token @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=main @token=empty_token
 #$cmdtIn @test=meta3/report2 @stderr:"Successfully ran" @stderr:"main" @-- $newCmdt1 @report=main @token=$tk0
 
-$cmdtIn @init=meta4 #@ignore
+$cmdtIn $forkCfg @init=meta4 #@ignore
 $cmdtIn @test=meta4/init @-- $newCmdt1 @init=sub4
 $cmdtIn @test=meta4/test1 @stderr:"PASSED" @stderr:"#01" @-- $newCmdt1 @test=sub4/ true
 $cmdtIn @test=meta4/test2 @stderr:"PASSED" @stderr:"#02" @-- $newCmdt1 @test=sub4/ true
@@ -97,7 +99,7 @@ export -n __CMDT_TOKEN
 #eval $( $cmdt @init @exportToken 2> /dev/null )
 
 >&2 echo "## Rules parsing stopper @--"
-$cmdtIn @init=parsing_stopper
+$cmdtIn $forkCfg @init=parsing_stopper
 $cmdtIn @test=parsing_stopper/ @stdout="foo @success @fail\n" @-- echo foo @success @fail
 $cmdtIn @report=parsing_stopper
 
@@ -110,7 +112,7 @@ newCmdt0="$newCmdt0 @token=$newTk"
 newCmdt1="$newCmdt1 @token=$newTk"
 
 >&2 echo "## Test Suite re-init"
-$cmdtIn @init=reinit #@verbose=5
+$cmdtIn $forkCfg @init=reinit #@verbose=5
 $cmdtIn @test=reinit/ @-- $newCmdt1 @test=sub1/ true
 $cmdtIn @test=reinit/ @fail @stderr:"$cannotReinitMsg" @-- $newCmdt1 @init=sub1
 $cmdtIn @test=reinit/ @stderr:"1 success" @-- $newCmdt1 @report=sub1
@@ -131,7 +133,7 @@ $cmdtIn @test=reinit/ @-- $newCmdt1 @test=sub3/ true
 $cmdtIn @test=reinit/ @stderr:"1 success" @-- $newCmdt1 @report=sub3
 
 >&2 echo "## Test Suite re-report and @keep"
-$cmdtIn @init=rereport_and_keep @ignore #@verbose=5
+$cmdtIn $forkCfg @init=rereport_and_keep @ignore #@verbose=5
 $cmdtIn @test=rereport_and_keep/init1 @-- $newCmdt1 @init=rereport_sub1
 $cmdtIn @test=rereport_and_keep/test1 @-- $newCmdt1 @test=rereport_sub1/test true
 $cmdtIn @test=rereport_and_keep/report1 @stderr:"rereport_sub1" @-- $newCmdt1 @report=rereport_sub1
@@ -156,7 +158,7 @@ $cmdtIn @test=rereport_and_keep/rerereportall4 @fail @stderr:"$nothingToReportEx
 
 
 >&2 echo "## Test Suite re-report v2"
-$cmdtIn @init=re-report-v2 #@verbose=5
+$cmdtIn $forkCfg @init=re-report-v2 #@verbose=5
 # report suite, report global, report @all, re-report
 $cmdtIn @test=re-report-v2/init1 @-- $newCmdt1 @init=re-report-v2_sub1 @verbose=5
 $cmdtIn @test=re-report-v2/test1 @-- $newCmdt1 @test=re-report-v2_sub1/testTrue true
@@ -187,7 +189,7 @@ $cmdtIn @test=re-report-v2/report-global3d @fail @stderr:"$nothingToReportExpect
 
 
 >&2 echo "## Test usage"
-$cmdtIn @init=meta
+$cmdtIn $forkCfg @init=meta
 $cmdtIn @test=meta/ @fail @stderr:"usage:" @-- $newCmdt0
 
 >&2 echo "## Test cmdt basic assertions"
@@ -225,7 +227,7 @@ $cmdtIn @test=meta/ @fail @stderr:"11 success" @stderr:"13 failures" @-- $newCmd
 
 >&2 echo "## Test assertions outputs"
 # Init the context used in t1 test suite
-$cmdtIn @init=outputs_assertions
+$cmdtIn $forkCfg @init=outputs_assertions
 $cmdtIn @test=outputs_assertions/ @stderr:"#01..." @stderr:"PASSED" @-- $newCmdt0 true @test=t1/
 $cmdtIn @test=outputs_assertions/ @stderr:"#02..." @stderr:"PASSED" @-- $newCmdt0 true @test=t1/
 $cmdtIn @test=outputs_assertions/ @stderr:"#03..." @stderr:"FAILED" @-- $newCmdt0 false @test=t1/
@@ -235,7 +237,7 @@ $cmdtIn @test=outputs_assertions/ @fail "@stderr~/Failures running \[.*t1.*\] te
 
 >&2 echo "## Test namings"
 $cmdt @init=main 2> /dev/null
-$cmdtIn @init=naming
+$cmdtIn $forkCfg @init=naming
 $cmdtIn @test=naming/init @-- $newCmdt1 @init
 $cmdtIn @test=naming/ @stderr~"/Test \[main\].*name1 #01.../" @stderr:"PASSED" @-- $newCmdt1 true @test=name1
 $cmdtIn @test=naming/ @stderr~"/Test \[main\].*name2 #02.../" @stderr:"PASSED" @-- $newCmdt1 true @test=name2
@@ -251,7 +253,7 @@ $cmdtIn @test=naming/ @stderr~"/Successfully ran \[.*main.*\] test suite/" @-- $
 
 
 >&2 echo "## Test display verbosity"
-$cmdtIn @init=display_verbosity
+$cmdtIn $forkCfg @init=display_verbosity
 # verbose=SHOW_REPORTS_ONLY
 $cmdtIn @test=display_verbosity/ @stdout= @stderr=                                                   @-- $newCmdt0 @verbose=0 echo foo 
 $cmdtIn @test=display_verbosity/ @stdout= @stderr=                                                   @-- $newCmdt0 @verbose=0 echo foo @fail
@@ -275,7 +277,7 @@ $cmdtIn @test=display_verbosity/ @stdout= @stderr:ERRORED @stderr:"Supplied cmd"
 
 
 >&2 echo "## Test rules missusage"
-$cmdtIn @init=failing_rule_missusage
+$cmdtIn $forkCfg @init=failing_rule_missusage
 $cmdtIn @test=failing_rule_missusage/ @fail @-- $newCmdt1 @init true
 $cmdtIn @test=failing_rule_missusage/ @fail @-- $newCmdt1 @init @test
 $cmdtIn @test=failing_rule_missusage/ @fail @-- $newCmdt1 @init @report
@@ -298,7 +300,7 @@ $cmdtIn @test=failing_rule_missusage/ @fail @stderr:"can't use rule: [@ignore]" 
 
 
 >&2 echo "## Test config"
-$cmdtIn @init=test_config
+$cmdtIn $forkCfg @init=test_config
 
 $cmdtIn @test=test_config/ @stderr:IGNORED @stderr!:FAILED @stderr!:PASSED @-- $newCmdt1 true @ignore
 $cmdtIn @test=test_config/ @stderr!:IGNORED @stderr:PASSED @-- $newCmdt1 true
@@ -332,7 +334,7 @@ $cmdtIn @test=test_config/ @fail @-- $newCmdt1 @report=main
 
 >&2 echo "## Test suite config"
 $newCmdt1 @init=suite_config_quiet @quiet
-$cmdtIn @init=suite_config
+$cmdtIn $forkCfg @init=suite_config
 $cmdtIn @test=suite_config/ @stdout= @stderr= @-- $newCmdt1 @test=suite_config_quiet/ @verbose echo foo
 $cmdtIn @test=suite_config/ @stderr:PASSED @-- $newCmdt1 @test=suite_config_quiet/ @verbose echo foo @quiet=false
 $cmdtIn @test=suite_config/ @stdout="foo\n" @stderr= @-- $newCmdt1 @test=suite_config_quiet/ echo foo @keepOutputs
@@ -343,7 +345,7 @@ $cmdtIn @test=suite_config/ @-- $newCmdt1 @report=suite_config_quiet
 
 
 >&2 echo "## Test assertions"
-$cmdtIn @init=assertion
+$cmdtIn $forkCfg @init=assertion
 $cmdtIn @test=assertion/init @-- $newCmdt1 @init @verbose=5
 $cmdtIn @test=assertion/ @stderr:PASSED @-- $newCmdt1 true
 $cmdtIn @test=assertion/ @stderr:PASSED @-- $newCmdt1 true @success
@@ -400,13 +402,13 @@ $cmdtIn @test=assertion/ @fail @-- $newCmdt1 @report=main
 
 
 >&2 echo "## Test stdin"
-$cmdtIn @init=stdin
+$cmdtIn $forkCfg @init=stdin
 echo foo | $cmdt @test=stdin/ @stdout="foo\n" cat
 # TODO test error raised if stdin used with @async=true
 
 
 >&2 echo "## Test file ref content in assertions"
-$cmdtIn @init=file_ref_content
+$cmdtIn $forkCfg @init=file_ref_content
 echo foo > /tmp/fileRefContent
 $cmdtIn @test=file_ref_content/ @stderr:PASSED @-- $newCmdt1 @stdout@=/tmp/fileRefContent echo foo
 $cmdtIn @test=file_ref_content/ @stderr:FAILED @-- $newCmdt1 @stdout@=/tmp/fileRefContent echo -n foo
@@ -420,12 +422,12 @@ $cmdtIn @test=file_ref_content/ @fail @-- $newCmdt1 @report=main
 
 >&2 echo "## Test export"
 export foo=bar
-$cmdtIn @init=export
+$cmdtIn $forkCfg @init=export
 $cmdtIn @test=export/ @stdout~"/foo='bar'/m" sh -c "export"
 
 
 >&2 echo "## Interlaced tests"
-$cmdtIn @init=interlaced
+$cmdtIn $forkCfg @init=interlaced
 $cmdtIn @test=interlaced/ @-- $newCmdt1 @init="testA" @verbose=0
 $cmdtIn @test=interlaced/ @-- $newCmdt1 @init="testB" @verbose=0
 
@@ -450,8 +452,8 @@ $cmdtIn @test="interlaced/" @fail @stderr:"2 success" @stderr:"1 failure" @stder
 merExpectedMsgRule="@stderr~/mutually exclusives/"
 actionExpectedMsgRule="@stderr:you can't use rule: "
 # Actions are mutually exclusives
-#eval $( $cmdtIn @init=mutually_exclusive_rules @exportToken )
-$cmdtIn @init=mutually_exclusive_rules
+#eval $( $cmdtIn $forkCfg @init=mutually_exclusive_rules @exportToken )
+$cmdtIn $forkCfg @init=mutually_exclusive_rules
 $cmdtIn @test=mutually_exclusive_rules/ @fail "$merExpectedMsgRule" @-- $newCmdt1 @global @init
 $cmdtIn @test=mutually_exclusive_rules/ @fail "$merExpectedMsgRule" @-- $newCmdt1 @init @global
 $cmdtIn @test=mutually_exclusive_rules/ @fail "$merExpectedMsgRule" @-- $newCmdt1 @init @test
@@ -489,7 +491,7 @@ done
 
 >&2 echo "## Test flow"
 $cmdt @init=main 2> /dev/null # clear main test suite
-$cmdtIn @init=test_flow
+$cmdtIn $forkCfg @init=test_flow
 $cmdtIn @test=test_flow/ @-- $newCmdt1 @init=flow
 $cmdtIn @test=test_flow/ @stderr:"#01" @stderr:PASSED @-- $newCmdt1 @test=flow/ @fail false
 $cmdtIn @test=test_flow/ @stderr:"#02" @stderr:PASSED @-- $newCmdt1 @test=flow/ true
@@ -503,7 +505,7 @@ $cmdtIn @test=test_flow/ @stderr:"1 success" @-- $newCmdt1 @report=flow
 
 
 >&2 echo "## Test ignore"
-$cmdtIn @init=test_ignore
+$cmdtIn $forkCfg @init=test_ignore
 $cmdtIn @test=test_ignore/init_suite @-- $newCmdt1 @init=test_ignore1_sub
 # following test should fail, but are ignored
 $cmdtIn @test=test_ignore/ @stderr:PASSED @-- $newCmdt1 @test=test_ignore1_sub/ true
@@ -533,7 +535,7 @@ $cmdtIn @test=test_ignore/report_suite @stderr:"Successfully ran" @stderr:"1 suc
 
 
 >&2 echo "## Test suite ignore"
-$cmdtIn @init=suite_ignore1 
+$cmdtIn $forkCfg @init=suite_ignore1 
 $cmdtIn @test=suite_ignore1/init_suite @-- $newCmdt1 @init=suite_ignore1_sub @ignore
 $cmdtIn @test=suite_ignore1/ @stderr= @-- $newCmdt1 @test=suite_ignore1_sub/ true
 $cmdtIn @test=suite_ignore1/ @stderr= @-- $newCmdt1 @test=suite_ignore1_sub/ true
@@ -541,13 +543,13 @@ $cmdtIn @test=suite_ignore1/report_suite @stderr:"Ignored not ran" @stderr:"suit
 
 newCmdt2="$newCmdt @isol=ignore $params0 $params1"
 
-$cmdtIn @init=suite_ignore2 
+$cmdtIn $forkCfg @init=suite_ignore2 
 $cmdtIn @test=suite_ignore2/init_suite @-- $newCmdt2 @init=suite_ignore2_sub @ignore
 $cmdtIn @test=suite_ignore2/ @stderr= @-- $newCmdt2 @test=suite_ignore2_sub/ true
 $cmdtIn @test=suite_ignore2/ @stderr= @-- $newCmdt2 @test=suite_ignore2_sub/ true
 $cmdtIn @test=suite_ignore2/global_report @stderr:"Ignored not ran" @stderr:"suite_ignore2_sub" @stderr!:"suite_ignore1_sub" @-- $newCmdt2 @report
 
-$cmdtIn @init=suite_ignore3
+$cmdtIn $forkCfg @init=suite_ignore3
 $cmdtIn @test=suite_ignore3/init_suite @-- $newCmdt2 @init=suite_ignore3_sub @ignore
 $cmdtIn @test=suite_ignore3/ @stderr= @-- $newCmdt2 @test=suite_ignore3_sub/ true
 $cmdtIn @test=suite_ignore3/ @stderr= @-- $newCmdt2 @test=suite_ignore3_sub/ true
@@ -555,7 +557,7 @@ $cmdtIn @test=suite_ignore3/global_report @stderr:"Ignored not ran" @stderr:"sui
 
 
 >&2 echo "## Test test timeout"
-$cmdtIn @init=test_timeout
+$cmdtIn $forkCfg @init=test_timeout
 $cmdtIn @test=test_timeout/init_suite @-- $newCmdt1 @init=test_timeout1_sub
 $cmdtIn @test=test_timeout/test_sleep @stderr:TIMEOUT @-- $newCmdt1 @test=test_timeout1_sub/tSleep @timeout=0.1s sleep 1
 $cmdtIn @test=test_timeout/report_suite @fail @stderr:"Failures running" @stderr:"0 success" @stderr:"1 timeout" @stderr!:"error" @stderr!:"failure" @-- $newCmdt1 @report=test_timeout1_sub
@@ -573,7 +575,7 @@ $cmdtIn @test=test_timeout/report_suite @fail @stderr:"Failures running" @stderr
 
 
 >&2 echo "## Test suite timeout"
-$cmdtIn @init=suite_timeout @ignore
+$cmdtIn $forkCfg @init=suite_timeout @ignore
 $cmdtIn @test=suite_timeout/init_suite @-- $newCmdt1 @init=suite_timeout_sub @suiteTimeout=0.1s
 $cmdtIn @test=suite_timeout/test_sleep @fail @stderr:TIMEOUTED @-- $newCmdt1 @test=suite_timeout_sub/tSleep sleep 1
 $cmdtIn @test=suite_timeout/report_suite @fail @stderr:Timeouted @-- $newCmdt1 @report=suite_timeout_sub
@@ -597,7 +599,7 @@ expectedBazErrMsg="$( 2>&1 ls baz || true )"
 echo foo > /tmp/fooFileContent
 echo baz > /tmp/bazFileContent
 
-$cmdtIn @init=cmd_mock #@verbose=4
+$cmdtIn $forkCfg @init=cmd_mock #@verbose=4
 $cmdtIn @test=cmd_mock/ @fail @stdout= @stderr:"shell builtin" @-- $newCmdt1 echo foo @mock="echo" # cannot mock shell builtin
 $cmdtIn @test=cmd_mock/ @fail @stdout= @stderr:"not found" @-- $newCmdt1 echo foo @mock="fooNotExists" # cannot mock not found command
 
@@ -677,7 +679,7 @@ $cmdtIn @test=cmd_mock/ @fail @-- $newCmdt1 @report=main
 testFile="/tmp/thisFileDoesNotExistsYet.txt"
 testFile2="/tmp/thisFileDoesNotExistsYet2.txt"
 rm -f @-- "$testFile" "$testFile2" 2> /dev/null || true
-$cmdtIn @init=before_after
+$cmdtIn $forkCfg @init=before_after
 $cmdtIn @test=before_after/init @-- $newCmdt1 @init
 $cmdtIn @test=before_after/ @stderr:PASSED @-- $newCmdt1 ls "$testFile" @fail
 $cmdtIn @test=before_after/ @stderr:PASSED @-- $newCmdt1 ls "$testFile" @before="touch $testFile"
@@ -690,7 +692,7 @@ $cmdtIn @test=before_after/ @-- $newCmdt1 @report=main
 
 
 >&2 echo "## Test @container"
-$cmdtIn @init=container $ignoreContainers #@keepOutputs #@debug=4 #@ignore #@keepOutputs
+$cmdtIn $forkCfg @init=container $ignoreContainers #@keepOutputs #@debug=4 #@ignore #@keepOutputs
 $cmdtIn @test=container/init @-- $newCmdt1 @init
 $cmdtIn @test=container/run_off_container @stderr:PASSED @-- $newCmdt1 sh -c "cat --help 2>&1 | head -1" @stdout!:BusyBox
 $cmdtIn @test=container/run_in_container @stderr:PASSED @-- $newCmdt1 @container sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox
@@ -712,7 +714,7 @@ $cmdtIn @test=container/ @fail @-- $newCmdt1 @report=main
 token="$__CMDT_TOKEN"
 export -n __CMDT_TOKEN
 
-$cmdtIn @init=container_wo_token $ignoreContainers #@keepOutputs #@ignore #@keepOutputs
+$cmdtIn $forkCfg @init=container_wo_token $ignoreContainers #@keepOutputs #@ignore #@keepOutputs
 $cmdtIn @test=container_wo_token/init @-- $newCmdt1 @init
 $cmdtIn @test=container_wo_token/run_in_container @stderr:PASSED @-- $newCmdt1 @container sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox
 $cmdtIn @test=container_wo_token/ @stderr:PASSED @-- $newCmdt1 @container true
@@ -729,7 +731,7 @@ testFile="/tmp/thisFileDoesNotExistsYet.txt"
 hostFile="/tmp/thisFileExistsOnHost.txt"
 rm -f @-- "$testFile" 2> /dev/null || true
 touch "$hostFile"
-$cmdtIn @init=ephemeralContainer $ignoreContainers #@keepOutputs #@ignore #@keepOutputs
+$cmdtIn $forkCfg @init=ephemeralContainer $ignoreContainers #@keepOutputs #@ignore #@keepOutputs
 $cmdtIn @test=ephemeralContainer/init @-- $newCmdt1 @init
 $cmdtIn @test=ephemeralContainer/run_in_container @stderr:PASSED @-- $newCmdt1 @container sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox #check run inside container
 $cmdtIn @test=ephemeralContainer/ @stderr:PASSED @-- $newCmdt1 ls "$hostFile" @stdout:"$hostFile" # file exists on host
@@ -742,7 +744,7 @@ $cmdtIn @test=ephemeralContainer/ @stderr:PASSED @-- $newCmdt1 @container ls "$h
 $cmdtIn @test=ephemeralContainer/ @stderr:PASSED @-- $newCmdt1 ls "$testFile" @fail @stdout= @stderr:"$testFile" # file should not exist on host
 $cmdtIn @test=ephemeralContainer/ @-- $newCmdt1 @report=main
 
-$cmdtIn @init=suiteContainer $ignoreContainers #@verbose=4 #@keepOutputs
+$cmdtIn $forkCfg @init=suiteContainer $ignoreContainers #@verbose=4 #@keepOutputs
 $cmdtIn @test=suiteContainer/ @-- $newCmdt1 @init=sub @container # container should live the test suite
 $cmdtIn @test=suiteContainer/run_in_container @stderr:PASSED @-- $newCmdt1 @test=sub/ sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox #check run inside container
 $cmdtIn @test=suiteContainer/ @stderr:PASSED @-- $newCmdt1 @test=sub/ ls "$testFile" @fail @stdout= @stderr:"$testFile" # file should not exist in suite container
@@ -754,7 +756,7 @@ $cmdtIn @test=suiteContainer/ @stderr:PASSED @-- $newCmdt1 @test=sub/ ls "$testF
 $cmdtIn @test=suiteContainer/ @stderr:PASSED @-- $newCmdt1 @test=sub/ ls "$testFile" @stdout:"$testFile" @debug=0 # file should exist in suite container
 $cmdtIn @test=suiteContainer/ @-- $newCmdt1 @report=sub
 
-$cmdtIn @init=dirtyContainer $ignoreContainers #@keepOutputs
+$cmdtIn $forkCfg @init=dirtyContainer $ignoreContainers #@keepOutputs
 $cmdtIn @test=dirtyContainer/ @-- $newCmdt1 @init=sub @container # container should live the test suite
 $cmdtIn @test=dirtyContainer/run_in_container @stderr:PASSED @-- $newCmdt1 @test=sub/ sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox #check run inside container
 $cmdtIn @test=dirtyContainer/ @stderr:PASSED @-- $newCmdt1 @test=sub/ ls "$testFile" @fail @stderr:"$testFile" # file should not exist in container
@@ -771,7 +773,7 @@ $cmdtIn @test=dirtyContainer/ @stderr:PASSED @-- $newCmdt1 @test=sub/ ls "$hostF
 $cmdtIn @test=dirtyContainer/ @stderr:PASSED @-- $newCmdt1 @test=sub/ ls "$testFile" @fail @dirtyContainer=beforeTest # file should not exist in fresh container
 $cmdtIn @test=dirtyContainer/ @-- $newCmdt1 @report=sub
 
-$cmdtIn @init=testContainer $ignoreContainers #@keepOutputs
+$cmdtIn $forkCfg @init=testContainer $ignoreContainers #@keepOutputs
 $cmdtIn @test=testContainer/ @-- $newCmdt1 @init=sub @container @dirtyContainer=beforeTest # container should live for each test
 $cmdtIn @test=testContainer/run_in_container @stderr:PASSED @-- $newCmdt1 @test=sub/ sh -c "cat --help 2>&1 | head -1" @stdout:BusyBox #check run inside container
 $cmdtIn @test=testContainer/ @stderr:PASSED @-- $newCmdt1 @test=sub/ ls "$testFile" @fail @stderr:"$testFile" # file should not exist in container
