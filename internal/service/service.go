@@ -87,12 +87,12 @@ func globalReport(ctx facade.GlobalContext, asyncMode bool) (exitCode int16, err
 		suiteIgnored := suiteCtx.Config.IgnoreSuite.GetOr(false)
 		goodModeSuite = true
 		count := suiteCtx.Repo.ToReportTestCountBySuiteAndMode(testSuite, asyncMode, all)
-		if count > 0 || suiteIgnored || all {
+		if count >= 0 || suiteIgnored || all {
 			nothingToReport = false
 			suiteContexts = append(suiteContexts, suiteCtx)
 			var code int16
 			var suiteOutcome model.SuiteOutcome
-			suiteOutcome, code, err = reportTestSuite(suiteCtx, all)
+			suiteOutcome, code, err = reportTestSuite(suiteCtx, true, all)
 			if err != nil {
 				// FIXME: aggregate errors
 				exitCode = 1
@@ -102,7 +102,7 @@ func globalReport(ctx facade.GlobalContext, asyncMode bool) (exitCode int16, err
 				exitCode = code
 			}
 			suiteOutcomes = append(suiteOutcomes, suiteOutcome)
-			if suiteOutcome.Outcome != model.IGNORED && suiteOutcome.Outcome != model.PASSED {
+			if suiteOutcome.Outcome != model.IGNORED && suiteOutcome.Outcome != model.PASSED && suiteOutcome.Outcome != model.EMPTY {
 				reportPassed = false
 			}
 		}
@@ -137,7 +137,7 @@ func ProcessGlobalReportDef(def model.ReportDefinition, asyncMode bool) (exitCod
 	return
 }
 
-func reportTestSuite(ctx facade.SuiteContext, all bool) (suiteOutcome model.SuiteOutcome, exitCode int16, err error) {
+func reportTestSuite(ctx facade.SuiteContext, global, all bool) (suiteOutcome model.SuiteOutcome, exitCode int16, err error) {
 	exitCode = 1
 	cfg := ctx.Config
 	testSuite := cfg.TestSuite.Get()
@@ -145,7 +145,7 @@ func reportTestSuite(ctx facade.SuiteContext, all bool) (suiteOutcome model.Suit
 	suiteIgnored := ctx.Config.IgnoreSuite.GetOr(false)
 	logger.Info("Reporting suite", "suite", testSuite, "testCount", testCount)
 
-	if !all && !suiteIgnored && testCount == 0 {
+	if !all && !suiteIgnored && testCount == 0 && !global {
 		err = fmt.Errorf("you must perform some test prior to report: [%s] suite", testSuite)
 		ProcessSuiteError(ctx, err)
 		exitCode = 1
@@ -177,7 +177,7 @@ func ProcessReportDef(def model.ReportDefinition) (exitCode int16, err error) {
 	ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.ReportAction, def.Config) // FIXME ? removing def.Config ?
 	//ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.ReportAction, model.Config{}) // FIXME ? removing def.Config ?
 
-	suiteOutcome, exitCode, err := reportTestSuite(ctx, false)
+	suiteOutcome, exitCode, err := reportTestSuite(ctx, false, false)
 	if err != nil {
 		return 1, err
 	}
@@ -483,16 +483,16 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			var asyncExitCode int16
 
 			ignoredSuiteCount := rep.IgnoredSuiteCount(globalCfg.ReportAll.Get())
-			syncSuites, err := rep.ListSyncSuites()
+			//syncSuites, err := rep.ListSyncSuites()
+			syncSuites, err := rep.ListReportableSuitesByMode(false, reportAll)
 			ProcessGlobalError(globalCtx, err)
-			asyncSuites, err := rep.ListAsyncSuites()
+			//asyncSuites, err := rep.ListAsyncSuites()
+			asyncSuites, err := rep.ListReportableSuitesByMode(true, reportAll)
 			ProcessGlobalError(globalCtx, err)
 
 			// 1- Report all sync suites
 			toReportSyncTestCount := rep.ToReportTestCountByMode(false, reportAll)
 			if reportAll || ignoredSuiteCount+toReportSyncTestCount > 0 {
-				syncSuites, err := rep.ListSyncSuites()
-				ProcessGlobalError(globalCtx, err)
 				exitCode, err = globalReport(globalCtx, false)
 				ProcessGlobalError(globalCtx, err)
 				for _, suite := range syncSuites {

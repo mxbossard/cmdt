@@ -7,3 +7,4 @@ export CMDT_BIN="$scriptDir/bin/cmdt"
 export CMDT_FORK_CFG="@fork=2"
 
 . $scriptDir/cmdtTest.sh
+

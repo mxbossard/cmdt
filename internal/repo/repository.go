@@ -48,8 +48,8 @@ type Repo interface {
 	ListReportableSuites() (suites []string, err error)
 	ListReportableSuitesByMode(asyncMode, all bool) (suites []string, err error)
 	ListAllSuites() (suites []string, err error)
-	ListSyncSuites() (suites []string, err error)
-	ListAsyncSuites() (suites []string, err error)
+	//ListSyncSuites() (suites []string, err error)
+	//ListAsyncSuites() (suites []string, err error)
 	ListReportedAsyncSuites() (suites []string, err error)
 
 	SaveTestOutcome(outcome model.TestOutcome) (err error)

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"cmdt/internal/model"
+
 	"github.com/mxbossard/utilz/collectionz"
 	"github.com/mxbossard/utilz/zql"
 )
@@ -199,6 +200,8 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 	} else if suiteOutcome == string(model.TIMEOUT) {
 		// Specific case TIMEOUT suite outcome is stored in suite outcome column
 		ocm = model.TIMEOUT
+	} else if testCount == 0 {
+		ocm = model.EMPTY
 	} else if testCount == ignoredCount {
 		ocm = model.IGNORED
 	} else if testCount == passedCount+ignoredCount {

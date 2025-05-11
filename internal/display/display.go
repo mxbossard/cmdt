@@ -156,7 +156,10 @@ func (d basicDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 	}
 	duration := outcome.Duration
 	fmtDuration := NormalizeDurationInSec(duration)
-	if outcome.Outcome == model.IGNORED {
+	if outcome.Outcome == model.EMPTY {
+		d.printer.ColoredErrf(WarningColor, "Empty not ran    [ %s ] test suite !", testSuiteLabel)
+		d.printer.Errf("\n")
+	} else if outcome.Outcome == model.IGNORED {
 		d.printer.ColoredErrf(WarningColor, "Ignored not ran  [ %s ] test suite !", testSuiteLabel)
 		if ignoredCount > 0 {
 			d.printer.ColoredErrf(WarningColor, "%s", ignoredMessage)

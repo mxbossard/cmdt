@@ -324,9 +324,9 @@ func (d Suite) ListOrdered() (suites []string, err error) {
 	rows, err := d.db.Query(`
 		SELECT s.name
 		FROM suite s
-		WHERE s.name <> '' AND s.startTime IS NOT NULL
+		WHERE s.name <> '' 
 		ORDER BY s.outcomeOrder ASC, s.startTime ASC
-	`)
+	`) // AND s.startTime IS NOT NULL
 	if err != nil {
 		return
 	}
@@ -350,11 +350,10 @@ func (d Suite) ListReportableOrdered() (suites []string, err error) {
 	rows, err := d.db.Query(`
 		SELECT s.name
 		FROM suite s
-		WHERE s.startTime IS NOT NULL
-		    AND (coalesce(s.reportedCount, 0) <> coalesce(s.seq, 0))
+		WHERE (coalesce(s.reportedCount, 0) <> coalesce(s.seq, 0))
 			AND s.name <> ''
 		ORDER BY s.outcomeOrder ASC, s.startTime ASC
-	`)
+	`) // AND s.startTime IS NOT NULL
 	if err != nil {
 		return
 	}
@@ -380,21 +379,19 @@ func (d Suite) ListReportableOrderedByMode(asyncMode, all bool) (suites []string
 		rows, err = d.db.Query(`
 			SELECT s.name
 			FROM suite s
-			WHERE s.startTime IS NOT NULL
-				AND s.async = ?
+			WHERE s.async = ?
 				AND s.name <> ''
 			ORDER BY s.outcomeOrder ASC, s.startTime ASC
-		`, asyncMode)
+		`, asyncMode) // AND s.startTime IS NOT NULL
 	} else {
 		rows, err = d.db.Query(`
 			SELECT s.name
 			FROM suite s
-			WHERE s.startTime IS NOT NULL
-				AND s.async = ? 
+			WHERE s.async = ? 
 				AND s.name <> ''
-				AND (s.reportedCount IS NULL OR s.reportedCount <> s.seq)
+				AND (s.reportedCount IS NULL OR s.reportedCount <> s.seq OR s.seq = 0 AND s.ignored = 0)
 			ORDER BY s.outcomeOrder ASC, s.startTime ASC
-		`, asyncMode)
+		`, asyncMode) // AND s.startTime IS NOT NULL
 	}
 
 	if err != nil {
@@ -413,15 +410,15 @@ func (d Suite) ListReportableOrderedByMode(asyncMode, all bool) (suites []string
 	return
 }
 
-func (d Suite) ListSync() (suites []string, err error) {
+func (d Suite) ListSync0() (suites []string, err error) {
 	p := logger.PerfTimer()
 	defer p.End()
 
 	rows, err := d.db.Query(`
 		SELECT s.name
 		FROM suite s
-		WHERE s.name <> '' AND s.startTime IS NOT NULL AND s.async = 0
-	`)
+		WHERE s.name <> '' AND s.async = 0
+	`) // AND s.startTime IS NOT NULL
 	if err != nil {
 		return
 	}
@@ -438,15 +435,15 @@ func (d Suite) ListSync() (suites []string, err error) {
 	return
 }
 
-func (d Suite) ListAsync() (suites []string, err error) {
+func (d Suite) ListAsync0() (suites []string, err error) {
 	p := logger.PerfTimer()
 	defer p.End()
 
 	rows, err := d.db.Query(`
 		SELECT s.name
 		FROM suite s
-		WHERE s.name <> '' AND s.startTime IS NOT NULL AND s.async = 1
-	`)
+		WHERE s.name <> '' AND s.async = 1
+	`) // AND s.startTime IS NOT NULL
 	if err != nil {
 		return
 	}

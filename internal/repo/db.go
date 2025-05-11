@@ -237,14 +237,14 @@ func (r dbRepo) ListAllSuites() (suites []string, err error) {
 	return
 }
 
-func (r dbRepo) ListSyncSuites() (suites []string, err error) {
-	suites, err = r.suiteDao.ListSync()
+func (r dbRepo) ListSyncSuites0() (suites []string, err error) {
+	suites, err = r.suiteDao.ListSync0()
 	err = r.wrap(err)
 	return
 }
 
-func (r dbRepo) ListAsyncSuites() (suites []string, err error) {
-	suites, err = r.suiteDao.ListAsync()
+func (r dbRepo) ListAsyncSuites0() (suites []string, err error) {
+	suites, err = r.suiteDao.ListAsync0()
 	err = r.wrap(err)
 	return
 }

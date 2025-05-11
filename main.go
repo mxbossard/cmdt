@@ -23,38 +23,11 @@ import (
 	"cmdt/internal/daemon"
 	"cmdt/internal/model"
 	"cmdt/internal/service"
+
 	"github.com/mxbossard/utilz/zlog"
 )
 
 /*
-
-## Fork ideas:
-- before/after and dirtiesScope cause problems to run in //
-- for // running must unqueue several tests in //
-  - if possible unqueue test from same suite but if waiting unqueue from another suite
-- @tests could always be added in a queue, a background process (daemon) in charge of executing it
-- one queue by token/repo
-- group outputs by test suite : first output take output priority (like mass do)
-- new test : enqueue test, wait some ms ?, check daemon is started or start it
-- no test in queue : wait some secs, stop daemon
-- @report should block until all tests done => @async=false by default on report
-- only one dameon running at a time by token/repo
-- new rules @async[=true/false] @wait[=true/false] @_daemon
-- do not run daemon in container => no queue in container
-- @async only needed for @test & @report
-- @test @async=false should queue test and wait for all previous suite test to be finished before running it
-- how to queue and unqueue a test by suite ? For // to work must unqueue in priority from suite but in some case must unqueue from another suite.
-  - a queue by suite
-  - unqueue in priority of already unqueued suite
-  - if previously unqueued a waiting test must not unqueue from this suite until test done
-  - suite choice responsibility given to repo
-  - unqueue by suite
-  - if suite waiting how repo know it
-  - SaveTestOutcome could release wait
-  - Unqueue should not block if possible but block if nothing to unqueue ???
-- Daemon wait for finished test with sql repo
-- Do not queue async report for simplicity sake => report always in sync
-
 
 ### Possible output behaviors:
 - for async test output when possible like async=false
