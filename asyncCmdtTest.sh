@@ -79,7 +79,7 @@ $cmdtIn @init="sync empty" #@verbose=4
 $cmdtIn @test=sync empty/should init1 @-- $newCmdt @isol="cleared_sync_empty_sub1" @init=sync_empty_sub1 @async=false @verbose=5
 $cmdtIn @test=sync empty/should not report1 @exit=1 @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt @isol="cleared_sync_empty_sub1" @verbose @report=sync_empty_sub1
 $cmdtIn @test=sync empty/should init2 @-- $newCmdt @isol="cleared_sync_empty_sub2" @init=sync_empty_sub2 @async=false @verbose=5
-$cmdtIn @test=sync empty/should not global report2 @exit=1 @stderr:"$nothingToReportExpectedStderrMsg" @stderr!:"sync_empty_sub" @-- $newCmdt @isol="cleared_sync_empty_sub2" @verbose @report
+$cmdtIn @test=sync empty/should not global report2 @exit=1 @stderr:"$nothingToReportExpectedStderrMsg" @stderr:"sync_empty_sub2" @-- $newCmdt @isol="cleared_sync_empty_sub2" @verbose @report
 $cmdtIn @test=sync empty/should not global report2 all @exit=0 @stderr:"Empty not ran" @stderr:"sync_empty_sub" @stderr!:"$nothingToReportExpectedStderrMsg" @-- $newCmdt @isol="cleared_sync_empty_sub2" @verbose @report @all
 $cmdtIn @test=sync empty/should init3 @-- $newCmdt @isol="cleared_sync_empty_sub3" @init=sync_empty_sub3 @async=false @verbose=5
 $cmdtIn @test=sync empty/should not global report3 all @exit=0 @stderr:"Empty not ran" @stderr:"sync_empty_sub" @stderr!:"$nothingToReportExpectedStderrMsg" @-- $newCmdt @isol="cleared_sync_empty_sub3" @verbose @report @all
@@ -90,8 +90,8 @@ $cmdtIn @test=sync empty/should test4b @-- $newCmdt @isol="cleared_sync_empty_su
 $cmdtIn @test=sync empty/should global report4 @exit=0 @stderr:"Empty not ran" @stderr:"sync_empty_sub4a" @stderr:"sync_empty_sub4b" @stderr:"Empty not ran" @stderr:"Successfully ran" @stderr!:"Ignored" @stderr!:"$nothingToReportExpectedStderrMsg" @-- $newCmdt @isol="cleared_sync_empty_sub4" @verbose @report
 $cmdtIn @test=sync empty/should global report4 all @exit=0 @stderr:"Empty not ran" @stderr:"sync_empty_sub4a" @stderr:"sync_empty_sub4b" @stderr:"Empty not ran" @stderr:"Successfully ran" @stderr!:"Ignored" @stderr!:"$nothingToReportExpectedStderrMsg" @-- $newCmdt @isol="cleared_sync_empty_sub4" @verbose @report @all
 # reporting suites, if one suite contain no tests must warn the user
-$cmdtIn @test=sync empty/should init5 @-- $newCmdt1 @init=sync_empty_sub4 @async=false @verbose=5
-$cmdtIn @test=sync empty/should not global report5 @exit=1 @stderr:"$nothingToReportExpectedStderrMsg" @stderr!:"sync_empty_sub" @-- $newCmdt0 @verbose @report
+$cmdtIn @test=sync empty/should init5 @-- $newCmdt1 @init=sync_empty_sub5 @async=false @verbose=5
+$cmdtIn @test=sync empty/should not global report5 @exit=1 @stderr:"$nothingToReportExpectedStderrMsg" @stderr:"sync_empty_sub5" @-- $newCmdt0 @verbose @report
 $cmdtIn @test=sync empty/should not global report5 all @exit=1 @stderr:"Empty not ran" @stderr:"sync_empty_sub" @stderr!:"$nothingToReportExpectedStderrMsg" @-- $newCmdt0 @verbose @report @all
 $cmdtIn @report
 
@@ -99,21 +99,21 @@ $cmdtIn @init="async empty" #@verbose=4
 # reporting no test should always report an error
 $cmdtIn @test=async empty/should init1 @-- $newCmdt @isol="cleared_async_empty_sub1" @init=async_empty_sub1 @async=true @verbose=5
 $cmdtIn @test=async empty/should not report1 @exit=1 @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt @isol="cleared_async_empty_sub1" @verbose @report=async_empty_sub1
-$cmdtIn @test=async empty/should init2 @-- $newCmdt @isol="cleared_sync_empty_sub2" @init=async_empty_sub2 @async=true @verbose=5
-$cmdtIn @test=async empty/should not global report2 @exit=1 @stderr:"$nothingToReportExpectedStderrMsg" @stderr!:"async_empty_sub" @-- $newCmdt @isol="cleared_async_empty_sub2" @verbose @report
-$cmdtIn @test=async empty/should not global report2 all @exit=1 @stderr:"Empty not ran" @stderr:"async_empty_sub" @stderr!:"$nothingToReportExpectedStderrMsg" @-- $newCmdt @isol="cleared_async_empty_sub2" @verbose @report @all
+$cmdtIn @test=async empty/should init2 @-- $newCmdt @isol="cleared_async_empty_sub2" @init=async_empty_sub2 @async=true @verbose=5
+$cmdtIn @test=async empty/should not global report2 @exit=1 @stderr:"$nothingToReportExpectedStderrMsg" @stderr:"async_empty_sub2" @-- $newCmdt @isol="cleared_async_empty_sub2" @verbose @report
+$cmdtIn @test=async empty/should not global report2 all @exit=0 @stderr:"Empty not ran" @stderr:"async_empty_sub" @stderr!:"$nothingToReportExpectedStderrMsg" @-- $newCmdt @isol="cleared_async_empty_sub2" @verbose @report @all
 $cmdtIn @test=async empty/should init3 @-- $newCmdt @isol="cleared_async_empty_sub3" @init=async_empty_sub3 @async=true @verbose=5
-$cmdtIn @test=async empty/should not global report3 all @exit=1 @stderr:"Empty not ran" @stderr:"async_empty_sub" @stderr!:"$nothingToReportExpectedStderrMsg" @-- $newCmdt @isol="cleared_async_empty_sub3" @verbose @report @all
+$cmdtIn @test=async empty/should not global report3 all @exit=0 @stderr:"Empty not ran" @stderr:"async_empty_sub" @stderr!:"$nothingToReportExpectedStderrMsg" @-- $newCmdt @isol="cleared_async_empty_sub3" @verbose @report @all
 # reporting 2 suites 1 empty should not error but warn for emptyness
-$cmdtIn @test=async empty/should init4a @-- $newCmdt @isol="cleared_sync_empty_sub4" @init=sync_empty_sub4a @async=true @verbose=5
-$cmdtIn @test=async empty/should init4b @-- $newCmdt @isol="cleared_sync_empty_sub4" @init=sync_empty_sub4b @async=true @verbose=5
-$cmdtIn @test=async empty/should test4b @-- $newCmdt @isol="cleared_sync_empty_sub4" @test=sync_empty_sub4b/test true
-$cmdtIn @test=async empty/should global report4 @exit=1 @stderr:"Empty not ran" @stderr:"sync_empty_sub4a" @stderr:"sync_empty_sub4b" @stderr:"Empty not ran" @stderr:"Successfully ran" @stderr!:"Ignored" @stderr!:"$nothingToReportExpectedStderrMsg" @-- $newCmdt @isol="cleared_sync_empty_sub4" @verbose @report
-$cmdtIn @test=async empty/should global report4 all @exit=1 @stderr:"Empty not ran" @stderr:"sync_empty_sub4a" @stderr:"sync_empty_sub4b" @stderr:"Empty not ran" @stderr:"Successfully ran" @stderr!:"Ignored" @stderr!:"$nothingToReportExpectedStderrMsg" @-- $newCmdt @isol="cleared_sync_empty_sub4" @verbose @report @all
+$cmdtIn @test=async empty/should init4a @-- $newCmdt @isol="cleared_async_empty_sub4" @init=async_empty_sub4a @async=true @verbose=5
+$cmdtIn @test=async empty/should init4b @-- $newCmdt @isol="cleared_async_empty_sub4" @init=async_empty_sub4b @async=true @verbose=5
+$cmdtIn @test=async empty/should test4b @-- $newCmdt @isol="cleared_async_empty_sub4" @test=async_empty_sub4b/test true
+$cmdtIn @test=async empty/should global report4 @exit=0 @stderr:"Empty not ran" @stderr:"async_empty_sub4a" @stderr:"async_empty_sub4b" @stderr:"Empty not ran" @stderr:"Successfully ran" @stderr!:"Ignored" @stderr!:"$nothingToReportExpectedStderrMsg" @-- $newCmdt @isol="cleared_async_empty_sub4" @verbose @report
+$cmdtIn @test=async empty/should global report4 all @exit=0 @stderr:"Empty not ran" @stderr:"async_empty_sub4a" @stderr:"async_empty_sub4b" @stderr:"Empty not ran" @stderr:"Successfully ran" @stderr!:"Ignored" @stderr!:"$nothingToReportExpectedStderrMsg" @-- $newCmdt @isol="cleared_async_empty_sub4" @verbose @report @all
 # reporting suites, if one suite contain no tests must warn the user
-$cmdtIn @test=async empty/should init4 @-- $newCmdt1 @init=async_empty_sub4 @async=true @verbose=5
-$cmdtIn @test=async empty/should not global report4 @exit=1 @stderr:"$nothingToReportExpectedStderrMsg" @stderr!:"async_empty_sub" @-- $newCmdt0 @verbose @report
-$cmdtIn @test=async empty/should not global report4 all @exit=1 @stderr:"Empty not ran" @stderr:"async_empty_sub" @stderr!:"$nothingToReportExpectedStderrMsg" @-- $newCmdt0 @verbose @report @all
+$cmdtIn @test=async empty/should init5 @-- $newCmdt1 @init=async_empty_sub5 @async=true @verbose=5
+$cmdtIn @test=async empty/should not global report5 @exit=1 @stderr:"$nothingToReportExpectedStderrMsg" @stderr:"async_empty_sub5" @-- $newCmdt0 @verbose @report
+$cmdtIn @test=async empty/should not global report5 all @exit=1 @stderr:"Empty not ran" @stderr:"async_empty_sub" @stderr!:"$nothingToReportExpectedStderrMsg" @-- $newCmdt0 @verbose @report @all
 $cmdtIn @report
 
 

@@ -237,18 +237,6 @@ func (r dbRepo) ListAllSuites() (suites []string, err error) {
 	return
 }
 
-func (r dbRepo) ListSyncSuites0() (suites []string, err error) {
-	suites, err = r.suiteDao.ListSync0()
-	err = r.wrap(err)
-	return
-}
-
-func (r dbRepo) ListAsyncSuites0() (suites []string, err error) {
-	suites, err = r.suiteDao.ListAsync0()
-	err = r.wrap(err)
-	return
-}
-
 func (r dbRepo) ListReportedAsyncSuites() (suites []string, err error) {
 	suites, err = r.suiteDao.ListReportedAsync()
 	err = r.wrap(err)
@@ -257,6 +245,15 @@ func (r dbRepo) ListReportedAsyncSuites() (suites []string, err error) {
 
 func (r dbRepo) IgnoredSuiteCount(reportAll bool) (n uint16) {
 	n, err := r.suiteDao.IgnoredSuiteCount(reportAll)
+	if err != nil {
+		err = r.wrap(err)
+		errorz.Fatal(err)
+	}
+	return
+}
+
+func (r dbRepo) EmptySuiteCount(reportAll bool) (n uint16) {
+	n, err := r.suiteDao.EmptySuiteCount(reportAll)
 	if err != nil {
 		err = r.wrap(err)
 		errorz.Fatal(err)

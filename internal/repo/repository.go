@@ -84,6 +84,8 @@ type Repo interface {
 
 	IgnoredSuiteCount(reportAll bool) (n uint16)
 
+	EmptySuiteCount(reportAll bool) (n uint16)
+
 	QueueOperation(op model.Operater) (err error)
 
 	UnqueueOperation() (op model.Operater, err error)

@@ -350,7 +350,7 @@ func (d Suite) ListReportableOrdered() (suites []string, err error) {
 	rows, err := d.db.Query(`
 		SELECT s.name
 		FROM suite s
-		WHERE (coalesce(s.reportedCount, 0) <> coalesce(s.seq, 0))
+		WHERE (coalesce(s.reportedCount, 0) <> coalesce(s.seq, 0) OR s.seq = 0 OR s.ignored = 1)
 			AND s.name <> ''
 		ORDER BY s.outcomeOrder ASC, s.startTime ASC
 	`) // AND s.startTime IS NOT NULL
@@ -370,6 +370,11 @@ func (d Suite) ListReportableOrdered() (suites []string, err error) {
 	return
 }
 
+/*
+- in "all mode", all suites are reportable
+- in "sync mode", all sync, ignored, and empty suite are repotable
+- in "async mode", all async suites not ignored nor empty ones are reportable
+*/
 func (d Suite) ListReportableOrderedByMode(asyncMode, all bool) (suites []string, err error) {
 	p := logger.PerfTimer()
 	defer p.End("asyncMode", asyncMode, "all", all, "suites", suites)
@@ -383,67 +388,26 @@ func (d Suite) ListReportableOrderedByMode(asyncMode, all bool) (suites []string
 				AND s.name <> ''
 			ORDER BY s.outcomeOrder ASC, s.startTime ASC
 		`, asyncMode) // AND s.startTime IS NOT NULL
+	} else if asyncMode {
+		rows, err = d.db.Query(`
+			SELECT s.name
+			FROM suite s
+			WHERE s.name <> ''
+				AND s.async = ? AND s.seq > 0 AND s.ignored = 0
+				AND (s.reportedCount IS NULL OR s.reportedCount <> s.seq)
+			ORDER BY s.outcomeOrder ASC, s.startTime ASC
+		`, asyncMode) // AND s.startTime IS NOT NULL
 	} else {
 		rows, err = d.db.Query(`
 			SELECT s.name
 			FROM suite s
-			WHERE s.async = ? 
-				AND s.name <> ''
-				AND (s.reportedCount IS NULL OR s.reportedCount <> s.seq OR s.seq = 0 AND s.ignored = 0)
+			WHERE s.name <> ''
+				AND (s.async = ? OR s.seq = 0 OR s.ignored = 1)
+				AND (s.reportedCount IS NULL OR s.reportedCount <> s.seq)
 			ORDER BY s.outcomeOrder ASC, s.startTime ASC
 		`, asyncMode) // AND s.startTime IS NOT NULL
 	}
 
-	if err != nil {
-		return
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var suiteName string
-		err = rows.Scan(&suiteName)
-		if err != nil {
-			return
-		}
-		suites = append(suites, suiteName)
-	}
-	return
-}
-
-func (d Suite) ListSync0() (suites []string, err error) {
-	p := logger.PerfTimer()
-	defer p.End()
-
-	rows, err := d.db.Query(`
-		SELECT s.name
-		FROM suite s
-		WHERE s.name <> '' AND s.async = 0
-	`) // AND s.startTime IS NOT NULL
-	if err != nil {
-		return
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var suiteName string
-		err = rows.Scan(&suiteName)
-		if err != nil {
-			return
-		}
-		suites = append(suites, suiteName)
-	}
-	return
-}
-
-func (d Suite) ListAsync0() (suites []string, err error) {
-	p := logger.PerfTimer()
-	defer p.End()
-
-	rows, err := d.db.Query(`
-		SELECT s.name
-		FROM suite s
-		WHERE s.name <> '' AND s.async = 1
-	`) // AND s.startTime IS NOT NULL
 	if err != nil {
 		return
 	}
@@ -501,6 +465,28 @@ func (d Suite) IgnoredSuiteCount(reportAll bool) (n uint16, err error) {
 				SELECT count(*)
 				FROM suite s
 				WHERE s.ignored = 1
+			`) //  AND (s.reportedCount IS NULL OR coalesce(s.reportedCount, 0) <> coalesce(s.seq, 0))
+	}
+	err = row.Scan(&n)
+	return
+}
+
+func (d Suite) EmptySuiteCount(reportAll bool) (n uint16, err error) {
+	p := logger.PerfTimer()
+	defer p.End("reportAll", reportAll, "n", n)
+
+	var row *sql.Row
+	if reportAll {
+		row = d.db.QueryRow(`
+				SELECT count(*)
+				FROM suite s
+				WHERE s.seq = 0
+			`)
+	} else {
+		row = d.db.QueryRow(`
+				SELECT count(*)
+				FROM suite s
+				WHERE s.seq = 0
 			`) //  AND (s.reportedCount IS NULL OR coalesce(s.reportedCount, 0) <> coalesce(s.seq, 0))
 	}
 	err = row.Scan(&n)

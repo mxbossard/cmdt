@@ -57,65 +57,66 @@ func globalReport(ctx facade.GlobalContext, asyncMode bool) (exitCode int16, err
 	isolation := ctx.Isolation
 	all := ctx.Config.ReportAll.Get()
 
-	var testSuites []string
-	testSuites, err = ctx.Repo.ListReportableSuitesByMode(asyncMode, all)
-	if err != nil {
+	nothingToReport := false
+	if all {
+		allSuites, err := ctx.Repo.ListAllSuites()
+		if err != nil {
+			return exitCode, err
+		}
+		nothingToReport = len(allSuites) == 0
+	} else {
+		reportableSuites, err := ctx.Repo.ListReportableSuites()
+		if err != nil {
+			return exitCode, err
+		}
+
+		nothingToReport = len(reportableSuites) == 0
+	}
+
+	if nothingToReport {
+		err = fmt.Errorf("you must perform some test prior to report all suites")
 		return
 	}
 
-	logger.Info("Global reporting suites", "token", token, "all", all, "asyncMode", asyncMode, "suites", testSuites)
+	reportableModedSuites, err := ctx.Repo.ListReportableSuitesByMode(asyncMode, all) //ToReportTestCountByMode(asyncMode, all)
+	if err != nil {
+		return exitCode, err
+	}
 
-	nothingToReport := true
+	logger.Info("Global reporting suites", "token", token, "all", all, "asyncMode", asyncMode, "reportableSuites", reportableModedSuites)
 
 	var suiteOutcomes []model.SuiteOutcome
 	var suiteContexts []facade.SuiteContext
-	goodModeSuite := false
+	goodModeSuite := len(reportableModedSuites) > 0
 	reportPassed := true
-	for _, testSuite := range testSuites {
+	for _, testSuite := range reportableModedSuites {
 		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, model.ReportAction, model.Config{})
 
 		if suiteCtx.Config.TestSuite.IsEmpty() {
 			fmt.Printf("\n<<>> empty suite name in ctx !!! \nctx: %v ; \ncfg: %v\n", suiteCtx, suiteCtx.Config)
 		}
 
-		suiteAsync := suiteCtx.Config.Async.Get()
-		if suiteAsync != asyncMode {
-			// Ignore suites in bad async mode
-			continue
+		suiteContexts = append(suiteContexts, suiteCtx)
+		var code int16
+		var suiteOutcome model.SuiteOutcome
+		suiteOutcome, code, err = reportTestSuite(suiteCtx, true, all)
+		if err != nil {
+			// FIXME: aggregate errors
+			exitCode = 1
+			return
 		}
-		// Override suite Keep config for reportAll which is global
-		suiteIgnored := suiteCtx.Config.IgnoreSuite.GetOr(false)
-		goodModeSuite = true
-		count := suiteCtx.Repo.ToReportTestCountBySuiteAndMode(testSuite, asyncMode, all)
-		if count >= 0 || suiteIgnored || all {
-			nothingToReport = false
-			suiteContexts = append(suiteContexts, suiteCtx)
-			var code int16
-			var suiteOutcome model.SuiteOutcome
-			suiteOutcome, code, err = reportTestSuite(suiteCtx, true, all)
-			if err != nil {
-				// FIXME: aggregate errors
-				exitCode = 1
-				return
-			}
-			if code != 0 {
-				exitCode = code
-			}
-			suiteOutcomes = append(suiteOutcomes, suiteOutcome)
-			if suiteOutcome.Outcome != model.IGNORED && suiteOutcome.Outcome != model.PASSED && suiteOutcome.Outcome != model.EMPTY {
-				reportPassed = false
-			}
+		if code != 0 {
+			exitCode = code
 		}
+		suiteOutcomes = append(suiteOutcomes, suiteOutcome)
+		if suiteOutcome.Outcome != model.IGNORED && suiteOutcome.Outcome != model.PASSED && suiteOutcome.Outcome != model.EMPTY {
+			reportPassed = false
+		}
+		// }
 	}
 
-	if len(testSuites) > 0 && !goodModeSuite {
+	if len(reportableModedSuites) > 0 && !goodModeSuite {
 		// No suites in supplied async mode => Nothing to report.
-		return
-	}
-
-	if nothingToReport {
-		allSuites, _ := ctx.Repo.ListAllSuites()
-		err = fmt.Errorf("you must perform some test prior to report all suites (testSuites: %s ; asyncMode: %v ; allSuites: %s)", testSuites, asyncMode, allSuites)
 		return
 	}
 
@@ -483,6 +484,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			var asyncExitCode int16
 
 			ignoredSuiteCount := rep.IgnoredSuiteCount(globalCfg.ReportAll.Get())
+			emptySuiteCount := rep.EmptySuiteCount(globalCfg.ReportAll.Get())
 			//syncSuites, err := rep.ListSyncSuites()
 			syncSuites, err := rep.ListReportableSuitesByMode(false, reportAll)
 			ProcessGlobalError(globalCtx, err)
@@ -492,7 +494,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 
 			// 1- Report all sync suites
 			toReportSyncTestCount := rep.ToReportTestCountByMode(false, reportAll)
-			if reportAll || ignoredSuiteCount+toReportSyncTestCount > 0 {
+			if reportAll || ignoredSuiteCount+emptySuiteCount+toReportSyncTestCount > 0 {
 				exitCode, err = globalReport(globalCtx, false)
 				ProcessGlobalError(globalCtx, err)
 				for _, suite := range syncSuites {
