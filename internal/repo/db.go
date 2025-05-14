@@ -194,13 +194,13 @@ func (r dbRepo) ClearSuite(testSuite string) (err error) {
 		err = r.wrap(err)
 		return
 	}
+
 	// FIXME: why is that commented out ? => timing out if uncommented
-	/*
-		err = r.queueDao.DeleteQueuesOfSuite(testSuite)
-		if err != nil {
-			return
-		}
-	*/
+	err = r.queueDao.DeleteQueuesOfSuite(testSuite)
+	if err != nil {
+		return
+	}
+
 	err = r.suiteDao.DeleteSuite(testSuite)
 	if err != nil {
 		err = r.wrap(err)
