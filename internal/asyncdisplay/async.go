@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"cmdt/internal/display"
@@ -41,6 +42,8 @@ func testDisplayerKey(ctx facade.TestContext) string {
 }
 
 type AsyncDisplay struct {
+	*sync.Mutex
+
 	verbose model.VerboseLevel
 	quiet   bool
 	tmpDir  string
@@ -134,6 +137,9 @@ func (d AsyncDisplay) SuiteTitle(ctx facade.SuiteContext) {
 }
 
 func (d AsyncDisplay) OpenTest(ctx facade.TestContext) display.TestDisplayer {
+	d.Lock()
+	defer d.Unlock()
+
 	cfg := ctx.Config
 
 	key := testDisplayerKey(ctx)
@@ -156,6 +162,9 @@ func (d AsyncDisplay) OpenTest(ctx facade.TestContext) display.TestDisplayer {
 }
 
 func (d AsyncDisplay) CloseTest(ctx facade.TestContext) {
+	d.Lock()
+	defer d.Unlock()
+
 	// report end of test to suite printer
 	key := testDisplayerKey(ctx)
 	td, ok := d.testDisplayers[key]
@@ -345,6 +354,9 @@ func (d AsyncDisplay) SuiteErrors(ctx facade.SuiteContext, errors ...error) {
 }
 
 func (d AsyncDisplay) TestErrors(ctx facade.TestContext, errors ...error) {
+	d.Lock()
+	defer d.Unlock()
+
 	key := testDisplayerKey(ctx)
 	if td, ok := d.testDisplayers[key]; ok {
 		td.Errors(errors...)
@@ -443,6 +455,7 @@ func New(tmpDir string, init bool, outs printz.Outputs) *AsyncDisplay {
 	logger.Info("Building new async display", "zcreenTmpDir", zcreenTmpDir)
 
 	d := &AsyncDisplay{
+		Mutex:          &sync.Mutex{},
 		tmpDir:         zcreenTmpDir,
 		outFormatter:   inoutz.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", display.TestColor, display.ResetColor)},
 		errFormatter:   inoutz.PrefixFormatter{Prefix: fmt.Sprintf("%serr%s>", display.ReportColor, display.ResetColor)},
@@ -467,6 +480,7 @@ func NewWaitingTailer(tmpDir string, init bool, outs printz.Outputs) *AsyncDispl
 	logger.Info("Building new async display", "zcreenTmpDir", zcreenTmpDir)
 
 	d := &AsyncDisplay{
+		Mutex:          &sync.Mutex{},
 		tmpDir:         zcreenTmpDir,
 		outFormatter:   inoutz.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", display.TestColor, display.ResetColor)},
 		errFormatter:   inoutz.PrefixFormatter{Prefix: fmt.Sprintf("%serr%s>", display.ReportColor, display.ResetColor)},

@@ -453,7 +453,7 @@ func (d Suite) IgnoredSuiteCount(reportAll bool) (n uint16, err error) {
 	p := logger.PerfTimer()
 	defer p.End("reportAll", reportAll, "n", n)
 
-	var row *sql.Row
+	var row *zql.SynchronizedRow
 	if reportAll {
 		row = d.db.QueryRow(`
 				SELECT count(*)
@@ -475,7 +475,7 @@ func (d Suite) EmptySuiteCount(reportAll bool) (n uint16, err error) {
 	p := logger.PerfTimer()
 	defer p.End("reportAll", reportAll, "n", n)
 
-	var row *sql.Row
+	var row *zql.SynchronizedRow
 	if reportAll {
 		row = d.db.QueryRow(`
 				SELECT count(*)

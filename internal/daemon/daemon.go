@@ -34,6 +34,7 @@ const (
 	ExtraRunningSecs           = 5
 	AsyncPollingSleepInMs      = 50
 	WaitAsyncReportTestTimeout = 2 * time.Second
+	daemonTryLockPeriod        = 10 * time.Microsecond
 )
 
 var logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
@@ -330,7 +331,7 @@ func TakeOver() {
 	logger.Debug("daemon prechecks", "token", token, "isolation", isolation, "debugLevel", debugLevel, "args", os.Args[1:])
 
 	repo := repo.New(token, isolation)
-	//defer repo.Close()
+	defer repo.Close()
 
 	d := daemon{token: token, isolation: isolation, repo: &repo}
 	lockFilepath := filepath.Join(repo.BackingFilepath(), DaemonLockFilename)
@@ -339,7 +340,7 @@ func TakeOver() {
 	// Wait to acquire file lock
 	lockCtx, cancel := context.WithTimeout(context.Background(), LockWatingSecs*time.Second)
 	defer cancel()
-	locked, err := fileLock.TryLockContext(lockCtx, time.Millisecond)
+	locked, err := fileLock.TryLockContext(lockCtx, daemonTryLockPeriod)
 	if err != nil {
 		panic(err)
 	}
@@ -396,7 +397,7 @@ func TakeOver() {
 	// Lock prior last unqueue
 	lockCtx, cancel = context.WithTimeout(context.Background(), LockWatingSecs*time.Second)
 	defer cancel()
-	locked, err = fileLock.TryLockContext(lockCtx, time.Millisecond)
+	locked, err = fileLock.TryLockContext(lockCtx, daemonTryLockPeriod)
 	if err != nil && err != context.DeadlineExceeded {
 		panic(err)
 	}

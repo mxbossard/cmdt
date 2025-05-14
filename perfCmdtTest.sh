@@ -2,6 +2,8 @@
 set -e -o pipefail
 scriptDir=$( dirname $( readlink -f $0 ) )
 
+COUNT="${1:-1}"
+
 . $scriptDir/buildCmdt.sh
 newCmdt="$BUILT_CMDT_BIN"
 ls -lh "$newCmdt"
@@ -16,36 +18,20 @@ cmdtIn="$cmdt $@"
 
 # Tested cmdt
 cmdt0="$newCmdt @isol=tested"
-cmdt1="$newCmdt @isol=tested @verbose @failuresLimit=-1" # Default verbose show passed test + perform all test beyond failures limit
-
-mkdir -p "$scriptDir/.tmp"
-reportFile="$( mktemp "$scriptDir/.tmp/XXXXXX.log" )"
-rm -- "$scriptDir/.tmp/"*.log || true
-
-RED_COLOR="\e[41m\e[30m"
-GREEN_COLOR="\e[42m\e[37m"
-CYAN_COLOR="\e[46m\e[30m"
-RESET_COLOR="\e[0m"
+cmdt1="$newCmdt @isol=tested @failuresLimit=-1" # Default verbose show passed test + perform all test beyond failures limit
 
 die() {
 	>&2 echo "$1"
 	exit 1
 }
 
-#cd "$GOBIN"
-#test -e cmdt || ln -s cmduest cmdt
-#export PATH="$PATH:."
-#cmd="cmdt"
-
-### NOTES
-# - Il est facile de sortir un test de la bonne test suite, et ce test ne sera jamais report !
-# => Should @report report all opened tests suites by default ?
+rm -rf -- /tmp/cmdt* /tmp/cmdt.log /tmp/daemon.log 2> /dev/null || true
 
 #$cmdt @global @silent
+$cmdt @global @suiteTimeout=10s
 
 # Clear context
 export -n __CMDT_TOKEN
-#$cmdt @init=main
 
 $cmdt1 @init=perf @verbose=4
 
@@ -56,11 +42,13 @@ $cmdt1 @test=perf/sleep_0.1 sleep 0.1
 $cmdt1 @report
 
 
+testSleepTime="0.02"
+
 >&2 echo "## test @async=false @fork=1"
 $cmdt1 @init=fork1_sync @verbose=3 @async=false @fork=1
 
 for i in $( seq 0 29 ); do
-	$cmdt1 @test=fork1_sync/sleep_0.1_$i sleep 0.01
+	$cmdt1 @test=fork1_sync/sleep_$i sleep $testSleepTime
 done
 $cmdt1 @report
 
@@ -68,7 +56,7 @@ $cmdt1 @report
 $cmdt1 @init=fork1_async @verbose=3 @async @fork=1
 
 for i in $( seq 0 29 ); do
-	$cmdt1 @test=fork1_async/sleep_0.1_$i sleep 0.01
+	$cmdt1 @test=fork1_async/sleep_$i sleep $testSleepTime
 done
 $cmdt1 @report
 
@@ -76,7 +64,7 @@ $cmdt1 @report
 $cmdt1 @init=fork2 @verbose=3 @fork=2
 
 for i in $( seq 0 29 ); do
-	$cmdt1 @test=fork2/sleep_0.1_$i sleep 0.01
+	$cmdt1 @test=fork2/sleep_$i sleep $testSleepTime
 done
 $cmdt1 @report
 
@@ -85,7 +73,7 @@ $cmdt1 @init=fork5 @verbose=3 @fork=5
 
 #$cmdt1 @test=fork/echo_foo echo foo
 for i in $( seq 0 29 ); do
-	$cmdt1 @test=fork5/sleep_0.1_$i sleep 0.01
+	$cmdt1 @test=fork5/sleep_$i sleep $testSleepTime
 done
 $cmdt1 @report
 
@@ -93,8 +81,25 @@ $cmdt1 @report
 $cmdt1 @init=fork20 @verbose=3 @fork=20
 
 for i in $( seq 0 29 ); do
-	$cmdt1 @test=fork20/sleep_0.1_$i sleep 0.01
+	$cmdt1 @test=fork20/sleep_$i sleep $testSleepTime
 done
 $cmdt1 @report
 
 $cmdt1 @report @all
+
+for p in $( seq 1 $COUNT ); do
+	>&2 echo
+	>&2 echo "---------------------"
+	>&2 echo "Stress test running 20 suites of 30 tests #$p ..."
+	for k in $( seq 1 20 ); do
+		>&2 echo "## seq test @fork=$k"
+		$cmdt1 @init=seq_fork$k @fork=$k @verbose=1
+
+		for i in $( seq 0 29 ); do
+			$cmdt1 @test=seq_fork$k/sleep_$i sleep $testSleepTime
+		done
+		#$cmdt1 @report
+	done
+	$cmdt1 @report 
+	$cmdt1 @report @all
+done

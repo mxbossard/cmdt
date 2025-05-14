@@ -25,6 +25,8 @@ var logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultL
 var _repo = make(map[string]repo.Repo)
 
 func Repo(token, isolation string) repo.Repo {
+	r := repo.New(token, isolation)
+	return &r
 	key := fmt.Sprintf("%s;%s", token, isolation)
 	if ok := _repo[key]; ok == nil {
 		r := repo.New(token, isolation)
@@ -253,21 +255,6 @@ func (c *TestContext) IncrementTestCount() (n uint16) {
 	logger.Debug("Incremented Test count", "n", n)
 	return n
 }
-
-/*
-func (c TestContext) NoErrorOrFatal(err error) {
-	if err != nil {
-		outcome := model.NewTestOutcome2(c.Config, c.Seq)
-		outcome.Outcome = model.ERRORED
-		outcome.Err = err
-		err2 := c.Repo.SaveTestOutcome(outcome)
-		if err2 != nil {
-			logger.Error("unable to save errored test outcome", "error", err2)
-		}
-	}
-	c.SuiteContext.NoErrorOrFatal(err)
-}
-*/
 
 func (c TestContext) ProcessTooMuchFailures() (n uint16) {
 	cfg := c.Config

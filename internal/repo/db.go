@@ -34,15 +34,6 @@ func (r *dbRepo) wrap(err error) error {
 }
 
 func (r *dbRepo) Init() (err error) {
-	/*
-		if r.db != nil {
-			err = r.db.Close()
-			if err != nil {
-				return
-			}
-		}
-	*/
-
 	db, err := dao.DbOpen(r.dirpath)
 	if err != nil {
 		return r.wrap(err)
@@ -124,6 +115,7 @@ func (r dbRepo) InitSuite(cfg model.Config) (err error) {
 			err = r.wrap(err)
 			return
 		}
+		cfg.SuiteStartTime.Set(time.Now())
 		fmt.Fprintf(os.Stderr, "Cleared suite: [%s] (contained %d tests)\n", suite, n)
 	}
 
@@ -560,10 +552,6 @@ func newDbRepo(dirpath, isolation, token string) (r dbRepo, err error) {
 		return r, err
 	}
 
-	// if !inited {
-	// 	fmt.Printf(">>> DB not initialized yet. pid: %d; dirpath: %s; token: %s; isol: %s\n", os.Getpid(), dirpath, token, isolation)
-	// }
-
 	r.queueDao, err = dao.NewQueue(db, !inited)
 	if err != nil {
 		err = r.wrap(err)
@@ -581,7 +569,5 @@ func newDbRepo(dirpath, isolation, token string) (r dbRepo, err error) {
 	}
 
 	logger.Info("New db repo", "dirpath", dirpath, "token", token, "isolation", isolation)
-
-	//err = r.Close()
 	return
 }
