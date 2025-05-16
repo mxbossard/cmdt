@@ -20,7 +20,7 @@ type FileRepo struct {
 	token     string
 	isolation string
 
-	dbRepo dbRepo
+	dbRepo DbRepo
 }
 
 func (r FileRepo) BackingFilepath() string {

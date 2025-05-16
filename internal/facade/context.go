@@ -16,6 +16,7 @@ import (
 
 	"github.com/mxbossard/utilz/cmdz"
 	"github.com/mxbossard/utilz/errorz"
+	"github.com/mxbossard/utilz/poolz"
 	"github.com/mxbossard/utilz/utilz"
 	"github.com/mxbossard/utilz/zlog"
 )
@@ -23,6 +24,8 @@ import (
 var logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 
 var _repo = make(map[string]repo.Repo)
+
+var _repoPool poolz.Pool[*repo.DbRepo]
 
 func Repo(token, isolation string) repo.Repo {
 	r := repo.New(token, isolation)
@@ -33,6 +36,21 @@ func Repo(token, isolation string) repo.Repo {
 		_repo[key] = &r
 	}
 	return _repo[key]
+}
+
+func Repo2(token, isolation string) repo.Repo {
+	if _repoPool == nil {
+		_repoPool = poolz.New(50, func() (*repo.DbRepo, error) {
+			r := repo.New(token, isolation)
+			return &r, nil
+		})
+	}
+	r, err := _repoPool.Open()
+	if err != nil {
+		panic(err)
+	}
+
+	return r
 }
 
 func NewGlobalContext(token, isolation string, inputCfg model.Config) GlobalContext {
@@ -118,6 +136,10 @@ type GlobalContext struct {
 
 	Repo   repo.Repo
 	Config model.Config
+}
+
+func (c GlobalContext) Close() error {
+	return c.Repo.PoolClose()
 }
 
 func (c GlobalContext) MergeConfig(newCfg model.Config) {

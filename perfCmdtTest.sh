@@ -25,7 +25,8 @@ die() {
 	exit 1
 }
 
-rm -rf -- /tmp/cmdt* /tmp/cmdt.log /tmp/daemon.log 2> /dev/null || true
+find /tmp -name "cmdt*.log" -o -name "daemon*.log" -exec rm {} \; 2> /dev/null || true
+rm -rf -- /tmp/cmdt* 2> /dev/null || true
 
 #$cmdt @global @silent
 $cmdt @global @suiteTimeout=10s

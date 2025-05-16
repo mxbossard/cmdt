@@ -10,12 +10,15 @@ import (
 	"cmdt/internal/model"
 
 	"github.com/mxbossard/utilz/errorz"
+	"github.com/mxbossard/utilz/poolz"
 	"github.com/mxbossard/utilz/zql"
 )
 
 const WaitingOpDoneSleepPeriodInMs = 50
 
-type dbRepo struct {
+type DbRepo struct {
+	poolz.PoolCloser
+
 	dirpath   string
 	token     string
 	isolation string
@@ -23,17 +26,18 @@ type dbRepo struct {
 	suiteDao  dao.Suite
 	queueDao  dao.Queue
 	testDao   dao.Test
+	globalDao dao.Global
 	//lastUpdate time.Time
 }
 
-func (r *dbRepo) wrap(err error) error {
+func (r *DbRepo) wrap(err error) error {
 	if err != nil {
 		return fmt.Errorf("DB repo [token: %s ; isol: %s ; file: %s] error: %w", r.token, r.isolation, r.BackingFilepath(), err)
 	}
 	return nil
 }
 
-func (r *dbRepo) Init() (err error) {
+func (r *DbRepo) Open() (err error) {
 	db, err := dao.DbOpen(r.dirpath)
 	if err != nil {
 		return r.wrap(err)
@@ -46,13 +50,21 @@ func (r *dbRepo) Init() (err error) {
 	return
 }
 
-func (r *dbRepo) Close() error {
+func (r *DbRepo) Close() error {
 	logger.Info("Closing DB", "file", r.db.FileLockPath())
 	err := r.db.Close()
 	return r.wrap(err)
 }
 
-func (r dbRepo) BackingFilepath() string {
+func (r *DbRepo) PoolClose() error {
+	return nil
+}
+
+func (r *DbRepo) SetPoolCloser(pc poolz.PoolCloser) {
+	r.PoolCloser = pc
+}
+
+func (r DbRepo) BackingFilepath() string {
 	path, err := forgeWorkDirectoryPath(r.token, r.isolation)
 	if err != nil {
 		err = r.wrap(err)
@@ -61,7 +73,7 @@ func (r dbRepo) BackingFilepath() string {
 	return path
 }
 
-func (r dbRepo) MockDirectoryPath(testSuite string, testId uint16) (mockDir string, err error) {
+func (r DbRepo) MockDirectoryPath(testSuite string, testId uint16) (mockDir string, err error) {
 	var path string
 	path, err = testSuiteDirectoryPath(testSuite, r.token, r.isolation)
 	if err != nil {
@@ -77,13 +89,13 @@ func (r dbRepo) MockDirectoryPath(testSuite string, testId uint16) (mockDir stri
 	return
 }
 
-func (r dbRepo) SaveGlobalConfig(cfg model.Config) (err error) {
+func (r DbRepo) SaveGlobalConfig(cfg model.Config) (err error) {
 	err = r.suiteDao.SaveGlobalConfig(cfg)
 	err = r.wrap(err)
 	return
 }
 
-func (r dbRepo) GetGlobalConfig() (cfg model.Config, err error) {
+func (r DbRepo) GetGlobalConfig() (cfg model.Config, err error) {
 	found, err := r.suiteDao.FindGlobalConfig()
 	if err != nil {
 		err = r.wrap(err)
@@ -105,7 +117,7 @@ func (r dbRepo) GetGlobalConfig() (cfg model.Config, err error) {
 	return
 }
 
-func (r dbRepo) InitSuite(cfg model.Config) (err error) {
+func (r DbRepo) InitSuite(cfg model.Config) (err error) {
 	suite := cfg.TestSuite.Get()
 
 	n := r.TestCount(suite)
@@ -137,7 +149,7 @@ func (r dbRepo) InitSuite(cfg model.Config) (err error) {
 	return
 }
 
-func (r dbRepo) SaveSuiteConfig(cfg model.Config) (err error) {
+func (r DbRepo) SaveSuiteConfig(cfg model.Config) (err error) {
 	err = r.suiteDao.SaveSuiteConfig(cfg.TestSuite.Get(), cfg)
 	if err != nil {
 		err = r.wrap(err)
@@ -147,7 +159,7 @@ func (r dbRepo) SaveSuiteConfig(cfg model.Config) (err error) {
 	return
 }
 
-func (r dbRepo) GetSuiteConfig(testSuite string, initless bool) (cfg model.Config, err error) {
+func (r DbRepo) GetSuiteConfig(testSuite string, initless bool) (cfg model.Config, err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("cannot load suite config: %w", err)
@@ -188,7 +200,7 @@ func (r dbRepo) GetSuiteConfig(testSuite string, initless bool) (cfg model.Confi
 	return
 }
 
-func (r dbRepo) ClearSuite(testSuite string) (err error) {
+func (r DbRepo) ClearSuite(testSuite string) (err error) {
 	err = r.testDao.DeleteTestsOfSuite(testSuite)
 	if err != nil {
 		err = r.wrap(err)
@@ -211,31 +223,31 @@ func (r dbRepo) ClearSuite(testSuite string) (err error) {
 	return
 }
 
-func (r dbRepo) ListReportableSuites() (suites []string, err error) {
+func (r DbRepo) ListReportableSuites() (suites []string, err error) {
 	suites, err = r.suiteDao.ListReportableOrdered()
 	err = r.wrap(err)
 	return
 }
 
-func (r dbRepo) ListReportableSuitesByMode(asyncMode, all bool) (suites []string, err error) {
+func (r DbRepo) ListReportableSuitesByMode(asyncMode, all bool) (suites []string, err error) {
 	suites, err = r.suiteDao.ListReportableOrderedByMode(asyncMode, all)
 	err = r.wrap(err)
 	return
 }
 
-func (r dbRepo) ListAllSuites() (suites []string, err error) {
+func (r DbRepo) ListAllSuites() (suites []string, err error) {
 	suites, err = r.suiteDao.ListOrdered()
 	err = r.wrap(err)
 	return
 }
 
-func (r dbRepo) ListReportedAsyncSuites() (suites []string, err error) {
+func (r DbRepo) ListReportedAsyncSuites() (suites []string, err error) {
 	suites, err = r.suiteDao.ListReportedAsync()
 	err = r.wrap(err)
 	return
 }
 
-func (r dbRepo) IgnoredSuiteCount(reportAll bool) (n uint16) {
+func (r DbRepo) IgnoredSuiteCount(reportAll bool) (n uint16) {
 	n, err := r.suiteDao.IgnoredSuiteCount(reportAll)
 	if err != nil {
 		err = r.wrap(err)
@@ -244,7 +256,7 @@ func (r dbRepo) IgnoredSuiteCount(reportAll bool) (n uint16) {
 	return
 }
 
-func (r dbRepo) EmptySuiteCount(reportAll bool) (n uint16) {
+func (r DbRepo) EmptySuiteCount(reportAll bool) (n uint16) {
 	n, err := r.suiteDao.EmptySuiteCount(reportAll)
 	if err != nil {
 		err = r.wrap(err)
@@ -253,7 +265,7 @@ func (r dbRepo) EmptySuiteCount(reportAll bool) (n uint16) {
 	return
 }
 
-func (r dbRepo) SaveTestOutcome(outcome model.TestOutcome) (err error) {
+func (r DbRepo) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 	err = r.testDao.SaveTestOutcome(outcome)
 	if err != nil {
 		err = r.wrap(err)
@@ -275,13 +287,13 @@ func (r dbRepo) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 	return
 }
 
-func (r dbRepo) SaveSuiteOutcome(outcome model.SuiteOutcome) (err error) {
+func (r DbRepo) SaveSuiteOutcome(outcome model.SuiteOutcome) (err error) {
 	err = r.suiteDao.UpdateSuiteOutcome(outcome.TestSuite, outcome.Outcome)
 	err = r.wrap(err)
 	return
 }
 
-func (r dbRepo) UpdateLastTestTime(testSuite string) {
+func (r DbRepo) UpdateLastTestTime(testSuite string) {
 	err := r.suiteDao.UpdateSuiteEndTime(testSuite, time.Now())
 	if err != nil {
 		err = r.wrap(err)
@@ -289,33 +301,33 @@ func (r dbRepo) UpdateLastTestTime(testSuite string) {
 	}
 }
 
-func (r dbRepo) MarkSuiteReported(suite string) (err error) {
+func (r DbRepo) MarkSuiteReported(suite string) (err error) {
 	err = r.suiteDao.MarkSuiteReported(suite)
 	err = r.wrap(err)
 	logger.Infof("Suite: [%s] was marked reported", suite)
 	return
 }
 
-func (r dbRepo) MarkSuitesReported() (err error) {
+func (r DbRepo) MarkSuitesReported() (err error) {
 	err = r.suiteDao.MarkSuitesReported()
 	err = r.wrap(err)
 	logger.Infof("All suites were marked reported")
 	return
 }
 
-func (r dbRepo) SuiteStatus(suite string) (exists, reported bool, err error) {
+func (r DbRepo) SuiteStatus(suite string) (exists, reported bool, err error) {
 	exists, reported, err = r.suiteDao.IsSuiteReported(suite)
 	err = r.wrap(err)
 	return
 }
 
-func (r dbRepo) LoadSuiteOutcome(testSuite string) (outcome model.SuiteOutcome, err error) {
+func (r DbRepo) LoadSuiteOutcome(testSuite string) (outcome model.SuiteOutcome, err error) {
 	outcome, err = r.testDao.GetSuiteOutcome(testSuite)
 	err = r.wrap(err)
 	return
 }
 
-func (r dbRepo) IncrementSuiteSeq(testSuite, name string) (n uint16) {
+func (r DbRepo) IncrementSuiteSeq(testSuite, name string) (n uint16) {
 	// FIXME should this be used ?
 
 	var err error
@@ -335,7 +347,7 @@ func (r dbRepo) IncrementSuiteSeq(testSuite, name string) (n uint16) {
 	return
 }
 
-func (r dbRepo) NotReportedTestCount() (n uint16) {
+func (r DbRepo) NotReportedTestCount() (n uint16) {
 	n, err := r.suiteDao.NotReportedTestCount()
 	if err != nil {
 		err = r.wrap(err)
@@ -345,7 +357,7 @@ func (r dbRepo) NotReportedTestCount() (n uint16) {
 	return
 }
 
-func (r dbRepo) TestCount(testSuite string) (n uint16) {
+func (r DbRepo) TestCount(testSuite string) (n uint16) {
 	n, err := r.suiteDao.TestCount(testSuite)
 	if err != nil {
 		err = r.wrap(err)
@@ -355,7 +367,7 @@ func (r dbRepo) TestCount(testSuite string) (n uint16) {
 	return
 }
 
-func (r dbRepo) ToReportTestCountByMode(asyncMode, all bool) (n uint16) {
+func (r DbRepo) ToReportTestCountByMode(asyncMode, all bool) (n uint16) {
 	n, err := r.suiteDao.ToReportTestCountByMode(asyncMode, all)
 	if err != nil {
 		err = r.wrap(err)
@@ -364,7 +376,7 @@ func (r dbRepo) ToReportTestCountByMode(asyncMode, all bool) (n uint16) {
 	return
 }
 
-func (r dbRepo) ToReportTestCountBySuiteAndMode(testSuite string, asyncMode, all bool) (n uint16) {
+func (r DbRepo) ToReportTestCountBySuiteAndMode(testSuite string, asyncMode, all bool) (n uint16) {
 	n, err := r.suiteDao.ToReportTestCountBySuiteAndMode(testSuite, asyncMode, all)
 	if err != nil {
 		err = r.wrap(err)
@@ -373,7 +385,7 @@ func (r dbRepo) ToReportTestCountBySuiteAndMode(testSuite string, asyncMode, all
 	return
 }
 
-func (r dbRepo) PassedCount(testSuite string) (n uint16) {
+func (r DbRepo) PassedCount(testSuite string) (n uint16) {
 	n, err := r.testDao.PassedCount(testSuite)
 	if err != nil {
 		err = r.wrap(err)
@@ -382,7 +394,7 @@ func (r dbRepo) PassedCount(testSuite string) (n uint16) {
 	return
 }
 
-func (r dbRepo) IgnoredCount(testSuite string) (n uint16) {
+func (r DbRepo) IgnoredCount(testSuite string) (n uint16) {
 	n, err := r.testDao.IgnoredCount(testSuite)
 	if err != nil {
 		err = r.wrap(err)
@@ -391,7 +403,7 @@ func (r dbRepo) IgnoredCount(testSuite string) (n uint16) {
 	return
 }
 
-func (r dbRepo) FailedCount(testSuite string) (n uint16) {
+func (r DbRepo) FailedCount(testSuite string) (n uint16) {
 	n, err := r.testDao.FailedCount(testSuite)
 	if err != nil {
 		err = r.wrap(err)
@@ -400,7 +412,7 @@ func (r dbRepo) FailedCount(testSuite string) (n uint16) {
 	return
 }
 
-func (r dbRepo) ErroredCount(testSuite string) (n uint16) {
+func (r DbRepo) ErroredCount(testSuite string) (n uint16) {
 	n, err := r.testDao.ErroredCount(testSuite)
 	if err != nil {
 		err = r.wrap(err)
@@ -409,7 +421,7 @@ func (r dbRepo) ErroredCount(testSuite string) (n uint16) {
 	return
 }
 
-func (r dbRepo) TooMuchCount(testSuite string) (n uint16) {
+func (r DbRepo) TooMuchCount(testSuite string) (n uint16) {
 	n, err := r.suiteDao.TooMuchCount(testSuite)
 	if err != nil {
 		err = r.wrap(err)
@@ -418,7 +430,7 @@ func (r dbRepo) TooMuchCount(testSuite string) (n uint16) {
 	return
 }
 
-func (r dbRepo) QueueOperation(op model.Operater) (err error) {
+func (r DbRepo) QueueOperation(op model.Operater) (err error) {
 	err = r.queueDao.QueueOperater(op)
 	if err == nil {
 		logger.Info("Queued operation", "testSuite", op.Suite(), "kind", op.Kind(), "seq", op.Seq())
@@ -427,7 +439,7 @@ func (r dbRepo) QueueOperation(op model.Operater) (err error) {
 	return
 }
 
-func (r dbRepo) UnqueueOperation() (op model.Operater, err error) {
+func (r DbRepo) UnqueueOperation() (op model.Operater, err error) {
 	op, err = r.queueDao.UnqueueOperater()
 	if op != nil {
 		logger.Info("Unqueued operation", "testSuite", op.Suite(), "kind", op.Kind(), "seq", op.Seq(), "err", err)
@@ -436,7 +448,7 @@ func (r dbRepo) UnqueueOperation() (op model.Operater, err error) {
 	return
 }
 
-func (r dbRepo) Done(op model.Operater) (err error) {
+func (r DbRepo) Done(op model.Operater) (err error) {
 	if op == nil {
 		return
 	}
@@ -447,7 +459,7 @@ func (r dbRepo) Done(op model.Operater) (err error) {
 	return
 }
 
-func (r dbRepo) WaitOperationDone(op model.Operater, timeout time.Duration) (exitCode int16, opErr, err error) {
+func (r DbRepo) WaitOperationDone(op model.Operater, timeout time.Duration) (exitCode int16, opErr, err error) {
 	exitCode = -1
 	start := time.Now()
 	for time.Since(start) < timeout {
@@ -465,7 +477,7 @@ func (r dbRepo) WaitOperationDone(op model.Operater, timeout time.Duration) (exi
 	return
 }
 
-func (r dbRepo) WaitEmptyQueue(testSuite string, timeout time.Duration) (err error) {
+func (r DbRepo) WaitEmptyQueue(testSuite string, timeout time.Duration) (err error) {
 	start := time.Now()
 	for time.Since(start) < timeout {
 		var count int
@@ -486,7 +498,7 @@ func (r dbRepo) WaitEmptyQueue(testSuite string, timeout time.Duration) (err err
 	return
 }
 
-func (r dbRepo) WaitAllEmpty(timeout time.Duration) (err error) {
+func (r DbRepo) WaitAllEmpty(timeout time.Duration) (err error) {
 	start := time.Now()
 	for time.Since(start) < timeout {
 		var count int
@@ -506,7 +518,7 @@ func (r dbRepo) WaitAllEmpty(timeout time.Duration) (err error) {
 	return
 }
 
-func (r dbRepo) unqueue() (ok bool, op model.Operater, err error) {
+func (r DbRepo) unqueue() (ok bool, op model.Operater, err error) {
 	queuedOperationsCount, err := r.queueDao.QueuedOperationsCount()
 	if err != nil {
 		err = r.wrap(err)
@@ -527,19 +539,24 @@ func (r dbRepo) unqueue() (ok bool, op model.Operater, err error) {
 	return
 }
 
-func (r dbRepo) Unqueue0() (ok bool, op model.Operater, err error) {
-	ok, op, err = r.unqueue()
-	err = r.wrap(err)
-	//	logger.Warn("Unqueue()", "kind", op.Kind(), "opId", op.Id())
-	return
+func (r DbRepo) SaveDaemonPid(pid int) (err error) {
+	return r.globalDao.SaveDaemonPid(pid)
 }
 
-func newDbRepo(dirpath, isolation, token string) (r dbRepo, err error) {
+func (r DbRepo) ClearDaemonPid(pid int) (err error) {
+	return r.globalDao.ClearDaemonPid(pid)
+}
+
+func (r DbRepo) GetDaemonPid() (int, error) {
+	return r.globalDao.GetDaemonPid()
+}
+
+func newDbRepo(dirpath, isolation, token string) (r DbRepo, err error) {
 	r.dirpath = dirpath
 	r.token = token
 	r.isolation = isolation
 
-	err = r.Init()
+	err = r.Open()
 	if err != nil {
 		err = r.wrap(err)
 		return
@@ -563,6 +580,11 @@ func newDbRepo(dirpath, isolation, token string) (r dbRepo, err error) {
 		return
 	}
 	r.testDao, err = dao.NewTest(db, !inited)
+	if err != nil {
+		err = r.wrap(err)
+		return
+	}
+	r.globalDao, err = dao.NewGlobal(db, !inited)
 	if err != nil {
 		err = r.wrap(err)
 		return

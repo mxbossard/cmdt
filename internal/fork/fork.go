@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	workerInactivityTimeout      = 100 * time.Millisecond
+	workerInactivityTimeout      = 50 * time.Millisecond
 	workerSleepPeriod            = 1 * time.Microsecond
 	schedulerQueueElectionPeriod = 1 * time.Microsecond
 	schedulerMaxWorker           = 20

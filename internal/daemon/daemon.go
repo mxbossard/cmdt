@@ -152,6 +152,7 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 			logger.Debug("Initializing test suite", "token", d.token, "isolation", d.isolation, "openedSuite", suite)
 			//fmt.Printf("\n<<>> opening suite: %s ; openedSuites: %s\n", suite, d.openedSuites)
 			ctx := facade.NewSuiteContext(d.token, d.isolation, suite, false, model.InitAction, model.Config{})
+			defer ctx.Close()
 			d.display.OpenSuite(ctx)
 			d.display.SuiteTitle(ctx)
 			fork.ClearQueue(suite)
@@ -350,8 +351,8 @@ func TakeOver() {
 	}
 
 	// If PID file already exists exit => already running
-	pid := d.ReadPid()
-	if pid != "" {
+	pidStr := d.ReadPid()
+	if pidStr != "" {
 		logger.Info("daemon already running")
 		fileLock.Unlock()
 		os.Exit(3)
@@ -390,9 +391,22 @@ func TakeOver() {
 
 	logger.Info("daemon taking over")
 
+	// Register Daemon PID in DB
+	pid := os.Getpid()
+	err = repo.SaveDaemonPid(pid)
+	if err != nil {
+		panic(err)
+	}
+
 	// Run daemon
 	//fmt.Printf("\n<<>> Running new daemon ; pid: %d ; isol: %s ; token: %s\n", os.Getpid(), isolation, token)
 	d.run()
+
+	// Clear Daemon PID in DB
+	err = repo.ClearDaemonPid(pid)
+	if err != nil {
+		panic(err)
+	}
 
 	// Lock prior last unqueue
 	lockCtx, cancel = context.WithTimeout(context.Background(), LockWatingSecs*time.Second)

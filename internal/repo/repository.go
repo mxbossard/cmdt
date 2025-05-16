@@ -25,9 +25,9 @@ var (
 )
 
 type Repo interface {
-	Init() error
-
+	Open() error
 	Close() error
+	PoolClose() error
 
 	BackingFilepath() string
 
@@ -97,9 +97,13 @@ type Repo interface {
 	WaitEmptyQueue(testSuite string, timeout time.Duration) (err error)
 
 	WaitAllEmpty(timeout time.Duration) (err error)
+
+	SaveDaemonPid(pid int) (err error)
+	ClearDaemonPid(pid int) (err error)
+	GetDaemonPid() (int, error)
 }
 
-func New(token, isolation string) (repo dbRepo) {
+func New(token, isolation string) (repo DbRepo) {
 	p := logger.PerfTimer("token", token, "isolation", isolation)
 	defer p.End()
 

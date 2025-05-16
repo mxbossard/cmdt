@@ -91,7 +91,6 @@ func globalReport(ctx facade.GlobalContext, asyncMode bool) (exitCode int16, err
 	reportPassed := true
 	for _, testSuite := range reportableModedSuites {
 		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, model.ReportAction, model.Config{})
-
 		if suiteCtx.Config.TestSuite.IsEmpty() {
 			fmt.Printf("\n<<>> empty suite name in ctx !!! \nctx: %v ; \ncfg: %v\n", suiteCtx, suiteCtx.Config)
 		}
@@ -111,6 +110,10 @@ func globalReport(ctx facade.GlobalContext, asyncMode bool) (exitCode int16, err
 		suiteOutcomes = append(suiteOutcomes, suiteOutcome)
 		if suiteOutcome.Outcome != model.IGNORED && suiteOutcome.Outcome != model.PASSED && suiteOutcome.Outcome != model.EMPTY {
 			reportPassed = false
+		}
+		err = suiteCtx.Close()
+		if err != nil {
+			return 1, err
 		}
 		// }
 	}
@@ -134,6 +137,7 @@ func globalReport(ctx facade.GlobalContext, asyncMode bool) (exitCode int16, err
 
 func ProcessGlobalReportDef(def model.ReportDefinition, asyncMode bool) (exitCode int16, err error) {
 	ctx := facade.NewGlobalContext(def.Token, def.Isolation, model.Config{})
+	defer ctx.Close()
 	exitCode, err = globalReport(ctx, asyncMode)
 	return
 }
@@ -176,7 +180,7 @@ func reportTestSuite(ctx facade.SuiteContext, global, all bool) (suiteOutcome mo
 func ProcessReportDef(def model.ReportDefinition) (exitCode int16, err error) {
 	//logger.Warn("ProcessReportDef()", "def", def)
 	ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.ReportAction, def.Config) // FIXME ? removing def.Config ?
-	//ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.ReportAction, model.Config{}) // FIXME ? removing def.Config ?
+	defer ctx.Close()
 
 	suiteOutcome, exitCode, err := reportTestSuite(ctx, false, false)
 	if err != nil {
@@ -194,12 +198,12 @@ func ProcessReportDef(def model.ReportDefinition) (exitCode int16, err error) {
 	return
 }
 
-func performTest(testDef model.TestDefinition) (exitCode int16, err error) {
+func performTest(testDef model.TestDefinition, ctx facade.TestContext) (exitCode int16, err error) {
 	logger.Debug("Performing test")
 	exitCode = 1
 	cfg := testDef.Config
-	ctx, err := facade.NewTestContext2(testDef)
-	ProcessTestError(ctx, err)
+	// ctx, err := facade.NewTestContext2(testDef)
+	// ProcessTestError(ctx, err)
 	seq := testDef.Seq
 
 	td := Dpl.OpenTest(ctx)
@@ -276,10 +280,10 @@ func ProcessTestDef(testDef model.TestDefinition) (exitCode int16) {
 	testSuite := testDef.TestSuite
 	testCfg := testDef.Config
 	testCtx, err := facade.NewTestContext2(testDef)
+	ProcessTestError(testCtx, err)
+	defer testCtx.Close()
 
 	Dpl.Quiet(testCfg.Quiet.Is(true))
-
-	ProcessTestError(testCtx, err)
 
 	tooMuchFailures := testCtx.ProcessTooMuchFailures()
 
@@ -299,7 +303,7 @@ func ProcessTestDef(testDef model.TestDefinition) (exitCode int16) {
 
 	if testCfg.ContainerDisabled.Is(true) || testCfg.ContainerImage.IsEmpty() {
 		logger.Debug("Performing test outside container", "image", testCfg.ContainerImage, "containerDisabled", testCfg.ContainerDisabled, "testConfig", testCfg)
-		exitCode, err = performTest(testDef)
+		exitCode, err = performTest(testDef, testCtx)
 
 		ProcessTestError(testCtx, err)
 	} else {
@@ -325,12 +329,13 @@ func ProcessTestDef(testDef model.TestDefinition) (exitCode int16) {
 	return
 }
 
-func ProcessMalDefinedTest(testDef model.TestDefinition, malDefErr error) (exitCode int16) {
-	testCtx, err := facade.NewTestContext2(testDef)
-	if err != nil {
-		// TODO
-		panic(err)
-	}
+func ProcessMalDefinedTest(testDef model.TestDefinition, testCtx facade.TestContext, malDefErr error) (exitCode int16) {
+	// testCtx, err := facade.NewTestContext2(testDef)
+	// if err != nil {
+	// 	// TODO
+	// 	panic(err)
+	// }
+	// defer testCtx.Close()
 
 	td := Dpl.OpenTest(testCtx)
 	defer td.Close()
@@ -366,6 +371,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		// With token in env catch isolation from args quickly
 		isol := utils.IsolationFromArgs(allArgs)
 		envCtx := facade.NewGlobalContext(envToken, isol, defaultCfg)
+		defer envCtx.Close()
 		defaultCfg = envCtx.Config
 	}
 	rulePrefix := defaultCfg.Prefix.Get()
@@ -396,6 +402,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			errorz.Fatal(parseArgsErrors)
 		}
 		globalCtx := facade.NewGlobalContext(token, isolation, inputConfig)
+		defer globalCtx.Close()
 
 		ProcessGlobalError(globalCtx, parseArgsErrors.Return())
 		Dpl.SetVerbose(globalCtx.Config.Verbose.Get())
@@ -409,10 +416,13 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 
 		// Check if suite exists and it's status
 		rep := facade.Repo(token, isolation)
+		defer rep.PoolClose()
+
 		exists, reported, err := rep.SuiteStatus(testSuite)
 
 		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig)
 		ProcessSuiteError(suiteCtx, err)
+		defer suiteCtx.Close()
 
 		if suiteCtx.Config.ForkCount.GetOr(1) > 1 {
 			// Forked suite MUST be async
@@ -464,9 +474,11 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				errorz.Fatal(parseArgsErrors)
 			}
 			globalCtx := facade.NewGlobalContext(token, isolation, inputConfig)
+			defer globalCtx.Close()
 			globalCfg := globalCtx.Config
 			Dpl.SetVerbose(globalCfg.Verbose.Get())
 			rep := facade.Repo(token, isolation)
+			defer rep.PoolClose()
 			reportAll := globalCfg.ReportAll.GetOr(model.DefaultReportAll)
 
 			wait = func() int16 {
@@ -539,6 +551,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 					}
 
 					asyncDpl := asyncdisplay.New(globalCtx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
+					// Report always launch a daemon, just in case daemon was not running.
 					daemonIsol = globalCtx.Isolation
 					daemonToken = globalCtx.Token
 
@@ -596,8 +609,8 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			testSuite := inputConfig.TestSuite.Get()
 			logger.Debug("Executing Report suite action", "suite", testSuite)
 			suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig)
-
 			ProcessSuiteError(suiteCtx, parseArgsErrors.Return())
+			defer suiteCtx.Close()
 
 			Dpl.SetVerbose(suiteCtx.Config.Verbose.Get())
 
@@ -638,6 +651,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				ProcessSuiteError(suiteCtx, err)
 
 				asyncDpl := asyncdisplay.New(suiteCtx.Repo.BackingFilepath(), false, printz.NewStandardOutputs())
+				// Report always launch a daemon, just in case daemon was not running.
 				daemonIsol = suiteCtx.Isolation
 				daemonToken = suiteCtx.Token
 
@@ -686,10 +700,10 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		ppid := uint32(utils.ReadEnvPpid())
 		logger.Debug("Executing Test action", "suite", testSuite)
 		testCtx, err := facade.NewTestContext(token, isolation, testSuite, 0, inputConfig, ppid)
-
 		if err != nil {
 			Dpl.Errors(err)
 		}
+		defer testCtx.Close()
 
 		if testCtx.Config.IgnoreSuite.GetOr(false) {
 			exitCode = 0
@@ -723,7 +737,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		}
 
 		if parseArgsErrors.GotError() {
-			exitCode = ProcessMalDefinedTest(testDef, parseArgsErrors.Return())
+			exitCode = ProcessMalDefinedTest(testDef, testCtx, parseArgsErrors.Return())
 			return
 		}
 
@@ -758,8 +772,14 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				// Don't wait return exit code 0
 				exitCode = 0
 			}
-			daemonIsol = isolation
-			daemonToken = token
+
+			daemonPid, err := testCtx.Repo.GetDaemonPid()
+			ProcessTestError(testCtx, err)
+			if daemonPid == 0 {
+				// For better perf : test launch a daemon only if no PID in DB.
+				daemonIsol = isolation
+				daemonToken = token
+			}
 		}
 	default:
 		err = fmt.Errorf("action: [%v] not known", inputConfig.Action)
