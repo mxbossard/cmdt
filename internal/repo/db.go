@@ -17,7 +17,7 @@ import (
 const WaitingOpDoneSleepPeriodInMs = 50
 
 type DbRepo struct {
-	poolz.PoolCloser
+	*poolz.PoolCloser
 
 	dirpath   string
 	token     string
@@ -57,11 +57,14 @@ func (r *DbRepo) Close() error {
 }
 
 func (r *DbRepo) PoolClose() error {
+	if r.PoolCloser != nil {
+		return r.PoolCloser.PoolClose()
+	}
 	return nil
 }
 
 func (r *DbRepo) SetPoolCloser(pc poolz.PoolCloser) {
-	r.PoolCloser = pc
+	r.PoolCloser = &pc
 }
 
 func (r DbRepo) BackingFilepath() string {

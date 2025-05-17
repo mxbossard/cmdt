@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"cmdt/internal/mock"
 	"cmdt/internal/model"
@@ -26,10 +27,13 @@ var logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultL
 var _repo = make(map[string]repo.Repo)
 
 var _repoPool poolz.Pool[*repo.DbRepo]
+var _repoPoolMap = make(map[string]poolz.Pool[*repo.DbRepo])
 
 func Repo(token, isolation string) repo.Repo {
-	r := repo.New(token, isolation)
-	return &r
+	return NewRepo(token, isolation)
+}
+
+func CachedRepo(token, isolation string) repo.Repo {
 	key := fmt.Sprintf("%s;%s", token, isolation)
 	if ok := _repo[key]; ok == nil {
 		r := repo.New(token, isolation)
@@ -38,10 +42,22 @@ func Repo(token, isolation string) repo.Repo {
 	return _repo[key]
 }
 
-func Repo2(token, isolation string) repo.Repo {
+func NewRepo(token, isolation string) repo.Repo {
+	r := repo.New(token, isolation)
+	return &r
+}
+
+var n = 0
+
+func Repo1(token, isolation string) repo.Repo {
 	if _repoPool == nil {
 		_repoPool = poolz.New(50, func() (*repo.DbRepo, error) {
 			r := repo.New(token, isolation)
+			n++
+			if n > 3 {
+				available, inUse := _repoPool.Count()
+				fmt.Printf("\n<<>> built single pool DbRepo #%d (avail: %d ; inUse: %d)\n", n, available, inUse)
+			}
 			return &r, nil
 		})
 	}
@@ -53,7 +69,31 @@ func Repo2(token, isolation string) repo.Repo {
 	return r
 }
 
-func NewGlobalContext(token, isolation string, inputCfg model.Config) GlobalContext {
+func PooledRepo(token, isolation string) repo.Repo {
+	key := fmt.Sprintf("%s;%s", token, isolation)
+	if ok := _repoPoolMap[key]; ok == nil {
+		r := poolz.New(50, func() (*repo.DbRepo, error) {
+			repo := repo.New(token, isolation)
+			// n++
+			// if n > 3 {
+			// 	available, inUse := _repoPoolMap[key].Count()
+			// 	fmt.Printf("\n<<>> built single pool DbRepo #%d (avail: %d ; inUse: %d)\n", n, available, inUse)
+			// }
+			return &repo, nil
+		})
+		r.SetMaxLifeTime(1000 * time.Millisecond)
+		_repoPoolMap[key] = r
+	}
+
+	r, err := _repoPoolMap[key].Open()
+	if err != nil {
+		panic(err)
+	}
+
+	return r
+}
+
+func NewGlobalContext(token, isolation string, inputCfg model.Config, pooledRepo bool) GlobalContext {
 	logger.Debug("Building Global context", "token", token, "isolation", isolation)
 	var err error
 	token, err = utils.ForgeContextualToken(token)
@@ -61,7 +101,14 @@ func NewGlobalContext(token, isolation string, inputCfg model.Config) GlobalCont
 		errorz.Fatal(err)
 	}
 
-	repo := Repo(token, isolation)
+	var repo repo.Repo
+	if pooledRepo {
+		repo = PooledRepo(token, isolation)
+		//repo = NewRepo(token, isolation)
+	} else {
+		repo = CachedRepo(token, isolation)
+		//repo = NewRepo(token, isolation)
+	}
 
 	cfg, err := repo.GetGlobalConfig()
 	if err != nil {
@@ -79,9 +126,9 @@ func NewGlobalContext(token, isolation string, inputCfg model.Config) GlobalCont
 	return c
 }
 
-func NewSuiteContext(token, isolation, testSuite string, initless bool, action model.Action, inputCfg model.Config) SuiteContext {
+func NewSuiteContext(token, isolation, testSuite string, initless bool, action model.Action, inputCfg model.Config, pooledRepo bool) SuiteContext {
 	logger.Debug("Building Suite context", "suite", testSuite, "token", token, "isolation", isolation)
-	globalCtx := NewGlobalContext(token, isolation, model.Config{})
+	globalCtx := NewGlobalContext(token, isolation, model.Config{}, pooledRepo)
 	suiteCfg, err := globalCtx.Repo.GetSuiteConfig(testSuite, initless)
 	if err != nil {
 		errorz.Fatal(err)
@@ -100,9 +147,9 @@ func NewSuiteContext(token, isolation, testSuite string, initless bool, action m
 	return suiteCtx
 }
 
-func NewTestContext(token, isolation, testSuite string, seq uint16, inputCfg model.Config, ppid uint32) (testCtx TestContext, err error) {
+func NewTestContext(token, isolation, testSuite string, seq uint16, inputCfg model.Config, ppid uint32, pooledRepo bool) (testCtx TestContext, err error) {
 	logger.Debug("Building Test context", "suite", testSuite, "seq", seq)
-	suiteCtx := NewSuiteContext(token, isolation, testSuite, true, model.TestAction, model.Config{})
+	suiteCtx := NewSuiteContext(token, isolation, testSuite, true, model.TestAction, model.Config{}, pooledRepo)
 	mergedCfg := suiteCtx.Config
 	mergedCfg.Merge(inputCfg)
 
@@ -126,8 +173,8 @@ func NewTestContext(token, isolation, testSuite string, seq uint16, inputCfg mod
 	return
 }
 
-func NewTestContext2(testDef model.TestDefinition) (TestContext, error) {
-	return NewTestContext(testDef.Token, testDef.Isolation, testDef.TestSuite, testDef.Seq, testDef.Config, testDef.Ppid)
+func NewTestContext2(testDef model.TestDefinition, pooledRepo bool) (TestContext, error) {
+	return NewTestContext(testDef.Token, testDef.Isolation, testDef.TestSuite, testDef.Seq, testDef.Config, testDef.Ppid, pooledRepo)
 }
 
 type GlobalContext struct {

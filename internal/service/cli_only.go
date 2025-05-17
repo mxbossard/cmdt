@@ -55,7 +55,7 @@ func cliInitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 }
 
 func cliAfterSuiteReport(token, isolation, suite string, dpl display.Displayer) (err error) {
-	rep := facade.Repo(token, isolation)
+	rep := facade.CachedRepo(token, isolation)
 	defer rep.PoolClose()
 	err = rep.MarkSuiteReported(suite)
 

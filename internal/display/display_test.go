@@ -6,13 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"cmdt/internal/facade"
 	"cmdt/internal/model"
+
 	"github.com/mxbossard/utilz/anzi"
 	"github.com/mxbossard/utilz/cmdz"
 	"github.com/mxbossard/utilz/printz"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDisplay_Stdout(t *testing.T) {
@@ -32,7 +33,7 @@ func TestDisplay_Stdout(t *testing.T) {
 	// Writing async
 	outMsg := "stdout"
 	errMsg := "stderr"
-	ctx, err := facade.NewTestContext("token", "isol", "suite", 12, model.Config{}, uint32(42))
+	ctx, err := facade.NewTestContext("token", "isol", "suite", 12, model.Config{}, uint32(42), false)
 	require.NoError(t, err)
 	ctx.CmdExec = cmdz.Cmd("true")
 	d.OpenTest(ctx)
@@ -102,7 +103,7 @@ func TestDisplay_TestTitle(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	ctx, err := facade.NewTestContext("token", "isol", "suite", 2, model.Config{}, 42)
+	ctx, err := facade.NewTestContext("token", "isol", "suite", 2, model.Config{}, 42, false)
 	require.NoError(t, err)
 	ctx.CmdExec = cmdz.Cmd("true")
 
@@ -163,7 +164,7 @@ func TestDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 
 	d.SetVerbose(model.SHOW_ALL)
 
-	gctx := facade.NewGlobalContext(token, isol, model.Config{})
+	gctx := facade.NewGlobalContext(token, isol, model.Config{}, false)
 	d.Global(gctx)
 
 	DisplaySuite(d, token, isol, 1) // 100- Init suite1

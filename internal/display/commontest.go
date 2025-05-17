@@ -5,14 +5,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
 	"cmdt/internal/facade"
 	"cmdt/internal/model"
+
 	"github.com/mxbossard/utilz/cmdz"
+	"github.com/stretchr/testify/require"
 )
 
 func DisplaySuite(d Displayer, token, isol string, suite int) {
-	ctx := facade.NewSuiteContext(token, isol, fmt.Sprintf("suite-%d", suite), true, model.InitAction, model.Config{})
+	ctx := facade.NewSuiteContext(token, isol, fmt.Sprintf("suite-%d", suite), true, model.InitAction, model.Config{}, false)
 	d.OpenSuite(ctx)
 	d.SuiteTitle(ctx)
 }
@@ -29,13 +30,13 @@ func DisplayReport(d Displayer, suite int) {
 }
 
 func CloseSuite(d Displayer, suite int, token, isol string) {
-	ctx := facade.NewSuiteContext(token, isol, fmt.Sprintf("suite-%d", suite), true, model.InitAction, model.Config{})
+	ctx := facade.NewSuiteContext(token, isol, fmt.Sprintf("suite-%d", suite), true, model.InitAction, model.Config{}, false)
 	d.CloseSuite(ctx)
 }
 
 func DisplayOpenTitleOutcomeTest(t *testing.T, d Displayer, token, isol string, suite int, seq int) TestDisplayer {
 	testSuite := fmt.Sprintf("suite-%d", suite)
-	ctx, err := facade.NewTestContext(token, isol, testSuite, uint16(seq), model.Config{}, uint32(42))
+	ctx, err := facade.NewTestContext(token, isol, testSuite, uint16(seq), model.Config{}, uint32(42), false)
 	require.NoError(t, err)
 	ctx.CmdExec = cmdz.Cmd("true")
 	outcome := model.TestOutcome{

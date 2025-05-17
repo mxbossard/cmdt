@@ -151,7 +151,7 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 			d.openedSuites = append(d.openedSuites, suite)
 			logger.Debug("Initializing test suite", "token", d.token, "isolation", d.isolation, "openedSuite", suite)
 			//fmt.Printf("\n<<>> opening suite: %s ; openedSuites: %s\n", suite, d.openedSuites)
-			ctx := facade.NewSuiteContext(d.token, d.isolation, suite, false, model.InitAction, model.Config{})
+			ctx := facade.NewSuiteContext(d.token, d.isolation, suite, false, model.InitAction, model.Config{}, true)
 			defer ctx.Close()
 			d.display.OpenSuite(ctx)
 			d.display.SuiteTitle(ctx)
@@ -201,7 +201,7 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 func (d *daemon) performTest0(testDef model.TestDefinition) (exitCode int16) {
 	perf := logger.PerfTimer()
 	defer perf.End()
-	exitCode = service.ProcessTestDef(testDef)
+	exitCode = service.ProcessTestDef(testDef, true)
 	return
 }
 

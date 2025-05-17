@@ -57,7 +57,7 @@ func QueueTestDef(testDef model.TestDefinition, op *model.TestOp) (err error) {
 	suite := testDef.TestSuite
 	forkCount := int(testDef.Config.ForkCount.Get())
 	work := func() {
-		exitCode := service.ProcessTestDef(testDef)
+		exitCode := service.ProcessTestDef(testDef, true)
 		op.SetExitCode(uint16(exitCode))
 	}
 	_, err = sched.schedule(suite, forkCount, work)

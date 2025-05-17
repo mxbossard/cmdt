@@ -17,6 +17,7 @@ import (
 	"cmdt/internal/facade"
 	"cmdt/internal/model"
 	"cmdt/internal/repo"
+
 	"github.com/mxbossard/utilz/anzi"
 	"github.com/mxbossard/utilz/cmdz"
 	"github.com/mxbossard/utilz/printz"
@@ -56,13 +57,13 @@ func TestAsyncDisplay_TestStdout(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	sctx := facade.NewSuiteContext(token, isol, suite, false, model.InitAction, model.Config{Timeout: utilz.OptionalOf[time.Duration](time.Second)})
+	sctx := facade.NewSuiteContext(token, isol, suite, false, model.InitAction, model.Config{Timeout: utilz.OptionalOf[time.Duration](time.Second)}, false)
 	d.OpenSuite(sctx)
 
 	// Writing async
 	outMsg := "stdout\n"
 	errMsg := "stderr\n"
-	ctx, err := facade.NewTestContext(token, isol, suite, 1, model.Config{}, uint32(42))
+	ctx, err := facade.NewTestContext(token, isol, suite, 1, model.Config{}, uint32(42), false)
 	require.NoError(t, err)
 	ctx.Config.Verbose.Set(model.SHOW_ALL)
 	ctx.CmdExec = cmdz.Cmd("true")
@@ -112,7 +113,7 @@ func TestAsyncDisplay_TestTitle(t *testing.T) {
 	outs := printz.NewOutputs(outW, errW)
 	d := New(tmpDir, true, outs)
 
-	sctx := facade.NewSuiteContext(token, isol, suite, false, model.InitAction, model.Config{})
+	sctx := facade.NewSuiteContext(token, isol, suite, false, model.InitAction, model.Config{}, false)
 	d.OpenSuite(sctx)
 
 	d.AsyncFlushAll(2 * time.Millisecond)
@@ -123,7 +124,7 @@ func TestAsyncDisplay_TestTitle(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	ctx, err := facade.NewTestContext(token, isol, suite, 1, model.Config{}, 42)
+	ctx, err := facade.NewTestContext(token, isol, suite, 1, model.Config{}, 42, false)
 	require.NoError(t, err)
 	ctx.CmdExec = cmdz.Cmd("true")
 
@@ -447,7 +448,7 @@ func TestBlockTailAll(t *testing.T) {
 	// 132- Test suite1 #3 err>
 	// 170- Report suite1
 
-	gctx := facade.NewGlobalContext(token, isol, model.Config{})
+	gctx := facade.NewGlobalContext(token, isol, model.Config{}, false)
 	d.Global(gctx)
 
 	// Start 3 tests async/unordered
@@ -537,7 +538,7 @@ func TestAsyncFlushAllThenDisplayThenBlockTailAll(t *testing.T) {
 	// 132- Test suite1 #3 err>
 	// 170- Report suite1
 
-	gctx := facade.NewGlobalContext(token, isol, model.Config{})
+	gctx := facade.NewGlobalContext(token, isol, model.Config{}, false)
 	d.Global(gctx)
 
 	// Start 3 tests async/unordered
@@ -648,7 +649,7 @@ func TestAsyncDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 	// 322- Test suite3 #2 err>
 	// 370- Report suite3
 
-	gctx := facade.NewGlobalContext(token, isol, model.Config{})
+	gctx := facade.NewGlobalContext(token, isol, model.Config{}, false)
 	d.Global(gctx)
 
 	display.DisplaySuite(d, token, isol, 1) // 100- Init suite1
@@ -792,7 +793,7 @@ func TestAsyncDisplayUsage_AsyncSuitesSerialTests(t *testing.T) {
 	// 322- Test suite3 #2 err>
 	// 370- Report suite3
 
-	gctx := facade.NewGlobalContext(token, isol, model.Config{})
+	gctx := facade.NewGlobalContext(token, isol, model.Config{}, false)
 	d.Global(gctx)
 
 	display.DisplaySuite(d, token, isol, 1) // 100- Init suite1
@@ -946,7 +947,7 @@ func TestAsyncDisplayUsage_AsyncSuitesAsyncTests(t *testing.T) {
 	// 322- Test suite3 #2 err>
 	// 370- Report suite3
 
-	gctx := facade.NewGlobalContext(token, isol, model.Config{})
+	gctx := facade.NewGlobalContext(token, isol, model.Config{}, false)
 	d.Global(gctx)
 
 	display.DisplaySuite(d, token, isol, 1) // 100- Init suite1

@@ -90,7 +90,7 @@ func globalReport(ctx facade.GlobalContext, asyncMode bool) (exitCode int16, err
 	goodModeSuite := len(reportableModedSuites) > 0
 	reportPassed := true
 	for _, testSuite := range reportableModedSuites {
-		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, model.ReportAction, model.Config{})
+		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, model.ReportAction, model.Config{}, false)
 		if suiteCtx.Config.TestSuite.IsEmpty() {
 			fmt.Printf("\n<<>> empty suite name in ctx !!! \nctx: %v ; \ncfg: %v\n", suiteCtx, suiteCtx.Config)
 		}
@@ -136,7 +136,7 @@ func globalReport(ctx facade.GlobalContext, asyncMode bool) (exitCode int16, err
 }
 
 func ProcessGlobalReportDef(def model.ReportDefinition, asyncMode bool) (exitCode int16, err error) {
-	ctx := facade.NewGlobalContext(def.Token, def.Isolation, model.Config{})
+	ctx := facade.NewGlobalContext(def.Token, def.Isolation, model.Config{}, false)
 	defer ctx.Close()
 	exitCode, err = globalReport(ctx, asyncMode)
 	return
@@ -179,7 +179,7 @@ func reportTestSuite(ctx facade.SuiteContext, global, all bool) (suiteOutcome mo
 
 func ProcessReportDef(def model.ReportDefinition) (exitCode int16, err error) {
 	//logger.Warn("ProcessReportDef()", "def", def)
-	ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.ReportAction, def.Config) // FIXME ? removing def.Config ?
+	ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.ReportAction, def.Config, false) // FIXME ? removing def.Config ?
 	defer ctx.Close()
 
 	suiteOutcome, exitCode, err := reportTestSuite(ctx, false, false)
@@ -276,10 +276,10 @@ func performTest(testDef model.TestDefinition, ctx facade.TestContext) (exitCode
 	return
 }
 
-func ProcessTestDef(testDef model.TestDefinition) (exitCode int16) {
+func ProcessTestDef(testDef model.TestDefinition, pooledRepo bool) (exitCode int16) {
 	testSuite := testDef.TestSuite
 	testCfg := testDef.Config
-	testCtx, err := facade.NewTestContext2(testDef)
+	testCtx, err := facade.NewTestContext2(testDef, pooledRepo)
 	ProcessTestError(testCtx, err)
 	defer testCtx.Close()
 
@@ -370,7 +370,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 	if envToken != "" {
 		// With token in env catch isolation from args quickly
 		isol := utils.IsolationFromArgs(allArgs)
-		envCtx := facade.NewGlobalContext(envToken, isol, defaultCfg)
+		envCtx := facade.NewGlobalContext(envToken, isol, defaultCfg, false)
 		defer envCtx.Close()
 		defaultCfg = envCtx.Config
 	}
@@ -401,7 +401,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		if parseArgsErrors.GotError() {
 			errorz.Fatal(parseArgsErrors)
 		}
-		globalCtx := facade.NewGlobalContext(token, isolation, inputConfig)
+		globalCtx := facade.NewGlobalContext(token, isolation, inputConfig, false)
 		defer globalCtx.Close()
 
 		ProcessGlobalError(globalCtx, parseArgsErrors.Return())
@@ -415,12 +415,12 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		logger.Debug("Executing Init action", "suite", testSuite)
 
 		// Check if suite exists and it's status
-		rep := facade.Repo(token, isolation)
+		rep := facade.CachedRepo(token, isolation)
 		defer rep.PoolClose()
 
 		exists, reported, err := rep.SuiteStatus(testSuite)
 
-		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig)
+		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig, false)
 		ProcessSuiteError(suiteCtx, err)
 		defer suiteCtx.Close()
 
@@ -473,11 +473,11 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			if parseArgsErrors.GotError() {
 				errorz.Fatal(parseArgsErrors)
 			}
-			globalCtx := facade.NewGlobalContext(token, isolation, inputConfig)
+			globalCtx := facade.NewGlobalContext(token, isolation, inputConfig, false)
 			defer globalCtx.Close()
 			globalCfg := globalCtx.Config
 			Dpl.SetVerbose(globalCfg.Verbose.Get())
-			rep := facade.Repo(token, isolation)
+			rep := facade.CachedRepo(token, isolation)
 			defer rep.PoolClose()
 			reportAll := globalCfg.ReportAll.GetOr(model.DefaultReportAll)
 
@@ -608,7 +608,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			// Reporting One test suite
 			testSuite := inputConfig.TestSuite.Get()
 			logger.Debug("Executing Report suite action", "suite", testSuite)
-			suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig)
+			suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig, false)
 			ProcessSuiteError(suiteCtx, parseArgsErrors.Return())
 			defer suiteCtx.Close()
 
@@ -699,7 +699,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 
 		ppid := uint32(utils.ReadEnvPpid())
 		logger.Debug("Executing Test action", "suite", testSuite)
-		testCtx, err := facade.NewTestContext(token, isolation, testSuite, 0, inputConfig, ppid)
+		testCtx, err := facade.NewTestContext(token, isolation, testSuite, 0, inputConfig, ppid, false)
 		if err != nil {
 			Dpl.Errors(err)
 		}
@@ -746,7 +746,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			// Process test without daemon
 			// enforce wait
 			logger.Info("executing test in sync (not queueing test)", "suite", testSuite, "seq", seq)
-			exitCode = ProcessTestDef(testDef)
+			exitCode = ProcessTestDef(testDef, false)
 		} else {
 			// Init suite config in repo if necessary
 			//facade.NewSuiteContext(token, isolation, testSuite, true, action, model.Config{Async: utilz.OptionalOf(true)})
