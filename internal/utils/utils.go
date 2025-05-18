@@ -87,14 +87,14 @@ func ReadEnvPpid() (ppid int) {
 	return
 }
 
-func ReadEnvTestSeq() (seq uint16) {
+func ReadEnvTestSeq() (seq uint) {
 	// Search uniqKey in env
 	if ok, seqEnv := ReadEnvValue(model.ContextTestSeqEnvVarName); ok {
 		s, err := strconv.Atoi(seqEnv)
 		if err != nil {
 			panic(err)
 		}
-		seq = uint16(s)
+		seq = uint(s)
 		logger.Trace("found env seq", "seq", seq)
 	} else {
 		logger.Trace("env ppid not found", "seq", seq)

@@ -76,7 +76,7 @@ func (r DbRepo) BackingFilepath() string {
 	return path
 }
 
-func (r DbRepo) MockDirectoryPath(testSuite string, testId uint16) (mockDir string, err error) {
+func (r DbRepo) MockDirectoryPath(testSuite string, testId uint) (mockDir string, err error) {
 	var path string
 	path, err = testSuiteDirectoryPath(testSuite, r.token, r.isolation)
 	if err != nil {
@@ -250,7 +250,7 @@ func (r DbRepo) ListReportedAsyncSuites() (suites []string, err error) {
 	return
 }
 
-func (r DbRepo) IgnoredSuiteCount(reportAll bool) (n uint16) {
+func (r DbRepo) IgnoredSuiteCount(reportAll bool) (n uint) {
 	n, err := r.suiteDao.IgnoredSuiteCount(reportAll)
 	if err != nil {
 		err = r.wrap(err)
@@ -259,7 +259,7 @@ func (r DbRepo) IgnoredSuiteCount(reportAll bool) (n uint16) {
 	return
 }
 
-func (r DbRepo) EmptySuiteCount(reportAll bool) (n uint16) {
+func (r DbRepo) EmptySuiteCount(reportAll bool) (n uint) {
 	n, err := r.suiteDao.EmptySuiteCount(reportAll)
 	if err != nil {
 		err = r.wrap(err)
@@ -330,7 +330,7 @@ func (r DbRepo) LoadSuiteOutcome(testSuite string) (outcome model.SuiteOutcome, 
 	return
 }
 
-func (r DbRepo) IncrementSuiteSeq(testSuite, name string) (n uint16) {
+func (r DbRepo) IncrementSuiteSeq(testSuite, name string) (n uint) {
 	// FIXME should this be used ?
 
 	var err error
@@ -350,7 +350,7 @@ func (r DbRepo) IncrementSuiteSeq(testSuite, name string) (n uint16) {
 	return
 }
 
-func (r DbRepo) NotReportedTestCount() (n uint16) {
+func (r DbRepo) NotReportedTestCount() (n uint) {
 	n, err := r.suiteDao.NotReportedTestCount()
 	if err != nil {
 		err = r.wrap(err)
@@ -360,7 +360,7 @@ func (r DbRepo) NotReportedTestCount() (n uint16) {
 	return
 }
 
-func (r DbRepo) TestCount(testSuite string) (n uint16) {
+func (r DbRepo) TestCount(testSuite string) (n uint) {
 	n, err := r.suiteDao.TestCount(testSuite)
 	if err != nil {
 		err = r.wrap(err)
@@ -370,7 +370,7 @@ func (r DbRepo) TestCount(testSuite string) (n uint16) {
 	return
 }
 
-func (r DbRepo) ToReportTestCountByMode(asyncMode, all bool) (n uint16) {
+func (r DbRepo) ToReportTestCountByMode(asyncMode, all bool) (n uint) {
 	n, err := r.suiteDao.ToReportTestCountByMode(asyncMode, all)
 	if err != nil {
 		err = r.wrap(err)
@@ -379,7 +379,7 @@ func (r DbRepo) ToReportTestCountByMode(asyncMode, all bool) (n uint16) {
 	return
 }
 
-func (r DbRepo) ToReportTestCountBySuiteAndMode(testSuite string, asyncMode, all bool) (n uint16) {
+func (r DbRepo) ToReportTestCountBySuiteAndMode(testSuite string, asyncMode, all bool) (n uint) {
 	n, err := r.suiteDao.ToReportTestCountBySuiteAndMode(testSuite, asyncMode, all)
 	if err != nil {
 		err = r.wrap(err)
@@ -388,7 +388,7 @@ func (r DbRepo) ToReportTestCountBySuiteAndMode(testSuite string, asyncMode, all
 	return
 }
 
-func (r DbRepo) PassedCount(testSuite string) (n uint16) {
+func (r DbRepo) PassedCount(testSuite string) (n uint) {
 	n, err := r.testDao.PassedCount(testSuite)
 	if err != nil {
 		err = r.wrap(err)
@@ -397,7 +397,7 @@ func (r DbRepo) PassedCount(testSuite string) (n uint16) {
 	return
 }
 
-func (r DbRepo) IgnoredCount(testSuite string) (n uint16) {
+func (r DbRepo) IgnoredCount(testSuite string) (n uint) {
 	n, err := r.testDao.IgnoredCount(testSuite)
 	if err != nil {
 		err = r.wrap(err)
@@ -406,7 +406,7 @@ func (r DbRepo) IgnoredCount(testSuite string) (n uint16) {
 	return
 }
 
-func (r DbRepo) FailedCount(testSuite string) (n uint16) {
+func (r DbRepo) FailedCount(testSuite string) (n uint) {
 	n, err := r.testDao.FailedCount(testSuite)
 	if err != nil {
 		err = r.wrap(err)
@@ -415,7 +415,7 @@ func (r DbRepo) FailedCount(testSuite string) (n uint16) {
 	return
 }
 
-func (r DbRepo) ErroredCount(testSuite string) (n uint16) {
+func (r DbRepo) ErroredCount(testSuite string) (n uint) {
 	n, err := r.testDao.ErroredCount(testSuite)
 	if err != nil {
 		err = r.wrap(err)
@@ -424,7 +424,7 @@ func (r DbRepo) ErroredCount(testSuite string) (n uint16) {
 	return
 }
 
-func (r DbRepo) TooMuchCount(testSuite string) (n uint16) {
+func (r DbRepo) TooMuchCount(testSuite string) (n uint) {
 	n, err := r.suiteDao.TooMuchCount(testSuite)
 	if err != nil {
 		err = r.wrap(err)

@@ -44,7 +44,7 @@ export -n __CMDT_TOKEN
 cannotReinitMsg="cannot erase test suite"
 nothingToReportExpectedStderrMsg="you must perform some test prior to report"
 
->&2 echo "## Test @report without test"
+>&2 echo "## Meta0 test @report without test"
 $cmdtIn $forkCfg @init=meta0 #@verbose=4
 $cmdtIn @test=meta0/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt0 @report=foo #@debug=4
 $cmdtIn @test=meta0/ @stderr= @-- $newCmdt0 @init=foo #@debug=4
@@ -59,7 +59,7 @@ $cmdtIn @test=meta1/"command before rule stop" @fail @stderr:"before rule parsin
 $cmdtIn @test=meta1/"rule on 2 args" @stderr:"PASSED" @-- $newCmdt1 @stdout:foo bar @-- echo foo bar
 $cmdtIn @test=meta1/ @exit=1 @stderr:"3 success" @stderr!:"failure" @stderr:"1 error" @-- $newCmdt0 @report=main
 
->&2 echo "## Test printed token"
+>&2 echo "## Meta2 test printed token"
 #tk0=$( $cmdt @init @printToken 2> /dev/null )
 tk0=$( $newCmdt0 @init @printToken )
 >&2 echo "token: $tk0"

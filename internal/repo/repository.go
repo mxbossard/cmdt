@@ -31,7 +31,7 @@ type Repo interface {
 
 	BackingFilepath() string
 
-	MockDirectoryPath(testSuite string, testId uint16) (mockDir string, err error)
+	MockDirectoryPath(testSuite string, testId uint) (mockDir string, err error)
 
 	SaveGlobalConfig(cfg model.Config) (err error)
 
@@ -65,26 +65,26 @@ type Repo interface {
 
 	SuiteStatus(suite string) (exists, reported bool, err error)
 
-	IncrementSuiteSeq(testSuite, name string) (n uint16)
+	IncrementSuiteSeq(testSuite, name string) (n uint)
 
-	NotReportedTestCount() (n uint16)
-	TestCount(testSuite string) (n uint16)
-	ToReportTestCountByMode(asyncMode, all bool) (n uint16)
-	ToReportTestCountBySuiteAndMode(testSuite string, asyncMode, all bool) (n uint16)
+	NotReportedTestCount() (n uint)
+	TestCount(testSuite string) (n uint)
+	ToReportTestCountByMode(asyncMode, all bool) (n uint)
+	ToReportTestCountBySuiteAndMode(testSuite string, asyncMode, all bool) (n uint)
 
-	PassedCount(testSuite string) (n uint16)
+	PassedCount(testSuite string) (n uint)
 
-	IgnoredCount(testSuite string) (n uint16)
+	IgnoredCount(testSuite string) (n uint)
 
-	FailedCount(testSuite string) (n uint16)
+	FailedCount(testSuite string) (n uint)
 
-	ErroredCount(testSuite string) (n uint16)
+	ErroredCount(testSuite string) (n uint)
 
-	TooMuchCount(testSuite string) (n uint16)
+	TooMuchCount(testSuite string) (n uint)
 
-	IgnoredSuiteCount(reportAll bool) (n uint16)
+	IgnoredSuiteCount(reportAll bool) (n uint)
 
-	EmptySuiteCount(reportAll bool) (n uint16)
+	EmptySuiteCount(reportAll bool) (n uint)
 
 	QueueOperation(op model.Operater) (err error)
 

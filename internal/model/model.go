@@ -25,7 +25,7 @@ type InitSuiteDefinition struct {
 
 type TestSignature struct {
 	TestSuite  string
-	Seq        uint16
+	Seq        uint
 	TestName   string
 	CmdAndArgs []string
 	//CmdTitle   string
@@ -69,7 +69,7 @@ type TestOutcome struct {
 	AssertionResults []AssertionResult
 }
 
-func NewTestOutcome(suite string, seq uint16, name string, cmdAndArgs []string,
+func NewTestOutcome(suite string, seq uint, name string, cmdAndArgs []string,
 	stdout, stderr string, exitCode int16, outcome Outcome, duration time.Duration,
 	err error, results []AssertionResult) TestOutcome {
 	sign := TestSignature{
@@ -92,7 +92,7 @@ func NewTestOutcome(suite string, seq uint16, name string, cmdAndArgs []string,
 	return to
 }
 
-func NewTestOutcome2(cfg Config, seq uint16) TestOutcome {
+func NewTestOutcome2(cfg Config, seq uint) TestOutcome {
 	sign := TestSignature{
 		TestSuite:  cfg.TestSuite.Get(),
 		Seq:        seq,

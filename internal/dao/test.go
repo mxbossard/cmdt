@@ -106,7 +106,7 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 	var testName, cmdAndArgs, testOc, stdout, stderr, testErrorMsg, prefix, assertName, op, expected, value, assertErrorMsg string
 	var success bool
 	var startTime, endTime, testDuration int64
-	var seq uint16
+	var seq uint
 	var exitCode int16
 	//var failedAssertionsMessages []string
 
@@ -140,7 +140,7 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 	}
 	defer rows.Close()
 
-	testOutcomeBySeq := make(map[uint16]model.TestOutcome)
+	testOutcomeBySeq := make(map[uint]model.TestOutcome)
 	for rows.Next() {
 		if err = rows.Scan(&seq, &testName, &cmdAndArgs, &testOc, &exitCode, &testErrorMsg,
 			&testDuration, &stdout, &stderr, &prefix, &assertName, &op, &expected, &value,
@@ -321,7 +321,7 @@ func (d Test) ClearSuite(suite string) (err error) {
 	return
 }
 
-func (d Test) TestedCount(suite string) (n uint16, err error) {
+func (d Test) TestedCount(suite string) (n uint, err error) {
 	row := d.db.QueryRow(`
 		SELECT count(*)
 		FROM tested t
@@ -331,7 +331,7 @@ func (d Test) TestedCount(suite string) (n uint16, err error) {
 	return
 }
 
-func (d Test) PassedCount(suite string) (n uint16, err error) {
+func (d Test) PassedCount(suite string) (n uint, err error) {
 	row := d.db.QueryRow(`
 		SELECT coalesce(sum(t.passed), 0)
 		FROM tested t
@@ -341,7 +341,7 @@ func (d Test) PassedCount(suite string) (n uint16, err error) {
 	return
 }
 
-func (d Test) IgnoredCount(suite string) (n uint16, err error) {
+func (d Test) IgnoredCount(suite string) (n uint, err error) {
 	row := d.db.QueryRow(`
 		SELECT coalesce(sum(t.ignored), 0)
 		FROM tested t
@@ -351,7 +351,7 @@ func (d Test) IgnoredCount(suite string) (n uint16, err error) {
 	return
 }
 
-func (d Test) FailedCount(suite string) (n uint16, err error) {
+func (d Test) FailedCount(suite string) (n uint, err error) {
 	row := d.db.QueryRow(`
 		SELECT coalesce(sum(t.failed), 0)
 		FROM tested t
@@ -361,7 +361,7 @@ func (d Test) FailedCount(suite string) (n uint16, err error) {
 	return
 }
 
-func (d Test) ErroredCount(suite string) (n uint16, err error) {
+func (d Test) ErroredCount(suite string) (n uint, err error) {
 	row := d.db.QueryRow(`
 		SELECT coalesce(sum(t.errored), 0)
 		FROM tested t
@@ -370,10 +370,3 @@ func (d Test) ErroredCount(suite string) (n uint16, err error) {
 	err = row.Scan(&n)
 	return
 }
-
-/*
-func (d Test) SaveTested(suite string, seq int, cfg model.Config) (err error) {
-	// TODO
-	return
-}
-*/

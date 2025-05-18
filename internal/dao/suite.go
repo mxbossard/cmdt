@@ -63,7 +63,7 @@ func (d Suite) init() (err error) {
 	return
 }
 
-func (d Suite) NextSeq(suite string) (seq uint16, err error) {
+func (d Suite) NextSeq(suite string) (seq uint, err error) {
 	p := logger.PerfTimer("suite", suite, "filelock", d.db.FileLockPath())
 	defer p.End()
 
@@ -120,7 +120,7 @@ func (d Suite) NextSeq(suite string) (seq uint16, err error) {
 	return
 }
 
-func (d Suite) IncrementTooMuchCount(suite string) (seq uint16, err error) {
+func (d Suite) IncrementTooMuchCount(suite string) (seq uint, err error) {
 	p := logger.PerfTimer("suite", suite, "filelock", d.db.FileLockPath())
 	defer p.End()
 
@@ -155,7 +155,7 @@ func (d Suite) IncrementTooMuchCount(suite string) (seq uint16, err error) {
 	return
 }
 
-func (d Suite) NotReportedTestCount() (n uint16, err error) {
+func (d Suite) NotReportedTestCount() (n uint, err error) {
 	p := logger.PerfTimer()
 	defer p.End()
 	// FIXME: not sure not reported test count works properly testing s.outcome
@@ -167,7 +167,7 @@ func (d Suite) NotReportedTestCount() (n uint16, err error) {
 	return
 }
 
-func (d Suite) ToReportTestCountByMode(asyncMode, all bool) (n uint16, err error) {
+func (d Suite) ToReportTestCountByMode(asyncMode, all bool) (n uint, err error) {
 	p := logger.PerfTimer()
 	defer p.End("asyncMode", asyncMode, "all", all, "n", n)
 
@@ -181,7 +181,7 @@ func (d Suite) ToReportTestCountByMode(asyncMode, all bool) (n uint16, err error
 	return
 }
 
-func (d Suite) ToReportTestCountBySuiteAndMode(testSuite string, asyncMode, all bool) (n uint16, err error) {
+func (d Suite) ToReportTestCountBySuiteAndMode(testSuite string, asyncMode, all bool) (n uint, err error) {
 	p := logger.PerfTimer()
 	defer p.End("testSuite", testSuite, "asyncMode", asyncMode, "all", all, "n", n)
 
@@ -195,7 +195,7 @@ func (d Suite) ToReportTestCountBySuiteAndMode(testSuite string, asyncMode, all 
 	return
 }
 
-func (d Suite) TestCount(suite string) (n uint16, err error) {
+func (d Suite) TestCount(suite string) (n uint, err error) {
 	p := logger.PerfTimer("suite", suite)
 	defer p.End("n", n)
 
@@ -208,7 +208,7 @@ func (d Suite) TestCount(suite string) (n uint16, err error) {
 	return
 }
 
-func (d Suite) TooMuchCount(suite string) (n uint16, err error) {
+func (d Suite) TooMuchCount(suite string) (n uint, err error) {
 	p := logger.PerfTimer("suite", suite)
 	defer p.End()
 
@@ -449,7 +449,7 @@ func (d Suite) ListReportedAsync() (suites []string, err error) {
 	return
 }
 
-func (d Suite) IgnoredSuiteCount(reportAll bool) (n uint16, err error) {
+func (d Suite) IgnoredSuiteCount(reportAll bool) (n uint, err error) {
 	p := logger.PerfTimer()
 	defer p.End("reportAll", reportAll, "n", n)
 
@@ -471,7 +471,7 @@ func (d Suite) IgnoredSuiteCount(reportAll bool) (n uint16, err error) {
 	return
 }
 
-func (d Suite) EmptySuiteCount(reportAll bool) (n uint16, err error) {
+func (d Suite) EmptySuiteCount(reportAll bool) (n uint, err error) {
 	p := logger.PerfTimer()
 	defer p.End("reportAll", reportAll, "n", n)
 

@@ -83,7 +83,7 @@ func (d Queue) QueueOperater(op model.Operater) (err error) {
 		return
 	}
 
-	op.SetId(uint16(id))
+	op.SetId(uint(id))
 
 	return
 }
@@ -288,7 +288,7 @@ func (d Queue) NextQueuedOperation(suite string, tx *zql.SynchronizedTx) (op mod
 		LIMIT 1;
 	`, sql.Named("suite", suite))
 	var b []byte
-	var opId uint16
+	var opId uint
 	err = row.Scan(&opId, &b)
 	if err == sql.ErrNoRows {
 		// No operation queued

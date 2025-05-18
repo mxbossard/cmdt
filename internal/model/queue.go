@@ -16,14 +16,14 @@ const (
 type Operater interface {
 	Kind() string
 	Suite() string
-	Seq() uint16
+	Seq() uint
 	Block() bool
 	ExitCode() uint16
 	SetExitCode(uint16)
 	Err() error
 	SetErr(error)
-	Id() uint16
-	SetId(uint16)
+	Id() uint
+	SetId(uint)
 	String() string
 }
 
@@ -31,11 +31,11 @@ type OperationBase struct {
 	//Token     string
 	Type      string
 	TestSuite string
-	Sequence  uint16
+	Sequence  uint
 	Blocking  bool
 	exit      uint16
 	err       error
-	id        uint16
+	id        uint
 }
 
 func (o OperationBase) Kind() string {
@@ -46,7 +46,7 @@ func (o OperationBase) Suite() string {
 	return o.TestSuite
 }
 
-func (o OperationBase) Seq() uint16 {
+func (o OperationBase) Seq() uint {
 	return o.Sequence
 }
 
@@ -70,11 +70,11 @@ func (o *OperationBase) SetErr(err error) {
 	o.err = err
 }
 
-func (o OperationBase) Id() uint16 {
+func (o OperationBase) Id() uint {
 	return o.id
 }
 
-func (o *OperationBase) SetId(id uint16) {
+func (o *OperationBase) SetId(id uint) {
 	o.id = id
 }
 
@@ -87,7 +87,7 @@ type TestOp struct {
 	Definition    TestDefinition
 }
 
-func TestOperation(suite string, seq uint16, blocking bool, def TestDefinition) TestOp {
+func TestOperation(suite string, seq uint, blocking bool, def TestDefinition) TestOp {
 	return TestOp{
 		OperationBase: OperationBase{
 			Type:      string(TestKind),

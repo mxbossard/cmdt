@@ -420,7 +420,7 @@ func testSuiteDirectoryPath(testSuite, token, isol string) (path string, err err
 	return
 }
 
-func testDirectoryPath(testSuite, token, isol string, seq uint16) (testDir string, err error) {
+func testDirectoryPath(testSuite, token, isol string, seq uint) (testDir string, err error) {
 	var tmpDir string
 	tmpDir, err = testSuiteDirectoryPath(testSuite, token, isol)
 	if err != nil {
@@ -570,7 +570,7 @@ func clearSuiteWorkspace(testSuite, token, isol string) (err error) {
 		return
 	}
 */
-func cmdLogFiles(testSuite, token, isol string, seq uint16) (stdoutFile, stderrFile, reportFile *os.File, err error) {
+func cmdLogFiles(testSuite, token, isol string, seq uint) (stdoutFile, stderrFile, reportFile *os.File, err error) {
 	var testDir string
 	testDir, err = testDirectoryPath(testSuite, token, isol, seq)
 	if err != nil {

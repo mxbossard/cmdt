@@ -141,7 +141,7 @@ func TestNextSeq(t *testing.T) {
 	addSuite(t, dao, "bar")
 	addSuite(t, dao, "baz")
 
-	var s uint16
+	var s uint
 	var err error
 
 	s, err = dao.NextSeq("foo")
@@ -182,7 +182,7 @@ func TestNextSeq_ReinitDao(t *testing.T) {
 	addSuite(t, dao, "bar")
 	addSuite(t, dao, "baz")
 
-	var s uint16
+	var s uint
 	var err error
 
 	s, err = dao.NextSeq("foo")

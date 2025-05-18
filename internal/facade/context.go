@@ -147,7 +147,7 @@ func NewSuiteContext(token, isolation, testSuite string, initless bool, action m
 	return suiteCtx
 }
 
-func NewTestContext(token, isolation, testSuite string, seq uint16, inputCfg model.Config, ppid uint32, pooledRepo bool) (testCtx TestContext, err error) {
+func NewTestContext(token, isolation, testSuite string, seq uint, inputCfg model.Config, ppid uint32, pooledRepo bool) (testCtx TestContext, err error) {
 	logger.Debug("Building Test context", "suite", testSuite, "seq", seq)
 	suiteCtx := NewSuiteContext(token, isolation, testSuite, true, model.TestAction, model.Config{}, pooledRepo)
 	mergedCfg := suiteCtx.Config
@@ -233,28 +233,28 @@ func (c SuiteContext) InitSuite() error {
 	return c.Repo.InitSuite(c.Config)
 }
 
-func (c SuiteContext) IncrementTestCount() (n uint16) {
+func (c SuiteContext) IncrementTestCount() (n uint) {
 	s := c.Repo.IncrementSuiteSeq(c.Config.TestSuite.Get(), model.TestSequenceFilename)
-	return uint16(s)
+	return uint(s)
 }
 
-func (c SuiteContext) IncrementPassedCount() (n uint16) {
+func (c SuiteContext) IncrementPassedCount() (n uint) {
 	return c.Repo.IncrementSuiteSeq(c.Config.TestSuite.Get(), model.PassedSequenceFilename)
 }
 
-func (c SuiteContext) IncrementIgnoredCount() (n uint16) {
+func (c SuiteContext) IncrementIgnoredCount() (n uint) {
 	return c.Repo.IncrementSuiteSeq(c.Config.TestSuite.Get(), model.IgnoredSequenceFilename)
 }
 
-func (c SuiteContext) IncrementFailedCount() (n uint16) {
+func (c SuiteContext) IncrementFailedCount() (n uint) {
 	return c.Repo.IncrementSuiteSeq(c.Config.TestSuite.Get(), model.FailedSequenceFilename)
 }
 
-func (c SuiteContext) IncrementErroredCount() (n uint16) {
+func (c SuiteContext) IncrementErroredCount() (n uint) {
 	return c.Repo.IncrementSuiteSeq(c.Config.TestSuite.Get(), model.ErroredSequenceFilename)
 }
 
-func (c SuiteContext) IncrementTooMuchCount() (n uint16) {
+func (c SuiteContext) IncrementTooMuchCount() (n uint) {
 	return c.Repo.IncrementSuiteSeq(c.Config.TestSuite.Get(), model.TooMuchSequenceFilename)
 }
 
@@ -297,7 +297,7 @@ type TestContext struct {
 	SuiteContext
 	Suite SuiteContext
 
-	Seq uint16
+	Seq uint
 
 	//MockDir        string
 	ContainerId    string
@@ -312,7 +312,7 @@ func (c TestContext) TestId() (id string) {
 	return fmt.Sprintf("%s__%d", c.Suite.Config.TestSuite.Get(), c.Seq)
 }
 
-func (c *TestContext) IncrementTestCount() (n uint16) {
+func (c *TestContext) IncrementTestCount() (n uint) {
 	logger.Debug("Incrementing Test count")
 	if utils.IsWithinContainer() {
 		// Do not increment seq
@@ -325,7 +325,7 @@ func (c *TestContext) IncrementTestCount() (n uint16) {
 	return n
 }
 
-func (c TestContext) ProcessTooMuchFailures() (n uint16) {
+func (c TestContext) ProcessTooMuchFailures() (n uint) {
 	cfg := c.Config
 	testSuite := cfg.TestSuite.Get()
 	failures := c.Repo.ErroredCount(testSuite) + c.Repo.FailedCount(testSuite)
@@ -354,7 +354,7 @@ func (c TestContext) TestQualifiedName0() (name string) {
 	return
 }
 
-func (c TestContext) initTestOutcome(seq uint16) (outcome model.TestOutcome) {
+func (c TestContext) initTestOutcome(seq uint) (outcome model.TestOutcome) {
 	testSuite := c.Config.TestSuite.Get()
 	outcome.TestSuite = testSuite
 	outcome.Seq = seq
@@ -397,7 +397,7 @@ func (c TestContext) UnknownTestOutcome() (outcome model.TestOutcome) {
 	return
 }
 
-func (c TestContext) AssertCmdExecBlocking(seq uint16, assertions []model.Assertion) (outcome model.TestOutcome, err error) {
+func (c TestContext) AssertCmdExecBlocking(seq uint, assertions []model.Assertion) (outcome model.TestOutcome, err error) {
 	testSuite := c.Config.TestSuite.Get()
 	exitCode, err := c.CmdExec.BlockRun()
 
@@ -527,7 +527,7 @@ func (c TestContext) ConfigMocking() (err error) {
 	return
 }
 
-func (c TestContext) MockDirectoryPath(testId uint16) (mockDir string, err error) {
+func (c TestContext) MockDirectoryPath(testId uint) (mockDir string, err error) {
 	return c.Repo.MockDirectoryPath(c.Config.TestSuite.Get(), testId)
 }
 

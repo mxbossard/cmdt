@@ -36,7 +36,7 @@ func CloseSuite(d Displayer, suite int, token, isol string) {
 
 func DisplayOpenTitleOutcomeTest(t *testing.T, d Displayer, token, isol string, suite int, seq int) TestDisplayer {
 	testSuite := fmt.Sprintf("suite-%d", suite)
-	ctx, err := facade.NewTestContext(token, isol, testSuite, uint16(seq), model.Config{}, uint32(42), false)
+	ctx, err := facade.NewTestContext(token, isol, testSuite, uint(seq), model.Config{}, uint32(42), false)
 	require.NoError(t, err)
 	ctx.CmdExec = cmdz.Cmd("true")
 	outcome := model.TestOutcome{
@@ -45,7 +45,7 @@ func DisplayOpenTitleOutcomeTest(t *testing.T, d Displayer, token, isol string, 
 		TestSignature: model.TestSignature{
 			TestSuite: testSuite,
 			TestName:  "",
-			Seq:       uint16(seq),
+			Seq:       uint(seq),
 		},
 	}
 	td := d.OpenTest(ctx)

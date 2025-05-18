@@ -5,10 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"cmdt/internal/model"
+
+	"github.com/mxbossard/utilz/filez"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"cmdt/internal/model"
-	"github.com/mxbossard/utilz/filez"
 )
 
 func initTestDao(t *testing.T, dirpath string) Test {
@@ -20,7 +21,7 @@ func initTestDao(t *testing.T, dirpath string) Test {
 	return dao
 }
 
-func addTest(t *testing.T, dao Test, suite string, seq uint16, name string, cmdAndArgs []string, stdout, stderr string,
+func addTest(t *testing.T, dao Test, suite string, seq uint, name string, cmdAndArgs []string, stdout, stderr string,
 	exitCode int16, outcome model.Outcome, results []model.AssertionResult) {
 	sign := model.TestSignature{
 		TestSuite:  suite,
