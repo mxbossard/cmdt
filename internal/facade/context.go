@@ -22,6 +22,10 @@ import (
 	"github.com/mxbossard/utilz/zlog"
 )
 
+const (
+	repoPoolMaxLifetime = 5 * time.Second
+)
+
 var logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 
 var _repo = make(map[string]repo.Repo)
@@ -81,7 +85,7 @@ func PooledRepo(token, isolation string) repo.Repo {
 			// }
 			return &repo, nil
 		})
-		r.SetMaxLifeTime(1000 * time.Millisecond)
+		r.SetMaxLifeTime(repoPoolMaxLifetime)
 		_repoPoolMap[key] = r
 	}
 

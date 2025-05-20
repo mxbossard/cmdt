@@ -32,9 +32,9 @@ const (
 	DaemonPidFilename          = "daemon.pid"
 	LockWatingSecs             = 5
 	ExtraRunningSecs           = 5
-	AsyncPollingSleepInMs      = 50
+	AsyncPollingSleep          = 1 * time.Millisecond
 	WaitAsyncReportTestTimeout = 2 * time.Second
-	daemonTryLockPeriod        = 10 * time.Microsecond
+	daemonTryLockPeriod        = 100 * time.Microsecond
 )
 
 var logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
@@ -110,7 +110,7 @@ func (d *daemon) run() {
 				// fmt.Printf("\n<<>> Stopping daemon\n")
 				break
 			}
-			time.Sleep(AsyncPollingSleepInMs * time.Millisecond)
+			time.Sleep(AsyncPollingSleep)
 			continue
 		}
 	}

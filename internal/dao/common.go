@@ -16,7 +16,7 @@ import (
 
 const (
 	DbFileName  = "cmdt.sqlite"
-	BusyTimeout = 5 * time.Second
+	BusyTimeout = 10 * time.Second
 )
 
 var (
