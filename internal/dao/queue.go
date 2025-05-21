@@ -7,9 +7,10 @@ import (
 	"cmdt/internal/model"
 
 	"github.com/mxbossard/utilz/zql"
+	"github.com/mxbossard/utilz/zqlite"
 )
 
-func NewQueue(db *zql.SynchronizedDB, init bool) (d Queue, err error) {
+func NewQueue(db *zqlite.SynchronizedDB, init bool) (d Queue, err error) {
 	d.db = db
 	if init {
 		err = d.init()
@@ -18,7 +19,7 @@ func NewQueue(db *zql.SynchronizedDB, init bool) (d Queue, err error) {
 }
 
 type Queue struct {
-	db *zql.SynchronizedDB
+	db *zqlite.SynchronizedDB
 }
 
 func (d Queue) init() (err error) {

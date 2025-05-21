@@ -9,14 +9,14 @@ import (
 	"cmdt/internal/model"
 
 	"github.com/mxbossard/utilz/collectionz"
-	"github.com/mxbossard/utilz/zql"
+	"github.com/mxbossard/utilz/zqlite"
 )
 
 const (
 	CMD_AND_ARGS_SEPARATOR = ","
 )
 
-func NewTest(db *zql.SynchronizedDB, init bool) (d Test, err error) {
+func NewTest(db *zqlite.SynchronizedDB, init bool) (d Test, err error) {
 	d.db = db
 	if init {
 		err = d.init()
@@ -25,7 +25,7 @@ func NewTest(db *zql.SynchronizedDB, init bool) (d Test, err error) {
 }
 
 type Test struct {
-	db *zql.SynchronizedDB
+	db *zqlite.SynchronizedDB
 }
 
 func (d Test) init() (err error) {

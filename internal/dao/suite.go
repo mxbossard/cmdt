@@ -9,9 +9,10 @@ import (
 	"cmdt/internal/model"
 
 	"github.com/mxbossard/utilz/zql"
+	"github.com/mxbossard/utilz/zqlite"
 )
 
-func NewSuite(db *zql.SynchronizedDB, init bool) (d Suite, err error) {
+func NewSuite(db *zqlite.SynchronizedDB, init bool) (d Suite, err error) {
 	d.db = db
 	if init {
 		err = d.init()
@@ -38,7 +39,7 @@ func outcomeOrder(o model.Outcome) int {
 }
 
 type Suite struct {
-	db *zql.SynchronizedDB
+	db *zqlite.SynchronizedDB
 }
 
 func (d Suite) init() (err error) {

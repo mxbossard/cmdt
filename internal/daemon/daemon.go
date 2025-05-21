@@ -34,7 +34,7 @@ const (
 	ExtraRunningSecs           = 5
 	AsyncPollingSleep          = 1 * time.Millisecond
 	WaitAsyncReportTestTimeout = 2 * time.Second
-	daemonTryLockPeriod        = 100 * time.Microsecond
+	daemonTryLockPeriod        = 200 * time.Microsecond
 )
 
 var logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))

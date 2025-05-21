@@ -10,7 +10,6 @@ import (
 	//_ "github.com/mattn/go-sqlite3"
 
 	"github.com/mxbossard/utilz/zlog"
-	"github.com/mxbossard/utilz/zql"
 	"github.com/mxbossard/utilz/zqlite"
 )
 
@@ -23,7 +22,7 @@ var (
 	logger = zlog.New()
 )
 
-func DbOpen(dirpath string) (db *zql.SynchronizedDB, err error) {
+func DbOpen(dirpath string) (db *zqlite.SynchronizedDB, err error) {
 	file := filepath.Join(dirpath, DbFileName)
 
 	_, err = os.Stat(file)
@@ -41,7 +40,7 @@ func DbOpen(dirpath string) (db *zql.SynchronizedDB, err error) {
 	return
 }
 
-func IsInitialized(db *zql.SynchronizedDB) (bool, error) {
+func IsInitialized(db *zqlite.SynchronizedDB) (bool, error) {
 	row := db.QueryRow(`
 		SELECT count(name), coalesce(group_concat(coalesce(name, 'NIL')), 'NULL')
 		FROM sqlite_schema

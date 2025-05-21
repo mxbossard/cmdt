@@ -88,17 +88,22 @@ $cmdt1 @report
 
 $cmdt1 @report @all
 
+testSleepTime="0.1"
+
 for p in $( seq 1 $COUNT ); do
 	>&2 echo
 	>&2 echo "---------------------"
-	>&2 echo "Stress test running 20 suites of 30 tests #$p ..."
-	for k in $( seq 1 20 ); do
-		>&2 echo "## seq test @fork=$k"
-		$cmdt1 @init=seq_fork$k @fork=$k @verbose=1
+	>&2 echo "Stress test running 19 suites of 30 tests sleeping $testSleepTime sec #$p ..."
+	for k in $( seq 2 20 ); do
+		>&2 echo -n "## seq test @fork=$k "
+		start=$( date +%s%3N )
+		$cmdt1 @init=seq_fork$k @fork=$k @verbose=1 2>&1 | tr '\n' ' '
 
 		for i in $( seq 0 29 ); do
 			$cmdt1 @test=seq_fork$k/sleep_$i sleep $testSleepTime
 		done
+		end=$( date +%s%3N )
+		>&2 echo " last $(( end - start )) ms"
 		#$cmdt1 @report
 	done
 	$cmdt1 @report 

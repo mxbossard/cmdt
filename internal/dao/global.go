@@ -4,10 +4,10 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/mxbossard/utilz/zql"
+	"github.com/mxbossard/utilz/zqlite"
 )
 
-func NewGlobal(db *zql.SynchronizedDB, init bool) (d Global, err error) {
+func NewGlobal(db *zqlite.SynchronizedDB, init bool) (d Global, err error) {
 	d.db = db
 	if init {
 		err = d.init()
@@ -16,7 +16,7 @@ func NewGlobal(db *zql.SynchronizedDB, init bool) (d Global, err error) {
 }
 
 type Global struct {
-	db *zql.SynchronizedDB
+	db *zqlite.SynchronizedDB
 }
 
 func (d Global) init() (err error) {

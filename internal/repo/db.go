@@ -11,7 +11,7 @@ import (
 
 	"github.com/mxbossard/utilz/errorz"
 	"github.com/mxbossard/utilz/poolz"
-	"github.com/mxbossard/utilz/zql"
+	"github.com/mxbossard/utilz/zqlite"
 )
 
 const WaitingOpDoneSleepPeriodInMs = 50
@@ -22,7 +22,7 @@ type DbRepo struct {
 	dirpath   string
 	token     string
 	isolation string
-	db        *zql.SynchronizedDB
+	db        *zqlite.SynchronizedDB
 	suiteDao  dao.Suite
 	queueDao  dao.Queue
 	testDao   dao.Test
