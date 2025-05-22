@@ -245,7 +245,7 @@ Refactor:
 
 */
 
-var logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
+var logger = zlog.New()
 
 func init() {
 	zlog.ColoredConfig()
@@ -254,7 +254,8 @@ func init() {
 	//zlog.SetLogLevelThreshold0IsFatal6IsTrace(5)
 	//zlog.SetTruncatedArgsLength(64)
 	zlog.SetTruncatedArgsLength(1024)
-	zlog.SetDefaultAppendingFileOutput(model.DefaultDebugLogFilepath)
+	loggingFilepath := fmt.Sprintf(model.DefaultDebugLogFilepath, "")
+	zlog.SetDefaultAppendingFileOutput(loggingFilepath)
 }
 
 func RecoverExiting() {
@@ -271,21 +272,20 @@ func main() {
 	for _, arg := range os.Args {
 		//  FIXME: properly get isolation value to configure logging file
 		if strings.HasPrefix(arg, "@isol=") {
-			isolation := strings.TrimLeft(arg, "@isol=")
+			isolation := strings.TrimPrefix(arg, "@isol=")
 			var loggingQualifier string
 			if isolation != "" {
 				loggingQualifier = "-" + isolation
 			}
 			loggingFilepath := fmt.Sprintf(model.DefaultDebugLogFilepath, loggingQualifier)
 			zlog.SetDefaultAppendingFileOutput(loggingFilepath)
+			break
 		}
 	}
 
 	daemon.TakeOver()
 
 	logger.Warn("cmdt started", "pid", os.Getpid(), "args", os.Args[1:])
-
-	//model.LoggerLevel.Set(slog.Level(8 - model.StartDebugLevel*4))
 
 	daemonToken, daemonIsol, wait := service.ProcessArgs(os.Args)
 
@@ -299,7 +299,6 @@ func main() {
 	//log.Printf("waiting\n")
 	exitCode := wait()
 
-	//log.Printf("exiting with code: %d\n", exitCode)
 	os.Exit(int(exitCode))
 }
 
