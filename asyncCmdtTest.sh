@@ -119,54 +119,55 @@ $cmdtIn @report
 
 # FIXME: async report should not fail if no test exist yet. It should fail after a short timeout if no test to report.
 >&2 echo "## Test @report without test"
-$cmdtIn @init=meta0 #@verbose=4
-$cmdtIn @test=meta0/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt0 @report=foo @async #@debug=4
-$cmdtIn @test=meta0/ @stderr= @-- $newCmdt0 @init=foo @async #@debug=4
-$cmdtIn @test=meta0/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt0 @report=foo @async #@debug=4
-$cmdtIn @test=meta0/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt0 @report @async #@debug=4
+$cmdtIn @init=report_wo_test #@verbose=4
+$cmdtIn @test=report_wo_test/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt0 @report=foo @async #@debug=4
+$cmdtIn @test=report_wo_test/ @stderr= @-- $newCmdt0 @init=foo @async #@debug=4
+$cmdtIn @test=report_wo_test/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt0 @report=foo @async #@debug=4
+$cmdtIn @test=report_wo_test/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt0 @report @async #@debug=4
 
 >&2 echo "## Meta1 test context not shared without token"
-$cmdtIn @init=meta1 #@verbose=4
-$cmdtIn @test=meta1/init @stderr= @-- $newCmdt1 @init @async @verbose=4
-$cmdtIn @test=meta1/"without token one" @stderr= @-- $newCmdt1 true #@debug
-$cmdtIn @test=meta1/"without token two" @stderr= @-- $newCmdt1 true #@debug
-$cmdtIn @test=meta1/"command before rule stop" @fail @stderr:"ERRORED" @stderr:"before rule parsing stopper" @-- $newCmdt1 true @-- @success
-$cmdtIn @test=meta1/"rule value splited in 2 args" @stderr= @-- $newCmdt1 @stdout:foo bar @-- echo foo bar
-$cmdtIn @test=meta1/"report without token" @exit=1 @stderr:"3 success" @stderr!:"failure" @stderr:"1 error" @stderr:"PASSED" @stderr!:"ERRORED" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @stderr:"#04" @stderr!:"#05" @-- $newCmdt0 @report=main @async
+$cmdtIn @init=isolation #@verbose=4
+$cmdtIn @test=isolation/init @stderr= @-- $newCmdt1 @init @async @verbose=4
+$cmdtIn @test=isolation/"without token one" @stderr= @-- $newCmdt1 true #@debug
+$cmdtIn @test=isolation/"without token two" @stderr= @-- $newCmdt1 true #@debug
+$cmdtIn @test=isolation/"command before rule stop" @fail @stderr:"ERRORED" @stderr:"before rule parsing stopper" @-- $newCmdt1 true @-- @success
+$cmdtIn @test=isolation/"rule value splited on 2 args" @stderr= @-- $newCmdt1 @stdout:foo bar @-- echo foo bar
+$cmdtIn @test=isolation/"report without token" @exit=1 @stderr:"3 success" @stderr!:"failure" @stderr:"1 error" @stderr:"PASSED" @stderr!:"ERRORED" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @stderr:"#04" @stderr!:"#05" @-- $newCmdt0 @report=main @async
 
 >&2 echo "## Test printed token"
 tk0=$( $newCmdt0 @init @printToken )
 >&2 echo "printed token: $tk0"
-$cmdtIn @init=meta2 #@verbose=4
-$cmdtIn @test=meta2/init @stderr= @-- $newCmdt1 @token=$tk0 @init @async @verbose=5
-$cmdtIn @test=meta2/"with token 1" @stderr= @-- $newCmdt1 @token=$tk0 @test=meta2_sub_test1 true
-$cmdtIn @test=meta2/"with token 2" @stderr= @-- $newCmdt1 @token=$tk0 @test=meta2_sub_test2 true
-$cmdtIn @test=meta2/"report without token" @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=main 
-$cmdtIn @test=meta2/"report with token" @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @token=$tk0 @report=main
-$cmdtIn @test=meta2/init @stderr= @-- $newCmdt1 @token=$tk0 @init=master @async @verbose=5
-$cmdtIn @test=meta2/"with token 3" @stderr= @-- $newCmdt1 @token=$tk0 @test=master/meta2_sub2_test3 true
-$cmdtIn @test=meta2/"with token 4" @stderr= @-- $newCmdt1 @token=$tk0 @test=master/meta2_sub2_test4 true
-$cmdtIn @test=meta2/"global report with token" @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @token=$tk0 @report
+$cmdtIn @init=printed_token #@verbose=4
+$cmdtIn @test=printed_token/init1 @stderr= @-- $newCmdt1 @token=$tk0 @init @async @verbose=5
+$cmdtIn @test=printed_token/"with token 1" @stderr= @-- $newCmdt1 @token=$tk0 @test=printed_token_sub_test1 true
+$cmdtIn @test=printed_token/"with token 2" @stderr= @-- $newCmdt1 @token=$tk0 @test=printed_token_sub_test2 true
+$cmdtIn @test=printed_token/"report wo token" @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=main 
+$cmdtIn @test=printed_token/"report with token" @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @token=$tk0 @report=main
+$cmdtIn @test=printed_token/init2 @stderr= @-- $newCmdt1 @token=$tk0 @init=master @async @verbose=5
+$cmdtIn @test=printed_token/"with token 3" @stderr= @-- $newCmdt1 @token=$tk0 @test=master/printed_token_sub2_test3 true
+$cmdtIn @test=printed_token/"with token 4" @stderr= @-- $newCmdt1 @token=$tk0 @test=master/printed_token_sub2_test4 true
+$cmdtIn @test=printed_token/"global report with token" @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @token=$tk0 @report
 $cmdt @report
 
 >&2 echo "## Test exported token"
 eval $( $cmdt @init @exportToken )
 >&2 echo "exported token: $__CMDT_TOKEN"
-$cmdtIn @init=meta3 #@ignore
-$cmdtIn @test=meta3/init @-- $newCmdt1 @init @async
-$cmdtIn @test=meta3/test1 @stderr= @-- $newCmdt1 true
-$cmdtIn @test=meta3/test2 @stderr= @-- $newCmdt1 true
-$cmdtIn @test=meta3/report1 @stderr:"Successfully ran" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @report=main
-$cmdtIn @test=meta3/report2 @stderr:"Successfully ran" @stderr!:"error" @stderr!:"#01" @stderr!:"#02" @stderr!:"#03" @-- $newCmdt1 @report=main
-$cmdtIn @test=meta3/report_other_token @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=main @token=empty_token
+$cmdtIn @init=exported_token #@ignore
+$cmdtIn @test=exported_token/init @-- $newCmdt1 @init @async
+$cmdtIn @test=exported_token/test1 @stderr= @-- $newCmdt1 true
+$cmdtIn @test=exported_token/test2 @stderr= @-- $newCmdt1 true
+$cmdtIn @test=exported_token/report1 @stderr:"Successfully ran" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @report=main
+$cmdtIn @test=exported_token/report2 @stderr:"Successfully ran" @stderr!:"error" @stderr!:"#01" @stderr!:"#02" @stderr!:"#03" @-- $newCmdt1 @report=main
+$cmdtIn @test=exported_token/report_other_token @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=main @token=empty_token
 
-$cmdtIn @init=meta4 #@ignore
-$cmdtIn @test=meta4/init @-- $newCmdt1 @init=sub4 @async
-$cmdtIn @test=meta4/test1 @stderr= @-- $newCmdt1 @test=sub4/ true
-$cmdtIn @test=meta4/test2 @stderr= @-- $newCmdt1 @test=sub4/ true
-$cmdtIn @test=meta4/report1 @stderr:"Successfully ran" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @report=sub4
-$cmdtIn @test=meta4/report2 @stderr:"Successfully ran" @stderr!:"error" @stderr!:"#01" @stderr!:"#02" @stderr!:"#03" @-- $newCmdt1 @report=sub4
-$cmdtIn @test=meta4/report_other_token @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @token=$tk0 @report=sub4
+$cmdtIn @init=exported_token_alt #@ignore
+$cmdtIn @test=exported_token_alt/init @-- $newCmdt1 @init=sub4 @async
+$cmdtIn @test=exported_token_alt/test1 @stderr= @-- $newCmdt1 @test=sub4/ true
+$cmdtIn @test=exported_token_alt/test2 @stderr= @-- $newCmdt1 @test=sub4/ true
+$cmdtIn @test=exported_token_alt/report1 @stderr:"Successfully ran" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @report=sub4
+$cmdtIn @test=exported_token_alt/report2 @stderr:"Successfully ran" @stderr!:"error" @stderr!:"#01" @stderr!:"#02" @stderr!:"#03" @-- $newCmdt1 @report=sub4
+$cmdtIn @test=exported_token_alt/global_report_all @stderr:"Successfully ran" @stderr!:"error" @stderr!:"#01" @stderr!:"#02" @stderr!:"#03" @stderr:main @stderr:sub4 @-- $newCmdt1 @report @all
+$cmdtIn @test=exported_token_alt/report_other_token @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @token=$tk0 @report=sub4
 $cmdt @report 
 
 export -n __CMDT_TOKEN
@@ -272,6 +273,112 @@ $cmdtIn @test=double_suite_init_async/open1 @stderr= @-- $newCmdt1 @init=double_
 $cmdtIn @test=double_suite_init_async/open2_without_test @stderr= @-- $newCmdt1 @init=double_suite_init_async_sub @async=true @verbose=5 
 $cmdtIn @test=double_suite_init_async/test @stderr= @-- $newCmdt1 @test=double_suite_init_async_sub/test true
 $cmdtIn @test=double_suite_init_async/open3_after_test @fail @stderr:"$cannotReinitMsg" @-- $newCmdt1 @init=double_suite_init_async_sub @async=true @verbose=5 
+
+
+
+## Display verbosity tests
+# SPEC:
+# verbose=0: display nothing during testing
+# verbose=1: display only not successing tests
+# verbose=2: display not successing tests outs
+# verbose=3: display successing tests
+# verbose=4: display successing test outs
+# verbose=5: display all
+# reporting is not affected by verbosity
+#
+$cmdtIn @init=verbosity_sync
+$cmdtIn @test=verbosity_sync/open @stderr= @-- $newCmdt0 @init=verbosity_sync_sub @verbose=0 @async=false @failuresLimit=-1
+$cmdtIn @test=verbosity_sync/verbose0_success @stderr= @-- $newCmdt0 @test=verbosity_sync_sub/verbose0_success @verbose=0 echo foo0_success
+$cmdtIn @test=verbosity_sync/verbose0_failure @stderr= @-- $newCmdt0 @test=verbosity_sync_sub/verbose0_failure @verbose=0 sh -c "echo foo0_failure; exit 1"
+$cmdtIn @test=verbosity_sync/verbose1_success @stderr= @-- $newCmdt0 @test=verbosity_sync_sub/verbose1_success @verbose=1 echo foo1_success
+$cmdtIn @test=verbosity_sync/verbose1_failure @stderr:FAILED @stderr!:">foo1" @-- $newCmdt0 @test=verbosity_sync_sub/verbose1_failure @verbose=1 sh -c "echo foo1_failure; exit 1"
+$cmdtIn @test=verbosity_sync/verbose2_success @stderr= @-- $newCmdt0 @test=verbosity_sync_sub/verbose2_success @verbose=2 echo foo2_success
+$cmdtIn @test=verbosity_sync/verbose2_failure @stderr:FAILED @stderr:">foo2" @-- $newCmdt0 @test=verbosity_sync_sub/verbose2_failure @verbose=2 sh -c "echo foo2_failure; exit 1"
+$cmdtIn @test=verbosity_sync/verbose3_success @stderr:PASSED @stderr!:">foo3" @-- $newCmdt0 @test=verbosity_sync_sub/verbose3_success @verbose=3 echo foo3_success
+$cmdtIn @test=verbosity_sync/verbose3_failure @stderr:FAILED @stderr:">foo3" @-- $newCmdt0 @test=verbosity_sync_sub/verbose3_failure @verbose=3 sh -c "echo foo3_failure; exit 1"
+$cmdtIn @test=verbosity_sync/verbose4_success @stderr:PASSED @stderr:">foo4" @-- $newCmdt0 @test=verbosity_sync_sub/verbose4_success @verbose=4 echo foo4_success
+$cmdtIn @test=verbosity_sync/verbose4_failure @stderr:FAILED @stderr:">foo4" @-- $newCmdt0 @test=verbosity_sync_sub/verbose4_failure @verbose=4 sh -c "echo foo4_failure; exit 1"
+$cmdtIn @test=verbosity_sync/verbose5_success @stderr:PASSED @stderr:">foo5" @-- $newCmdt0 @test=verbosity_sync_sub/verbose5_success @verbose=5 echo foo5_success
+$cmdtIn @test=verbosity_sync/verbose5_failure @stderr:FAILED @stderr:">foo5" @-- $newCmdt0 @test=verbosity_sync_sub/verbose5_failure @verbose=5 sh -c "echo foo5_failure; exit 1"
+$cmdtIn @test=verbosity_sync/report @fail @stderr:verbosity_sync_sub @stderr!:verbose0 @stderr!:verbose1 @stderr!:verbose2 @stderr!:verbose3 @stderr!:verbose4 @stderr!:verbose5 @-- $newCmdt0 @report=verbosity_sync_sub
+
+$cmdtIn @test=verbosity_sync/suite_verbose0_open @stderr= @-- $newCmdt0 @init=suite_verbose0_sub @async=false @verbose=0
+$cmdtIn @test=verbosity_sync/suite_verbose0_success @stderr= @-- $newCmdt0 @test=suite_verbose0_sub/success echo bar0_success
+$cmdtIn @test=verbosity_sync/suite_verbose0_failure @stderr= @-- $newCmdt0 @test=suite_verbose0_sub/failure sh -c "echo bar0_failure; exit 1"
+$cmdtIn @test=verbosity_sync/suite_verbose0_report @fail @stderr:suite_verbose0_sub @-- $newCmdt1 @report=suite_verbose0_sub
+
+$cmdtIn @test=verbosity_sync/suite_verbose1_open @stderr= @-- $newCmdt0 @init=suite_verbose1_sub @async=false @verbose=1
+$cmdtIn @test=verbosity_sync/suite_verbose1_success @stderr= @-- $newCmdt0 @test=suite_verbose1_sub/success echo bar1_success
+$cmdtIn @test=verbosity_sync/suite_verbose1_failure @stderr:"FAILED" @stderr!=">bar1" @-- $newCmdt0 @test=suite_verbose1_sub/failure sh -c "echo bar1_failure; exit 1"
+$cmdtIn @test=verbosity_sync/suite_verbose1_report @fail @stderr:suite_verbose1_sub @-- $newCmdt1 @report=suite_verbose1_sub
+
+$cmdtIn @test=verbosity_sync/suite_verbose2_open @stderr= @-- $newCmdt0 @init=suite_verbose2_sub @async=false @verbose=2
+$cmdtIn @test=verbosity_sync/suite_verbose2_success @stderr= @-- $newCmdt0 @test=suite_verbose2_sub/success echo bar2_success
+$cmdtIn @test=verbosity_sync/suite_verbose2_failure @stderr:"FAILED" @stderr:">bar2" @-- $newCmdt0 @test=suite_verbose2_sub/failure sh -c "echo bar2_failure; exit 1"
+$cmdtIn @test=verbosity_sync/suite_verbose2_report @fail @stderr:suite_verbose2_sub @-- $newCmdt1 @report=suite_verbose2_sub
+
+$cmdtIn @test=verbosity_sync/suite_verbose3_open @stderr:"suite_verbose3_sub" @-- $newCmdt0 @init=suite_verbose3_sub @async=false @verbose=3
+$cmdtIn @test=verbosity_sync/suite_verbose3_success @stderr:PASSED @stderr!:">bar3" @-- $newCmdt0 @test=suite_verbose3_sub/success echo bar3_success
+$cmdtIn @test=verbosity_sync/suite_verbose3_failure @stderr:"FAILED" @stderr:">bar3" @-- $newCmdt0 @test=suite_verbose3_sub/failure sh -c "echo bar3_failure; exit 1"
+$cmdtIn @test=verbosity_sync/suite_verbose3_report @fail @stderr:suite_verbose3_sub @-- $newCmdt1 @report=suite_verbose3_sub
+
+$cmdtIn @test=verbosity_sync/suite_verbose4_open @stderr:"suite_verbose4_sub" @-- $newCmdt0 @init=suite_verbose4_sub @async=false @verbose=4
+$cmdtIn @test=verbosity_sync/suite_verbose4_success @stderr:PASSED @stderr:">bar4" @-- $newCmdt0 @test=suite_verbose4_sub/success echo bar4_success
+$cmdtIn @test=verbosity_sync/suite_verbose4_failure @stderr:"FAILED" @stderr:">bar4" @-- $newCmdt0 @test=suite_verbose4_sub/failure sh -c "echo bar4_failure; exit 1"
+$cmdtIn @test=verbosity_sync/suite_verbose4_report @fail @stderr:suite_verbose4_sub @-- $newCmdt1 @report=suite_verbose4_sub
+
+$cmdtIn @test=verbosity_sync/suite_verbose5_open @stderr:"suite_verbose5_sub" @-- $newCmdt0 @init=suite_verbose5_sub @async=false @verbose=5
+$cmdtIn @test=verbosity_sync/suite_verbose5_success @stderr:PASSED @stderr:">bar5" @-- $newCmdt0 @test=suite_verbose5_sub/success echo bar5_success
+$cmdtIn @test=verbosity_sync/suite_verbose5_failure @stderr:"FAILED" @stderr:">bar5" @-- $newCmdt0 @test=suite_verbose5_sub/failure sh -c "echo bar5_failure; exit 1"
+$cmdtIn @test=verbosity_sync/suite_verbose5_report @fail @stderr:suite_verbose5_sub @-- $newCmdt1 @report=suite_verbose5_sub
+
+
+$cmdtIn @init=verbosity_async
+$cmdtIn @test=verbosity_async/open @stderr= @-- $newCmdt0 @init=verbosity_async_sub @async=true @verbose=0
+$cmdtIn @test=verbosity_async/verbose0_success @stderr= @-- $newCmdt0 @test=verbosity_async_sub/verbose0_success @verbose=0 echo foo0_success
+$cmdtIn @test=verbosity_async/verbose0_failure @stderr= @-- $newCmdt0 @test=verbosity_async_sub/verbose0_failure @verbose=0 sh -c "echo foo0_failure; exit 1"
+$cmdtIn @test=verbosity_async/verbose1_success @stderr= @-- $newCmdt0 @test=verbosity_async_sub/verbose1_success @verbose=1 echo foo1_success
+$cmdtIn @test=verbosity_async/verbose1_failure @stderr= @-- $newCmdt0 @test=verbosity_async_sub/verbose1_failure @verbose=1 sh -c "echo foo1_failure; exit 1"
+$cmdtIn @test=verbosity_async/verbose2_success @stderr= @-- $newCmdt0 @test=verbosity_async_sub/verbose2_success @verbose=2 echo foo2_success
+$cmdtIn @test=verbosity_async/verbose2_failure @stderr= @-- $newCmdt0 @test=verbosity_async_sub/verbose2_failure @verbose=2 sh -c "echo foo2_failure; exit 1"
+$cmdtIn @test=verbosity_async/verbose3_success @stderr= @-- $newCmdt0 @test=verbosity_async_sub/verbose3_success @verbose=3 echo foo3_success
+$cmdtIn @test=verbosity_async/verbose3_failure @stderr= @-- $newCmdt0 @test=verbosity_async_sub/verbose3_failure @verbose=3 sh -c "echo foo3_failure; exit 1"
+$cmdtIn @test=verbosity_async/verbose4_success @stderr= @-- $newCmdt0 @test=verbosity_async_sub/verbose4_success @verbose=4 echo foo4_success
+$cmdtIn @test=verbosity_async/verbose4_failure @stderr= @-- $newCmdt0 @test=verbosity_async_sub/verbose4_failure @verbose=4 sh -c "echo foo4_failure; exit 1"
+$cmdtIn @test=verbosity_async/verbose5_success @stderr= @-- $newCmdt0 @test=verbosity_async_sub/verbose5_success @verbose=5 echo foo5_success
+$cmdtIn @test=verbosity_async/verbose5_failure @stderr= @-- $newCmdt0 @test=verbosity_async_sub/verbose5_failure @verbose=5 sh -c "echo foo5_failure; exit 1"
+$cmdtIn @test=verbosity_async/report @fail @stderr:verbosity_async_sub @stderr!:verbose0 @stderr!:verbose1_success @stderr:verbose1_failure @stderr!:verbose2_success @stderr:verbose2_failure @stderr!:verbose3_success @stderr:verbose3_failure @stderr:verbose4_success @stderr:verbose4_failure @stderr:verbose5_success @stderr:verbose5_failure @-- $newCmdt0 @report=verbosity_async_sub
+
+$cmdtIn @test=verbosity_async/suite_verbose0_open @stderr= @-- $newCmdt0 @init=async_suite_verbose0_sub @async=true @verbose=0
+$cmdtIn @test=verbosity_async/suite_verbose0_success @stderr= @-- $newCmdt0 @test=async_suite_verbose0_sub/success echo bar0_success
+$cmdtIn @test=verbosity_async/suite_verbose0_failure @stderr= @-- $newCmdt0 @test=async_suite_verbose0_sub/failure sh -c "echo bar0_failure; exit 1"
+$cmdtIn @test=verbosity_async/suite_verbose0_report @fail @stderr:suite_verbose0_sub @stderr!:bar0 @-- $newCmdt1 @report=async_suite_verbose0_sub
+
+$cmdtIn @test=verbosity_async/suite_verbose1_open @stderr= @-- $newCmdt0 @init=async_suite_verbose1_sub @async=true @verbose=1
+$cmdtIn @test=verbosity_async/suite_verbose1_success @stderr= @-- $newCmdt0 @test=async_suite_verbose1_sub/success echo bar1_success
+$cmdtIn @test=verbosity_async/suite_verbose1_failure @stderr= @-- $newCmdt0 @test=async_suite_verbose1_sub/failure sh -c "echo bar1_failure; exit 1"
+$cmdtIn @test=verbosity_async/suite_verbose1_report @fail @stderr:suite_verbose1_sub @stderr:FAILED @stderr!:bar2 @-- $newCmdt1 @report=async_suite_verbose1_sub
+
+$cmdtIn @test=verbosity_async/suite_verbose2_open @stderr= @-- $newCmdt0 @init=async_suite_verbose2_sub @async=true @verbose=2
+$cmdtIn @test=verbosity_async/suite_verbose2_success @stderr= @-- $newCmdt0 @test=async_suite_verbose2_sub/success echo bar2_success
+$cmdtIn @test=verbosity_async/suite_verbose2_failure @stderr= @-- $newCmdt0 @test=async_suite_verbose2_sub/failure sh -c "echo bar2_failure; exit 1"
+$cmdtIn @test=verbosity_async/suite_verbose2_report @fail @stderr:suite_verbose2_sub @stderr!:">bar2_succ" @stderr:FAILED @stderr:">bar2_fail" @-- $newCmdt1 @report=async_suite_verbose2_sub
+
+$cmdtIn @test=verbosity_async/suite_verbose3_open @stderr= @-- $newCmdt0 @init=async_suite_verbose3_sub @async=true @verbose=3
+$cmdtIn @test=verbosity_async/suite_verbose3_success @stderr= @-- $newCmdt0 @test=async_suite_verbose3_sub/success echo bar3_success
+$cmdtIn @test=verbosity_async/suite_verbose3_failure @stderr= @-- $newCmdt0 @test=async_suite_verbose3_sub/failure sh -c "echo bar3_failure; exit 1"
+$cmdtIn @test=verbosity_async/suite_verbose3_report @fail @stderr:suite_verbose3_sub @stderr:PASSED @stderr!:">bar3_succ" @stderr:FAILED @stderr:">bar3_fail" @-- $newCmdt1 @report=async_suite_verbose3_sub
+
+$cmdtIn @test=verbosity_async/suite_verbose4_open @stderr= @-- $newCmdt0 @init=async_suite_verbose4_sub @async=true @verbose=4
+$cmdtIn @test=verbosity_async/suite_verbose4_success @stderr= @-- $newCmdt0 @test=async_suite_verbose4_sub/success echo bar4_success
+$cmdtIn @test=verbosity_async/suite_verbose4_failure @stderr= @-- $newCmdt0 @test=async_suite_verbose4_sub/failure sh -c "echo bar4_failure; exit 1"
+$cmdtIn @test=verbosity_async/suite_verbose4_report @fail @stderr:suite_verbose4_sub @stderr:PASSED @stderr:">bar4_succ" @stderr:FAILED @stderr:">bar4_fail" @-- $newCmdt1 @report=async_suite_verbose4_sub
+
+$cmdtIn @test=verbosity_async/suite_verbose5_open @stderr= @-- $newCmdt0 @init=async_suite_verbose5_sub @async=true @verbose=5
+$cmdtIn @test=verbosity_async/suite_verbose5_success @stderr= @-- $newCmdt0 @test=async_suite_verbose5_sub/success echo bar5_success
+$cmdtIn @test=verbosity_async/suite_verbose5_failure @stderr= @-- $newCmdt0 @test=async_suite_verbose5_sub/failure sh -c "echo bar5_failure; exit 1"
+$cmdtIn @test=verbosity_async/suite_verbose5_report @fail @stderr:suite_verbose5_sub @stderr:PASSED @stderr!:">bar5_succ" @stderr:FAILED @stderr:">bar5_fail" @-- $newCmdt1 @report=async_suite_verbose5_sub
+
 
 
 ## Flow test

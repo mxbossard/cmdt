@@ -19,6 +19,7 @@ const (
 	DefaultInitedVerboseLevel   = SHOW_FAILED_OUTS
 	DefaultInitlessVerboseLevel = DefaultVerboseLevel
 	DefaultAsync                = false
+	DefaultForkCount            = 5
 	DefaultWait                 = true
 	DefaultInitedAsync          = false
 	DefaultInitedWait           = false
@@ -188,7 +189,7 @@ func NewGlobalDefaultConfig() Config {
 		Wait:              utilz.OptionalOf(DefaultWait),
 		ReportAll:         utilz.OptionalOf(DefaultReportAll),
 		GlobalStartTime:   utilz.OptionalOf(time.Now()),
-		ForkCount:         utilz.OptionalOf(uint16(1)),
+		ForkCount:         utilz.OptionalOf(uint16(DefaultForkCount)),
 		Ignore:            utilz.OptionalOf(false),
 		StopOnFailure:     utilz.OptionalOf(false),
 		KeepStdout:        utilz.OptionalOf(false),

@@ -544,7 +544,7 @@ func ApplyConfig(c *model.Config, ruleExpr string) (ok bool, rule model.Rule, er
 			}
 
 		case "fork":
-			c.ForkCount, err = TranslateOptional(rule, Uint16Mapper, OperatorValidater[uint16]("="), Uint16ValueValidater(1, 20))
+			c.ForkCount, err = TranslateOptional(rule, Uint16Mapper, OperatorValidater[uint16]("="), Uint16ValueValidater(0, 20))
 		case "suiteTimeout":
 			c.SuiteTimeout, err = TranslateOptional(rule, DurationMapper)
 

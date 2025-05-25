@@ -423,10 +423,20 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		ProcessSuiteError(suiteCtx, err)
 		defer suiteCtx.Close()
 
-		if suiteCtx.Config.ForkCount.IsPresent() {
-			// Forked suite MUST be async
-			suiteCtx.Config.Async.Set(true)
+		if !suiteCtx.Config.Async.IsSet() {
+			if suiteCtx.Config.ForkCount.IsSet() {
+				if suiteCtx.Config.ForkCount.Is(0) {
+					suiteCtx.Config.Async.Set(false)
+				} else {
+					// Forked suite MUST be async
+					suiteCtx.Config.Async.Set(true)
+				}
+			}
 		}
+		//  else if suiteCtx.Config.Async.Is(true) {
+		// 	// If async but no fork config set default fork config
+		// 	suiteCtx.Config.ForkCount.Set(model.DefaultForkCount)
+		// }
 
 		// Store ignore at suite level
 		suiteCtx.Config.IgnoreSuite = suiteCtx.Config.Ignore

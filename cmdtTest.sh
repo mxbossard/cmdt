@@ -21,6 +21,7 @@ newCmdt0="$newCmdt @isol=tested $params0"
 newCmdt1="$newCmdt @isol=tested $params0 $params1"
 
 forkCfg="${CMDT_FORK_CFG}"
+>&2 echo "CMDT_FORK_CFG: [$CMDT_FORK_CFG]"
 
 die() {
 	>&2 echo "$1"
@@ -45,52 +46,56 @@ cannotReinitMsg="cannot erase test suite"
 nothingToReportExpectedStderrMsg="you must perform some test prior to report"
 
 >&2 echo "## Meta0 test @report without test"
-$cmdtIn $forkCfg @init=meta0 #@verbose=4
-$cmdtIn @test=meta0/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt0 @report=foo #@debug=4
-$cmdtIn @test=meta0/ @stderr= @-- $newCmdt0 @init=foo #@debug=4
-$cmdtIn @test=meta0/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt0 @report=foo #@debug=4
-$cmdtIn @test=meta0/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt0 @report #@debug=4
+$cmdtIn $forkCfg @init=report_wo_test #@verbose=4
+$cmdtIn @test=report_wo_test/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt0 @report=foo #@debug=4
+$cmdtIn @test=report_wo_test/ @stderr= @-- $newCmdt0 @init=foo #@debug=4
+$cmdtIn @test=report_wo_test/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt0 @report=foo #@debug=4
+$cmdtIn @test=report_wo_test/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt0 @report #@debug=4
 
 >&2 echo "## Meta1 test context not shared without token"
-$cmdtIn $forkCfg @init=meta1 #@verbose=4
-$cmdtIn @test=meta1/"without token one" @stderr:"PASSED" @stderr:"#01" @-- $newCmdt1 true #@debug
-$cmdtIn @test=meta1/"without token two" @stderr:"PASSED" @stderr:"#02" @-- $newCmdt1 true #@debug
-$cmdtIn @test=meta1/"command before rule stop" @fail @stderr:"before rule parsing stopper" @-- $newCmdt1 true @-- @success
-$cmdtIn @test=meta1/"rule on 2 args" @stderr:"PASSED" @-- $newCmdt1 @stdout:foo bar @-- echo foo bar
-$cmdtIn @test=meta1/ @exit=1 @stderr:"3 success" @stderr!:"failure" @stderr:"1 error" @-- $newCmdt0 @report=main
+$cmdtIn $forkCfg @init=isolation #@verbose=4
+$cmdtIn @test=isolation/"without token one" @stderr:"PASSED" @stderr:"#01" @-- $newCmdt1 true #@debug
+$cmdtIn @test=isolation/"without token two" @stderr:"PASSED" @stderr:"#02" @-- $newCmdt1 true #@debug
+$cmdtIn @test=isolation/"command before rule stop" @fail @stderr:"before rule parsing stopper" @-- $newCmdt1 true @-- @success
+$cmdtIn @test=isolation/"rule value splited on 2 args" @stderr:"PASSED" @-- $newCmdt1 @stdout:foo bar @-- echo foo bar
+$cmdtIn @test=isolation/"report without token" @exit=1 @stderr:"3 success" @stderr!:"failure" @stderr:"1 error" @-- $newCmdt0 @report=main
 
 >&2 echo "## Meta2 test printed token"
 #tk0=$( $cmdt @init @printToken 2> /dev/null )
 tk0=$( $newCmdt0 @init @printToken )
 >&2 echo "token: $tk0"
-$cmdtIn $forkCfg @init=meta2 #@verbose=4
-$cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#01" @-- $newCmdt1 true @token=$tk0
-$cmdtIn @test=meta2/ @stderr:"PASSED" @stderr:"#02" @-- $newCmdt1 true @token=$tk0
-$cmdtIn @test=meta2/ @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=main
-$cmdtIn @test=meta2/ @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @-- $newCmdt1 @report @token=$tk0
+$cmdtIn $forkCfg @init=printed_token #@verbose=5
+$cmdtIn @test=printed_token/init1 @-- $newCmdt1 @token=$tk0 @init
+$cmdtIn @test=printed_token/"with token 1" @stderr:"PASSED" @stderr:"#01" @-- $newCmdt1 @token=$tk0 @test=printed_token_sub_test1 true @verbose=5
+$cmdtIn @test=printed_token/"with token 2" @stderr:"PASSED" @stderr:"#02" @-- $newCmdt1 @token=$tk0 @test=printed_token_sub_test2 true
+$cmdtIn @test=printed_token/"report wo token" @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=main
+$cmdtIn @test=printed_token/"report with token" @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @-- $newCmdt1 @report @token=$tk0
+$cmdtIn @test=printed_token/init2 @-- $newCmdt1 @token=$tk0 @init=master @verbose=5
+$cmdtIn @test=printed_token/"with token 3" @stderr:PASSED @stderr:"#01" @-- $newCmdt1 @token=$tk0 @test=master/printed_token_sub2_test3 true
+$cmdtIn @test=printed_token/"with token 4" @stderr:PASSED @stderr:"#02" @-- $newCmdt1 @token=$tk0 @test=master/printed_token_sub2_test4 true
+$cmdtIn @test=printed_token/"global report with token" @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @stderr!:"#01" @-- $newCmdt1 @token=$tk0 @report
 $cmdt @report
 
 >&2 echo "## Test exported token"
 eval $( $newCmdt0 @init @exportToken )
 >&2 echo "token: $__CMDT_TOKEN"
 
-#tk=$( $cmdt0 @init @printToken )
-$cmdtIn $forkCfg @init=meta3 #@ignore
-$cmdtIn @test=meta3/init @-- $newCmdt1 @init
-$cmdtIn @test=meta3/test1 @stderr:"PASSED" @stderr:"#01" @-- $newCmdt1 true
-$cmdtIn @test=meta3/test2 @stderr:"PASSED" @stderr:"#02" @-- $newCmdt1 true
-$cmdtIn @test=meta3/report1 @stderr:"Successfully ran" @stderr:"main" @-- $newCmdt1 @report=main
-$cmdtIn @test=meta3/report2 @stderr:"Successfully ran" @stderr:"main" @-- $newCmdt1 @report=main
-$cmdtIn @test=meta3/report_other_token @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=main @token=empty_token
-#$cmdtIn @test=meta3/report2 @stderr:"Successfully ran" @stderr:"main" @-- $newCmdt1 @report=main @token=$tk0
+$cmdtIn $forkCfg @init=exported_token #@ignore
+$cmdtIn @test=exported_token/init @-- $newCmdt1 @init
+$cmdtIn @test=exported_token/test1 @stderr:"PASSED" @stderr:"#01" @-- $newCmdt1 true
+$cmdtIn @test=exported_token/test2 @stderr:"PASSED" @stderr:"#02" @-- $newCmdt1 true
+$cmdtIn @test=exported_token/report1 @stderr:"Successfully ran" @stderr:"main" @-- $newCmdt1 @report=main
+$cmdtIn @test=exported_token/report2 @stderr:"Successfully ran" @stderr:"main" @-- $newCmdt1 @report=main
+$cmdtIn @test=exported_token/report_other_token @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=main @token=empty_token
 
-$cmdtIn $forkCfg @init=meta4 #@ignore
-$cmdtIn @test=meta4/init @-- $newCmdt1 @init=sub4
-$cmdtIn @test=meta4/test1 @stderr:"PASSED" @stderr:"#01" @-- $newCmdt1 @test=sub4/ true
-$cmdtIn @test=meta4/test2 @stderr:"PASSED" @stderr:"#02" @-- $newCmdt1 @test=sub4/ true
-$cmdtIn @test=meta4/report1 @stderr:"Successfully ran" @-- $newCmdt1 @report=sub4
-$cmdtIn @test=meta4/report2 @stderr:"Successfully ran" @-- $newCmdt1 @report=sub4
-$cmdtIn @test=meta4/report_other_token @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=sub4 @token=$tk0
+$cmdtIn $forkCfg @init=exported_token_alt #@ignore
+$cmdtIn @test=exported_token_alt/init @-- $newCmdt1 @init=sub4
+$cmdtIn @test=exported_token_alt/test1 @stderr:"PASSED" @stderr:"#01" @-- $newCmdt1 @test=sub4/ true
+$cmdtIn @test=exported_token_alt/test2 @stderr:"PASSED" @stderr:"#02" @-- $newCmdt1 @test=sub4/ true
+$cmdtIn @test=exported_token_alt/report1 @stderr:"Successfully ran" @-- $newCmdt1 @report=sub4
+$cmdtIn @test=exported_token_alt/report2 @stderr:"Successfully ran" @-- $newCmdt1 @report=sub4
+$cmdtIn @test=exported_token_alt/global_report_all @stderr:"main" @stderr:"sub4" @-- $newCmdt1 @report @all
+$cmdtIn @test=exported_token_alt/report_other_token @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=sub4 @token=$tk0
 $cmdt @report
 
 export -n __CMDT_TOKEN
