@@ -146,31 +146,31 @@ func TestNextSeq(t *testing.T) {
 
 	s, err = dao.NextSeq("foo")
 	require.NoError(t, err)
-	assert.Equal(t, uint16(1), s)
+	assert.Equal(t, uint(1), s)
 
 	s, err = dao.NextSeq("foo")
 	require.NoError(t, err)
-	assert.Equal(t, uint16(2), s)
+	assert.Equal(t, uint(2), s)
 
 	s, err = dao.NextSeq("foo")
 	require.NoError(t, err)
-	assert.Equal(t, uint16(3), s)
+	assert.Equal(t, uint(3), s)
 
 	s, err = dao.NextSeq("bar")
 	require.NoError(t, err)
-	assert.Equal(t, uint16(1), s)
+	assert.Equal(t, uint(1), s)
 
 	s, err = dao.NextSeq("foo")
 	require.NoError(t, err)
-	assert.Equal(t, uint16(4), s)
+	assert.Equal(t, uint(4), s)
 
 	s, err = dao.NextSeq("bar")
 	require.NoError(t, err)
-	assert.Equal(t, uint16(2), s)
+	assert.Equal(t, uint(2), s)
 
 	s, err = dao.NextSeq("baz")
 	require.NoError(t, err)
-	assert.Equal(t, uint16(1), s)
+	assert.Equal(t, uint(1), s)
 }
 
 func TestNextSeq_ReinitDao(t *testing.T) {
@@ -187,13 +187,13 @@ func TestNextSeq_ReinitDao(t *testing.T) {
 
 	s, err = dao.NextSeq("foo")
 	require.NoError(t, err)
-	assert.Equal(t, uint16(1), s)
+	assert.Equal(t, uint(1), s)
 
 	dao = initSuiteDao(t, dirpath)
 
 	s, err = dao.NextSeq("foo")
 	require.NoError(t, err)
-	assert.Equal(t, uint16(2), s)
+	assert.Equal(t, uint(2), s)
 }
 
 func TestUpdateEndTime(t *testing.T) {

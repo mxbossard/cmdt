@@ -405,7 +405,6 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		defer globalCtx.Close()
 
 		ProcessGlobalError(globalCtx, parseArgsErrors.Return())
-		Dpl.SetVerbose(globalCtx.Config.Verbose.Get())
 		logger.Trace("Forged context", "ctx", globalCtx)
 		logger.Info("Processing global action", "token", token)
 		Dpl.Quiet(globalCtx.Config.Quiet.Is(true))
@@ -424,7 +423,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		ProcessSuiteError(suiteCtx, err)
 		defer suiteCtx.Close()
 
-		if suiteCtx.Config.ForkCount.GetOr(1) > 1 {
+		if suiteCtx.Config.ForkCount.IsPresent() {
 			// Forked suite MUST be async
 			suiteCtx.Config.Async.Set(true)
 		}
@@ -447,7 +446,6 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		}
 
 		ProcessSuiteError(suiteCtx, parseArgsErrors.Return())
-		Dpl.SetVerbose(suiteCtx.Config.Verbose.Get())
 		logger.Trace("Forged context", "ctx", suiteCtx)
 		logger.Info("Processing init action", "token", token, "suite", testSuite, "async", suiteCtx.Config.Async.Get())
 		Dpl.Quiet(suiteCtx.Config.Quiet.Is(true))
@@ -476,7 +474,6 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			globalCtx := facade.NewGlobalContext(token, isolation, inputConfig, false)
 			defer globalCtx.Close()
 			globalCfg := globalCtx.Config
-			Dpl.SetVerbose(globalCfg.Verbose.Get())
 			rep := facade.CachedRepo(token, isolation)
 			defer rep.PoolClose()
 			reportAll := globalCfg.ReportAll.GetOr(model.DefaultReportAll)
@@ -612,8 +609,6 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			ProcessSuiteError(suiteCtx, parseArgsErrors.Return())
 			defer suiteCtx.Close()
 
-			Dpl.SetVerbose(suiteCtx.Config.Verbose.Get())
-
 			def := model.ReportDefinition{
 				Token:     token,
 				Isolation: isolation,
@@ -713,7 +708,6 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		//ProcessTestError(testCtx, err)
 
 		testCtx.IncrementTestCount()
-		Dpl.SetVerbose(testCtx.Config.Verbose.Get())
 		seq := testCtx.Seq
 
 		testCfg := testCtx.Config

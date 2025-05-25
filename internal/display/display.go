@@ -48,7 +48,6 @@ type Displayer interface {
 
 	Flush() error
 	Quiet(bool)
-	SetVerbose(model.VerboseLevel)
 }
 
 type basicDisplay struct {
@@ -57,8 +56,8 @@ type basicDisplay struct {
 	clearAnsiFormatter inoutz.Formatter
 	outFormatter       inoutz.Formatter
 	errFormatter       inoutz.Formatter
-	verbose            model.VerboseLevel
-	openedTest         *basicTestDisplayer
+	//verbose            model.VerboseLevel
+	openedTest *basicTestDisplayer
 }
 
 func (d basicDisplay) Global(ctx facade.GlobalContext) {
@@ -291,17 +290,12 @@ func (d *basicDisplay) Quiet(quiet bool) {
 	}
 }
 
-func (d *basicDisplay) SetVerbose(level model.VerboseLevel) {
-	d.verbose = level
-}
-
 func New() *basicDisplay {
 	d := &basicDisplay{
 		notQuietPrinter:    printz.NewStandard(),
 		clearAnsiFormatter: inoutz.AnsiFormatter{AnsiFormat: anzi.Reset},
 		outFormatter:       inoutz.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", TestColor, ResetColor)},
 		errFormatter:       inoutz.PrefixFormatter{Prefix: fmt.Sprintf("%serr%s>", ReportColor, ResetColor)},
-		verbose:            model.DefaultVerboseLevel,
 	}
 	d.printer = d.notQuietPrinter
 	return d

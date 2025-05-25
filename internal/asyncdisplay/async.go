@@ -44,9 +44,9 @@ func testDisplayerKey(ctx facade.TestContext) string {
 type AsyncDisplay struct {
 	*sync.Mutex
 
-	verbose model.VerboseLevel
-	quiet   bool
-	tmpDir  string
+	//verbose model.VerboseLevel
+	quiet  bool
+	tmpDir string
 
 	screen zcreen.Sink
 	tailer zcreen.Tailer
@@ -374,10 +374,6 @@ func (d *AsyncDisplay) Quiet(quiet bool) {
 	d.quiet = quiet
 }
 
-func (d *AsyncDisplay) SetVerbose(level model.VerboseLevel) {
-	d.verbose = level
-}
-
 /** Launch a goroutine to flush the display. */
 func (d *AsyncDisplay) AsyncFlush(suite string, timeout time.Duration) {
 	go func() {
@@ -459,7 +455,6 @@ func New(tmpDir string, init bool, outs printz.Outputs) *AsyncDisplay {
 		tmpDir:         zcreenTmpDir,
 		outFormatter:   inoutz.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", display.TestColor, display.ResetColor)},
 		errFormatter:   inoutz.PrefixFormatter{Prefix: fmt.Sprintf("%serr%s>", display.ReportColor, display.ResetColor)},
-		verbose:        model.DefaultVerboseLevel,
 		quiet:          false,
 		testDisplayers: openedTests,
 	}
@@ -484,7 +479,6 @@ func NewWaitingTailer(tmpDir string, init bool, outs printz.Outputs) *AsyncDispl
 		tmpDir:         zcreenTmpDir,
 		outFormatter:   inoutz.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", display.TestColor, display.ResetColor)},
 		errFormatter:   inoutz.PrefixFormatter{Prefix: fmt.Sprintf("%serr%s>", display.ReportColor, display.ResetColor)},
-		verbose:        model.DefaultVerboseLevel,
 		quiet:          false,
 		testDisplayers: openedTests,
 	}

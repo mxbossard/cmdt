@@ -12,6 +12,7 @@ import (
 	"github.com/mxbossard/utilz/anzi"
 	"github.com/mxbossard/utilz/cmdz"
 	"github.com/mxbossard/utilz/printz"
+	"github.com/mxbossard/utilz/utilz"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +20,6 @@ import (
 func TestDisplay_Stdout(t *testing.T) {
 	//t.Skip()
 	d := New()
-	d.SetVerbose(model.SHOW_ALL)
 
 	// Replace notQuietPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
@@ -33,7 +33,7 @@ func TestDisplay_Stdout(t *testing.T) {
 	// Writing async
 	outMsg := "stdout"
 	errMsg := "stderr"
-	ctx, err := facade.NewTestContext("token", "isol", "suite", 12, model.Config{}, uint32(42), false)
+	ctx, err := facade.NewTestContext("token", "isol", "suite", 12, model.Config{Verbose: utilz.OptionalOf(model.SHOW_ALL)}, uint32(42), false)
 	require.NoError(t, err)
 	ctx.CmdExec = cmdz.Cmd("true")
 	d.OpenTest(ctx)
@@ -92,7 +92,6 @@ func TestDisplay_Errors(t *testing.T) {
 func TestDisplay_TestTitle(t *testing.T) {
 	//t.Skip()
 	d := New()
-	d.SetVerbose(model.SHOW_ALL)
 
 	// Replace notQuietPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
@@ -103,7 +102,7 @@ func TestDisplay_TestTitle(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	ctx, err := facade.NewTestContext("token", "isol", "suite", 2, model.Config{}, 42, false)
+	ctx, err := facade.NewTestContext("token", "isol", "suite", 2, model.Config{Verbose: utilz.OptionalOf(model.SHOW_ALL)}, 42, false)
 	require.NoError(t, err)
 	ctx.CmdExec = cmdz.Cmd("true")
 
@@ -121,7 +120,6 @@ func TestDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 	token := "foo"
 	isol := "bar3"
 	d := New()
-	d.SetVerbose(model.SHOW_ALL)
 
 	// Replace notQuietPrinter std outputs by 2 string builders
 	outW := &strings.Builder{}
@@ -162,9 +160,7 @@ func TestDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 	// 322- Test suite3 #2 err>
 	// 370- Report suite3
 
-	d.SetVerbose(model.SHOW_ALL)
-
-	gctx := facade.NewGlobalContext(token, isol, model.Config{}, false)
+	gctx := facade.NewGlobalContext(token, isol, model.Config{Verbose: utilz.OptionalOf(model.SHOW_ALL)}, false)
 	d.Global(gctx)
 
 	DisplaySuite(d, token, isol, 1) // 100- Init suite1
