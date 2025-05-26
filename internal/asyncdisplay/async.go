@@ -44,7 +44,6 @@ func testDisplayerKey(ctx facade.TestContext) string {
 type AsyncDisplay struct {
 	*sync.Mutex
 
-	//verbose model.VerboseLevel
 	quiet  bool
 	tmpDir string
 
@@ -86,7 +85,6 @@ func (d AsyncDisplay) OpenSuite(ctx facade.SuiteContext) {
 	suite := ctx.Config.TestSuite.Get()
 	logger.Info("Opening suite", "suite", suite)
 	session := d.screen.Session(suite, 0)
-	//fmt.Printf("\n<<>> opened session: %s\n", session)
 	err = session.Start(ctx.Config.SuiteTimeout.Get())
 	if err != nil {
 		panic(err)
@@ -214,16 +212,6 @@ func (d AsyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 		if err != nil {
 			panic(err)
 		}
-		//fmt.Printf("flushed end suite printer & session\n")
-		// err = session.ClosePrinter(SuiteEndPrinterName)
-		// if err != nil {
-		// 	panic(err)
-		// }
-
-		// err = session.End()
-		// if err != nil {
-		// 	panic(err)
-		// }
 	}()
 
 	//fmt.Printf("reporting suite ...\n")

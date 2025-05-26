@@ -261,7 +261,7 @@ $cmdtIn @test=timeout_async/timeout @stderr= @-- $newCmdt1 @test=timeout_async_s
 $cmdtIn @test=timeout_async/report $noPanic @exit=1 @stderr:"PASSED" @stderr!:"IGNORED" @stderr:"TIMEOUT" @stderr:"1 success" @stderr:"1 timeout" @-- $newCmdt1 @report=timeout_async_sub
 
 
-# Test a double suit init
+# Test a double suite init
 $cmdtIn @init=double_suite_init_sync
 $cmdtIn @test=double_suite_init_sync/open1 @-- $newCmdt1 @init=double_suite_init_sync_sub @async=false @verbose=5 
 $cmdtIn @test=double_suite_init_sync/open2_without_test @-- $newCmdt1 @init=double_suite_init_sync_sub @async=false @verbose=5 
@@ -278,16 +278,15 @@ $cmdtIn @test=double_suite_init_async/open3_after_test @fail @stderr:"$cannotRei
 
 ## Display verbosity tests
 # SPEC:
-# verbose=0: display nothing during testing
+# verbose=0: display reports only (no test displayed)
 # verbose=1: display only not successing tests
 # verbose=2: display not successing tests outs
 # verbose=3: display successing tests
 # verbose=4: display successing test outs
 # verbose=5: display all
-# reporting is not affected by verbosity
 #
 $cmdtIn @init=verbosity_sync
-$cmdtIn @test=verbosity_sync/open @stderr= @-- $newCmdt0 @init=verbosity_sync_sub @verbose=0 @async=false @failuresLimit=-1
+$cmdtIn @test=verbosity_sync/open @stderr= @-- $newCmdt0 @init=verbosity_sync_sub @failuresLimit=-1 @verbose=0 @async=false
 $cmdtIn @test=verbosity_sync/verbose0_success @stderr= @-- $newCmdt0 @test=verbosity_sync_sub/verbose0_success @verbose=0 echo foo0_success
 $cmdtIn @test=verbosity_sync/verbose0_failure @stderr= @-- $newCmdt0 @test=verbosity_sync_sub/verbose0_failure @verbose=0 sh -c "echo foo0_failure; exit 1"
 $cmdtIn @test=verbosity_sync/verbose1_success @stderr= @-- $newCmdt0 @test=verbosity_sync_sub/verbose1_success @verbose=1 echo foo1_success
@@ -333,8 +332,8 @@ $cmdtIn @test=verbosity_sync/suite_verbose5_failure @stderr:"FAILED" @stderr:">b
 $cmdtIn @test=verbosity_sync/suite_verbose5_report @fail @stderr:suite_verbose5_sub @-- $newCmdt1 @report=suite_verbose5_sub
 
 
-$cmdtIn @init=verbosity_async
-$cmdtIn @test=verbosity_async/open @stderr= @-- $newCmdt0 @init=verbosity_async_sub @async=true @verbose=0
+$cmdtIn @init=verbosity_async @failuresLimit=-1
+$cmdtIn @test=verbosity_async/open @stderr= @-- $newCmdt0 @init=verbosity_async_sub @failuresLimit=-1 @async=true @fork=1 @verbose=0
 $cmdtIn @test=verbosity_async/verbose0_success @stderr= @-- $newCmdt0 @test=verbosity_async_sub/verbose0_success @verbose=0 echo foo0_success
 $cmdtIn @test=verbosity_async/verbose0_failure @stderr= @-- $newCmdt0 @test=verbosity_async_sub/verbose0_failure @verbose=0 sh -c "echo foo0_failure; exit 1"
 $cmdtIn @test=verbosity_async/verbose1_success @stderr= @-- $newCmdt0 @test=verbosity_async_sub/verbose1_success @verbose=1 echo foo1_success
@@ -347,7 +346,7 @@ $cmdtIn @test=verbosity_async/verbose4_success @stderr= @-- $newCmdt0 @test=verb
 $cmdtIn @test=verbosity_async/verbose4_failure @stderr= @-- $newCmdt0 @test=verbosity_async_sub/verbose4_failure @verbose=4 sh -c "echo foo4_failure; exit 1"
 $cmdtIn @test=verbosity_async/verbose5_success @stderr= @-- $newCmdt0 @test=verbosity_async_sub/verbose5_success @verbose=5 echo foo5_success
 $cmdtIn @test=verbosity_async/verbose5_failure @stderr= @-- $newCmdt0 @test=verbosity_async_sub/verbose5_failure @verbose=5 sh -c "echo foo5_failure; exit 1"
-$cmdtIn @test=verbosity_async/report @fail @stderr:verbosity_async_sub @stderr!:verbose0 @stderr!:verbose1_success @stderr:verbose1_failure @stderr!:verbose2_success @stderr:verbose2_failure @stderr!:verbose3_success @stderr:verbose3_failure @stderr:verbose4_success @stderr:verbose4_failure @stderr:verbose5_success @stderr:verbose5_failure @-- $newCmdt0 @report=verbosity_async_sub
+$cmdtIn @test=verbosity_async/report @fail @stderr:verbosity_async_sub @stderr!:verbose0 @stderr!:">foo0" @stderr!:verbose1_success @stderr:verbose1_failure @stderr!:">foo1" @stderr!:verbose2_success @stderr!:">foo2_succ" @stderr:verbose2_failure @stderr:">foo2_fail" @stderr:verbose3_success @stderr!:">foo3_succ" @stderr:verbose3_failure @stderr:">foo3_fail" @stderr:verbose4_success @stderr:">foo4_succ" @stderr:verbose4_failure @stderr:">foo4_fail" @stderr:verbose5_success @stderr:">foo5_succ" @stderr:verbose5_failure @stderr:">foo5_fail" @-- $newCmdt0 @report=verbosity_async_sub
 
 $cmdtIn @test=verbosity_async/suite_verbose0_open @stderr= @-- $newCmdt0 @init=async_suite_verbose0_sub @async=true @verbose=0
 $cmdtIn @test=verbosity_async/suite_verbose0_success @stderr= @-- $newCmdt0 @test=async_suite_verbose0_sub/success echo bar0_success
@@ -377,8 +376,7 @@ $cmdtIn @test=verbosity_async/suite_verbose4_report @fail @stderr:suite_verbose4
 $cmdtIn @test=verbosity_async/suite_verbose5_open @stderr= @-- $newCmdt0 @init=async_suite_verbose5_sub @async=true @verbose=5
 $cmdtIn @test=verbosity_async/suite_verbose5_success @stderr= @-- $newCmdt0 @test=async_suite_verbose5_sub/success echo bar5_success
 $cmdtIn @test=verbosity_async/suite_verbose5_failure @stderr= @-- $newCmdt0 @test=async_suite_verbose5_sub/failure sh -c "echo bar5_failure; exit 1"
-$cmdtIn @test=verbosity_async/suite_verbose5_report @fail @stderr:suite_verbose5_sub @stderr:PASSED @stderr!:">bar5_succ" @stderr:FAILED @stderr:">bar5_fail" @-- $newCmdt1 @report=async_suite_verbose5_sub
-
+$cmdtIn @test=verbosity_async/suite_verbose5_report @fail @stderr:suite_verbose5_sub @stderr:PASSED @stderr:">bar5_succ" @stderr:FAILED @stderr:">bar5_fail" @-- $newCmdt1 @report=async_suite_verbose5_sub
 
 
 ## Flow test

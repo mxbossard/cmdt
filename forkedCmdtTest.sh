@@ -4,7 +4,7 @@ scriptDir=$( dirname $( readlink -f $0 ) )
 
 # Use last cmdt bin built
 export CMDT_BIN="$scriptDir/bin/cmdt"
-export CMDT_FORK_CFG="@fork=2"
+export CMDT_FORK_CFG="@fork=1"
 
-. $scriptDir/cmdtTest.sh
+. $scriptDir/cmdtTest.sh "$@"
 

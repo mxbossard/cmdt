@@ -202,12 +202,8 @@ func performTest(testDef model.TestDefinition, ctx facade.TestContext) (exitCode
 	logger.Debug("Performing test")
 	exitCode = 1
 	cfg := testDef.Config
-	// ctx, err := facade.NewTestContext2(testDef)
-	// ProcessTestError(ctx, err)
 	seq := testDef.Seq
-
 	td := Dpl.OpenTest(ctx)
-	//defer td.Close()
 	defer Dpl.CloseTest(ctx)
 	td.Title()
 
@@ -419,24 +415,21 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 
 		exists, reported, err := rep.SuiteStatus(testSuite)
 
-		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig, false)
-		ProcessSuiteError(suiteCtx, err)
-		defer suiteCtx.Close()
-
-		if !suiteCtx.Config.Async.IsSet() {
-			if suiteCtx.Config.ForkCount.IsSet() {
-				if suiteCtx.Config.ForkCount.Is(0) {
-					suiteCtx.Config.Async.Set(false)
+		// If @fork is present but not @async => Add @async
+		if !inputConfig.Async.IsSet() {
+			if inputConfig.ForkCount.IsSet() {
+				if inputConfig.ForkCount.Is(0) {
+					inputConfig.Async.Set(false)
 				} else {
 					// Forked suite MUST be async
-					suiteCtx.Config.Async.Set(true)
+					inputConfig.Async.Set(true)
 				}
 			}
 		}
-		//  else if suiteCtx.Config.Async.Is(true) {
-		// 	// If async but no fork config set default fork config
-		// 	suiteCtx.Config.ForkCount.Set(model.DefaultForkCount)
-		// }
+
+		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, action, inputConfig, false)
+		ProcessSuiteError(suiteCtx, err)
+		defer suiteCtx.Close()
 
 		// Store ignore at suite level
 		suiteCtx.Config.IgnoreSuite = suiteCtx.Config.Ignore
@@ -450,7 +443,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 		if exists {
 			n := rep.TestCount(testSuite)
 			if n > 0 && !reported {
-				err = fmt.Errorf("cannot erase test suite: [%s] which contains %d test(s) not reported yet", testSuite, n)
+				err = fmt.Errorf("cannot erase test suite: [%s] (isol: %s) which contains %d test(s) not reported yet", testSuite, isolation, n)
 				ProcessSuiteError(suiteCtx, err)
 			}
 		}

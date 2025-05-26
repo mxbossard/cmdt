@@ -503,16 +503,16 @@ func (c *TestContext) initExecuter(ppid uint32) (err error) {
 func (c TestContext) ConfigMocking() (err error) {
 	cfg := c.Config
 	cmd := c.CmdExec
-	// Mocking config
 	currentPath := os.Getenv("PATH")
-	var mockDir string
-	mockDir, err = c.MockDirectoryPath(c.Seq)
-	if err != nil {
-		return
-	}
 	//logger.Warn("configuring mocking", "dir", mockDir, "count", len(cfg.Mocks)+len(cfg.RootMocks))
 
 	if len(cfg.Mocks)+len(cfg.RootMocks) > 0 {
+		// Mocking config
+		var mockDir string
+		mockDir, err = c.MockDirectoryPath(c.Seq)
+		if err != nil {
+			return
+		}
 		// Put mockDir in PATH
 		err = mock.ProcessMocking(mockDir, cfg.RootMocks, cfg.Mocks)
 		if err != nil {

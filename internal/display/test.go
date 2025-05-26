@@ -57,7 +57,9 @@ type basicTestDisplayer struct {
 }
 
 func (d *basicTestDisplayer) title(ctx facade.TestContext) {
-	if ctx.Config.Verbose.Get() == model.SHOW_REPORTS_ONLY {
+	if ctx.Config.Verbose.Get() <= model.SHOW_REPORTS_ONLY {
+		// FIXME: BUG: if nothing is printed, zcreen will never flush the printer !
+		d.printer.Errf("")
 		return
 	}
 	defer d.flush()
@@ -81,6 +83,9 @@ func (d *basicTestDisplayer) title(ctx facade.TestContext) {
 
 	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
 		d.printer.ColoredErrf(TestColor, title)
+	} else {
+		// FIXME: BUG: if nothing is printed, zcreen will never flush the printer !
+		d.printer.Errf("")
 	}
 
 	/*
@@ -99,7 +104,7 @@ func (d *basicTestDisplayer) Title() {
 }
 
 func (d *basicTestDisplayer) Outcome(outcome model.TestOutcome) {
-	if d.ctx.Config.Verbose.Get() == model.SHOW_REPORTS_ONLY {
+	if d.ctx.Config.Verbose.Get() <= model.SHOW_REPORTS_ONLY {
 		return
 	}
 	defer func() {

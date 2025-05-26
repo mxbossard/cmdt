@@ -60,6 +60,9 @@ $cmdtIn @test=isolation/"command before rule stop" @fail @stderr:"before rule pa
 $cmdtIn @test=isolation/"rule value splited on 2 args" @stderr:"PASSED" @-- $newCmdt1 @stdout:foo bar @-- echo foo bar
 $cmdtIn @test=isolation/"report without token" @exit=1 @stderr:"3 success" @stderr!:"failure" @stderr:"1 error" @-- $newCmdt0 @report=main
 
+# Must wait isolation completion
+$cmdtIn @report
+
 >&2 echo "## Meta2 test printed token"
 #tk0=$( $cmdt @init @printToken 2> /dev/null )
 tk0=$( $newCmdt0 @init @printToken )
@@ -74,7 +77,7 @@ $cmdtIn @test=printed_token/init2 @-- $newCmdt1 @token=$tk0 @init=master @verbos
 $cmdtIn @test=printed_token/"with token 3" @stderr:PASSED @stderr:"#01" @-- $newCmdt1 @token=$tk0 @test=master/printed_token_sub2_test3 true
 $cmdtIn @test=printed_token/"with token 4" @stderr:PASSED @stderr:"#02" @-- $newCmdt1 @token=$tk0 @test=master/printed_token_sub2_test4 true
 $cmdtIn @test=printed_token/"global report with token" @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @stderr!:"#01" @-- $newCmdt1 @token=$tk0 @report
-$cmdt @report
+$cmdtIn @report
 
 >&2 echo "## Test exported token"
 eval $( $newCmdt0 @init @exportToken )
@@ -192,6 +195,8 @@ $cmdtIn @test=re-report-v2/test3b @stderr:"#02" @-- $newCmdt1 @test=re-report-v2
 $cmdtIn @test=re-report-v2/report-global3c @stderr:"re-report-v2_sub3" @stderr:"Session duration" @stderr!:"testTrue" @stderr:"2 success" @-- $newCmdt1 @report
 $cmdtIn @test=re-report-v2/report-global3d @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report
 
+# Must wait all tests reported before continuing
+$cmdtIn @report
 
 >&2 echo "## Test usage"
 $cmdtIn $forkCfg @init=meta
@@ -348,6 +353,8 @@ $cmdtIn @test=suite_config/ @-- $newCmdt1 @report=suite_config_quiet
 
 >&2 echo "## Test global config"
 
+# Need to wait all tests reported before continuing
+$cmdtIn @report
 
 >&2 echo "## Test assertions"
 $cmdtIn $forkCfg @init=assertion

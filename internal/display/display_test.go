@@ -36,20 +36,20 @@ func TestDisplay_Stdout(t *testing.T) {
 	ctx, err := facade.NewTestContext("token", "isol", "suite", 12, model.Config{Verbose: utilz.OptionalOf(model.SHOW_ALL)}, uint32(42), false)
 	require.NoError(t, err)
 	ctx.CmdExec = cmdz.Cmd("true")
-	d.OpenTest(ctx)
-	d.TestStdout(ctx, "beforeOut\n")
-	d.TestStderr(ctx, "beforeErr\n")
+	td := d.OpenTest(ctx)
+	td.Stdout("beforeOut\n")
+	td.Stderr("beforeErr\n")
 	// Before stdout & stderr should be printed
 	assert.Equal(t, "beforeOut\n", anzi.Unformat(outW.String()))
 	assert.Equal(t, "beforeErr\n", anzi.Unformat(errW.String()))
 
-	d.TestTitle(ctx)
+	td.Title()
 	// Title should be printed
 	assert.Equal(t, "beforeOut\n", anzi.Unformat(outW.String()))
 	assert.Regexp(t, `beforeErr\n\[\d+\] Test \[suite\]\(on host\)>true #12...\s*$`, anzi.Unformat(errW.String()))
 
-	d.TestStdout(ctx, outMsg)
-	d.TestStderr(ctx, errMsg)
+	td.Stdout(outMsg)
+	td.Stderr(errMsg)
 	// stdout & stderr should not be printed until outcome printed
 	assert.Equal(t, "beforeOut\n", anzi.Unformat(outW.String()))
 	assert.Regexp(t, `beforeErr\n\[\d+\] Test \[suite\]\(on host\)>true #12...\s*$`, anzi.Unformat(errW.String()))
@@ -59,7 +59,7 @@ func TestDisplay_Stdout(t *testing.T) {
 		Duration:      3 * time.Millisecond,
 		Outcome:       model.FAILED,
 	}
-	d.TestOutcome(ctx, to)
+	td.Outcome(to)
 
 	// assert.Empty(t, outW.String())
 	// assert.Empty(t, errW.String())
@@ -106,8 +106,8 @@ func TestDisplay_TestTitle(t *testing.T) {
 	require.NoError(t, err)
 	ctx.CmdExec = cmdz.Cmd("true")
 
-	d.OpenTest(ctx)
-	d.TestTitle(ctx)
+	td := d.OpenTest(ctx)
+	td.Title()
 
 	assert.Empty(t, outW.String())
 	expectedTitlePattern := `\[\d+\] Test \[suite\]\(on host\)>true #02...\s*`

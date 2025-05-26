@@ -106,22 +106,6 @@ func (d *basicDisplay) OpenTest(ctx facade.TestContext) TestDisplayer {
 	return td
 }
 
-func (d basicDisplay) TestTitle(ctx facade.TestContext) {
-	d.openedTest.Title()
-}
-
-func (d basicDisplay) TestOutcome(ctx facade.TestContext, outcome model.TestOutcome) {
-	d.openedTest.Outcome(outcome)
-}
-
-func (d basicDisplay) TestStdout(ctx facade.TestContext, s string) {
-	d.openedTest.Stdout(s)
-}
-
-func (d basicDisplay) TestStderr(ctx facade.TestContext, s string) {
-	d.openedTest.Stderr(s)
-}
-
 func (d *basicDisplay) CloseTest(ctx facade.TestContext) {
 	if d.openedTest == nil {
 		panic("no test currently open")
