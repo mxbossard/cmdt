@@ -43,7 +43,7 @@ $cmdt1 @test=perf/sleep_0.1 sleep 0.1
 $cmdt1 @report
 
 
-testSleepTime="0.02"
+testSleepTime="0.01"
 
 >&2 echo "## test @async=false @fork=1"
 $cmdt1 @init=fork1_sync @verbose=3 @async=false @fork=1

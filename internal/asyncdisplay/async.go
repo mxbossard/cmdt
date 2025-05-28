@@ -84,7 +84,10 @@ func (d AsyncDisplay) OpenSuite(ctx facade.SuiteContext) {
 
 	suite := ctx.Config.TestSuite.Get()
 	logger.Info("Opening suite", "suite", suite)
-	session := d.screen.Session(suite, 0)
+	session, err := d.screen.Session(suite, 0)
+	if err != nil {
+		panic(err)
+	}
 	err = session.Start(ctx.Config.SuiteTimeout.Get())
 	if err != nil {
 		panic(err)
@@ -97,8 +100,11 @@ func (d AsyncDisplay) OpenSuite(ctx facade.SuiteContext) {
 
 func (d AsyncDisplay) CloseSuite(ctx facade.SuiteContext) {
 	suite := ctx.Config.TestSuite.Get()
-	session := d.screen.Session(suite, 0)
-	err := session.End(fmt.Sprintf("closing suite: %s", suite))
+	session, err := d.screen.Session(suite, 0)
+	if err != nil {
+		panic(err)
+	}
+	err = session.End(fmt.Sprintf("closing suite: %s", suite))
 	if err != nil {
 		panic(err)
 	}
@@ -121,14 +127,20 @@ func (d AsyncDisplay) ClearSuite(name string) {
 
 func (d AsyncDisplay) SuiteTitle(ctx facade.SuiteContext) {
 	suite := ctx.Config.TestSuite.Get()
-	session := d.screen.Session(suite, 0)
+	session, err := d.screen.Session(suite, 0)
+	if err != nil {
+		panic(err)
+	}
 	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
-		printer := session.Printer(SuiteBeginPrinterName, 0)
+		printer, err := session.Printer(SuiteBeginPrinterName, 0)
+		if err != nil {
+			panic(err)
+		}
 		printer.ColoredErrf(display.MessageColor, "## Test suite [%s] (token: %s)\n", suite, ctx.Token)
 		printer.Flush()
 		session.ClosePrinter(SuiteBeginPrinterName, "low verbosity")
 	}
-	err := session.Flush()
+	err = session.Flush()
 	if err != nil {
 		panic(err)
 	}
@@ -146,8 +158,14 @@ func (d AsyncDisplay) OpenTest(ctx facade.TestContext) display.TestDisplayer {
 	} else {
 		id := ctx.TestId()
 		seq := ctx.Seq
-		session := d.screen.Session(cfg.TestSuite.Get(), 0)
-		printer := session.Printer(id, int(seq))
+		session, err := d.screen.Session(cfg.TestSuite.Get(), 0)
+		if err != nil {
+			panic(err)
+		}
+		printer, err := session.Printer(id, int(seq))
+		if err != nil {
+			panic(err)
+		}
 		flusher := func() error {
 			return session.Flush()
 		}
@@ -174,7 +192,10 @@ func (d AsyncDisplay) CloseTest(ctx facade.TestContext) {
 
 	cfg := ctx.Config
 	suite := cfg.TestSuite.Get()
-	session := d.screen.Session(suite, 0)
+	session, err := d.screen.Session(suite, 0)
+	if err != nil {
+		panic(err)
+	}
 
 	// Close properly test display.
 	td.Close()
@@ -199,9 +220,15 @@ func (d AsyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 	// }
 
 	suite := outcome.TestSuite
-	session := d.screen.Session(suite, 0)
+	session, err := d.screen.Session(suite, 0)
+	if err != nil {
+		panic(err)
+	}
 
-	printer := session.Printer(SuiteEndPrinterName, 9999)
+	printer, err := session.Printer(SuiteEndPrinterName, 9999)
+	if err != nil {
+		panic(err)
+	}
 
 	defer func() {
 		err := printer.Flush()
@@ -305,8 +332,14 @@ func (d AsyncDisplay) TooMuchFailures(ctx facade.SuiteContext, testSuite string)
 	if ctx.Config.Verbose.Get() == model.SHOW_REPORTS_ONLY {
 		return
 	}
-	session := d.screen.Session(testSuite, 0)
-	printer := session.Printer(SuiteEndPrinterName, 9999)
+	session, err := d.screen.Session(testSuite, 0)
+	if err != nil {
+		panic(err)
+	}
+	printer, err := session.Printer(SuiteEndPrinterName, 9999)
+	if err != nil {
+		panic(err)
+	}
 	defer printer.Flush()
 	printer.ColoredErrf(display.WarningColor, "Too much failure for [%s] test suite. Stop testing.\n", testSuite)
 }
@@ -333,7 +366,10 @@ func (d AsyncDisplay) GlobalErrors(ctx facade.GlobalContext, errors ...error) {
 func (d AsyncDisplay) SuiteErrors(ctx facade.SuiteContext, errors ...error) {
 	logErrors(errors...)
 	testSuite := ctx.Config.TestSuite.Get()
-	session := d.screen.Session(testSuite, 0)
+	session, err := d.screen.Session(testSuite, 0)
+	if err != nil {
+		panic(err)
+	}
 	printer := session.NotifyPrinter()
 	defer printer.Flush()
 	for _, err := range errors {

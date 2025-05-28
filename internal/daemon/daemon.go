@@ -70,8 +70,7 @@ type daemon struct {
 	token, isolation string
 	repo             repo.Repo
 	display          *asyncdisplay.AsyncDisplay
-	//openedSuite      string
-	openedSuites []string
+	openedSuites     []string
 }
 
 func (d *daemon) run() {
@@ -86,36 +85,49 @@ func (d *daemon) run() {
 
 	for {
 		if time.Since(debugTime) > time.Second {
-			// fmt.Printf("\n<<>> Daemon is running ... \n")
 			debugTime = time.Now()
 			logger.Trace("DAEMON: running", "token", d.token, "for", time.Since(startTime))
 		}
 
-		if op, err := d.unqueue(); err != nil {
-			panic(err)
-		} else if op != nil {
+		if _, done := d.unqueueAndProcess(); done {
 			lastUnqueue = time.Now()
-			_, err := d.process(op)
-			if err != nil {
-				logger.Errorf("DAEMON ERROR: %s", err)
-				d.display.Errors(err)
-				panic(err)
-			}
 		} else {
 			// nothing to unqueue wait some period
 			duration := time.Since(lastUnqueue)
 			if duration > ExtraRunningSecs*time.Second {
 				logger.Debug("DAEMON: nothing to unqueue", "duration", duration, "token", d.token)
-				// More than ExtraRunningSecs since last unqueue
-				// fmt.Printf("\n<<>> Stopping daemon\n")
 				break
 			}
 			time.Sleep(AsyncPollingSleep)
 			continue
 		}
 	}
-	// fmt.Printf("\n<<>> Stopping daemon\n")
 	logger.Warn("DAEMON: stopping ...", "token", d.token, "after", time.Since(startTime))
+}
+
+// Process Operation and trap panic to continue processing
+func (d *daemon) unqueueAndProcess() (op model.Operater, done bool) {
+	defer func() {
+		err := recover()
+		if err != nil {
+			logger.Error("DAEMON ERROR: trapped a panic", "error", err)
+			fmt.Printf("\n/!\\ DAEMON ERROR: trapped a panic /!\\\n%v\n", err)
+			d.display.Errors(fmt.Errorf("%s", err))
+			time.Sleep(time.Second)
+		}
+	}()
+
+	var err error
+	if op, err = d.repo.UnqueueOperation(); err != nil {
+		panic(err)
+	} else if op != nil {
+		_, err := d.process(op)
+		if err != nil {
+			panic(err)
+		}
+		done = true
+	}
+	return
 }
 
 func (d daemon) unqueue() (op model.Operater, err error) {
