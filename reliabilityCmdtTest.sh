@@ -2,6 +2,9 @@
 set -e -o pipefail
 scriptDir=$( dirname $( readlink -f $0 ) )
 
+. $scriptDir/buildCmdt.sh
+export SKIP_CMDT_BUILD=true
+
 SCRIPTS=("$scriptDir/cmdtTest.sh" "$scriptDir/asyncCmdtTest.sh" "$scriptDir/perfCmdtTest.sh")
 #SCRIPTS=("false")
 
@@ -24,10 +27,14 @@ runRandomScript() {
 	k=$(( RANDOM % ${#SCRIPTS[@]} ))
 	randomScript=${SCRIPTS[k]}
 	>&2 echo
-	>&2 echo "---------- Running script ($k): [$randomScript] (#$n started since $SECONDS sec) ... ----------"
+	>&2 echo "---------- Running script ($k): [$randomScript] [#$n] (started since $SECONDS sec) ... ----------"
+	start=$( date +%s%3N )
 	bash -e -c "$randomScript"
 	rc=$?
+	end=$( date +%s%3N )
+	d="$(( (end - start) ))"
 	>&2 echo "> RC=$rc"
+	>&2 echo "---------- Ran script ($k): [$randomScript] [#$n in $d ms] (started since $SECONDS sec) ----------"
 	n=$(( n + 1 ))
 	return $rc
 }
