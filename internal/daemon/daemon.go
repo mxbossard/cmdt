@@ -31,7 +31,7 @@ const (
 	DaemonLockFilename         = "daemon.lock"
 	DaemonPidFilename          = "daemon.pid"
 	LockWatingSecs             = 5
-	ExtraRunningSecs           = 5
+	ExtraRunningSecs           = 2
 	AsyncPollingSleep          = 1 * time.Millisecond
 	WaitAsyncReportTestTimeout = 2 * time.Second
 	daemonTryLockPeriod        = 200 * time.Microsecond

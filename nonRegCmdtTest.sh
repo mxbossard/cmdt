@@ -12,8 +12,6 @@ for script in ${SCRIPTS[@]}; do
 	if pgrep -f -a "cmdt ._daemon" | grep ""; then
 		>&2 echo "killing daemon ..."
 		pkill -f "cmdt ._daemon" || true
-		#pkill -f "cmdt ._daemon" || true
-		#pgrep -f -a "cmdt ._daemon"
 		>&2 echo
 	fi
 done
