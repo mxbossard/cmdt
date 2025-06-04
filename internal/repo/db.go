@@ -554,6 +554,14 @@ func (r DbRepo) GetDaemonPid() (int, error) {
 	return r.globalDao.GetDaemonPid()
 }
 
+func (r DbRepo) ReportActivity() (err error) {
+	return r.globalDao.ReportActivity()
+}
+
+func (r DbRepo) InactivityDuration() (time.Duration, error) {
+	return r.globalDao.InactivityDuration()
+}
+
 func newDbRepo(dirpath, isolation, token string) (r DbRepo, err error) {
 	r.dirpath = dirpath
 	r.token = token

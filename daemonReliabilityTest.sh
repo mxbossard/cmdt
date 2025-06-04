@@ -35,14 +35,16 @@ $cmdt @global @suiteTimeout=10s
 export -n __CMDT_TOKEN
 
 
+testSleepTime=0.1
+
 >&2 echo "## long tests longer than daemon inactivity max period @fork=1"
 $cmdt1 @init=long_fork1 @verbose=3 @fork=1
 $cmdt1 @test=long_fork1/sleep_2sec sleep 3
-pgrep -f "cmdt ._daemon" || true
+>&2 echo "daemon PID: $( pgrep -f "cmdt ._daemon" || true )"
 sleep 3
 $cmdt1 @test=long_fork1/sleep_0.1sec sleep 0.1
 $cmdt1 @report
-pgrep -f "cmdt ._daemon" || true
+>&2 echo "daemon PID: $( pgrep -f "cmdt ._daemon" || true )"
 
 >&2 echo "## test @fork=2"
 $cmdt1 @init=fork2 @verbose=3 @fork=2
@@ -52,7 +54,7 @@ for i in $( seq -f "%02g" 1 $testCount ); do
 done
 # Kill Daemon
 >&2 echo "Killing daemon ..."
-pkill -f "cmdt ._daemon" || true
+pkill -1 -f "cmdt ._daemon" || true
 
 $cmdt1 @report
 

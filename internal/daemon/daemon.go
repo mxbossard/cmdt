@@ -21,20 +21,22 @@ import (
 	"cmdt/internal/service"
 
 	"github.com/mxbossard/utilz/collectionz"
-	"github.com/mxbossard/utilz/filez"
 	"github.com/mxbossard/utilz/printz"
 	_ "github.com/mxbossard/utilz/zcreen"
 	"github.com/mxbossard/utilz/zlog"
 )
 
 const (
-	DaemonLockFilename         = "daemon.lock"
-	DaemonPidFilename          = "daemon.pid"
-	LockWatingSecs             = 5
-	ExtraRunningSecs           = 2
-	AsyncPollingSleep          = 1 * time.Millisecond
-	WaitAsyncReportTestTimeout = 2 * time.Second
-	daemonTryLockPeriod        = 200 * time.Microsecond
+	DaemonLockFilename           = "daemon.lock"
+	DaemonPidFilename            = "daemon.pid"
+	LockWatingSecs               = 5
+	ExtraRunningSecs             = 2
+	AsyncPollingSleep            = 1 * time.Millisecond
+	WaitAsyncReportTestTimeout   = 2 * time.Second
+	daemonTryLockPeriod          = 200 * time.Microsecond
+	daemonHeartBeatPeriod        = 100 * time.Millisecond
+	maxHeartBeatSuccessiveErrors = 5
+	maxDaemonRestart             = 3
 )
 
 var logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
@@ -78,6 +80,9 @@ func (d *daemon) run() {
 	startTime := time.Now()
 	debugTime := time.Now()
 	lastUnqueue := time.Now()
+
+	startHeartBeat(d.repo)
+	defer stopHeartBeat()
 
 	outs := printz.NewDiscardingOutputs() // Daemon shoud not write on stdouts by default
 	d.display = asyncdisplay.New(d.repo.BackingFilepath(), true, outs)
@@ -284,6 +289,7 @@ func (d *daemon) globalReport(def model.ReportDefinition) (exitCode int16, err e
 	return
 }
 
+/*
 func (d daemon) ReadPid() string {
 	pidFilepath := filepath.Join(d.repo.BackingFilepath(), DaemonPidFilename)
 	//fmt.Printf("reading PID file: %s ...", pidFilepath)
@@ -311,6 +317,7 @@ func (d daemon) ClearPid() {
 		panic(err)
 	}
 }
+*/
 
 func TakeOver() {
 	defaultLogLevel := slog.LevelDebug
@@ -363,15 +370,20 @@ func TakeOver() {
 	}
 
 	// If PID file already exists exit => already running
-	pidStr := d.ReadPid()
-	if pidStr != "" {
+	pid, err := repo.GetDaemonPid()
+	if err != nil {
+		panic(err)
+	}
+	if pid > 0 {
 		logger.Info("daemon already running")
 		fileLock.Unlock()
 		os.Exit(3)
 	}
 
-	// Write PID file
-	d.WritePid()
+	err = repo.SaveDaemonPid(os.Getpid())
+	if err != nil {
+		panic(err)
+	}
 
 	// Release file lock
 	err = fileLock.Unlock()
@@ -403,22 +415,9 @@ func TakeOver() {
 
 	logger.Info("daemon taking over")
 
-	// Register Daemon PID in DB
-	pid := os.Getpid()
-	err = repo.SaveDaemonPid(pid)
-	if err != nil {
-		panic(err)
-	}
-
 	// Run daemon
 	//fmt.Printf("\n<<>> Running new daemon ; pid: %d ; isol: %s ; token: %s\n", os.Getpid(), isolation, token)
 	d.run()
-
-	// Clear Daemon PID in DB
-	err = repo.ClearDaemonPid(pid)
-	if err != nil {
-		panic(err)
-	}
 
 	// Lock prior last unqueue
 	lockCtx, cancel = context.WithTimeout(context.Background(), LockWatingSecs*time.Second)
@@ -438,8 +437,11 @@ func TakeOver() {
 		panic(err)
 	}
 
-	// Clear PID file
-	d.ClearPid()
+	// Clear Daemon PID in DB
+	err = repo.ClearDaemonPid(pid)
+	if err != nil {
+		panic(err)
+	}
 
 	// Release file lock
 	fileLock.Unlock()

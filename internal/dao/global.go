@@ -3,6 +3,7 @@ package dao
 import (
 	"database/sql"
 	"errors"
+	"time"
 
 	"github.com/mxbossard/utilz/zqlite"
 )
@@ -22,7 +23,8 @@ type Global struct {
 func (d Global) init() (err error) {
 	_, err = d.db.Exec(`
 		CREATE TABLE IF NOT EXISTS global (
-			daemonPid INTEGER NULL
+			daemonPid INTEGER NULL,
+			activity INTEGER NULL
 		);
 	`)
 	return
@@ -54,7 +56,7 @@ func (d Global) GetDaemonPid() (pid int, err error) {
 
 	row := d.db.QueryRow(`
 		SELECT daemonPid
-		FROM global
+		FROM global;
 	`)
 	err = row.Scan(&pid)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -68,3 +70,36 @@ func (d Global) GetDaemonPid() (pid int, err error) {
 
 	return
 }
+
+func (d Global) ReportActivity() (err error) {
+	p := logger.PerfTimer()
+	defer p.End()
+
+	now := time.Now().UnixMilli()
+	_, err = d.db.Exec("UPDATE global set activity = ?;", now)
+
+	return
+}
+
+func (d Global) InactivityDuration() (period time.Duration, err error) {
+	p := logger.PerfTimer()
+	defer p.End()
+
+	var timestamp int64
+	row := d.db.QueryRow(`
+		SELECT activity
+		FROM global;
+	`)
+	err = row.Scan(&timestamp)
+	if errors.Is(err, sql.ErrNoRows) {
+		// No row found => Return pid = 0
+		err = nil
+		return
+	}
+	lastActivity := time.UnixMilli(timestamp)
+	period = time.Since(lastActivity)
+
+	return
+
+}
+

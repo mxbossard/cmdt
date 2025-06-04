@@ -588,10 +588,11 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 						return max(exitCode, asyncExitCode)
 					}
 
-					// FIXME: Waiting for zcreen tail but daemon could not be launched !
-					err = asyncDpl.TailSuppliedBlocking(asyncSuites, globalCtx.Config.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
-					ProcessGlobalError(globalCtx, err)
-					logger.Info("finished async TailAllBlocking", "opId", op.Id())
+					go func() {
+						err = asyncDpl.TailSuppliedBlocking(asyncSuites, globalCtx.Config.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
+						ProcessGlobalError(globalCtx, err)
+						logger.Info("finished async TailAllBlocking", "opId", op.Id())
+					}()
 				}
 			}
 
@@ -670,17 +671,17 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 						err = cliAfterSuiteReport(daemonToken, daemonIsol, testSuite, asyncDpl)
 						ProcessSuiteError(suiteCtx, err)
 
-						//asyncDpl.ClearSuite(suiteCtx)
 						return exitCode
 					}
 				} else {
 					exitCode = 0
 				}
 
-				// FIXME: Waiting for zcreen tail but daemon could not be launched !
-				err = asyncDpl.TailBlocking(testSuite, suiteCtx.Config.SuiteTimeout.Get())
-				ProcessSuiteError(suiteCtx, err)
-				logger.Info("finished async TailBlocking")
+				go func() {
+					err = asyncDpl.TailBlocking(testSuite, suiteCtx.Config.SuiteTimeout.Get())
+					ProcessSuiteError(suiteCtx, err)
+					logger.Info("finished async TailBlocking")
+				}()
 
 			} else {
 				logger.Info("executing report in sync", "suite", testSuite)

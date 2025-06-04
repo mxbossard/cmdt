@@ -290,6 +290,7 @@ func main() {
 	daemonToken, daemonIsol, wait := service.ProcessArgs(os.Args)
 
 	if daemonToken != "" {
+		go daemon.WatchDaemonActivity(daemonToken, daemonIsol)
 		err := daemon.LanchProcessIfNeeded(daemonToken, daemonIsol)
 		if err != nil {
 			panic(err)

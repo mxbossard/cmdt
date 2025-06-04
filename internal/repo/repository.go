@@ -101,6 +101,9 @@ type Repo interface {
 	SaveDaemonPid(pid int) (err error)
 	ClearDaemonPid(pid int) (err error)
 	GetDaemonPid() (int, error)
+
+	ReportActivity() (err error)
+	InactivityDuration() (period time.Duration, err error)
 }
 
 func New(token, isolation string) (repo DbRepo) {
