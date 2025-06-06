@@ -3,6 +3,7 @@ package dao
 import (
 	"database/sql"
 	"errors"
+	"os"
 
 	"cmdt/internal/model"
 
@@ -189,7 +190,7 @@ func (d Queue) Done(op model.Operater) (err error) {
 		msg := op.Err().Error()
 		errMsg = &msg
 	}
-	_, err = tx.Exec(`UPDATE operation_queue SET exitCode = ?, error = ? WHERE id = ?;`, op.ExitCode(), errMsg, op.Id())
+	_, err = tx.Exec(`UPDATE operation_queue SET unqueued = -1, exitCode = ?, error = ? WHERE id = ?;`, op.ExitCode(), errMsg, op.Id())
 	if err != nil {
 		return
 	}
@@ -245,8 +246,8 @@ func (d Queue) QueuedOperationsCount() (count int, err error) {
 	row := d.db.QueryRow(`
 		SELECT count(*) 
 		FROM operation_queue q
-		WHERE q.unqueued = 0;
-	`)
+		WHERE q.unqueued >= 0 AND q.unqueued <> @pid;
+	`, sql.Named("pid", os.Getpid()))
 	err = row.Scan(&count)
 	return
 }
@@ -260,8 +261,8 @@ func (d Queue) QueuedOperationsCountBySuite(suite string, tx *zql.SynchronizedTx
 	row := qr.QueryRow(`
 		SELECT count(*) 
 		FROM operation_queue q
-		WHERE q.suite = ? and q.unqueued = 0;
-	`, suite)
+		WHERE q.suite = ? and q.unqueued >= 0 AND q.unqueued <> @pid;
+	`, suite, sql.Named("pid", os.Getpid()))
 	err = row.Scan(&count)
 	return
 }
@@ -284,10 +285,10 @@ func (d Queue) NextQueuedOperation(suite string, tx *zql.SynchronizedTx) (op mod
 	row := qr.QueryRow(`
 		SELECT q.id, q.op 
 		FROM operation_queue q
-		WHERE q.suite = @suite and q.unqueued = 0 
+		WHERE q.suite = @suite and (q.unqueued >= 0 AND q.unqueued <> @pid)
 		ORDER BY q.id 
 		LIMIT 1;
-	`, sql.Named("suite", suite))
+	`, sql.Named("suite", suite), sql.Named("pid", os.Getpid()))
 	var b []byte
 	var opId uint
 	err = row.Scan(&opId, &b)
@@ -394,8 +395,8 @@ func (d Queue) UnqueueOperater() (op model.Operater, err error) {
 	}
 
 	// Remove operation
-	_, err = tx.Exec(`UPDATE operation_queue SET unqueued = 1 WHERE id = @id;`,
-		sql.Named("id", opId))
+	_, err = tx.Exec(`UPDATE operation_queue SET unqueued = @pid WHERE id = @id;`,
+		sql.Named("pid", os.Getpid()), sql.Named("id", opId))
 	if err != nil {
 		return
 	}

@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	workerInactivityTimeout      = 30 * time.Millisecond
+	workerInactivityTimeout      = 50 * time.Millisecond
 	workerSleepPeriod            = 100 * time.Microsecond
 	schedulerQueueElectionPeriod = 100 * time.Microsecond
 	schedulerMaxWorker           = 30
@@ -71,6 +71,16 @@ func QueueOperation0(op *model.Operater) (err error) {
 	}
 
 	// TODO ?
+	return
+}
+
+func WorkersCount() (n int, err error) {
+	sched, err = instance()
+	if err != nil {
+		return 0, err
+	}
+
+	n = sched.workerCount
 	return
 }
 

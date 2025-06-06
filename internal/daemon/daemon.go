@@ -27,16 +27,17 @@ import (
 )
 
 const (
-	DaemonLockFilename           = "daemon.lock"
-	DaemonPidFilename            = "daemon.pid"
-	LockWatingSecs               = 5
-	ExtraRunningSecs             = 2
-	AsyncPollingSleep            = 1 * time.Millisecond
-	WaitAsyncReportTestTimeout   = 2 * time.Second
-	daemonTryLockPeriod          = 200 * time.Microsecond
-	daemonHeartBeatPeriod        = 100 * time.Millisecond
-	maxHeartBeatSuccessiveErrors = 5
-	maxDaemonRestart             = 3
+	DaemonLockFilename         = "daemon.lock"
+	DaemonPidFilename          = "daemon.pid"
+	LockWatingSecs             = 5
+	ExtraRunningSecs           = 2
+	AsyncPollingSleep          = 1 * time.Millisecond
+	WaitAsyncReportTestTimeout = 2 * time.Second
+	daemonTryLockPeriod        = 200 * time.Microsecond
+	daemonWatcherPeriod        = 10 * time.Millisecond
+	maxWatcherSuccessiveErrors = 5
+	maxDaemonRestart           = 3
+	maxWatcherInactivityPeriod = (maxWatcherSuccessiveErrors * 2) * daemonWatcherPeriod
 )
 
 var logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
@@ -97,11 +98,17 @@ func (d *daemon) run() {
 		if _, done := d.unqueueAndProcess(); done {
 			lastUnqueue = time.Now()
 		} else {
-			// nothing to unqueue wait some period
-			duration := time.Since(lastUnqueue)
-			if duration > ExtraRunningSecs*time.Second {
-				logger.Debug("DAEMON: nothing to unqueue", "duration", duration, "token", d.token)
-				break
+			n, err := fork.WorkersCount()
+			if err != nil {
+				logger.Error("Error", "err", err)
+			}
+			if n == 0 {
+				// nothing to unqueue wait some period
+				duration := time.Since(lastUnqueue)
+				if duration > ExtraRunningSecs*time.Second {
+					logger.Debug("DAEMON: nothing to unqueue", "duration", duration, "token", d.token)
+					break
+				}
 			}
 			time.Sleep(AsyncPollingSleep)
 			continue
