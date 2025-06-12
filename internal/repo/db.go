@@ -451,6 +451,16 @@ func (r DbRepo) UnqueueOperation() (op model.Operater, err error) {
 	return
 }
 
+func (r DbRepo) NotDone(op model.Operater) (err error) {
+	if op == nil {
+		panic(fmt.Errorf("nil operation"))
+	}
+
+	err = r.queueDao.NotDone(op)
+	err = r.wrap(err)
+	return
+}
+
 func (r DbRepo) Done(op model.Operater) (err error) {
 	if op == nil {
 		return
@@ -459,6 +469,61 @@ func (r DbRepo) Done(op model.Operater) (err error) {
 	err = r.queueDao.Done(op)
 	err = r.wrap(err)
 	//logger.Warn("Unblock() unblocked", "opId", op.Id())
+	return
+}
+
+func (r DbRepo) CountGlobalNotDoneBefore(op model.Operater) (count int, err error) {
+	if op == nil {
+		panic(fmt.Errorf("nil operation"))
+	}
+
+	count, err = r.queueDao.CountGlobalNotDoneBefore(op)
+	err = r.wrap(err)
+	return
+}
+
+func (r DbRepo) CountSuiteNotDoneBefore(op model.Operater) (count int, err error) {
+	if op == nil {
+		panic(fmt.Errorf("nil operation"))
+	}
+
+	count, err = r.queueDao.CountSuiteNotDoneBefore(op)
+	err = r.wrap(err)
+	return
+}
+
+// FIXME: move wait functions outside of repo
+func (r DbRepo) WaitAllOperationsDoneBefore(op model.Operater, timeout time.Duration) (err error) {
+	start := time.Now()
+	for time.Since(start) < timeout {
+		var count int
+		count, err = r.queueDao.CountGlobalNotDoneBefore(op)
+		if count == 0 || err != nil {
+			// All operater done
+			return
+		}
+		time.Sleep(WaitingOpDoneSleepPeriodInMs * time.Millisecond)
+		logger.Trace("waiting ...", "op", op)
+	}
+	err = fmt.Errorf("WaitAllOperationsDoneBefore() for op: %s timed out after %s", op, timeout)
+	err = r.wrap(err)
+	return
+}
+
+func (r DbRepo) WaitSuiteOperationsDoneBefore(op model.Operater, timeout time.Duration) (err error) {
+	start := time.Now()
+	for time.Since(start) < timeout {
+		var count int
+		count, err = r.queueDao.CountSuiteNotDoneBefore(op)
+		if count == 0 || err != nil {
+			// All operater done
+			return
+		}
+		time.Sleep(WaitingOpDoneSleepPeriodInMs * time.Millisecond)
+		logger.Trace("waiting ...", "op", op)
+	}
+	err = fmt.Errorf("WaitSuiteOperationsDoneBefore() for op: %s timed out after %s", op, timeout)
+	err = r.wrap(err)
 	return
 }
 

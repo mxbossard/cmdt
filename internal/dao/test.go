@@ -52,6 +52,8 @@ func (d Test) init() (err error) {
 			FOREIGN KEY(suite) REFERENCES suite(name)
 		);
 
+		CREATE INDEX IF NOT EXISTS tested_suite ON tested(suite);
+		CREATE INDEX IF NOT EXISTS tested_idx ON tested(suite, seq);
 		CREATE INDEX IF NOT EXISTS tested_suite_idx ON tested(suite);
 
 		CREATE TABLE IF NOT EXISTS assertion_result (
@@ -69,6 +71,7 @@ func (d Test) init() (err error) {
 			FOREIGN KEY(suite, seq) REFERENCES tested(suite, seq)
 		);	
 
+		CREATE INDEX IF NOT EXISTS assertion_result_suite ON assertion_result(suite);
 		CREATE INDEX IF NOT EXISTS assertion_result_fk_idx ON assertion_result(suite, seq);
 	`)
 	return

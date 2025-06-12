@@ -90,7 +90,11 @@ type Repo interface {
 
 	UnqueueOperation() (op model.Operater, err error)
 
+	NotDone(op model.Operater) (err error)
 	Done(op model.Operater) (err error)
+
+	WaitAllOperationsDoneBefore(op model.Operater, timeout time.Duration) (err error)
+	WaitSuiteOperationsDoneBefore(op model.Operater, timeout time.Duration) (err error)
 
 	WaitOperationDone(op model.Operater, timeout time.Duration) (exitCode int16, opErr, err error)
 

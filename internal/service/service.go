@@ -751,7 +751,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 
 			// Delegate test processing to daemon
 			logger.Info("executing test async (queueing test)", "suite", testSuite, "seq", seq)
-			testOp := model.TestOperation(testSuite, seq, true, testDef) // FIXME should not block if test can be run simultaneously
+			testOp := model.TestOperation(testSuite, seq, false, testDef) // FIXME should not block if test can be run simultaneously
 			err = testCtx.Repo.QueueOperation(&testOp)
 			ProcessTestError(testCtx, err)
 

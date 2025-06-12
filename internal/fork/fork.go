@@ -48,7 +48,7 @@ const (
 - Do not queue async report for simplicity sake => report always in sync
 */
 
-func QueueTestDef(testDef model.TestDefinition, op *model.TestOp) (err error) {
+func QueueTestDef(testDef model.TestDefinition, op *model.TestOp, onDone func()) (err error) {
 	sched, err = instance()
 	if err != nil {
 		return err
@@ -59,6 +59,7 @@ func QueueTestDef(testDef model.TestDefinition, op *model.TestOp) (err error) {
 	work := func() {
 		exitCode := service.ProcessTestDef(testDef, true)
 		op.SetExitCode(uint16(exitCode))
+		onDone()
 	}
 	_, err = sched.schedule(suite, forkCount, work)
 	return

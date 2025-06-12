@@ -58,6 +58,11 @@ func (d Suite) init() (err error) {
 			async INTEGER NOT NULL DEFAULT 0,
 			ignored INTEGER NOT NULL DEFAULT 0
 		);
+		CREATE INDEX IF NOT EXISTS suite_name ON suite(name);
+		CREATE INDEX IF NOT EXISTS suite_name_async ON suite(name, async);
+		CREATE INDEX IF NOT EXISTS suite_name_outcome ON suite(name, outcome);
+		CREATE INDEX IF NOT EXISTS suite_async ON suite(async);
+		CREATE INDEX IF NOT EXISTS suite_seq ON suite(seq);
 	`)
 	count, _ := res.RowsAffected()
 	logger.Trace("init suite DAO", "rows affected", count)

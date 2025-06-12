@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime/debug"
 	"slices"
 	"strconv"
 	"time"
@@ -78,6 +79,7 @@ type daemon struct {
 
 func (d *daemon) run() {
 	logger.Warn("DAEMON: starting ...", "token", d.token, "isolation", d.isolation)
+	fmt.Printf("\n<<>> Daemon running ...\n")
 	startTime := time.Now()
 	debugTime := time.Now()
 	lastUnqueue := time.Now()
@@ -115,6 +117,7 @@ func (d *daemon) run() {
 		}
 	}
 	logger.Warn("DAEMON: stopping ...", "token", d.token, "after", time.Since(startTime))
+	fmt.Printf("\n<<>> Daemon stopped\n")
 }
 
 // Process Operation and trap panic to continue processing
@@ -124,7 +127,12 @@ func (d *daemon) unqueueAndProcess() (op model.Operater, done bool) {
 		if err != nil {
 			logger.Error("DAEMON ERROR: trapped a panic", "error", err)
 			fmt.Printf("\n/!\\ DAEMON ERROR: trapped a panic /!\\\n%v\n", err)
+			fmt.Printf("\nstack :%s\n", string(debug.Stack()))
 			d.display.Errors(fmt.Errorf("%s", err))
+			err2 := d.repo.NotDone(op)
+			if err2 != nil {
+				panic(fmt.Errorf("cannot put back on queue failed operation: %w", err2))
+			}
 			time.Sleep(time.Second)
 		}
 	}()
@@ -133,6 +141,7 @@ func (d *daemon) unqueueAndProcess() (op model.Operater, done bool) {
 	if op, err = d.repo.UnqueueOperation(); err != nil {
 		panic(err)
 	} else if op != nil {
+		fmt.Printf("\n<<>> processing op: %d (%s %d) [%s] ... \n", op.Id(), op.Kind(), op.Seq(), d.token)
 		_, err := d.process(op)
 		if err != nil {
 			panic(err)
@@ -155,16 +164,19 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 		return
 	}
 
-	defer func() {
+	onDone := func() {
 		//logger.Warn("doning op ...", "op", op)
 		err = d.repo.Done(op)
 		if err != nil {
 			err = fmt.Errorf("unable to done op: [%s] : %w", op, err)
 			logger.Error(err.Error())
+			panic(err)
 		} else {
 			logger.Info("op done", "ok", ok, "op", op)
+			fmt.Printf("\n<<>> op done: %d (%s %d) [%s] ... \n", op.Id(), op.Kind(), op.Seq(), d.token)
+
 		}
-	}()
+	}
 
 	suite := op.Suite()
 	logger.Info("DAEMON: unqueued operation.", "kind", op.Kind(), "id", op.Id(), "suite", op.Suite(), "seq", op.Seq())
@@ -190,7 +202,7 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 
 		// exitCode := service.ProcessTestDef(def)
 		// o.SetExitCode(uint16(exitCode))
-		fork.QueueTestDef(def, o)
+		fork.QueueTestDef(def, o, onDone)
 
 	case *model.ReportOp:
 		// FIXME: must override bad token & isolation inside ReportDefinition !
@@ -200,9 +212,15 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 
 		fork.WaitQueueComplete(def.TestSuite)
 
+		err = d.repo.WaitSuiteOperationsDoneBefore(op, def.Config.SuiteTimeout.Get())
+		if err != nil {
+			return false, err
+		}
+
 		exitCode, err2 := d.report(def)
 		op.SetExitCode(uint16(exitCode))
 		op.SetErr(err2)
+		onDone()
 	case *model.ReportAllOp:
 		// FIXME: must override bad token & isolation inside ReportDefinition !
 		def := o.Definition
@@ -211,9 +229,16 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 
 		fork.WaitAllQueuesComplete()
 
+		// FIXME: which timeout for glbal report ?
+		err = d.repo.WaitAllOperationsDoneBefore(op, def.Config.SuiteTimeout.Get())
+		if err != nil {
+			return false, err
+		}
+
 		exitCode, err2 := d.globalReport(def)
 		op.SetExitCode(uint16(exitCode))
 		op.SetErr(err2)
+		onDone()
 	default:
 		err = fmt.Errorf("unknown operation %T", op)
 		return
@@ -253,6 +278,10 @@ func (d *daemon) report(def model.ReportDefinition) (exitCode int16, err error) 
 
 	// Wait for some test to report until suite timeout
 	// FIXME: Daemon never report @all ?
+	// FIXME: must wait all previous operations in suite are done !
+	// Add a WaitAllOperationsDone(seq) error
+	// Add a WaitSuiteOperationsDone(suite, seq) error
+	// On first suite test Op done update suite start time
 	testCount := d.repo.ToReportTestCountBySuiteAndMode(def.TestSuite, true, false)
 	for testCount == 0 {
 		if time.Since(start) > cfg.SuiteTimeout.Get() {

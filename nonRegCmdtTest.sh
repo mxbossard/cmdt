@@ -2,7 +2,7 @@
 set -e -o pipefail
 scriptDir=$( dirname $( readlink -f $0 ) )
 
-SCRIPTS=("$scriptDir/cmdtTest.sh" "$scriptDir/asyncCmdtTest.sh" "$scriptDir/perfCmdtTest.sh" "$scriptDir/visualCmdtTest.sh")
+SCRIPTS=("$scriptDir/cmdtTest.sh" "$scriptDir/asyncCmdtTest.sh" "$scriptDir/perfCmdtTest.sh" "$scriptDir/daemonReliabilityTest.sh" "$scriptDir/visualCmdtTest.sh")
 
 for script in ${SCRIPTS[@]}; do
 	>&2 echo "-------------------- Running test script: $script ..."

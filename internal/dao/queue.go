@@ -31,7 +31,10 @@ func (d Queue) init() (err error) {
 			open INTEGER NOT NULL,
 			blocking INTEGER
 		);
-
+		CREATE INDEX IF NOT EXISTS suite_queue_name ON suite_queue(name);
+		CREATE INDEX IF NOT EXISTS suite_queue_open ON suite_queue(open);
+		CREATE INDEX IF NOT EXISTS suite_queue_open_blocking ON suite_queue(open, blocking);
+		
 		CREATE TABLE IF NOT EXISTS operation_queue (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			suite TEXT NOT NULL,
@@ -42,6 +45,12 @@ func (d Queue) init() (err error) {
 			block INTEGER,
 			FOREIGN KEY(suite) REFERENCES suite_queue(name)
 		);
+		CREATE INDEX IF NOT EXISTS operation_queue_id ON operation_queue(id);
+		CREATE INDEX IF NOT EXISTS operation_queue_suite ON operation_queue(suite);
+		CREATE INDEX IF NOT EXISTS operation_queue_unqueued ON operation_queue(unqueued);
+		CREATE INDEX IF NOT EXISTS operation_queue_suite_unqueued ON operation_queue(suite, unqueued);
+		CREATE INDEX IF NOT EXISTS operation_queue_id_exitCode ON operation_queue(id, exitCode);
+		CREATE INDEX IF NOT EXISTS operation_queue_id_unqueued ON operation_queue(id, unqueued);
 	`)
 	return
 }
@@ -60,11 +69,6 @@ func (d Queue) QueueOperater(op model.Operater) (err error) {
 		return
 	}
 	defer tx.Rollback()
-	// defer func() {
-	// 	if err != nil {
-	// 		tx.Rollback()
-	// 	}
-	// }()
 
 	res, err := tx.Exec(`
 		INSERT OR IGNORE INTO suite_queue(name, open) VALUES (@suite, 0);
@@ -113,13 +117,13 @@ func (d Queue) IsOperationsDone(op model.Operater) (done bool, exitCode int16, o
 	return
 }
 
-func (d Queue) QueuedSuites() (queued []string, err error) {
+func (d Queue) QueuedSuites0() (queued []string, err error) {
 	rows, err := d.db.Query(`
 		SELECT s.name 
 		FROM suite_queue s 
-		WHERE s.open = 0 
+		WHERE s.open = 0 OR (s.open > 0 AND s.open <> @pid)
 		ORDER BY s.id;
-	`)
+	`, sql.Named("pid", os.Getpid()))
 	if err != nil {
 		return
 	}
@@ -142,9 +146,9 @@ func (d Queue) OpenedNotBlockingSuites() (opened []string, err error) {
 	rows, err := d.db.Query(`
 		SELECT s.name 
 		FROM suite_queue s
-		WHERE s.open = 1 AND s.blocking IS NULL 
+		WHERE s.open > 0 AND (s.blocking IS NULL OR s.open <> @pid)
 		ORDER BY s.id;
-	`)
+	`, sql.Named("pid", os.Getpid()))
 	if err != nil {
 		return
 	}
@@ -157,6 +161,30 @@ func (d Queue) OpenedNotBlockingSuites() (opened []string, err error) {
 		}
 		opened = append(opened, col)
 	}
+	return
+}
+
+// Requeue not done operation
+func (d Queue) NotDone(op model.Operater) (err error) {
+	perf := logger.PerfTimer()
+	defer perf.End()
+
+	tx, err := d.db.Begin()
+	if err != nil {
+		return
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec(`
+			UPDATE operation_queue 
+			SET unqueued = 0, exitCode = NULL, error = NULL 
+			WHERE id = @opId;
+			
+			UPDATE suite_queue 
+			SET blocking = NULL
+			WHERE name = @suite AND blocking = @opId;
+		`, sql.Named("suite", op.Suite()), sql.Named("opId", op.Id()))
+
 	return
 }
 
@@ -174,11 +202,6 @@ func (d Queue) Done(op model.Operater) (err error) {
 		return
 	}
 	defer tx.Rollback()
-	// defer func() {
-	// 	if err != nil {
-	// 		tx.Rollback()
-	// 	}
-	// }()
 
 	count, err := d.QueuedOperationsCountBySuite(suite, tx)
 	if err != nil {
@@ -213,7 +236,31 @@ func (d Queue) Done(op model.Operater) (err error) {
 	return
 }
 
-func (d Queue) CloseSuite(suite string) (err error) {
+func (d Queue) CountGlobalNotDoneBefore(op model.Operater) (count int, err error) {
+	row := d.db.QueryRow(`
+		SELECT count(*) 
+		FROM operation_queue q
+		WHERE q.id < @id AND q.unqueued > -1;
+	`, sql.Named("id", op.Id()))
+	err = row.Scan(&count)
+	return
+}
+
+func (d Queue) CountSuiteNotDoneBefore(op model.Operater) (count int, err error) {
+	suite := op.Suite()
+	if suite == "" {
+
+	}
+	row := d.db.QueryRow(`
+		SELECT count(*) 
+		FROM operation_queue q
+		WHERE q.id < @id AND q.suite = @suite AND q.unqueued > -1;
+	`, sql.Named("suite", suite), sql.Named("id", op.Id()))
+	err = row.Scan(&count)
+	return
+}
+
+func (d Queue) CloseSuite0(suite string) (err error) {
 	_, err = d.db.Exec(`UPDATE suite_queue SET open = 0 WHERE name = @suite;`, sql.Named("suite", suite))
 	return
 }
@@ -246,8 +293,8 @@ func (d Queue) QueuedOperationsCount() (count int, err error) {
 	row := d.db.QueryRow(`
 		SELECT count(*) 
 		FROM operation_queue q
-		WHERE q.unqueued >= 0 AND q.unqueued <> @pid;
-	`, sql.Named("pid", os.Getpid()))
+		WHERE q.unqueued > -1;
+	`) //  AND q.unqueued <> @pid  // sql.Named("pid", os.Getpid())
 	err = row.Scan(&count)
 	return
 }
@@ -261,8 +308,8 @@ func (d Queue) QueuedOperationsCountBySuite(suite string, tx *zql.SynchronizedTx
 	row := qr.QueryRow(`
 		SELECT count(*) 
 		FROM operation_queue q
-		WHERE q.suite = ? and q.unqueued >= 0 AND q.unqueued <> @pid;
-	`, suite, sql.Named("pid", os.Getpid()))
+		WHERE q.suite = ? and q.unqueued > -1;
+	`, suite) //  AND q.unqueued <> @pid  // , sql.Named("pid", os.Getpid())
 	err = row.Scan(&count)
 	return
 }
@@ -285,7 +332,7 @@ func (d Queue) NextQueuedOperation(suite string, tx *zql.SynchronizedTx) (op mod
 	row := qr.QueryRow(`
 		SELECT q.id, q.op 
 		FROM operation_queue q
-		WHERE q.suite = @suite and (q.unqueued >= 0 AND q.unqueued <> @pid)
+		WHERE q.suite = @suite and (q.unqueued > -1 AND q.unqueued <> @pid)
 		ORDER BY q.id 
 		LIMIT 1;
 	`, sql.Named("suite", suite), sql.Named("pid", os.Getpid()))
@@ -333,10 +380,10 @@ func (d Queue) UnqueueOperater() (op model.Operater, err error) {
 		row := d.db.QueryRow(`
 			SELECT s.name 
 			FROM suite_queue s
-			WHERE s.open = 0
+			WHERE s.open = 0 OR (s.open > 0 AND s.open <> @pid)
 			ORDER BY s.id
 			LIMIT 1;
-		`)
+		`, sql.Named("pid", os.Getpid()))
 		err = row.Scan(&electedSuite)
 		if err == sql.ErrNoRows {
 			logger.Debug("no closed suite_queue found")
@@ -345,12 +392,14 @@ func (d Queue) UnqueueOperater() (op model.Operater, err error) {
 			return
 		}
 
+		//fmt.Printf("\n<<>> not already opened electedSuite: %s\n", electedSuite)
 		if electedSuite == "" {
 			// No suite found
 			return
 		}
 	}
 
+	//fmt.Printf("\n<<>> electedSuite: %s\n", electedSuite)
 	logger.Trace("UnqueueOperater() 2", "electedSuite", electedSuite)
 
 	tx, err := d.db.Begin()
@@ -358,11 +407,6 @@ func (d Queue) UnqueueOperater() (op model.Operater, err error) {
 		return
 	}
 	defer tx.Rollback()
-	// defer func() {
-	// 	if err != nil {
-	// 		tx.Rollback()
-	// 	}
-	// }()
 
 	// Get next operation
 	op, err = d.NextQueuedOperation(electedSuite, tx)
@@ -380,14 +424,14 @@ func (d Queue) UnqueueOperater() (op model.Operater, err error) {
 	// Open this suite & Record blocking state
 	if op.Block() {
 		_, err = tx.Exec(`
-			UPDATE suite_queue SET open = 1, blocking = @opId
+			UPDATE suite_queue SET open = @pid, blocking = @opId
 			WHERE name = @suite;
-	`, sql.Named("suite", electedSuite), sql.Named("opId", op.Id()))
+	`, sql.Named("pid", os.Getpid()), sql.Named("suite", electedSuite), sql.Named("opId", op.Id()))
 	} else {
 		_, err = tx.Exec(`
-			UPDATE suite_queue SET open = 1, blocking = NULL
+			UPDATE suite_queue SET open = @pid, blocking = NULL
 			WHERE name = @suite;
-	`, sql.Named("suite", electedSuite))
+	`, sql.Named("pid", os.Getpid()), sql.Named("suite", electedSuite))
 	}
 
 	if err != nil {
@@ -401,7 +445,6 @@ func (d Queue) UnqueueOperater() (op model.Operater, err error) {
 		return
 	}
 
-	//rollback = false
 	err = tx.Commit()
 	return
 }
