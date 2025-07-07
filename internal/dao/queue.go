@@ -164,6 +164,30 @@ func (d Queue) OpenedNotBlockingSuites() (opened []string, err error) {
 	return
 }
 
+func (d Queue) electSuite(tx *zql.SynchronizedTx) (elected string, err error) {
+	perf := logger.PerfTimer()
+	defer perf.End("elected", elected)
+
+	// Elect suite with followinf rules
+	// 1- Only suite with already queued operations
+	// 2- Suite which are not blocked by current daemon
+	// 3- Priorize already opened suite
+	// 4- Priorize oldest suite
+	row := tx.QueryRow(`
+		SELECT s.name 
+		FROM suite_queue s LEFT JOIN operation_queue o ON s.name = o.suite
+		WHERE o.exitCode IS NULL AND (s.blocking IS NULL OR o.unqueued <> :pid)
+		ORDER BY s.open DESC, s.id ASC
+		LIMIT 1
+	`, sql.Named("pid", os.Getpid()))
+
+	err = row.Scan(&elected)
+	if err == sql.ErrNoRows {
+		err = nil
+	}
+	return
+}
+
 // Requeue not done operation
 func (d Queue) NotDone(op model.Operater) (err error) {
 	perf := logger.PerfTimer()
@@ -240,7 +264,7 @@ func (d Queue) CountGlobalNotDoneBefore(op model.Operater) (count int, err error
 	row := d.db.QueryRow(`
 		SELECT count(*) 
 		FROM operation_queue q
-		WHERE q.id < @id AND q.unqueued > -1;
+		WHERE q.id < @id AND q.exitCode IS NULL;
 	`, sql.Named("id", op.Id()))
 	err = row.Scan(&count)
 	return
@@ -254,7 +278,7 @@ func (d Queue) CountSuiteNotDoneBefore(op model.Operater) (count int, err error)
 	row := d.db.QueryRow(`
 		SELECT count(*) 
 		FROM operation_queue q
-		WHERE q.id < @id AND q.suite = @suite AND q.unqueued > -1;
+		WHERE q.id < @id AND q.suite = @suite AND q.exitCode IS NULL;
 	`, sql.Named("suite", suite), sql.Named("id", op.Id()))
 	err = row.Scan(&count)
 	return
@@ -365,39 +389,42 @@ func (d Queue) UnqueueOperater() (op model.Operater, err error) {
 
 	// Get first opened not blocking suite
 	var electedSuite string
-	openedNotBlockingSuites, err := d.OpenedNotBlockingSuites()
-	if err != nil {
-		return
-	}
-	if len(openedNotBlockingSuites) > 0 {
-		electedSuite = openedNotBlockingSuites[0]
-	}
 
-	logger.Trace("UnqueueOperater() 1", "electedSuite", electedSuite)
-
-	if electedSuite == "" {
-		// Select first closed suite
-		row := d.db.QueryRow(`
-			SELECT s.name 
-			FROM suite_queue s
-			WHERE s.open = 0 OR (s.open > 0 AND s.open <> @pid)
-			ORDER BY s.id
-			LIMIT 1;
-		`, sql.Named("pid", os.Getpid()))
-		err = row.Scan(&electedSuite)
-		if err == sql.ErrNoRows {
-			logger.Debug("no closed suite_queue found")
-			err = nil
-		} else if err != nil {
+	/*
+		openedNotBlockingSuites, err := d.OpenedNotBlockingSuites()
+		if err != nil {
 			return
 		}
+		if len(openedNotBlockingSuites) > 0 {
+			electedSuite = openedNotBlockingSuites[0]
+		}
 
-		//fmt.Printf("\n<<>> not already opened electedSuite: %s\n", electedSuite)
+		logger.Trace("UnqueueOperater() 1", "electedSuite", electedSuite)
+
 		if electedSuite == "" {
-			// No suite found
-			return
+			// Select first closed suite
+			row := d.db.QueryRow(`
+				SELECT s.name
+				FROM suite_queue s
+				WHERE s.open = 0 OR (s.open > 0 AND s.open <> @pid)
+				ORDER BY s.id
+				LIMIT 1;
+			`, sql.Named("pid", os.Getpid()))
+			err = row.Scan(&electedSuite)
+			if err == sql.ErrNoRows {
+				logger.Debug("no closed suite_queue found")
+				err = nil
+			} else if err != nil {
+				return
+			}
+
+			//fmt.Printf("\n<<>> not already opened electedSuite: %s\n", electedSuite)
+			if electedSuite == "" {
+				// No suite found
+				return
+			}
 		}
-	}
+	*/
 
 	//fmt.Printf("\n<<>> electedSuite: %s\n", electedSuite)
 	logger.Trace("UnqueueOperater() 2", "electedSuite", electedSuite)
@@ -407,6 +434,16 @@ func (d Queue) UnqueueOperater() (op model.Operater, err error) {
 		return
 	}
 	defer tx.Rollback()
+
+	electedSuite, err = d.electSuite(tx)
+	if err != nil {
+		return
+	}
+
+	if electedSuite == "" {
+		// No suite found
+		return
+	}
 
 	// Get next operation
 	op, err = d.NextQueuedOperation(electedSuite, tx)

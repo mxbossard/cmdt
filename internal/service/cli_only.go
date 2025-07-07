@@ -62,6 +62,7 @@ func cliAfterSuiteReport(token, isolation, suite string, dpl display.Displayer) 
 	if err != nil {
 		return
 	}
-	dpl.ClearSuite(suite)
+	// FIXME: why clear suite after report ?
+	//dpl.ClearSuite(suite)
 	return
 }

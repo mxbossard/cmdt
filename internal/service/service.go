@@ -203,9 +203,12 @@ func performTest(testDef model.TestDefinition, ctx facade.TestContext) (exitCode
 	exitCode = 1
 	cfg := testDef.Config
 	seq := testDef.Seq
+	fmt.Printf("\n<<>> display: opening test\n")
+
 	td := Dpl.OpenTest(ctx)
 	defer Dpl.CloseTest(ctx)
 	td.Title()
+	fmt.Printf("\n<<>> display: printed test\n")
 
 	if cfg.Ignore.Is(true) {
 		ctx.IncrementIgnoredCount()
@@ -578,13 +581,13 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 						err = globalCtx.Repo.MarkSuitesReported()
 						ProcessGlobalError(globalCtx, err)
 
+						// FIXME: why clear all suites on report all ?
 						// Clear all reported suite async display
-						suites, err := globalCtx.Repo.ListReportedAsyncSuites()
-						ProcessGlobalError(globalCtx, err)
-
-						for _, suite := range suites {
-							asyncdisplay.ClearSuite(globalCtx.Repo.BackingFilepath(), suite)
-						}
+						// suites, err := globalCtx.Repo.ListReportedAsyncSuites()
+						// ProcessGlobalError(globalCtx, err)
+						// for _, suite := range suites {
+						// 	asyncdisplay.ClearSuite(globalCtx.Repo.BackingFilepath(), suite)
+						// }
 						return max(exitCode, asyncExitCode)
 					}
 

@@ -202,6 +202,7 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 
 		// exitCode := service.ProcessTestDef(def)
 		// o.SetExitCode(uint16(exitCode))
+		fmt.Printf("\n<<>> queued test: #%d", def.Seq)
 		fork.QueueTestDef(def, o, onDone)
 
 	case *model.ReportOp:
@@ -229,8 +230,8 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 
 		fork.WaitAllQueuesComplete()
 
-		// FIXME: which timeout for glbal report ?
-		err = d.repo.WaitAllOperationsDoneBefore(op, def.Config.SuiteTimeout.Get())
+		// FIXME: which timeout for global report ?
+		err = d.repo.WaitAllOperationsDoneBefore(op, def.Config.SuiteTimeout.GetOr(10*time.Second))
 		if err != nil {
 			return false, err
 		}

@@ -36,6 +36,7 @@ export -n __CMDT_TOKEN
 
 
 testSleepTime=0.2
+#testSleepTime=2
 testCount=5
 
 test1() {
@@ -50,6 +51,7 @@ test1() {
 	>&2 echo ">> long_fork1/sleep_0.1sec ..."
 	$cmdt1 @test=long_fork1/sleep_0.1sec sleep 0.1
 
+	tree -Ch /tmp/cmdtest-*_tested/zcreen
 	>&2 echo ">> reporting long_fork1 ..."
 	$cmdt @test="report_long_fork1" @stderr:"Successfully ran" @stderr:"2 success" @-- $cmdt1 @report=long_fork1
 
@@ -59,24 +61,32 @@ test1() {
 
 $cmdt1 @init @fork=1
 $cmdt1 true
+
+#tree -Ch /tmp/cmdtest-*_tested/zcreen
 $cmdt1 @report
 
 >&2 echo
 >&2 echo "## test @fork=2"
-$cmdt1 @init=fork2 @fork=2
+$cmdt1 @init=fork2 @fork=2 @verbose=5
 for i in $( seq -f "%02g" 1 $testCount ); do
 	$cmdt1 @test=fork2/sleep_$i sleep "$testSleepTime"
 done
 >&2 echo ">> launched $testCount tests"
 
 sleep "$testSleepTime"
+tree -Ch /tmp/cmdtest-*_tested/zcreen
+
 # Kill Daemon
 >&2 echo ">> Killing daemon ..."
 pkill -1 -f "cmdt ._daemon" || true
 
+#exit 1
+
+tree -Ch /tmp/cmdtest-*_tested/zcreen
 >&2 echo ">> reporting fork2 ..."
 $cmdt @test="report_fork2" @stderr:"Successfully ran" @stderr:"$testCount success" @-- $cmdt1 @report=fork2
 
+tree -Ch /tmp/cmdtest-*_tested/zcreen
 exit 1
 
 >&2 echo

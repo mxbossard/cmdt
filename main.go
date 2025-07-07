@@ -153,6 +153,10 @@ Features:
 - mock web spawning a web server ?
 - test port opening if daemon ; test sending data on port ???
 
+- proposer des sidecar outils avec @container ex: jouer des tests venom dans un sidecar venom
+- monter cmdt dans un "sidecar" plutot que de le monter dans un volume. y ajouter en option des outils comme venom (merge d'image ?)
+- proposer le build de l'image au premier @container referencé si on pointe vers un build context plutot qu'une image.
+
 
 Refactor:
 - Parse args in daemon for better flow (could perform a parse args in client for quick response and full process in daemon from parse args for simplicity) ?
