@@ -153,6 +153,9 @@ func (d AsyncDisplay) OpenTest(ctx facade.TestContext) display.TestDisplayer {
 	cfg := ctx.Config
 
 	key := testDisplayerKey(ctx)
+
+	fmt.Printf("\n<<>> ASYNC opening testCtx: %s\n", key)
+
 	if td, ok := d.testDisplayers[key]; ok {
 		return td
 	} else {
@@ -484,7 +487,8 @@ func New(tmpDir string, init bool, outs printz.Outputs) *AsyncDisplay {
 	}
 
 	if init {
-		d.screen = zcreen.NewAsyncScreen(zcreenTmpDir)
+		d.screen = zcreen.NewAsyncScreen(zcreenTmpDir, true)
+		fmt.Printf("\n<<>> !!! NEW Async screen: %s\n", zcreenTmpDir)
 	}
 	go func() {
 		// Tailer should be build later after daemon initialized the screen
@@ -508,7 +512,7 @@ func NewWaitingTailer(tmpDir string, init bool, outs printz.Outputs) *AsyncDispl
 	}
 
 	if init {
-		d.screen = zcreen.NewAsyncScreen(zcreenTmpDir)
+		d.screen = zcreen.NewAsyncScreen(zcreenTmpDir, true)
 	}
 	// Tailer should be build later after daemon initialized the screen
 	d.tailer = zcreen.NewAsyncScreenTailerWaiting(outs, zcreenTmpDir, 2*time.Second)
