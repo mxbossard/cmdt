@@ -79,7 +79,7 @@ type daemon struct {
 
 func (d *daemon) run() {
 	logger.Warn("DAEMON: starting ...", "token", d.token, "isolation", d.isolation)
-	fmt.Printf("\n<<>> Daemon running ...\n")
+	// fmt.Printf("\n<<>> Daemon running ...\n")
 	startTime := time.Now()
 	debugTime := time.Now()
 	lastUnqueue := time.Now()
@@ -117,7 +117,7 @@ func (d *daemon) run() {
 		}
 	}
 	logger.Warn("DAEMON: stopping ...", "token", d.token, "after", time.Since(startTime))
-	fmt.Printf("\n<<>> Daemon stopped\n")
+	// fmt.Printf("\n<<>> Daemon stopped\n")
 }
 
 // Process Operation and trap panic to continue processing
@@ -141,7 +141,7 @@ func (d *daemon) unqueueAndProcess() (op model.Operater, done bool) {
 	if op, err = d.repo.UnqueueOperation(); err != nil {
 		panic(err)
 	} else if op != nil {
-		fmt.Printf("\n<<>> processing op: %d (%s %d) [%s] ... \n", op.Id(), op.Kind(), op.Seq(), d.token)
+		// fmt.Printf("\n<<>> processing op: %d (%s %d) [%s] ... \n", op.Id(), op.Kind(), op.Seq(), d.token)
 		_, err := d.process(op)
 		if err != nil {
 			panic(err)
@@ -173,7 +173,7 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 			panic(err)
 		} else {
 			logger.Info("op done", "ok", ok, "op", op)
-			fmt.Printf("\n<<>> op done: %d (%s %d) [%s] ... \n", op.Id(), op.Kind(), op.Seq(), d.token)
+			// fmt.Printf("\n<<>> op done: %d (%s %d) [%s] ... \n", op.Id(), op.Kind(), op.Seq(), d.token)
 
 		}
 	}
@@ -202,7 +202,7 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 
 		// exitCode := service.ProcessTestDef(def)
 		// o.SetExitCode(uint16(exitCode))
-		fmt.Printf("\n<<>> queued test: #%d", def.Seq)
+		// fmt.Printf("\n<<>> queued test: #%d", def.Seq)
 		fork.QueueTestDef(def, o, onDone)
 
 	case *model.ReportOp:

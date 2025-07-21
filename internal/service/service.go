@@ -91,9 +91,9 @@ func globalReport(ctx facade.GlobalContext, asyncMode bool) (exitCode int16, err
 	reportPassed := true
 	for _, testSuite := range reportableModedSuites {
 		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, model.ReportAction, model.Config{}, false)
-		if suiteCtx.Config.TestSuite.IsEmpty() {
-			fmt.Printf("\n<<>> empty suite name in ctx !!! \nctx: %v ; \ncfg: %v\n", suiteCtx, suiteCtx.Config)
-		}
+		// if suiteCtx.Config.TestSuite.IsEmpty() {
+		// 	fmt.Printf("\n<<>> empty suite name in ctx !!! \nctx: %v ; \ncfg: %v\n", suiteCtx, suiteCtx.Config)
+		// }
 
 		suiteContexts = append(suiteContexts, suiteCtx)
 		var code int16
@@ -203,12 +203,12 @@ func performTest(testDef model.TestDefinition, ctx facade.TestContext) (exitCode
 	exitCode = 1
 	cfg := testDef.Config
 	seq := testDef.Seq
-	fmt.Printf("\n<<>> display: opening test\n")
+	// fmt.Printf("\n<<>> display: opening test\n")
 
 	td := Dpl.OpenTest(ctx)
 	defer Dpl.CloseTest(ctx)
 	td.Title()
-	fmt.Printf("\n<<>> display: printed test\n")
+	// fmt.Printf("\n<<>> display: printed test\n")
 
 	if cfg.Ignore.Is(true) {
 		ctx.IncrementIgnoredCount()

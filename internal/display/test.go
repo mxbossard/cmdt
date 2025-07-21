@@ -57,15 +57,18 @@ type basicTestDisplayer struct {
 }
 
 func (d *basicTestDisplayer) title(ctx facade.TestContext) {
-	fmt.Printf("\n<<>> DISPLAY title called: #%d\n", ctx.Seq)
+	// fmt.Printf("\n<<>> DISPLAY title called: #%d\n", ctx.Seq)
 	if ctx.Config.Verbose.Get() <= model.SHOW_REPORTS_ONLY {
 		// FIXME: BUG: if nothing is printed, zcreen will never flush the printer !
 		//d.printer.Errf("")
 		return
 	}
-	defer d.flush()
+	if !ctx.Config.Async.Is(true) {
+		// For async test, do not flush before test is done.
+		defer d.flush()
+	}
 	d.titled = true
-	fmt.Printf("\n<<>> DISPLAY title not silent: #%d\n", ctx.Seq)
+	// fmt.Printf("\n<<>> DISPLAY title not silent: #%d\n", ctx.Seq)
 
 	cfg := ctx.Config
 	timecode := int(time.Since(cfg.SuiteStartTime.Get()).Milliseconds())
@@ -84,7 +87,7 @@ func (d *basicTestDisplayer) title(ctx facade.TestContext) {
 	}
 
 	if ctx.Config.Verbose.Get() >= model.SHOW_PASSED {
-		fmt.Printf("\n<<>> DISPLAY title verbosity OK: #%d\n", ctx.Seq)
+		// fmt.Printf("\n<<>> DISPLAY title verbosity OK: #%d\n", ctx.Seq)
 		d.printer.ColoredErrf(TestColor, title)
 		// } else {
 		// 	// FIXME: BUG: if nothing is printed, zcreen will never flush the printer !

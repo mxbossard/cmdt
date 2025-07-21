@@ -140,10 +140,10 @@ func (d AsyncDisplay) SuiteTitle(ctx facade.SuiteContext) {
 		printer.Flush()
 		session.ClosePrinter(SuiteBeginPrinterName, "low verbosity")
 	}
-	err = session.Flush()
-	if err != nil {
-		panic(err)
-	}
+	// err = session.Flush()
+	// if err != nil {
+	// 	panic(err)
+	// }
 }
 
 func (d AsyncDisplay) OpenTest(ctx facade.TestContext) display.TestDisplayer {
@@ -154,7 +154,7 @@ func (d AsyncDisplay) OpenTest(ctx facade.TestContext) display.TestDisplayer {
 
 	key := testDisplayerKey(ctx)
 
-	fmt.Printf("\n<<>> ASYNC opening testCtx: %s\n", key)
+	// fmt.Printf("\n<<>> ASYNC opening testCtx: %s\n", key)
 
 	if td, ok := d.testDisplayers[key]; ok {
 		return td
@@ -488,7 +488,7 @@ func New(tmpDir string, init bool, outs printz.Outputs) *AsyncDisplay {
 
 	if init {
 		d.screen = zcreen.NewAsyncScreen(zcreenTmpDir, true)
-		fmt.Printf("\n<<>> !!! NEW Async screen: %s\n", zcreenTmpDir)
+		// fmt.Printf("\n<<>> !!! NEW Async screen: %s\n", zcreenTmpDir)
 	}
 	go func() {
 		// Tailer should be build later after daemon initialized the screen
