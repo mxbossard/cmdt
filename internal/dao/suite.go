@@ -268,12 +268,16 @@ func (d Suite) MarkSuiteReported(suite string) (err error) {
 	defer p.End()
 
 	now := time.Now()
+	// _, err = d.db.Exec(`
+	// 	UPDATE suite SET reportedCount = (
+	// 			SELECT coalesce(max(s.seq), 0)
+	// 			FROM suite s
+	// 			WHERE s.name = @suite
+	// 		), lastReportTime = @now
+	// 	WHERE name = @suite
+	// `, sql.Named("suite", suite), sql.Named("now", now.UnixMicro()))
 	_, err = d.db.Exec(`
-		UPDATE suite SET reportedCount = (
-				SELECT coalesce(max(s.seq), 0)
-				FROM suite s
-				WHERE s.name = @suite
-			), lastReportTime = @now
+		UPDATE suite SET reportedCount = coalesce(seq, 0), lastReportTime = @now
 		WHERE name = @suite
 	`, sql.Named("suite", suite), sql.Named("now", now.UnixMicro()))
 
@@ -287,8 +291,8 @@ func (d Suite) MarkSuitesReported() (err error) {
 	now := time.Now()
 	// Update all reportedCount with seq except for global row
 	_, err = d.db.Exec(`
-		UPDATE suite SET reportedCount = coalesce(seq, 0), lastReportTime = ?
-	`, now.UnixMicro())
+		UPDATE suite SET reportedCount = coalesce(seq, 0), lastReportTime = @now
+	`, sql.Named("now", now.UnixMicro()))
 
 	return
 }

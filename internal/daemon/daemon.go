@@ -226,7 +226,7 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 		op.SetExitCode(uint16(exitCode))
 		op.SetErr(err2)
 		onDone()
-	case *model.ReportAllOp:
+	case *model.GlobalReportOp:
 		// FIXME: must override bad token & isolation inside ReportDefinition !
 		def := o.Definition
 		def.Token = d.token

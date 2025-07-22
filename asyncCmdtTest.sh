@@ -172,7 +172,6 @@ $cmdt @report
 
 export -n __CMDT_TOKEN
 
-
 # Isolate tester & tested cmdt with tokens
 testerTk=$( $cmdt @init @printToken )
 cmdt="$cmdt @token=$testerTk"
@@ -233,6 +232,8 @@ $cmdtIn @test=failure_global_async/init $noPanic @-- $newCmdt1 @init=failure_glo
 $cmdtIn @test=failure_global_async/success @stderr= @-- $newCmdt1 @test=failure_global_async_sub/success true
 $cmdtIn @test=failure_global_async/failure @stderr= @-- $newCmdt1 @test=failure_global_async_sub/failure false
 $cmdtIn @test=failure_global_async/"global report" $noPanic @exit=1 @stderr:"PASSED" @stderr!:"IGNORED" @stderr:"FAILED" @stderr!:"ERRORED" @stderr!:"TIMEOUT" @stderr:"1 success" @stderr:"1 failure" @-- $newCmdt1 @report
+
+exit 1
 
 # Test error
 $cmdtIn @init=error_sync #@verbose

@@ -241,7 +241,7 @@ Loop:
 		time.Sleep(period)
 	}
 	logger.Error("WATCHER Stopped")
-	fmt.Printf("\n/!\\ WATCHER STOPPED [%d](%s) /!\\\n", os.Getpid(), w.lock.Path())
+	//fmt.Printf("\n/!\\ WATCHER STOPPED [%d](%s) /!\\\n", os.Getpid(), w.lock.Path())
 	w.daemonRunning = false
 	w.stopChan <- false
 }

@@ -418,7 +418,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 
 		exists, reported, err := rep.SuiteStatus(testSuite)
 
-		// If @fork is present but not @async => Add @async
+		// If @async is missing but @fork is present => Add @async
 		if !inputConfig.Async.IsSet() {
 			if inputConfig.ForkCount.IsSet() {
 				if inputConfig.ForkCount.Is(0) {
@@ -507,7 +507,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 			asyncSuites, err := rep.ListReportableSuitesByMode(true, reportAll)
 			ProcessGlobalError(globalCtx, err)
 
-			// 1- Report all sync suites
+			// 1- Global Report sync suites
 			toReportSyncTestCount := rep.ToReportTestCountByMode(false, reportAll)
 			if reportAll || ignoredSuiteCount+emptySuiteCount+toReportSyncTestCount > 0 {
 				exitCode, err = globalReport(globalCtx, false)
@@ -520,7 +520,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				exitCode = 0
 			}
 
-			// 2- Report All already reported async suites
+			// 2- Global Report All already reported async suites
 			reportedAsyncSuites, err := rep.ListReportedAsyncSuites()
 			ProcessGlobalError(globalCtx, err)
 			if reportAll && len(reportedAsyncSuites) > 0 {
@@ -547,7 +547,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 						//TestSuite: "__global",
 						Config: globalCtx.Config,
 					}
-					op := model.ReportAllOperation(true, def) // FIXME should not block if test can be run simultaneously
+					op := model.GlobalReportOperation(true, def) // FIXME should not block if test can be run simultaneously
 					err = globalCtx.Repo.QueueOperation(&op)
 					if err != nil {
 						errorz.Fatal(err)

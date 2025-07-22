@@ -115,13 +115,13 @@ func ReportOperation(suite string, blocking bool, def ReportDefinition) ReportOp
 	}
 }
 
-type ReportAllOp struct {
+type GlobalReportOp struct {
 	OperationBase
 	Definition ReportDefinition
 }
 
-func ReportAllOperation(blocking bool, def ReportDefinition) ReportAllOp {
-	return ReportAllOp{
+func GlobalReportOperation(blocking bool, def ReportDefinition) GlobalReportOp {
+	return GlobalReportOp{
 		OperationBase: OperationBase{
 			Type:      string(ReportKind),
 			TestSuite: "__global",
@@ -132,9 +132,9 @@ func ReportAllOperation(blocking bool, def ReportDefinition) ReportAllOp {
 }
 
 type SerializedOp struct {
-	Test      *TestOp      `yaml:",omitempty"`
-	Report    *ReportOp    `yaml:",omitempty"`
-	ReportAll *ReportAllOp `yaml:",omitempty"`
+	Test      *TestOp         `yaml:",omitempty"`
+	Report    *ReportOp       `yaml:",omitempty"`
+	ReportAll *GlobalReportOp `yaml:",omitempty"`
 }
 
 func SerializeOp0(op Operater) (sop SerializedOp) {
@@ -143,7 +143,7 @@ func SerializeOp0(op Operater) (sop SerializedOp) {
 		sop.Test = o
 	case *ReportOp:
 		sop.Report = o
-	case *ReportAllOp:
+	case *GlobalReportOp:
 		sop.ReportAll = o
 	default:
 		err := fmt.Errorf("unable to serialize operation")
