@@ -189,9 +189,13 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 			//fmt.Printf("\n<<>> opening suite: %s ; openedSuites: %s\n", suite, d.openedSuites)
 			ctx := facade.NewSuiteContext(d.token, d.isolation, suite, false, model.InitAction, model.Config{}, true)
 			defer ctx.Close()
-			d.display.OpenSuite(ctx)
-			d.display.SuiteTitle(ctx)
 			fork.ClearQueue(suite)
+			d.display.OpenSuite(ctx)
+			if ctx.Config.Titled.Is(false) {
+				d.display.SuiteTitle(ctx)
+				ctx.Config.Titled.Set(true)
+				facade.CachedRepo(d.token, d.isolation).SaveSuiteConfig(ctx.Config)
+			}
 		} else {
 			logger.Debug("Test suite already opened", "token", d.token, "isolation", d.isolation, "openedSuite", suite)
 		}
