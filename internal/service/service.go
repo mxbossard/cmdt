@@ -126,7 +126,7 @@ func globalReport(ctx facade.GlobalContext, asyncMode bool) (exitCode int16, err
 	Dpl.ReportSuites(suiteOutcomes)
 
 	for _, suiteCtx := range suiteContexts {
-		Dpl.CloseSuite(suiteCtx)
+		Dpl.CloseSuite(suiteCtx, fmt.Sprintf("following global report"))
 	}
 
 	if reportPassed {
@@ -193,7 +193,7 @@ func ProcessReportDef(def model.ReportDefinition) (exitCode int16, err error) {
 	}
 
 	Dpl.ReportSuite(suiteOutcome)
-	Dpl.CloseSuite(ctx)
+	Dpl.CloseSuite(ctx, "following report")
 
 	return
 }
@@ -281,6 +281,14 @@ func ProcessTestDef(testDef model.TestDefinition, pooledRepo bool) (exitCode int
 	testCtx, err := facade.NewTestContext2(testDef, pooledRepo)
 	ProcessTestError(testCtx, err)
 	defer testCtx.Close()
+
+	// Firstly check if test not already performed (to fix async restart bug which may want to redo a test already performed but not done)
+	testOc, err := testCtx.Repo.LoadTestOutcome(testDef.TestSignature)
+	ProcessTestError(testCtx, err)
+	if testOc != nil {
+		// Test already performed
+		return testOc.ExitCode
+	}
 
 	Dpl.Quiet(testCfg.Quiet.Is(true))
 
@@ -544,8 +552,7 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 					def := model.ReportDefinition{
 						Token:     token,
 						Isolation: isolation,
-						//TestSuite: "__global",
-						Config: globalCtx.Config,
+						Config:    globalCtx.Config,
 					}
 					op := model.GlobalReportOperation(true, def) // FIXME should not block if test can be run simultaneously
 					err = globalCtx.Repo.QueueOperation(&op)
@@ -592,8 +599,10 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 					}
 
 					go func() {
+						fmt.Fprintf(os.Stderr, "\n<<>> tailing suites: %s ... \n", asyncSuites)
 						err = asyncDpl.TailSuppliedBlocking(asyncSuites, globalCtx.Config.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
 						ProcessGlobalError(globalCtx, err)
+						fmt.Fprintf(os.Stderr, "\n<<>> tailing suites: %s finished. \n", asyncSuites)
 						logger.Info("finished async TailAllBlocking", "opId", op.Id())
 					}()
 				}

@@ -187,7 +187,7 @@ func NewGlobalDefaultConfig() Config {
 		Prefix:            utilz.OptionalOf(DefaultRulePrefix),
 		Async:             utilz.OptionalOf(DefaultAsync),
 		Wait:              utilz.OptionalOf(DefaultWait),
-		Titled:            utilz.OptionalOf(false),
+		SuiteTitled:       utilz.OptionalOf(false),
 		ReportAll:         utilz.OptionalOf(DefaultReportAll),
 		GlobalStartTime:   utilz.OptionalOf(time.Now()),
 		ForkCount:         utilz.OptionalOf(uint16(DefaultForkCount)),
@@ -211,7 +211,7 @@ func NewSuiteDefaultConfig() Config {
 	return Config{
 		Async:           utilz.OptionalOf(DefaultInitedAsync),
 		Wait:            utilz.OptionalOf(DefaultInitedWait),
-		Titled:          utilz.OptionalOf(false),
+		SuiteTitled:     utilz.OptionalOf(false),
 		TooMuchFailures: utilz.OptionalOf(int32(DefaultTooMuchFailures)),
 		SuiteStartTime:  utilz.OptionalOf(time.Now()),
 		SuiteTimeout:    utilz.OptionalOf(120 * time.Second),
@@ -224,7 +224,7 @@ func NewInitlessSuiteDefaultConfig() Config {
 	return Config{
 		Async:           utilz.OptionalOf(DefaultInitlessAsync),
 		Wait:            utilz.OptionalOf(DefaultInitlessWait),
-		Titled:          utilz.OptionalOf(false),
+		SuiteTitled:     utilz.OptionalOf(false),
 		TooMuchFailures: utilz.OptionalOf(int32(TooMuchFailuresNoLimit)),
 		SuiteStartTime:  utilz.OptionalOf(time.Now()),
 		SuiteTimeout:    utilz.OptionalOf(3600 * time.Second),
@@ -300,7 +300,7 @@ type Config struct {
 	Async       utilz.Optional[bool]   `yaml:""`
 	Wait        utilz.Optional[bool]   `yaml:""`
 	IgnoreSuite utilz.Optional[bool]   `yaml:""`
-	Titled      utilz.Optional[bool]   `yaml:""`
+	SuiteTitled utilz.Optional[bool]   `yaml:""`
 
 	Prefix          utilz.Optional[string]        `yaml:""`
 	CmdAndArgs      []string                      `yaml:""`
@@ -372,7 +372,7 @@ func (c *Config) Merge(right Config) {
 	c.Async.Merge(right.Async)
 	c.Wait.Merge(right.Wait)
 	c.IgnoreSuite.Merge(right.IgnoreSuite)
-	c.Titled.Merge(right.Titled)
+	c.SuiteTitled.Merge(right.SuiteTitled)
 
 	c.Prefix.Merge(right.Prefix)
 	c.TooMuchFailures.Merge(right.TooMuchFailures)

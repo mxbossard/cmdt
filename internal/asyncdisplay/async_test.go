@@ -75,7 +75,7 @@ func TestAsyncDisplay_TestStdout(t *testing.T) {
 	assert.Empty(t, errW.String())
 
 	d.AsyncFlush(suite, 20*time.Millisecond)
-	d.CloseSuite(sctx)
+	d.CloseSuite(sctx, "TestAsyncDisplay_TestStdout")
 	err = d.TailBlocking(suite, 20*time.Millisecond)
 	require.NoError(t, err)
 
@@ -131,7 +131,7 @@ func TestAsyncDisplay_TestTitle(t *testing.T) {
 	td := d.OpenTest(ctx)
 	td.Title()
 	td.Close()
-	d.CloseSuite(sctx)
+	d.CloseSuite(sctx, "TestAsyncDisplay_TestTitle")
 
 	d.AsyncFlushAll(10 * time.Millisecond)
 	err = d.TailAllBlocking(10 * time.Millisecond)

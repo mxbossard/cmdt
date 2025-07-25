@@ -268,6 +268,15 @@ func (r DbRepo) EmptySuiteCount(reportAll bool) (n uint) {
 	return
 }
 
+func (r DbRepo) LoadTestOutcome(test model.TestSignature) (outcome *model.TestOutcome, err error) {
+	outcome, err = r.testDao.LoadTestOutcome(test)
+	if err != nil {
+		err = r.wrap(err)
+		return
+	}
+	return
+}
+
 func (r DbRepo) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 	err = r.testDao.SaveTestOutcome(outcome)
 	if err != nil {
@@ -616,7 +625,9 @@ func (r DbRepo) ClearDaemonPid(pid int) (err error) {
 }
 
 func (r DbRepo) GetDaemonPid() (int, error) {
-	return r.globalDao.GetDaemonPid()
+	pid, err := r.globalDao.GetDaemonPid()
+	fmt.Printf("\n<<>> found Daemon [%d](%s/%s) PID in DB: %d\n", os.Getpid(), r.token, r.isolation, pid)
+	return pid, err
 }
 
 func (r DbRepo) ReportActivity() (err error) {

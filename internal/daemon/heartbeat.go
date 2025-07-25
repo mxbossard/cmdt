@@ -14,9 +14,13 @@ import (
 	"github.com/mxbossard/utilz/utilz"
 )
 
+// The Daemon Watcher verify the daemon is processing work.
+// If the Daemon is inactive for a too long period, the watcher will attempt to restart it.
+
 var stopChan = make(chan bool)
 var watcher *activityWatcher
 
+/*
 func heartBeat(rep repo.Repo) {
 	fmt.Printf("\n/!\\ HEARTBEAT STARTED /!\\\n")
 	successives := 0
@@ -51,18 +55,20 @@ Loop:
 	}
 	fmt.Printf("\n/!\\ HEARTBEAT STOPPED /!\\\n")
 }
+*/
 
-func startHeartBeat(rep repo.Repo) {
+func startHeartBeat(rep repo.Repo, msg string) {
 	watcher = NewActivityWatcher(filepath.Join(rep.BackingFilepath(), "activity.ping"))
-	watcher.StartDaemon(daemonWatcherPeriod)
+	watcher.StartDaemon(daemonWatcherPeriod, msg)
 	// go heartBeat(rep)
 }
 
-func stopHeartBeat() {
-	watcher.StopDaemon()
+func stopHeartBeat(msg string) {
+	watcher.StopDaemon(msg)
 	// stopChan <- true
 }
 
+/*
 func WatchDaemonActivity0(daemonToken, daemonIsol string) {
 	rep := repo.New(daemonToken, daemonIsol)
 	daemonRestart := 0
@@ -110,7 +116,9 @@ func WatchDaemonActivity0(daemonToken, daemonIsol string) {
 		time.Sleep(daemonWatcherPeriod)
 	}
 }
+*/
 
+// Watch for daemon activity and restart the daemon if it is inactive for too long.
 func WatchDaemonActivity(daemonToken, daemonIsol string) {
 	rep := repo.New(daemonToken, daemonIsol)
 	daemonRestart := 0
@@ -124,12 +132,12 @@ func WatchDaemonActivity(daemonToken, daemonIsol string) {
 		if ok {
 			if daemonRestart >= maxDaemonRestart {
 				logger.Errorf("Stop restarting daemon after %d restart", daemonRestart)
-				fmt.Printf("\n/!\\ Stop restarting daemon after %d restart /!\\\n", daemonRestart)
+				fmt.Printf("\n/!\\ ACTIVITY WATCHER: stop restarting daemon [%d](%s/%s) after %d restart /!\\\n", os.Getpid(), daemonToken, daemonIsol, daemonRestart)
 				os.Exit(1)
 				return
 			}
 
-			fmt.Printf("\n/!\\ Restarting daemon token: %s ... /!\\\n", daemonToken)
+			fmt.Printf("\n/!\\ ACTIVITY WATCHER: restarting daemon [%d](%s/%s) ... /!\\\n", os.Getpid(), daemonToken, daemonIsol)
 			pid, err := rep.GetDaemonPid()
 			if err != nil {
 				logger.Error("WATCHER ERROR", "error", err)
@@ -140,10 +148,13 @@ func WatchDaemonActivity(daemonToken, daemonIsol string) {
 
 				// Need to clean Daemon
 				err = rep.ClearDaemonPid(pid)
+				fmt.Printf("\n<<>> ACTIVITY WATCHER: cleared daemon PID [%d](%s/%s) in DB.\n", os.Getpid(), daemonToken, daemonIsol)
 				if err != nil {
 					logger.Error("WATCHER ERROR", "error", err)
 				}
 			}
+
+			// TODO check if daemon need to be started (is there work to do ?)
 
 			err = LanchProcessIfNeeded(daemonToken, daemonIsol)
 			if err != nil {
@@ -192,8 +203,8 @@ func (w *activityWatcher) InactiveFor() (time.Duration, error) {
 	if err != nil {
 		return time.Duration(0), err
 	}
-	if b == nil {
-		return time.Duration(0), nil
+	if len(b) == 0 {
+		return 100 * maxWatcherInactivityPeriod, nil
 	}
 	lastPingTimeNs := binary.LittleEndian.Uint64(b)
 	lastPingTime := time.Unix(0, int64(lastPingTimeNs))
@@ -209,14 +220,14 @@ func (w *activityWatcher) IsInactiveFor(d time.Duration) (bool, error) {
 	return InactivityDuration > d, nil
 }
 
-func (w *activityWatcher) startDaemon(period time.Duration) {
+func (w *activityWatcher) startDaemon(period time.Duration, msg string) {
 	if w.daemonRunning {
 		return
 	}
 	w.daemonRunning = true
 	successivErrors := 0
 	logger.Error("WATCHER Start", "period", period)
-	fmt.Printf("\n/!\\ WATCHER STARTED [%d](%s) /!\\\n", os.Getpid(), w.lock.Path())
+	fmt.Printf("\n/!\\ WATCHER STARTED [%d] msg: %s (%s) /!\\\n", os.Getpid(), msg, w.lock.Path())
 Loop:
 	for {
 		select {
@@ -241,20 +252,21 @@ Loop:
 		time.Sleep(period)
 	}
 	logger.Error("WATCHER Stopped")
-	//fmt.Printf("\n/!\\ WATCHER STOPPED [%d](%s) /!\\\n", os.Getpid(), w.lock.Path())
+	fmt.Printf("\n/!\\ WATCHER STOPPED [%d](%s) /!\\\n", os.Getpid(), w.lock.Path())
 	w.daemonRunning = false
 	w.stopChan <- false
 }
 
-func (w *activityWatcher) StartDaemon(period time.Duration) {
-	go w.startDaemon(period)
+func (w *activityWatcher) StartDaemon(period time.Duration, msg string) {
+	go w.startDaemon(period, msg)
 }
 
-func (w *activityWatcher) StopDaemon() {
-	//fmt.Printf("\n/!\\ WATCHER STOPPING ... (%s) /!\\\n", w.lock.Path())
+func (w *activityWatcher) StopDaemon(msg string) {
+	fmt.Printf("\n/!\\ WATCHER STOPPING [%d] msg: %s ... (%s) /!\\\n", os.Getpid(), msg, w.lock.Path())
 	w.stopChan <- true
 	// Wait for daemon stopped ?
 	<-w.stopChan
+	// fmt.Printf("\n/!\\ WATCHER STOPPED [%d]. (%s) /!\\\n", os.Getpid(), w.lock.Path())
 }
 
 func NewActivityWatcher(filepath string) *activityWatcher {

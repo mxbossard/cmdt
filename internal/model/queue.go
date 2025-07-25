@@ -124,7 +124,7 @@ func GlobalReportOperation(blocking bool, def ReportDefinition) GlobalReportOp {
 	return GlobalReportOp{
 		OperationBase: OperationBase{
 			Type:      string(ReportKind),
-			TestSuite: "__global",
+			TestSuite: GlobalConfigTestSuiteName,
 			Blocking:  blocking,
 		},
 		Definition: def,

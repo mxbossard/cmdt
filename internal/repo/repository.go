@@ -52,6 +52,7 @@ type Repo interface {
 	//ListAsyncSuites() (suites []string, err error)
 	ListReportedAsyncSuites() (suites []string, err error)
 
+	LoadTestOutcome(sign model.TestSignature) (outcome *model.TestOutcome, err error)
 	SaveTestOutcome(outcome model.TestOutcome) (err error)
 
 	SaveSuiteOutcome(outcome model.SuiteOutcome) (err error)

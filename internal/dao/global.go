@@ -102,4 +102,3 @@ func (d Global) InactivityDuration() (period time.Duration, err error) {
 	return
 
 }
-

@@ -28,7 +28,7 @@ type Displayer interface {
 	Global(facade.GlobalContext)
 
 	OpenSuite(facade.SuiteContext)
-	CloseSuite(facade.SuiteContext)
+	CloseSuite(facade.SuiteContext, string)
 	ClearSuite(string)
 
 	SuiteTitle(facade.SuiteContext)
@@ -79,7 +79,7 @@ func (d basicDisplay) OpenSuite(ctx facade.SuiteContext) {
 	// Nothing to do
 }
 
-func (d basicDisplay) CloseSuite(ctx facade.SuiteContext) {
+func (d basicDisplay) CloseSuite(ctx facade.SuiteContext, msg string) {
 	// Nothing to do
 }
 

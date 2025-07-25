@@ -30,8 +30,8 @@ import (
 const (
 	DaemonLockFilename         = "daemon.lock"
 	DaemonPidFilename          = "daemon.pid"
-	LockWatingSecs             = 5
-	ExtraRunningSecs           = 2
+	LockWatingDuration         = 5 * time.Second
+	MaxNoOpToUnqueueDuration   = 10 * time.Second // Max time to wait for an ooperation to unqueue before sopping the daemon.
 	AsyncPollingSleep          = 1 * time.Millisecond
 	WaitAsyncReportTestTimeout = 2 * time.Second
 	daemonTryLockPeriod        = 200 * time.Microsecond
@@ -84,8 +84,8 @@ func (d *daemon) run() {
 	debugTime := time.Now()
 	lastUnqueue := time.Now()
 
-	startHeartBeat(d.repo)
-	defer stopHeartBeat()
+	startHeartBeat(d.repo, "starting daemon run")
+	defer stopHeartBeat("finished daemon run")
 
 	outs := printz.NewDiscardingOutputs() // Daemon shoud not write on stdouts by default
 	d.display = asyncdisplay.New(d.repo.BackingFilepath(), true, outs)
@@ -107,8 +107,9 @@ func (d *daemon) run() {
 			if n == 0 {
 				// nothing to unqueue wait some period
 				duration := time.Since(lastUnqueue)
-				if duration > ExtraRunningSecs*time.Second {
+				if duration > MaxNoOpToUnqueueDuration {
 					logger.Debug("DAEMON: nothing to unqueue", "duration", duration, "token", d.token)
+					fmt.Printf("\n<<>> No Op to unqueue for %d\n", time.Since(lastUnqueue))
 					break
 				}
 			}
@@ -126,7 +127,7 @@ func (d *daemon) unqueueAndProcess() (op model.Operater, done bool) {
 		err := recover()
 		if err != nil {
 			logger.Error("DAEMON ERROR: trapped a panic", "error", err)
-			fmt.Printf("\n/!\\ DAEMON ERROR: trapped a panic /!\\\n%v\n", err)
+			fmt.Printf("\n/!\\ DAEMON ERROR [%d]: trapped a panic /!\\\n%v\n", os.Getpid(), err)
 			fmt.Printf("\nstack :%s\n", string(debug.Stack()))
 			d.display.Errors(fmt.Errorf("%s", err))
 			err2 := d.repo.NotDone(op)
@@ -164,6 +165,8 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 		return
 	}
 
+	fmt.Printf("\n<<>> Processing op: %s ...\n", op)
+
 	onDone := func() {
 		//logger.Warn("doning op ...", "op", op)
 		err = d.repo.Done(op)
@@ -174,40 +177,94 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 		} else {
 			logger.Info("op done", "ok", ok, "op", op)
 			// fmt.Printf("\n<<>> op done: %d (%s %d) [%s] ... \n", op.Id(), op.Kind(), op.Seq(), d.token)
-
 		}
+		fmt.Printf("\n<<>> Op: %s DONE.\n", op)
+	}
+
+	onDoneSavingSuiteCfg := func() {
+		onDone()
 	}
 
 	suite := op.Suite()
 	logger.Info("DAEMON: unqueued operation.", "kind", op.Kind(), "id", op.Id(), "suite", op.Suite(), "seq", op.Seq())
+
+	// Automagicaly open suite on first operation
+	var saveCfgOnDone bool
+	if suite != model.GlobalConfigTestSuiteName && !slices.Contains(d.openedSuites, suite) {
+		// Do not open *special* global suite
+		d.openedSuites = append(d.openedSuites, suite)
+		logger.Debug("Initializing test suite", "token", d.token, "isolation", d.isolation, "openedSuite", suite)
+		fmt.Printf("\n<<>> [%d] opening suite: %s ; openedSuites: %s ; op: %s\n", os.Getpid(), suite, d.openedSuites, op)
+		ctx := facade.NewSuiteContext(d.token, d.isolation, suite, false, model.InitAction, model.Config{}, true)
+		defer ctx.Close()
+		err = fork.ClearQueue(suite)
+		if err != nil {
+			return false, err
+		}
+		d.display.OpenSuite(ctx)
+		if ctx.Config.SuiteTitled.Is(false) {
+			// Display suite title once and record it was done.
+			d.display.SuiteTitle(ctx)
+			ctx.Config.SuiteTitled.Set(true)
+			// The title will be flushed with first test display.
+			// The SuiteTitled state must be recorded with outcome.
+			// FIXME: for now it is recorded after outcome in onDoneSavingSuiteCfg().
+			onDoneSavingSuiteCfg = func() {
+				// Replace onDone() func to save the config on test done.
+				onDone()
+				err := d.repo.SaveSuiteConfig(ctx.Config)
+				if err != nil {
+					logger.Error(err.Error())
+					panic(err)
+				}
+			}
+			// fork.QueueTestDef(def, o, onDoneSavingSuiteCfg)
+			saveCfgOnDone = true
+		}
+	} else {
+		logger.Debug("Test suite already opened", "token", d.token, "isolation", d.isolation, "openedSuite", suite)
+	}
+
 	switch o := op.(type) {
 	case *model.TestOp:
-		// Automagicaly open suite on first test
-		if !slices.Contains(d.openedSuites, suite) {
-			d.openedSuites = append(d.openedSuites, suite)
-			logger.Debug("Initializing test suite", "token", d.token, "isolation", d.isolation, "openedSuite", suite)
-			//fmt.Printf("\n<<>> opening suite: %s ; openedSuites: %s\n", suite, d.openedSuites)
-			ctx := facade.NewSuiteContext(d.token, d.isolation, suite, false, model.InitAction, model.Config{}, true)
-			defer ctx.Close()
-			fork.ClearQueue(suite)
-			d.display.OpenSuite(ctx)
-			if ctx.Config.Titled.Is(false) {
-				d.display.SuiteTitle(ctx)
-				ctx.Config.Titled.Set(true)
-				facade.CachedRepo(d.token, d.isolation).SaveSuiteConfig(ctx.Config)
-			}
-		} else {
-			logger.Debug("Test suite already opened", "token", d.token, "isolation", d.isolation, "openedSuite", suite)
-		}
 		// FIXME: must override bad token & isolation inside ReportDefinition !
 		def := o.Definition
 		def.Token = d.token
 		def.Isolation = d.isolation
 
+		// var forked bool
+		// // Automagicaly open suite on first test
+		// if !slices.Contains(d.openedSuites, suite) {
+		// 	d.openedSuites = append(d.openedSuites, suite)
+		// 	logger.Debug("Initializing test suite", "token", d.token, "isolation", d.isolation, "openedSuite", suite)
+		// 	fmt.Printf("\n<<>> [%d] opening suite: %s ; openedSuites: %s\n", os.Getpid(), suite, d.openedSuites)
+		// 	ctx := facade.NewSuiteContext(d.token, d.isolation, suite, false, model.InitAction, model.Config{}, true)
+		// 	defer ctx.Close()
+		// 	fork.ClearQueue(suite)
+		// 	d.display.OpenSuite(ctx)
+		// 	if ctx.Config.SuiteTitled.Is(false) {
+		// 		// Display suite title once and record it was done.
+		// 		d.display.SuiteTitle(ctx)
+		// 		ctx.Config.SuiteTitled.Set(true)
+		// 		// The title will be flushed with first test display.
+		// 		// The SuiteTitled state must be recorded with outcome.
+		// 		// FIXME: for now it is recorded after outcome in onDoneSavingSuiteCfg().
+
+		// 		fork.QueueTestDef(def, o, onDoneSavingSuiteCfg)
+		// 		forked = true
+		// 	}
+		// } else {
+		// 	logger.Debug("Test suite already opened", "token", d.token, "isolation", d.isolation, "openedSuite", suite)
+		// }
+
 		// exitCode := service.ProcessTestDef(def)
 		// o.SetExitCode(uint16(exitCode))
 		// fmt.Printf("\n<<>> queued test: #%d", def.Seq)
-		fork.QueueTestDef(def, o, onDone)
+		if saveCfgOnDone {
+			fork.QueueTestDef(def, o, onDoneSavingSuiteCfg)
+		} else {
+			fork.QueueTestDef(def, o, onDone)
+		}
 
 	case *model.ReportOp:
 		// FIXME: must override bad token & isolation inside ReportDefinition !
@@ -222,7 +279,7 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 			return false, err
 		}
 
-		exitCode, err2 := d.report(def)
+		exitCode, err2 := d.report(o)
 		op.SetExitCode(uint16(exitCode))
 		op.SetErr(err2)
 		onDone()
@@ -239,8 +296,9 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 		if err != nil {
 			return false, err
 		}
+		time.Sleep(1 * time.Second)
 
-		exitCode, err2 := d.globalReport(def)
+		exitCode, err2 := d.globalReport(o)
 		op.SetExitCode(uint16(exitCode))
 		op.SetErr(err2)
 		onDone()
@@ -259,27 +317,33 @@ func (d *daemon) performTest0(testDef model.TestDefinition) (exitCode int16) {
 	return
 }
 
-func (d *daemon) report(def model.ReportDefinition) (exitCode int16, err error) {
+func (d *daemon) report(op *model.ReportOp) (exitCode int16, err error) {
 	perf := logger.PerfTimer()
 	defer perf.End()
 
-	// Check if suite was started or wait some time
-	start := time.Now()
+	def := op.Definition
 	cfg, err := d.repo.GetSuiteConfig(def.TestSuite, true)
 	if err != nil {
 		return 1, err
 	}
-	for cfg.SuiteStartTime.IsEmpty() {
-		// Wait until suite is started
-		if time.Since(start) > WaitAsyncReportTestTimeout {
-			return 1, fmt.Errorf("you must perform some test prior to report")
-		}
-		time.Sleep(time.Millisecond)
-		cfg, err = d.repo.GetSuiteConfig(def.TestSuite, true)
-		if err != nil {
-			return 1, err
-		}
-	}
+
+	// // Check if suite was started or wait some time
+	// start := time.Now()
+	// cfg, err := d.repo.GetSuiteConfig(def.TestSuite, true)
+	// if err != nil {
+	// 	return 1, err
+	// }
+	// for cfg.SuiteStartTime.IsEmpty() {
+	// 	// Wait until suite is started
+	// 	if time.Since(start) > WaitAsyncReportTestTimeout {
+	// 		return 1, fmt.Errorf("you must perform some test prior to report")
+	// 	}
+	// 	time.Sleep(time.Millisecond)
+	// 	cfg, err = d.repo.GetSuiteConfig(def.TestSuite, true)
+	// 	if err != nil {
+	// 		return 1, err
+	// 	}
+	// }
 
 	// Wait for some test to report until suite timeout
 	// FIXME: Daemon never report @all ?
@@ -287,45 +351,64 @@ func (d *daemon) report(def model.ReportDefinition) (exitCode int16, err error) 
 	// Add a WaitAllOperationsDone(seq) error
 	// Add a WaitSuiteOperationsDone(suite, seq) error
 	// On first suite test Op done update suite start time
-	testCount := d.repo.ToReportTestCountBySuiteAndMode(def.TestSuite, true, false)
-	for testCount == 0 {
-		if time.Since(start) > cfg.SuiteTimeout.Get() {
-			return 1, fmt.Errorf("timeouted suite report waiting for test")
-		}
-		time.Sleep(time.Millisecond)
-		testCount = d.repo.TestCount(def.TestSuite)
+
+	// testCount := d.repo.ToReportTestCountBySuiteAndMode(def.TestSuite, true, false)
+	// for testCount == 0 {
+	// 	if time.Since(start) > cfg.SuiteTimeout.Get() {
+	// 		return 1, fmt.Errorf("timeouted suite report waiting for test")
+	// 	}
+	// 	time.Sleep(time.Millisecond)
+	// 	testCount = d.repo.TestCount(def.TestSuite)
+	// }
+
+	// FIXME: must use right timeout
+	err = d.repo.WaitSuiteOperationsDoneBefore(&op.OperationBase, cfg.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
+	if err != nil {
+		return 1, err
 	}
 
 	exitCode, err = service.ProcessReportDef(def)
 	logger.Debug("Closing test suite", "token", def.Token, "isolation", def.Isolation, "openedSuite", def.TestSuite)
 	d.openedSuites = collectionz.Delete(d.openedSuites, def.TestSuite)
-	//fmt.Printf("\n<<>> deleted opened suite: %s ; openedSuites: %s\n", def.TestSuite, d.openedSuites)
+	fmt.Printf("\n<<>> [%d] deleted opened suite: %s ; openedSuites: %s\n", os.Getpid(), def.TestSuite, d.openedSuites)
 	return
 }
 
-func (d *daemon) globalReport(def model.ReportDefinition) (exitCode int16, err error) {
+func (d *daemon) globalReport(op *model.GlobalReportOp) (exitCode int16, err error) {
 	perf := logger.PerfTimer()
 	defer perf.End()
 
-	start := time.Now()
+	def := op.Definition
+	cfg, err := d.repo.GetGlobalConfig()
+	if err != nil {
+		return 1, err
+	}
 
+	// start := time.Now()
 	// Wait for some test to report until suite timeout.
 	// FIXME: Daemon never report @all ?
-	testCount := d.repo.ToReportTestCountByMode(true, false)
+	// testCount := d.repo.ToReportTestCountByMode(true, false)
 
-	// FIXME: should not need to wait for test count > 0
-	for testCount == 0 {
-		if time.Since(start) > WaitAsyncReportTestTimeout {
-			// FIXME: why not return an error ?
-			return 1, fmt.Errorf("timeouted global report waiting for test")
-		}
-		time.Sleep(time.Millisecond)
-		testCount = d.repo.NotReportedTestCount()
+	// // FIXME: should not need to wait for test count > 0
+	// for testCount == 0 {
+	// 	if time.Since(start) > WaitAsyncReportTestTimeout {
+	// 		// FIXME: why not return an error ?
+	// 		return 1, fmt.Errorf("timeouted global report waiting for test")
+	// 	}
+	// 	time.Sleep(time.Millisecond)
+	// 	testCount = d.repo.NotReportedTestCount()
+	// }
+
+	// FIXME: must use right timeout
+	err = d.repo.WaitAllOperationsDoneBefore(&op.OperationBase, cfg.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
+	if err != nil {
+		return 1, err
 	}
 
 	exitCode, err = service.ProcessGlobalReportDef(def, true)
 	logger.Debug("Closing all test suites", "token", def.Token, "isolation", def.Isolation)
 	d.openedSuites = []string{}
+	fmt.Printf("\n<<>> [%d] deleted all opened suite\n", os.Getpid())
 	//d.display.Clear()
 	return
 }
@@ -399,7 +482,7 @@ func TakeOver() {
 	fileLock := flock.New(lockFilepath)
 
 	// Wait to acquire file lock
-	lockCtx, cancel := context.WithTimeout(context.Background(), LockWatingSecs*time.Second)
+	lockCtx, cancel := context.WithTimeout(context.Background(), LockWatingDuration)
 	defer cancel()
 	locked, err := fileLock.TryLockContext(lockCtx, daemonTryLockPeriod)
 	if err != nil {
@@ -461,7 +544,7 @@ func TakeOver() {
 	d.run()
 
 	// Lock prior last unqueue
-	lockCtx, cancel = context.WithTimeout(context.Background(), LockWatingSecs*time.Second)
+	lockCtx, cancel = context.WithTimeout(context.Background(), LockWatingDuration)
 	defer cancel()
 	locked, err = fileLock.TryLockContext(lockCtx, daemonTryLockPeriod)
 	if err != nil && err != context.DeadlineExceeded {

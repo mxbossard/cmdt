@@ -295,10 +295,12 @@ func main() {
 
 	if daemonToken != "" {
 		go daemon.WatchDaemonActivity(daemonToken, daemonIsol)
+		// FIXME: delegate the daemon launch to the demon activity watcher. Which should launch a daemon only if necessary.
 		err := daemon.LanchProcessIfNeeded(daemonToken, daemonIsol)
 		if err != nil {
 			panic(err)
 		}
+
 	}
 
 	//log.Printf("waiting\n")

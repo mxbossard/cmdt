@@ -4,10 +4,13 @@ import (
 	"cmdt/internal/model"
 	"cmdt/internal/service"
 	"fmt"
+	"os"
+	"runtime/debug"
 	"sync"
 	"time"
 
 	"github.com/mxbossard/utilz/collectionz"
+	"github.com/mxbossard/utilz/zlog"
 )
 
 const (
@@ -17,6 +20,8 @@ const (
 	schedulerMaxWorker           = 30
 	waitQueueCompleteSleepPeriod = 1 * time.Millisecond
 )
+
+var logger = zlog.New() //slog.New(slog.NewTextHandler(os.Stderr, model.DefaultLoggerOpts))
 
 /*
 
@@ -57,6 +62,17 @@ func QueueTestDef(testDef model.TestDefinition, op *model.TestOp, onDone func())
 	suite := testDef.TestSuite
 	forkCount := int(testDef.Config.ForkCount.Get())
 	work := func() {
+		defer func() {
+			err := recover()
+			if err != nil {
+				logger.Error("FORK ERROR: trapped a panic", "error", err)
+				fmt.Printf("\n/!\\ FORK ERROR [%d]: trapped a panic /!\\\n%v\n", os.Getpid(), err)
+				fmt.Printf("\nstack :%s\n", string(debug.Stack()))
+				// panic(err)
+				os.Exit(1)
+			}
+		}()
+
 		exitCode := service.ProcessTestDef(testDef, true)
 		op.SetExitCode(uint16(exitCode))
 		onDone()

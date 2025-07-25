@@ -98,13 +98,14 @@ func (d AsyncDisplay) OpenSuite(ctx facade.SuiteContext) {
 	}
 }
 
-func (d AsyncDisplay) CloseSuite(ctx facade.SuiteContext) {
+func (d AsyncDisplay) CloseSuite(ctx facade.SuiteContext, msg string) {
 	suite := ctx.Config.TestSuite.Get()
 	session, err := d.screen.Session(suite, 0)
 	if err != nil {
 		panic(err)
 	}
-	err = session.End(fmt.Sprintf("closing suite: %s", suite))
+	msg = fmt.Sprintf("async CloseSuite() %s", msg)
+	err = session.End(msg)
 	if err != nil {
 		panic(err)
 	}

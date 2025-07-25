@@ -232,6 +232,28 @@ func (d Test) GetSuiteOutcome(suite string) (outcome model.SuiteOutcome, err err
 	return
 }
 
+func (d Test) LoadTestOutcome(sign model.TestSignature) (outcome *model.TestOutcome, err error) {
+	row := d.db.QueryRow(`
+		SELECT exitCode
+		FROM tested t
+		WHERE t.suite = @suite AND t.seq = @seq
+	`, sql.Named("suite", sign.TestSuite), sql.Named("seq", sign.Seq))
+	var exitCode int
+	err = row.Scan(&exitCode)
+	if err == nil {
+		// FIXME: load other TestOutcome fields ?
+		outcome = &model.TestOutcome{
+			TestSignature: sign,
+			ExitCode:      int16(exitCode),
+		}
+	} else if err == sql.ErrNoRows {
+		// Swallow no row error
+		err = nil
+	}
+
+	return
+}
+
 func (d Test) SaveTestOutcome(outcome model.TestOutcome) (err error) {
 	seq := outcome.Seq
 	suite := outcome.TestSuite
