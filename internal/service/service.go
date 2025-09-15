@@ -598,13 +598,40 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 						return max(exitCode, asyncExitCode)
 					}
 
-					go func() {
+					// Attempt to perform global report of async suites on cli side.
+					wait = func() int16 {
 						fmt.Fprintf(os.Stderr, "\n<<>> tailing suites: %s ... \n", asyncSuites)
 						err = asyncDpl.TailSuppliedBlocking(asyncSuites, globalCtx.Config.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
 						ProcessGlobalError(globalCtx, err)
 						fmt.Fprintf(os.Stderr, "\n<<>> tailing suites: %s finished. \n", asyncSuites)
 						logger.Info("finished async TailAllBlocking", "opId", op.Id())
-					}()
+
+						err := globalCtx.Repo.WaitAllOperationsDoneBefore(&op, globalCtx.Config.SuiteTimeout.GetOr(defaultGlobalTimeout))
+						if err != nil {
+							//panic(err)
+							Dpl.Errors(err)
+						}
+						fmt.Fprintf(os.Stderr, "\n<<>> all op done.\n")
+						logger.Info("all op done")
+
+						asyncExitCode, err = globalReport(globalCtx, true)
+						ProcessGlobalError(globalCtx, err)
+						for _, suite := range asyncSuites {
+							err = cliAfterSuiteReport(globalCtx.Token, globalCtx.Isolation, suite, Dpl)
+							ProcessGlobalError(globalCtx, err)
+						}
+						return max(exitCode, asyncExitCode)
+					}
+
+					/*
+						go func() {
+							fmt.Fprintf(os.Stderr, "\n<<>> tailing suites: %s ... \n", asyncSuites)
+							err = asyncDpl.TailSuppliedBlocking(asyncSuites, globalCtx.Config.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
+							ProcessGlobalError(globalCtx, err)
+							fmt.Fprintf(os.Stderr, "\n<<>> tailing suites: %s finished. \n", asyncSuites)
+							logger.Info("finished async TailAllBlocking", "opId", op.Id())
+						}()
+					*/
 				}
 			}
 
@@ -666,34 +693,58 @@ func ProcessArgs(allArgs []string) (daemonToken, daemonIsol string, wait func() 
 				daemonIsol = suiteCtx.Isolation
 				daemonToken = suiteCtx.Token
 
-				if suiteCtx.Config.Wait.Is(true) {
-					wait = func() int16 {
-						// FIXME: bad timeout
-						pt := logger.QualifiedPerfTimer("waiting report done ...", "suite", testSuite)
-						defer pt.End()
-						var opErr error
-						exitCode, opErr, err = suiteCtx.Repo.WaitOperationDone(&op, suiteCtx.Config.SuiteTimeout.Get())
-						if err != nil {
-							//panic(err)
-							Dpl.Errors(err)
-						} else if opErr != nil {
-							Dpl.Errors(fmt.Errorf("daemon error: %w", opErr))
-						}
-
-						err = cliAfterSuiteReport(daemonToken, daemonIsol, testSuite, asyncDpl)
-						ProcessSuiteError(suiteCtx, err)
-
-						return exitCode
+				// always wait
+				// if suiteCtx.Config.Wait.Is(true) {
+				wait = func() int16 {
+					// FIXME: bad timeout
+					pt := logger.QualifiedPerfTimer("waiting report done ...", "suite", testSuite)
+					defer pt.End()
+					var opErr error
+					exitCode, opErr, err = suiteCtx.Repo.WaitOperationDone(&op, suiteCtx.Config.SuiteTimeout.Get())
+					if err != nil {
+						//panic(err)
+						Dpl.Errors(err)
+					} else if opErr != nil {
+						Dpl.Errors(fmt.Errorf("daemon error: %w", opErr))
 					}
-				} else {
-					exitCode = 0
-				}
 
-				go func() {
+					err = cliAfterSuiteReport(daemonToken, daemonIsol, testSuite, asyncDpl)
+					ProcessSuiteError(suiteCtx, err)
+
+					return exitCode
+				}
+				// } else {
+				// 	exitCode = 0
+				// }
+
+				wait = func() int16 {
 					err = asyncDpl.TailBlocking(testSuite, suiteCtx.Config.SuiteTimeout.Get())
 					ProcessSuiteError(suiteCtx, err)
 					logger.Info("finished async TailBlocking")
-				}()
+
+					err := suiteCtx.Repo.WaitSuiteOperationsDoneBefore(&op, suiteCtx.Config.SuiteTimeout.GetOr(defaultGlobalTimeout))
+					if err != nil {
+						//panic(err)
+						Dpl.Errors(err)
+					}
+					fmt.Fprintf(os.Stderr, "\n<<>> all op done.\n")
+					logger.Info("all op done")
+
+					exitCode, err = ProcessReportDef(def)
+					ProcessSuiteError(suiteCtx, err)
+					err = cliAfterSuiteReport(suiteCtx.Token, suiteCtx.Isolation, testSuite, Dpl)
+					ProcessSuiteError(suiteCtx, err)
+
+					return exitCode
+				}
+
+				/*
+					go func() {
+						err = asyncDpl.TailBlocking(testSuite, suiteCtx.Config.SuiteTimeout.Get())
+						ProcessSuiteError(suiteCtx, err)
+						logger.Info("finished async TailBlocking")
+					}()
+				*/
 
 			} else {
 				logger.Info("executing report in sync", "suite", testSuite)

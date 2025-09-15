@@ -109,7 +109,7 @@ func (d *daemon) run() {
 				duration := time.Since(lastUnqueue)
 				if duration > MaxNoOpToUnqueueDuration {
 					logger.Debug("DAEMON: nothing to unqueue", "duration", duration, "token", d.token)
-					fmt.Printf("\n<<>> No Op to unqueue for %d\n", time.Since(lastUnqueue))
+					fmt.Printf("\n<<>> No Op to unqueue for %s\n", time.Since(lastUnqueue))
 					break
 				}
 			}
@@ -296,7 +296,7 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 		if err != nil {
 			return false, err
 		}
-		time.Sleep(1 * time.Second)
+		// time.Sleep(1 * time.Second)
 
 		exitCode, err2 := d.globalReport(o)
 		op.SetExitCode(uint16(exitCode))
@@ -367,7 +367,12 @@ func (d *daemon) report(op *model.ReportOp) (exitCode int16, err error) {
 		return 1, err
 	}
 
-	exitCode, err = service.ProcessReportDef(def)
+	// Attempt to perform report on cli side only
+	// exitCode, err = service.ProcessReportDef(def)
+	ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.ReportAction, def.Config, false) // FIXME ? removing def.Config ?
+	defer ctx.Close()
+	d.display.CloseSuite(ctx, "following suite report")
+
 	logger.Debug("Closing test suite", "token", def.Token, "isolation", def.Isolation, "openedSuite", def.TestSuite)
 	d.openedSuites = collectionz.Delete(d.openedSuites, def.TestSuite)
 	fmt.Printf("\n<<>> [%d] deleted opened suite: %s ; openedSuites: %s\n", os.Getpid(), def.TestSuite, d.openedSuites)
@@ -405,7 +410,23 @@ func (d *daemon) globalReport(op *model.GlobalReportOp) (exitCode int16, err err
 		return 1, err
 	}
 
-	exitCode, err = service.ProcessGlobalReportDef(def, true)
+	// Attempt to perform report on cli side only
+	// exitCode, err = service.ProcessGlobalReportDef(def, true)
+	// if err != nil {
+	// 	return 1, err
+	// }
+	ctx := facade.NewGlobalContext(def.Token, def.Isolation, model.Config{}, false)
+	defer ctx.Close()
+	reportableSuites, err := ctx.Repo.ListReportableSuites()
+	if err != nil {
+		return 1, err
+	}
+	for _, suite := range reportableSuites {
+		sctx := facade.NewSuiteContext(def.Token, def.Isolation, suite, false, model.ReportAction, def.Config, false) // FIXME ? removing def.Config ?
+		d.display.CloseSuite(sctx, "following global report")
+		sctx.Close()
+	}
+
 	logger.Debug("Closing all test suites", "token", def.Token, "isolation", def.Isolation)
 	d.openedSuites = []string{}
 	fmt.Printf("\n<<>> [%d] deleted all opened suite\n", os.Getpid())

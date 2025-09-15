@@ -62,7 +62,7 @@ func (d AsyncDisplay) Global(ctx facade.GlobalContext) {
 
 	if ctx.Config.Verbose.Get() >= model.SHOW_FAILED_OUTS {
 		printer := d.screen.NotifyPrinter()
-		printer.ColoredErrf(display.MessageColor, "## New config (token: %s)\n", ctx.Token)
+		printer.ColoredErrf(display.MessageColor, "[A] ## New config (token: %s)\n", ctx.Token)
 		printer.Flush()
 	}
 }
@@ -137,7 +137,7 @@ func (d AsyncDisplay) SuiteTitle(ctx facade.SuiteContext) {
 		if err != nil {
 			panic(err)
 		}
-		printer.ColoredErrf(display.MessageColor, "## Test suite [%s] (token: %s)\n", suite, ctx.Token)
+		printer.ColoredErrf(display.MessageColor, "[A] ## Test suite [%s] (token: %s)\n", suite, ctx.Token)
 		printer.Flush()
 		session.ClosePrinter(SuiteBeginPrinterName, "low verbosity")
 	}
@@ -254,13 +254,13 @@ func (d AsyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 	duration := outcome.Duration
 	fmtDuration := display.NormalizeDurationInSec(duration)
 	if failedCount == 0 && errorCount == 0 && timeoutCount == 0 {
-		printer.ColoredErrf(display.SuccessColor, "Successfully ran [ %s ] test suite in %10s (%3d success)", testSuiteLabel, fmtDuration, passedCount)
+		printer.ColoredErrf(display.SuccessColor, "[A] Successfully ran [ %s ] test suite in %10s (%3d success)", testSuiteLabel, fmtDuration, passedCount)
 		printer.ColoredErrf(display.WarningColor, "%s", ignoredMessage)
 		printer.Errf("\n")
 	} else {
 		//printer.ColoredErrf(display.FailureColor, "Failures running [ %s ] test suite in %10s (%3d success, %3d failures, %3d errors, %3d timeouts on %3d tests)", testSuiteLabel, fmtDuration, passedCount, failedCount, errorCount, timeoutCount, testCount)
 		//printer.ColoredErrf(display.WarningColor, "%s", ignoredMessage)
-		printer.ColoredErrf(display.FailureColor, "Failures running [ %s ] test suite in %10s (%3d success", testSuiteLabel, fmtDuration, passedCount)
+		printer.ColoredErrf(display.FailureColor, "[A] Failures running [ %s ] test suite in %10s (%3d success", testSuiteLabel, fmtDuration, passedCount)
 		if failedCount > 0 {
 			printer.ColoredErrf(display.FailureColor, ", %3d failures", failedCount)
 		}
@@ -284,7 +284,7 @@ func (d AsyncDisplay) reportSuite(outcome model.SuiteOutcome, padding int) {
 		}
 	}
 	if tooMuchCount > 0 {
-		printer.ColoredErrf(display.WarningColor, "Too much failures (%d tests not executed)\n", tooMuchCount)
+		printer.ColoredErrf(display.WarningColor, "[A] Too much failures (%d tests not executed)\n", tooMuchCount)
 	}
 
 	/*
@@ -326,7 +326,7 @@ func (d AsyncDisplay) ReportAllFooter(globalCtx facade.GlobalContext) {
 	defer printer.Flush()
 	globalStartTime := globalCtx.Config.GlobalStartTime.Get()
 	globalDuration := model.NormalizeDurationInSec(time.Since(globalStartTime))
-	printer.ColoredErrf(display.MessageColor, "Global duration time: %s\n", globalDuration)
+	printer.ColoredErrf(display.MessageColor, "[A] Global duration time: %s\n", globalDuration)
 }
 
 func (d AsyncDisplay) TooMuchFailures(ctx facade.SuiteContext, testSuite string) {
@@ -345,7 +345,7 @@ func (d AsyncDisplay) TooMuchFailures(ctx facade.SuiteContext, testSuite string)
 		panic(err)
 	}
 	defer printer.Flush()
-	printer.ColoredErrf(display.WarningColor, "Too much failure for [%s] test suite. Stop testing.\n", testSuite)
+	printer.ColoredErrf(display.WarningColor, "[A] Too much failure for [%s] test suite. Stop testing.\n", testSuite)
 }
 
 func (d AsyncDisplay) Errors(errors ...error) {
@@ -354,7 +354,7 @@ func (d AsyncDisplay) Errors(errors ...error) {
 	printer := d.screen.NotifyPrinter()
 	defer printer.Flush()
 	for _, err := range errors {
-		printer.ColoredErrf(display.ErrorColor, "ERROR: %s\n", err)
+		printer.ColoredErrf(display.ErrorColor, "[A] ERROR: %s\n", err)
 	}
 }
 
@@ -363,7 +363,7 @@ func (d AsyncDisplay) GlobalErrors(ctx facade.GlobalContext, errors ...error) {
 	printer := d.screen.NotifyPrinter()
 	defer printer.Flush()
 	for _, err := range errors {
-		printer.ColoredErrf(display.ErrorColor, "ERROR: %s\n", err)
+		printer.ColoredErrf(display.ErrorColor, "[A] ERROR: %s\n", err)
 	}
 }
 
@@ -377,7 +377,7 @@ func (d AsyncDisplay) SuiteErrors(ctx facade.SuiteContext, errors ...error) {
 	printer := session.NotifyPrinter()
 	defer printer.Flush()
 	for _, err := range errors {
-		printer.ColoredErrf(display.ErrorColor, "ERROR: %s\n", err)
+		printer.ColoredErrf(display.ErrorColor, "[A] ERROR: %s\n", err)
 	}
 }
 
