@@ -1,4 +1,4 @@
-package daemon
+package background
 
 import (
 	"encoding/binary"
@@ -12,7 +12,18 @@ import (
 	"github.com/gofrs/flock"
 	"github.com/mxbossard/utilz/filez"
 	"github.com/mxbossard/utilz/utilz"
+	"github.com/mxbossard/utilz/zlog"
 )
+
+const (
+	daemonTryLockPeriod        = 200 * time.Microsecond
+	daemonWatcherPeriod        = 10 * time.Millisecond
+	maxWatcherSuccessiveErrors = 5
+	maxDaemonRestart           = 3
+	maxWatcherInactivityPeriod = (maxWatcherSuccessiveErrors * 2) * daemonWatcherPeriod
+)
+
+var logger = zlog.New()
 
 // The Daemon Watcher verify the daemon is processing work.
 // If the Daemon is inactive for a too long period, the watcher will attempt to restart it.
@@ -57,13 +68,13 @@ Loop:
 }
 */
 
-func startHeartBeat(rep repo.Repo, msg string) {
+func StartHeartBeat(rep repo.Repo, msg string) {
 	watcher = NewActivityWatcher(filepath.Join(rep.BackingFilepath(), "activity.ping"))
 	watcher.StartDaemon(daemonWatcherPeriod, msg)
 	// go heartBeat(rep)
 }
 
-func stopHeartBeat(msg string) {
+func StopHeartBeat(msg string) {
 	watcher.StopDaemon(msg)
 	// stopChan <- true
 }
@@ -119,7 +130,7 @@ func WatchDaemonActivity0(daemonToken, daemonIsol string) {
 */
 
 // Watch for daemon activity and restart the daemon if it is inactive for too long.
-func WatchDaemonActivity(daemonToken, daemonIsol string) {
+func watchDaemonActivity(daemonToken, daemonIsol string) {
 	rep := repo.New(daemonToken, daemonIsol)
 	daemonRestart := 0
 

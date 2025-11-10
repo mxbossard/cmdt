@@ -291,17 +291,7 @@ func main() {
 
 	logger.Warn("cmdt started", "pid", os.Getpid(), "args", os.Args[1:])
 
-	daemonToken, daemonIsol, wait := service.ProcessArgs(os.Args)
-
-	if daemonToken != "" {
-		go daemon.WatchDaemonActivity(daemonToken, daemonIsol)
-		// FIXME: delegate the daemon launch to the demon activity watcher. Which should launch a daemon only if necessary.
-		err := daemon.LanchProcessIfNeeded(daemonToken, daemonIsol)
-		if err != nil {
-			panic(err)
-		}
-
-	}
+	wait := service.ProcessArgs(os.Args)
 
 	//log.Printf("waiting\n")
 	exitCode := wait()
