@@ -93,14 +93,27 @@ type Repo interface {
 
 	NotDone(op model.Operater) (err error)
 	Done(op model.Operater) (err error)
+	IsOperationsDone(op model.Operater) (done bool, exitCode int16, opErr, err error)
+
+	CountSuiteTestedBeforeId(suite string, id uint) (count int, err error)
+	CountGlobalTestedBeforeId(id uint) (count int, err error)
+	CountGlobalNotDoneBeforeId(id uint) (count int, err error)
+	CountGlobalNotDoneBeforeOp(op model.Operater) (count int, err error)
+	CountSuiteNotDoneBeforeId(suite string, id uint) (count int, err error)
+	CountSuiteNotDoneBeforeOp(op model.Operater) (count int, err error)
+	// LastGlobalSeq() (lastId int, err error)
+	// LastSuiteSeq(suite string) (lastId int, err error)
+	LastGlobalTestedId() (lastId int, err error)
+	LastSuiteTestedId(suite string) (lastId int, err error)
+	LastGlobalOperationId() (lastId int, err error)
+	LastSuiteOperationId(suite string) (lastId int, err error)
+	QueuedOperationsCountBySuite(suite string) (count int, err error)
+	QueuedOperationsCount() (count int, err error)
 
 	WaitAllOperationsDoneBefore(op model.Operater, timeout time.Duration) (err error)
 	WaitSuiteOperationsDoneBefore(op model.Operater, timeout time.Duration) (err error)
-
 	WaitOperationDone(op model.Operater, timeout time.Duration) (exitCode int16, opErr, err error)
-
 	WaitEmptyQueue(testSuite string, timeout time.Duration) (err error)
-
 	WaitAllEmpty(timeout time.Duration) (err error)
 
 	SaveDaemonPid(pid int) (err error)

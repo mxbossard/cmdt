@@ -442,6 +442,42 @@ func (r DbRepo) TooMuchCount(testSuite string) (n uint) {
 	return
 }
 
+// func (r DbRepo) LastGlobalSeq() (lastId int, err error) {
+// 	lastId, err = r.suiteDao.LastGlobalSeq()
+// 	err = r.wrap(err)
+// 	return
+// }
+
+// func (r DbRepo) LastSuiteSeq(suite string) (lastId int, err error) {
+// 	lastId, err = r.suiteDao.LastSuiteSeq(suite)
+// 	err = r.wrap(err)
+// 	return
+// }
+
+func (r DbRepo) LastGlobalTestedId() (lastId int, err error) {
+	lastId, err = r.testDao.LastGlobalTestedId()
+	err = r.wrap(err)
+	return
+}
+
+func (r DbRepo) LastSuiteTestedId(suite string) (lastId int, err error) {
+	lastId, err = r.testDao.LastSuiteTestedId(suite)
+	err = r.wrap(err)
+	return
+}
+
+func (r DbRepo) CountGlobalTestedBeforeId(id uint) (count int, err error) {
+	count, err = r.testDao.CountGlobalTestedBeforeId(id)
+	err = r.wrap(err)
+	return
+}
+
+func (r DbRepo) CountSuiteTestedBeforeId(suite string, id uint) (count int, err error) {
+	count, err = r.testDao.CountSuiteTestedBeforeId(suite, id)
+	err = r.wrap(err)
+	return
+}
+
 func (r DbRepo) QueueOperation(op model.Operater) (err error) {
 	err = r.queueDao.QueueOperater(op)
 	if err == nil {
@@ -481,22 +517,66 @@ func (r DbRepo) Done(op model.Operater) (err error) {
 	return
 }
 
-func (r DbRepo) CountGlobalNotDoneBefore(op model.Operater) (count int, err error) {
-	if op == nil {
-		panic(fmt.Errorf("nil operation"))
-	}
-
-	count, err = r.queueDao.CountGlobalNotDoneBefore(op)
+func (r DbRepo) IsOperationsDone(op model.Operater) (done bool, exitCode int16, opErr, err error) {
+	done, exitCode, opErr, err = r.queueDao.IsOperationsDone(op)
 	err = r.wrap(err)
 	return
 }
 
-func (r DbRepo) CountSuiteNotDoneBefore(op model.Operater) (count int, err error) {
+func (r DbRepo) CountGlobalNotDoneBeforeId(id uint) (count int, err error) {
+	count, err = r.queueDao.CountGlobalNotDoneBeforeId(id)
+	err = r.wrap(err)
+	return
+}
+
+// FIXME: remove ?
+func (r DbRepo) CountGlobalNotDoneBeforeOp(op model.Operater) (count int, err error) {
 	if op == nil {
 		panic(fmt.Errorf("nil operation"))
 	}
 
-	count, err = r.queueDao.CountSuiteNotDoneBefore(op)
+	count, err = r.queueDao.CountGlobalNotDoneBeforeOp(op)
+	err = r.wrap(err)
+	return
+}
+
+func (r DbRepo) CountSuiteNotDoneBeforeId(suite string, id uint) (count int, err error) {
+	count, err = r.queueDao.CountSuiteNotDoneBeforeId(suite, id)
+	err = r.wrap(err)
+	return
+}
+
+// FIXME: remove ?
+func (r DbRepo) CountSuiteNotDoneBeforeOp(op model.Operater) (count int, err error) {
+	if op == nil {
+		panic(fmt.Errorf("nil operation"))
+	}
+
+	count, err = r.queueDao.CountSuiteNotDoneBeforeOp(op)
+	err = r.wrap(err)
+	return
+}
+
+func (r DbRepo) LastGlobalOperationId() (lastId int, err error) {
+	lastId, err = r.queueDao.LastGlobalOperationId()
+	err = r.wrap(err)
+	return
+}
+
+func (r DbRepo) LastSuiteOperationId(suite string) (lastId int, err error) {
+	lastId, err = r.queueDao.LastSuiteOperationId(suite)
+	err = r.wrap(err)
+	return
+}
+
+func (r DbRepo) QueuedOperationsCountBySuite(suite string) (count int, err error) {
+	count, err = r.queueDao.QueuedOperationsCountBySuite(suite, nil)
+	err = r.wrap(err)
+	return
+}
+
+func (r DbRepo) QueuedOperationsCount() (count int, err error) {
+	count, err = r.queueDao.QueuedOperationsCount()
 	err = r.wrap(err)
 	return
 }
@@ -506,7 +586,7 @@ func (r DbRepo) WaitAllOperationsDoneBefore(op model.Operater, timeout time.Dura
 	start := time.Now()
 	for time.Since(start) < timeout {
 		var count int
-		count, err = r.queueDao.CountGlobalNotDoneBefore(op)
+		count, err = r.queueDao.CountGlobalNotDoneBeforeOp(op)
 		if count == 0 || err != nil {
 			// All operater done
 			return
@@ -519,11 +599,32 @@ func (r DbRepo) WaitAllOperationsDoneBefore(op model.Operater, timeout time.Dura
 	return
 }
 
+func (r DbRepo) WaitAllOperationsDone(timeout time.Duration) (err error) {
+	start := time.Now()
+	for time.Since(start) < timeout {
+		var count, lastId int
+		lastId, err = r.queueDao.LastGlobalOperationId()
+		if err != nil {
+			return err
+		}
+		count, err = r.queueDao.CountGlobalNotDoneBeforeId(uint(lastId) + 1)
+		if count == 0 || err != nil {
+			// All operater done
+			return
+		}
+		time.Sleep(WaitingOpDoneSleepPeriodInMs * time.Millisecond)
+		logger.Trace("waiting ...", "ops <=", lastId)
+	}
+	err = fmt.Errorf("WaitAllOperationsDone() timed out after %s", timeout)
+	err = r.wrap(err)
+	return
+}
+
 func (r DbRepo) WaitSuiteOperationsDoneBefore(op model.Operater, timeout time.Duration) (err error) {
 	start := time.Now()
 	for time.Since(start) < timeout {
 		var count int
-		count, err = r.queueDao.CountSuiteNotDoneBefore(op)
+		count, err = r.queueDao.CountSuiteNotDoneBeforeOp(op)
 		if count == 0 || err != nil {
 			// All operater done
 			return
@@ -532,6 +633,27 @@ func (r DbRepo) WaitSuiteOperationsDoneBefore(op model.Operater, timeout time.Du
 		logger.Trace("waiting ...", "op", op)
 	}
 	err = fmt.Errorf("WaitSuiteOperationsDoneBefore() for op: %s timed out after %s", op, timeout)
+	err = r.wrap(err)
+	return
+}
+
+func (r DbRepo) WaitSuiteOperationsDone(suite string, timeout time.Duration) (err error) {
+	start := time.Now()
+	for time.Since(start) < timeout {
+		var count, lastId int
+		lastId, err = r.queueDao.LastSuiteOperationId(suite)
+		if err != nil {
+			return err
+		}
+		count, err = r.queueDao.CountSuiteNotDoneBeforeId(suite, uint(lastId)+1)
+		if count == 0 || err != nil {
+			// All operater done
+			return
+		}
+		time.Sleep(WaitingOpDoneSleepPeriodInMs * time.Millisecond)
+		logger.Trace("waiting ...", "op <=", lastId)
+	}
+	err = fmt.Errorf("WaitSuiteOperationsDone() for suite: %s timed out after %s", suite, timeout)
 	err = r.wrap(err)
 	return
 }

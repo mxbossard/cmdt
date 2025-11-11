@@ -559,13 +559,13 @@ $cmdtIn $forkCfg @init=suite_ignore2
 $cmdtIn @test=suite_ignore2/init_suite @-- $newCmdt2 @init=suite_ignore2_sub @ignore
 $cmdtIn @test=suite_ignore2/ @stderr= @-- $newCmdt2 @test=suite_ignore2_sub/ true
 $cmdtIn @test=suite_ignore2/ @stderr= @-- $newCmdt2 @test=suite_ignore2_sub/ true
-$cmdtIn @test=suite_ignore2/global_report @stderr:"Ignored not ran" @stderr:"suite_ignore2_sub" @stderr!:"suite_ignore1_sub" @-- $newCmdt2 @report
+$cmdtIn @test=suite_ignore2/global_report @fail @stderr:"Ignored not ran" @stderr:"suite_ignore2_sub" @stderr!:"suite_ignore1_sub" @-- $newCmdt2 @report
 
 $cmdtIn $forkCfg @init=suite_ignore3
 $cmdtIn @test=suite_ignore3/init_suite @-- $newCmdt2 @init=suite_ignore3_sub @ignore
 $cmdtIn @test=suite_ignore3/ @stderr= @-- $newCmdt2 @test=suite_ignore3_sub/ true
 $cmdtIn @test=suite_ignore3/ @stderr= @-- $newCmdt2 @test=suite_ignore3_sub/ true
-$cmdtIn @test=suite_ignore3/global_report @stderr:"Ignored not ran" @stderr:"suite_ignore3_sub" @stderr!:"suite_ignore1_sub" @stderr!:"suite_ignore2_sub" @-- $newCmdt2 @report
+$cmdtIn @test=suite_ignore3/global_report @fail @stderr:"Ignored not ran" @stderr:"suite_ignore2_sub" @stderr:"suite_ignore3_sub" @stderr!:"suite_ignore1_sub" @-- $newCmdt2 @report
 
 
 >&2 echo "## Test test timeout"

@@ -260,28 +260,35 @@ func (d Queue) Done(op model.Operater) (err error) {
 	return
 }
 
-func (d Queue) CountGlobalNotDoneBefore(op model.Operater) (count int, err error) {
+func (d Queue) CountGlobalNotDoneBeforeId(id uint) (count int, err error) {
 	row := d.db.QueryRow(`
 		SELECT count(*) 
 		FROM operation_queue q
 		WHERE q.id < @id AND q.exitCode IS NULL;
-	`, sql.Named("id", op.Id()))
+	`, sql.Named("id", id))
 	err = row.Scan(&count)
 	return
 }
 
-func (d Queue) CountSuiteNotDoneBefore(op model.Operater) (count int, err error) {
-	suite := op.Suite()
-	if suite == "" {
+func (d Queue) CountGlobalNotDoneBeforeOp(op model.Operater) (count int, err error) {
+	return d.CountGlobalNotDoneBeforeId(op.Id())
+}
 
+func (d Queue) CountSuiteNotDoneBeforeId(suite string, id uint) (count int, err error) {
+	if suite == "" {
+		// FIXME: what to do ?
 	}
 	row := d.db.QueryRow(`
 		SELECT count(*) 
 		FROM operation_queue q
 		WHERE q.id < @id AND q.suite = @suite AND q.exitCode IS NULL;
-	`, sql.Named("suite", suite), sql.Named("id", op.Id()))
+	`, sql.Named("suite", suite), sql.Named("id", id))
 	err = row.Scan(&count)
 	return
+}
+
+func (d Queue) CountSuiteNotDoneBeforeOp(op model.Operater) (count int, err error) {
+	return d.CountSuiteNotDoneBeforeId(op.Suite(), op.Id())
 }
 
 func (d Queue) CloseSuite0(suite string) (err error) {
@@ -344,6 +351,25 @@ func (d Queue) GlobalOperationsCount() (count int, err error) {
 		FROM operation_queue q
 	;`)
 	err = row.Scan(&count)
+	return
+}
+
+func (d Queue) LastSuiteOperationId(suite string) (id int, err error) {
+	row := d.db.QueryRow(`
+		SELECT max(q.id) 
+		FROM operation_queue q
+		WHERE q.suite = ?
+	;`, suite)
+	err = row.Scan(&id)
+	return
+}
+
+func (d Queue) LastGlobalOperationId() (id int, err error) {
+	row := d.db.QueryRow(`
+		SELECT max(q.id) 
+		FROM operation_queue q
+	;`)
+	err = row.Scan(&id)
 	return
 }
 

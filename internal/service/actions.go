@@ -214,40 +214,13 @@ func reportAllAction(token, isolation string, inputConfig model.Config, parseArg
 				return max(exitCode, asyncExitCode)
 			}
 
-			// Attempt to perform global report of async suites on cli side.
-			wait = func() int16 {
+			go func() {
 				fmt.Fprintf(os.Stderr, "\n<<>> tailing suites: %s ... \n", asyncSuites)
 				err = asyncDpl.TailSuppliedBlocking(asyncSuites, globalCtx.Config.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
 				ProcessGlobalError(globalCtx, err)
 				fmt.Fprintf(os.Stderr, "\n<<>> tailing suites: %s finished. \n", asyncSuites)
 				logger.Info("finished async TailAllBlocking", "opId", op.Id())
-
-				err := globalCtx.Repo.WaitAllOperationsDoneBefore(&op, globalCtx.Config.SuiteTimeout.GetOr(defaultGlobalTimeout))
-				if err != nil {
-					//panic(err)
-					Dpl.Errors(err)
-				}
-				fmt.Fprintf(os.Stderr, "\n<<>> all op done.\n")
-				logger.Info("all op done")
-
-				asyncExitCode, err = globalReport(globalCtx, true)
-				ProcessGlobalError(globalCtx, err)
-				for _, suite := range asyncSuites {
-					err = cliAfterSuiteReport(globalCtx.Token, globalCtx.Isolation, suite, Dpl)
-					ProcessGlobalError(globalCtx, err)
-				}
-				return max(exitCode, asyncExitCode)
-			}
-
-			/*
-				go func() {
-					fmt.Fprintf(os.Stderr, "\n<<>> tailing suites: %s ... \n", asyncSuites)
-					err = asyncDpl.TailSuppliedBlocking(asyncSuites, globalCtx.Config.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
-					ProcessGlobalError(globalCtx, err)
-					fmt.Fprintf(os.Stderr, "\n<<>> tailing suites: %s finished. \n", asyncSuites)
-					logger.Info("finished async TailAllBlocking", "opId", op.Id())
-				}()
-			*/
+			}()
 		}
 	}
 
@@ -259,6 +232,108 @@ func reportAllAction(token, isolation string, inputConfig model.Config, parseArg
 
 	// Display report all footer before wait is called and then before suites are marked reported for accurate timings
 	Dpl.ReportAllFooter(globalCtx)
+
+	return
+}
+
+func syncReportAllAction(token, isolation string, inputConfig model.Config, parseArgsErrors errorz.Aggregated) (exitCode int16, wait func() int16, err error) {
+	// Report all sync suites then all async suites
+	exitCode = 1
+	wait = func() int16 { return exitCode }
+
+	logger.Debug("Executing Report all action")
+	// Reporting All test suite
+	if parseArgsErrors.GotError() {
+		errorz.Fatal(parseArgsErrors)
+	}
+	globalCtx := facade.NewGlobalContext(token, isolation, inputConfig, false)
+	defer globalCtx.Close()
+	globalCfg := globalCtx.Config
+	rep := facade.CachedRepo(token, isolation)
+	defer rep.PoolClose()
+	reportAll := globalCfg.ReportAll.GetOr(model.DefaultReportAll)
+
+	defer func() {
+		err = globalCtx.Repo.MarkSuitesReported()
+		ProcessGlobalError(globalCtx, err)
+	}()
+
+	// Process report all without daemon
+	logger.Trace("Forged context", "ctx", globalCtx)
+	// logger.Info("executing report all in sync (not queueing report)")
+	Dpl.Quiet(globalCfg.Quiet.Is(true))
+
+	var suites []string
+	if reportAll {
+		suites, err = rep.ListAllSuites()
+	} else {
+		suites, err = rep.ListReportableSuites()
+	}
+	ProcessGlobalError(globalCtx, err)
+
+	//if len(syncSuites)+len(asyncSuites) == 0 { // !reportAll && ignoredSuiteCount+toReportSyncTestCount+toReportAsyncTestCount == 0
+	if len(suites) == 0 {
+		exitCode = 1
+		err := fmt.Errorf("you must perform some test prior to report globaly")
+		ProcessGlobalError(globalCtx, err)
+	}
+
+	suitesChan, err := WatchAllTestsPerformed(rep, reportAll, defaultGlobalTimeout)
+	ProcessGlobalError(globalCtx, err)
+
+	reportPassed := true
+	var testsPassed uint32
+	for suite := range suitesChan {
+		if suite.Err != nil {
+			ProcessGlobalError(globalCtx, err)
+		}
+		testSuite := suite.Val
+
+		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, model.ReportAction, model.Config{}, false)
+		// if suiteCtx.Config.TestSuite.IsEmpty() {
+		// 	fmt.Printf("\n<<>> empty suite name in ctx !!! \nctx: %v ; \ncfg: %v\n", suiteCtx, suiteCtx.Config)
+		// }
+
+		def := model.ReportDefinition{Token: token, Isolation: isolation, TestSuite: testSuite, Config: suiteCtx.Config}
+		ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.ReportAction, def.Config, false) // FIXME ? removing def.Config ?
+
+		suiteOutcome, _, err := reportTestSuite(ctx, true, reportAll)
+		ProcessGlobalError(globalCtx, err)
+
+		if suiteOutcome.Duration < 0 {
+			// FIXME: report should save an endTime for suite duration to be saved
+			suiteOutcome.Duration = time.Since(ctx.Config.SuiteStartTime.Get())
+		}
+
+		Dpl.ReportSuite(suiteOutcome)
+		Dpl.CloseSuite(ctx, "following report")
+
+		err = cliAfterSuiteReport(token, isolation, testSuite, Dpl)
+		ProcessGlobalError(globalCtx, err)
+		reportPassed = reportPassed && (suiteOutcome.Outcome == model.PASSED || suiteOutcome.Outcome == model.IGNORED || suiteOutcome.Outcome == model.EMPTY)
+		testsPassed += suiteOutcome.PassedCount
+
+		ctx.Close()
+	}
+
+	// err = globalCtx.Repo.MarkSuitesReported()
+	// ProcessGlobalError(globalCtx, err)
+
+	if reportPassed {
+		exitCode = 0
+	} else {
+		exitCode = 1
+	}
+
+	// Display report all footer before wait is called and then before suites are marked reported for accurate timings
+	Dpl.ReportAllFooter(globalCtx)
+
+	if testsPassed == 0 && !reportAll {
+		// When not reporting @all, reporting no tests passed should fail.
+		exitCode = 1
+		err := fmt.Errorf("you must perform some test prior to report globaly")
+		ProcessGlobalError(globalCtx, err)
+	}
 
 	return
 }

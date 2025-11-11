@@ -162,7 +162,7 @@ func reportTestSuite(ctx facade.SuiteContext, global, all bool) (suiteOutcome mo
 		}
 	}
 
-	if suiteOutcome.Outcome == model.IGNORED || suiteOutcome.Outcome == model.PASSED {
+	if suiteOutcome.Outcome == model.IGNORED || suiteOutcome.Outcome == model.PASSED || suiteOutcome.Outcome == model.EMPTY {
 		exitCode = 0
 	}
 
@@ -414,7 +414,7 @@ func ProcessArgs(allArgs []string) (wait func() int16) {
 		// Report must always be delayed until all tests are done
 
 		if inputConfig.GlobalReport.Is(true) {
-			exitCode, wait, err = reportAllAction(token, isolation, inputConfig, parseArgsErrors)
+			exitCode, wait, err = syncReportAllAction(token, isolation, inputConfig, parseArgsErrors)
 		} else {
 			exitCode, wait, err = reportSuiteAction(token, isolation, inputConfig, parseArgsErrors)
 		}

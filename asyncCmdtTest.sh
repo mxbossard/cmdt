@@ -77,17 +77,17 @@ $cmdtIn @report
 $cmdtIn @init="sync empty" #@verbose=4
 # reporting no test should always report an error
 $cmdtIn @test=sync empty/should init1 @-- $newCmdt @isol="cleared_sync_empty_sub1" @init=sync_empty_sub1 @async=false @verbose=5
-$cmdtIn @test=sync empty/should not report1 @exit=1 @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt @isol="cleared_sync_empty_sub1" @verbose @report=sync_empty_sub1
+$cmdtIn @test=sync empty/should not report1 @exit=1 @stderr:"$nothingToReportExpectedStderrMsg" @stderr:"sync_empty_sub1" @-- $newCmdt @isol="cleared_sync_empty_sub1" @verbose @report=sync_empty_sub1
 $cmdtIn @test=sync empty/should init2 @-- $newCmdt @isol="cleared_sync_empty_sub2" @init=sync_empty_sub2 @async=false @verbose=5
 $cmdtIn @test=sync empty/should not global report2 @exit=1 @stderr:"$nothingToReportExpectedStderrMsg" @stderr:"sync_empty_sub2" @-- $newCmdt @isol="cleared_sync_empty_sub2" @verbose @report
-$cmdtIn @test=sync empty/should not global report2 all @exit=0 @stderr:"Empty not ran" @stderr:"sync_empty_sub" @stderr!:"$nothingToReportExpectedStderrMsg" @-- $newCmdt @isol="cleared_sync_empty_sub2" @verbose @report @all
+$cmdtIn @test=sync empty/should global report2 all @exit=0 @stderr:"Empty not ran" @stderr:"sync_empty_sub" @stderr!:"$nothingToReportExpectedStderrMsg" @-- $newCmdt @isol="cleared_sync_empty_sub2" @verbose @report @all
 $cmdtIn @test=sync empty/should init3 @-- $newCmdt @isol="cleared_sync_empty_sub3" @init=sync_empty_sub3 @async=false @verbose=5
-$cmdtIn @test=sync empty/should not global report3 all @exit=0 @stderr:"Empty not ran" @stderr:"sync_empty_sub" @stderr!:"$nothingToReportExpectedStderrMsg" @-- $newCmdt @isol="cleared_sync_empty_sub3" @verbose @report @all
+$cmdtIn @test=sync empty/should global report3 all @exit=0 @stderr:"Empty not ran" @stderr:"sync_empty_sub" @stderr!:"$nothingToReportExpectedStderrMsg" @-- $newCmdt @isol="cleared_sync_empty_sub3" @verbose @report @all
 # reporting 2 suites 1 empty should not error but warn for emptyness
 $cmdtIn @test=sync empty/should init4a @-- $newCmdt @isol="cleared_sync_empty_sub4" @init=sync_empty_sub4a @async=false @verbose=5
 $cmdtIn @test=sync empty/should init4b @-- $newCmdt @isol="cleared_sync_empty_sub4" @init=sync_empty_sub4b @async=false @verbose=5
 $cmdtIn @test=sync empty/should test4b @-- $newCmdt @isol="cleared_sync_empty_sub4" @test=sync_empty_sub4b/test true
-$cmdtIn @test=sync empty/should global report4 @exit=0 @stderr:"Empty not ran" @stderr:"sync_empty_sub4a" @stderr:"sync_empty_sub4b" @stderr:"Empty not ran" @stderr:"Successfully ran" @stderr!:"Ignored" @stderr!:"$nothingToReportExpectedStderrMsg" @-- $newCmdt @isol="cleared_sync_empty_sub4" @verbose @report
+$cmdtIn @test=sync empty/should global report4 @exit=0 @stderr:"Empty not ran" @stderr:"sync_empty_sub4a" @stderr:"sync_empty_sub4b" @stderr:"Successfully ran" @stderr!:"Ignored" @stderr!:"$nothingToReportExpectedStderrMsg" @-- $newCmdt @isol="cleared_sync_empty_sub4" @verbose @report
 $cmdtIn @test=sync empty/should global report4 all @exit=0 @stderr:"Empty not ran" @stderr:"sync_empty_sub4a" @stderr:"sync_empty_sub4b" @stderr:"Empty not ran" @stderr:"Successfully ran" @stderr!:"Ignored" @stderr!:"$nothingToReportExpectedStderrMsg" @-- $newCmdt @isol="cleared_sync_empty_sub4" @verbose @report @all
 # reporting suites, if one suite contain no tests must warn the user
 $cmdtIn @test=sync empty/should init5 @-- $newCmdt1 @init=sync_empty_sub5 @async=false @verbose=5
@@ -147,6 +147,7 @@ $cmdtIn @test=printed_token/init2 @stderr= @-- $newCmdt1 @token=$tk0 @init=maste
 $cmdtIn @test=printed_token/"with token 3" @stderr= @-- $newCmdt1 @token=$tk0 @test=master/printed_token_sub2_test3 true
 $cmdtIn @test=printed_token/"with token 4" @stderr= @-- $newCmdt1 @token=$tk0 @test=master/printed_token_sub2_test4 true
 $cmdtIn @test=printed_token/"global report with token" @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @token=$tk0 @report
+#$cmdtIn @test=printed_token/"global report all with token" @stderr:"2 success" @stderr!:"failure" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @token=$tk0 @report @all
 $cmdt @report
 
 >&2 echo "## Test exported token"

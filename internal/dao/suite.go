@@ -227,6 +227,27 @@ func (d Suite) TooMuchCount(suite string) (n uint, err error) {
 	return
 }
 
+/* Does not works
+func (d Suite) LastSuiteSeq(suite string) (id int, err error) {
+	row := d.db.QueryRow(`
+		SELECT max(s.seq)
+		FROM suite s
+		WHERE t.name = ?
+	;`, suite)
+	err = row.Scan(&id)
+	return
+}
+
+func (d Suite) LastGlobalSeq() (id int, err error) {
+	row := d.db.QueryRow(`
+		SELECT max(s.seq)
+		FROM suite s
+	;`)
+	err = row.Scan(&id)
+	return
+}
+*/
+
 func (d Suite) UpdateSuiteStartTime(suite string, start time.Time) (err error) {
 	p := logger.PerfTimer("suite", suite)
 	defer p.End()

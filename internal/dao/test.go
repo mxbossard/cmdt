@@ -395,3 +395,42 @@ func (d Test) ErroredCount(suite string) (n uint, err error) {
 	err = row.Scan(&n)
 	return
 }
+
+func (d Test) LastSuiteTestedId(suite string) (id int, err error) {
+	row := d.db.QueryRow(`
+		SELECT max(t.id) 
+		FROM tested t
+		WHERE t.suite = ?
+	;`, suite)
+	err = row.Scan(&id)
+	return
+}
+
+func (d Test) LastGlobalTestedId() (id int, err error) {
+	row := d.db.QueryRow(`
+		SELECT max(t.id) 
+		FROM tested t
+	;`)
+	err = row.Scan(&id)
+	return
+}
+
+func (d Test) CountSuiteTestedBeforeId(suite string, id uint) (count int, err error) {
+	row := d.db.QueryRow(`
+		SELECT count(t.seq) 
+		FROM tested t
+		WHERE t.suite = ? AND t.seq < ?
+	;`, suite, id)
+	err = row.Scan(&count)
+	return
+}
+
+func (d Test) CountGlobalTestedBeforeId(id uint) (count int, err error) {
+	row := d.db.QueryRow(`
+		SELECT count(t.seq) 
+		FROM tested t
+		WHERE t.seq < ?
+	;`, id)
+	err = row.Scan(&count)
+	return
+}

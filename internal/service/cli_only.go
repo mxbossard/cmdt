@@ -12,6 +12,8 @@ import (
 	"github.com/mxbossard/utilz/utilz"
 )
 
+// FIXME: move into cli package ?
+
 func cliInitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 	logger.Debug("Initializing test suite", "token", ctx.Token, "isolation", ctx.Isolation, "suites", ctx.Config.TestSuite)
 	// Clear and Init new test suite
