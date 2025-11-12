@@ -23,6 +23,7 @@
 
 ## NEW: Report v3
 All report done only from cli side.
+Must still async display tests outputs.
 
 ### Suite Report (@report=)
 - Wait for all suite tests to be performed and report the suite.

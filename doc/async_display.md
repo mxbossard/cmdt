@@ -23,10 +23,14 @@ suiteOutputsSink (tmp file) ==tail==> displayOutputs
 - Permet de flush tout les printers d'une suite soit une seule fois, soit en boucle jusqu'a ce que la suite soit fermée. 
 
 
-
-
-
 ### struct asyncDisplay
+
+
+### Design
+#### Sink
+Un sink permet d'écrire dans le display.
+#### Tailer
+Un tailer permet de lire le display.
 
 
 

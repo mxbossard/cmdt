@@ -520,6 +520,27 @@ func NewWaitingTailer(tmpDir string, init bool, outs printz.Outputs) *AsyncDispl
 	return d
 }
 
+func NewReadOnlyNotWaitingTailer(tmpDir string, outs printz.Outputs) (*AsyncDisplay, error) {
+	openedTests := make(map[string]display.TestDisplayer, 0)
+	zcreenTmpDir := zcreenTmpDir(tmpDir)
+	logger.Info("Building new async display", "zcreenTmpDir", zcreenTmpDir)
+
+	d := &AsyncDisplay{
+		Mutex:          &sync.Mutex{},
+		tmpDir:         zcreenTmpDir,
+		outFormatter:   inoutz.PrefixFormatter{Prefix: fmt.Sprintf("%sout%s>", display.TestColor, display.ResetColor)},
+		errFormatter:   inoutz.PrefixFormatter{Prefix: fmt.Sprintf("%serr%s>", display.ReportColor, display.ResetColor)},
+		quiet:          false,
+		testDisplayers: openedTests,
+	}
+
+	// Tailer should be build later after daemon initialized the screen
+	var err error
+	d.tailer, err = zcreen.NewAsyncScreenTailer(outs, zcreenTmpDir)
+
+	return d, err
+}
+
 func ClearSuite(tmpDir, name string) error {
 	zcreenTmpDir := zcreenTmpDir(tmpDir)
 	return zcreen.ClearSession(zcreenTmpDir, name)
