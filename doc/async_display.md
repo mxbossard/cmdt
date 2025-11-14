@@ -31,7 +31,9 @@ suiteOutputsSink (tmp file) ==tail==> displayOutputs
 Un sink permet d'écrire dans le display.
 #### Tailer
 Un tailer permet de lire le display.
-
+Un tailer devrait attendre la présence du sink.
+Que faire si le sink n'a jamais été créé ? => timeout
+Créer une test suite sans test devrait permettre de créer un sink => initialisation du sink nécéssaire lors de l'initialisation de la suite.
 
 
 ### Todo

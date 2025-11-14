@@ -6,9 +6,7 @@ import (
 	"cmdt/internal/facade"
 	"cmdt/internal/model"
 	"cmdt/internal/utils"
-	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"time"
 
@@ -301,16 +299,10 @@ func syncReportAllAction(token, isolation string, inputConfig model.Config, pars
 
 		if ctx.Config.Async.Is(true) {
 			// Manage async display
-			asyncDpl, err := asyncdisplay.NewReadOnlyNotWaitingTailer(globalCtx.Repo.BackingFilepath(), printz.NewStandardOutputs())
-			if err != nil && !errors.Is(err, fs.ErrNotExist) {
-				ProcessGlobalError(globalCtx, err)
-			} else if err == nil {
-				//err = asyncDpl.TailSuppliedBlocking(asyncSuites, globalCtx.Config.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
-				err = asyncDpl.TailBlocking(testSuite, globalCtx.Config.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
-				ProcessGlobalError(globalCtx, err)
-			}
-			// err is fs.ErrNotExist, the tailer backend does not exists so cannot tail the suite async display
-			// FIXME: MUST be integrated in async display, user should not know be bother with this implementation details !!!
+			asyncDpl := asyncdisplay.NewWaitingTailer(globalCtx.Repo.BackingFilepath(), true, printz.NewStandardOutputs())
+			asyncDpl.CloseSuite(ctx, "all tests performed")
+			err = asyncDpl.TailBlocking(testSuite, globalCtx.Config.SuiteTimeout.GetOr(1*time.Second)) // model.DefaultSuiteTimeout
+			ProcessGlobalError(globalCtx, err)
 		}
 
 		// Report Suite
