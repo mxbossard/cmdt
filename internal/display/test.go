@@ -158,10 +158,20 @@ func (d *basicTestDisplayer) Outcome(outcome model.TestOutcome) {
 		panic(fmt.Sprintf("unknown outcome: %s", outcome.Outcome))
 	}
 
+	noOutputs := len(outcome.Stdout) == 0 && len(outcome.Stderr) == 0
+
 	if outcome.Outcome == model.ERRORED {
-		d.printer.Errf("\tSupplied cmd: \t\t[%s]\n", CmdTitle(d.ctx))
+		d.printer.Errf("\tSupplied cmd: \t\t[%s]", CmdTitle(d.ctx))
+		if noOutputs {
+			d.printer.ColoredErrf(WarningColor, "\tNo outputs.")
+		}
+		d.printer.Errf("\n")
 	} else if verbose >= model.SHOW_FAILED_ONLY && outcome.Outcome != model.PASSED && outcome.Outcome != model.IGNORED || verbose >= model.SHOW_PASSED_OUTS {
-		d.printer.Errf("\tExecuting cmd: \t\t[%s]\n", CmdTitle(d.ctx))
+		d.printer.Errf("\tExecuting cmd: \t\t[%s]", CmdTitle(d.ctx))
+		if noOutputs {
+			d.printer.ColoredErrf(WarningColor, "\t> empty outputs")
+		}
+		d.printer.Errf("\n")
 	}
 
 	if outcome.Err != nil {
@@ -173,9 +183,11 @@ func (d *basicTestDisplayer) Outcome(outcome model.TestOutcome) {
 	}
 
 	if verbose >= model.SHOW_FAILED_OUTS && (len(outcome.AssertionResults) > 0 || outcome.Outcome == model.TIMEOUT || outcome.Outcome == model.ERRORED) || verbose >= model.SHOW_PASSED_OUTS {
-		d.printer.Errf(d.outFormatter.Format(outcome.Stdout))
-		d.printer.Errf(d.errFormatter.Format(outcome.Stderr))
-		d.printer.Errf("\n")
+		if len(outcome.Stdout) > 0 || len(outcome.Stderr) > 0 {
+			d.printer.Errf(d.outFormatter.Format(outcome.Stdout))
+			d.printer.Errf(d.errFormatter.Format(outcome.Stderr))
+			d.printer.Errf("\n")
+		}
 	}
 }
 

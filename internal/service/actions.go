@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/mxbossard/utilz/collectionz"
 	"github.com/mxbossard/utilz/errorz"
 	"github.com/mxbossard/utilz/printz"
 )
@@ -271,14 +272,16 @@ func syncReportAllAction(token, isolation string, inputConfig model.Config, pars
 	}
 	ProcessGlobalError(globalCtx, err)
 
-	//if len(syncSuites)+len(asyncSuites) == 0 { // !reportAll && ignoredSuiteCount+toReportSyncTestCount+toReportAsyncTestCount == 0
 	if len(suites) == 0 {
 		exitCode = 1
 		err := fmt.Errorf("you must perform some test prior to report globaly")
 		ProcessGlobalError(globalCtx, err)
 	}
 
-	suitesChan, err := WatchAllTestsPerformed(rep, reportAll, defaultGlobalTimeout)
+	suitesChan, err := WatchAllTestsPerformed(rep, reportAll, 3*time.Second) //defaultGlobalTimeout
+	ProcessGlobalError(globalCtx, err)
+
+	reportedAsyncSuites, err := rep.ListReportedAsyncSuites()
 	ProcessGlobalError(globalCtx, err)
 
 	reportPassed := true
@@ -290,15 +293,12 @@ func syncReportAllAction(token, isolation string, inputConfig model.Config, pars
 		testSuite := suite.Val
 
 		suiteCtx := facade.NewSuiteContext(token, isolation, testSuite, false, model.ReportAction, model.Config{}, false)
-		// if suiteCtx.Config.TestSuite.IsEmpty() {
-		// 	fmt.Printf("\n<<>> empty suite name in ctx !!! \nctx: %v ; \ncfg: %v\n", suiteCtx, suiteCtx.Config)
-		// }
 
 		def := model.ReportDefinition{Token: token, Isolation: isolation, TestSuite: testSuite, Config: suiteCtx.Config}
 		ctx := facade.NewSuiteContext(def.Token, def.Isolation, def.TestSuite, false, model.ReportAction, def.Config, false) // FIXME ? removing def.Config ?
 
-		if ctx.Config.Async.Is(true) {
-			// Manage async display
+		if ctx.Config.Async.Is(true) && !collectionz.Contains(&reportedAsyncSuites, testSuite) {
+			// Manage async display of not already reported async suites
 			asyncDpl := asyncdisplay.NewWaitingTailer(globalCtx.Repo.BackingFilepath(), true, printz.NewStandardOutputs())
 			asyncDpl.CloseSuite(ctx, "all tests performed")
 			err = asyncDpl.TailBlocking(testSuite, globalCtx.Config.SuiteTimeout.GetOr(1*time.Second)) // model.DefaultSuiteTimeout
@@ -311,8 +311,14 @@ func syncReportAllAction(token, isolation string, inputConfig model.Config, pars
 
 		if suiteOutcome.Duration < 0 {
 			// FIXME: report should save an endTime for suite duration to be saved
+			// FIXME: suite time SHOULD be calculated from first test start to last test end.
 			suiteOutcome.Duration = time.Since(ctx.Config.SuiteStartTime.Get())
 		}
+
+		// if ctx.Config.Async.Is(true) && collectionz.Contains(&reportedAsyncSuites, testSuite) {
+		// 	// TEST: report suite twice if already reported
+		// 	Dpl.ReportSuite(suiteOutcome)
+		// }
 
 		Dpl.ReportSuite(suiteOutcome)
 		Dpl.CloseSuite(ctx, "following report")
@@ -324,9 +330,6 @@ func syncReportAllAction(token, isolation string, inputConfig model.Config, pars
 
 		ctx.Close()
 	}
-
-	// err = globalCtx.Repo.MarkSuitesReported()
-	// ProcessGlobalError(globalCtx, err)
 
 	if reportPassed {
 		exitCode = 0

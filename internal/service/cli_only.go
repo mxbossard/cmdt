@@ -45,9 +45,12 @@ func cliInitTestSuite(ctx facade.SuiteContext) (exitCode int16, err error) {
 		Dpl.SuiteTitle(ctx)
 	} else {
 		// On async init, init async display.
-		asyncdisplay.New(ctx.Repo.BackingFilepath(), true, nil)
+		ad := asyncdisplay.New(ctx.Repo.BackingFilepath(), true, nil)
 		// On async init do not display but attempt to clear session
 		asyncdisplay.ClearSuite(ctx.Repo.BackingFilepath(), ctx.Config.TestSuite.Get())
+
+		ad.OpenSuite(ctx)
+		ad.SuiteTitle(ctx)
 	}
 	logger.Debug("cleared suite cli side", "suite", ctx.Config.TestSuite.Get(), "async", cfg.Async.Get())
 

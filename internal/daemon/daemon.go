@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
-	"slices"
 	"strconv"
 	"time"
 
@@ -21,7 +20,6 @@ import (
 	"cmdt/internal/repo"
 	"cmdt/internal/service"
 
-	"github.com/mxbossard/utilz/collectionz"
 	"github.com/mxbossard/utilz/printz"
 	_ "github.com/mxbossard/utilz/zcreen"
 	"github.com/mxbossard/utilz/zlog"
@@ -74,7 +72,7 @@ type daemon struct {
 	token, isolation string
 	repo             repo.Repo
 	display          *asyncdisplay.AsyncDisplay
-	openedSuites     []string
+	//openedSuites     []string
 }
 
 func (d *daemon) run() {
@@ -181,49 +179,51 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 		fmt.Printf("\n<<>> Op: %s DONE.\n", op)
 	}
 
-	onDoneSavingSuiteCfg := func() {
-		onDone()
-	}
+	// onDoneSavingSuiteCfg := func() {
+	// 	onDone()
+	// }
 
 	suite := op.Suite()
-	logger.Info("DAEMON: unqueued operation.", "kind", op.Kind(), "id", op.Id(), "suite", op.Suite(), "seq", op.Seq())
+	logger.Info("DAEMON: unqueued operation.", "kind", op.Kind(), "id", op.Id(), "suite", suite, "seq", op.Seq())
 
-	// Automagicaly open suite on first operation
-	var saveCfgOnDone bool
-	if suite != model.GlobalConfigTestSuiteName && !slices.Contains(d.openedSuites, suite) {
-		// Do not open *special* global suite
-		d.openedSuites = append(d.openedSuites, suite)
-		logger.Debug("Initializing test suite", "token", d.token, "isolation", d.isolation, "openedSuite", suite)
-		fmt.Printf("\n<<>> [%d] opening suite: %s ; openedSuites: %s ; op: %s\n", os.Getpid(), suite, d.openedSuites, op)
-		ctx := facade.NewSuiteContext(d.token, d.isolation, suite, false, model.InitAction, model.Config{}, true)
-		defer ctx.Close()
-		err = fork.ClearQueue(suite)
-		if err != nil {
-			return false, err
-		}
-		d.display.OpenSuite(ctx)
-		if ctx.Config.SuiteTitled.Is(false) {
-			// Display suite title once and record it was done.
-			d.display.SuiteTitle(ctx)
-			ctx.Config.SuiteTitled.Set(true)
-			// The title will be flushed with first test display.
-			// The SuiteTitled state must be recorded with outcome.
-			// FIXME: for now it is recorded after outcome in onDoneSavingSuiteCfg().
-			onDoneSavingSuiteCfg = func() {
-				// Replace onDone() func to save the config on test done.
-				onDone()
-				err := d.repo.SaveSuiteConfig(ctx.Config)
-				if err != nil {
-					logger.Error(err.Error())
-					panic(err)
-				}
+	/*
+		// Automagicaly open suite on first operation
+		var saveCfgOnDone bool
+		if suite != model.GlobalConfigTestSuiteName && !slices.Contains(d.openedSuites, suite) {
+			// Do not open *special* global suite
+			d.openedSuites = append(d.openedSuites, suite)
+			logger.Debug("Initializing test suite", "token", d.token, "isolation", d.isolation, "openedSuite", suite)
+			fmt.Printf("\n<<>> [%d] opening suite: %s ; openedSuites: %s ; op: %s\n", os.Getpid(), suite, d.openedSuites, op)
+			ctx := facade.NewSuiteContext(d.token, d.isolation, suite, false, model.InitAction, model.Config{}, true)
+			defer ctx.Close()
+			err = fork.ClearQueue(suite)
+			if err != nil {
+				return false, err
 			}
-			// fork.QueueTestDef(def, o, onDoneSavingSuiteCfg)
-			saveCfgOnDone = true
+			d.display.OpenSuite(ctx)
+			if ctx.Config.SuiteTitled.Is(false) {
+				// Display suite title once and record it was done.
+				d.display.SuiteTitle(ctx)
+				ctx.Config.SuiteTitled.Set(true)
+				// The title will be flushed with first test display.
+				// The SuiteTitled state must be recorded with outcome.
+				// FIXME: for now it is recorded after outcome in onDoneSavingSuiteCfg().
+				onDoneSavingSuiteCfg = func() {
+					// Replace onDone() func to save the config on test done.
+					onDone()
+					err := d.repo.SaveSuiteConfig(ctx.Config)
+					if err != nil {
+						logger.Error(err.Error())
+						panic(err)
+					}
+				}
+				// fork.QueueTestDef(def, o, onDoneSavingSuiteCfg)
+				saveCfgOnDone = true
+			}
+		} else {
+			logger.Debug("Test suite already opened", "token", d.token, "isolation", d.isolation, "openedSuite", suite)
 		}
-	} else {
-		logger.Debug("Test suite already opened", "token", d.token, "isolation", d.isolation, "openedSuite", suite)
-	}
+	*/
 
 	switch o := op.(type) {
 	case *model.TestOp:
@@ -256,15 +256,13 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 		// } else {
 		// 	logger.Debug("Test suite already opened", "token", d.token, "isolation", d.isolation, "openedSuite", suite)
 		// }
+		// if saveCfgOnDone {
+		// 	fork.QueueTestDef(def, o, onDoneSavingSuiteCfg)
+		// } else {
+		// 	fork.QueueTestDef(def, o, onDone)
+		// }
 
-		// exitCode := service.ProcessTestDef(def)
-		// o.SetExitCode(uint16(exitCode))
-		// fmt.Printf("\n<<>> queued test: #%d", def.Seq)
-		if saveCfgOnDone {
-			fork.QueueTestDef(def, o, onDoneSavingSuiteCfg)
-		} else {
-			fork.QueueTestDef(def, o, onDone)
-		}
+		fork.QueueTestDef(def, o, onDone)
 
 	case *model.ReportOp:
 		// FIXME: must override bad token & isolation inside ReportDefinition !
@@ -374,8 +372,8 @@ func (d *daemon) report(op *model.ReportOp) (exitCode int16, err error) {
 	d.display.CloseSuite(ctx, "following suite report")
 
 	logger.Debug("Closing test suite", "token", def.Token, "isolation", def.Isolation, "openedSuite", def.TestSuite)
-	d.openedSuites = collectionz.Delete(d.openedSuites, def.TestSuite)
-	fmt.Printf("\n<<>> [%d] deleted opened suite: %s ; openedSuites: %s\n", os.Getpid(), def.TestSuite, d.openedSuites)
+	// d.openedSuites = collectionz.Delete(d.openedSuites, def.TestSuite)
+	// fmt.Printf("\n<<>> [%d] deleted opened suite: %s ; openedSuites: %s\n", os.Getpid(), def.TestSuite, d.openedSuites)
 	return
 }
 
@@ -428,8 +426,8 @@ func (d *daemon) globalReport(op *model.GlobalReportOp) (exitCode int16, err err
 	}
 
 	logger.Debug("Closing all test suites", "token", def.Token, "isolation", def.Isolation)
-	d.openedSuites = []string{}
-	fmt.Printf("\n<<>> [%d] deleted all opened suite\n", os.Getpid())
+	// d.openedSuites = []string{}
+	// fmt.Printf("\n<<>> [%d] deleted all opened suite\n", os.Getpid())
 	//d.display.Clear()
 	return
 }

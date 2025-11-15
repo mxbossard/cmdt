@@ -157,18 +157,18 @@ $cmdtIn @init=exported_token #@ignore
 $cmdtIn @test=exported_token/init @-- $newCmdt1 @init @async
 $cmdtIn @test=exported_token/test1 @stderr= @-- $newCmdt1 true
 $cmdtIn @test=exported_token/test2 @stderr= @-- $newCmdt1 true
-$cmdtIn @test=exported_token/report1 @stderr:"Successfully ran" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @report=main
-$cmdtIn @test=exported_token/report2 @stderr:"Successfully ran" @stderr!:"error" @stderr!:"#01" @stderr!:"#02" @stderr!:"#03" @-- $newCmdt1 @report=main
-$cmdtIn @test=exported_token/report_other_token @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=main @token=empty_token
+$cmdtIn @test=exported_token/report_suite @stderr:"Successfully ran" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @report=main
+$cmdtIn @test=exported_token/re-report_suite @stderr:"Successfully ran" @stderr!:"error" @stderr!:"#01" @stderr!:"#02" @stderr!:"#03" @-- $newCmdt1 @report=main
+$cmdtIn @test=exported_token/re-report_suite_other_token @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=main @token=empty_token
 
 $cmdtIn @init=exported_token_alt #@ignore
 $cmdtIn @test=exported_token_alt/init @-- $newCmdt1 @init=sub4 @async
 $cmdtIn @test=exported_token_alt/test1 @stderr= @-- $newCmdt1 @test=sub4/ true
 $cmdtIn @test=exported_token_alt/test2 @stderr= @-- $newCmdt1 @test=sub4/ true
-$cmdtIn @test=exported_token_alt/report1 @stderr:"Successfully ran" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @report=sub4
-$cmdtIn @test=exported_token_alt/report2 @stderr:"Successfully ran" @stderr!:"error" @stderr!:"#01" @stderr!:"#02" @stderr!:"#03" @-- $newCmdt1 @report=sub4
+$cmdtIn @test=exported_token_alt/report_suite @stderr:"Successfully ran" @stderr!:"error" @stderr:"#01" @stderr:"#02" @stderr!:"#03" @-- $newCmdt1 @report=sub4
+$cmdtIn @test=exported_token_alt/re-report_suite @stderr:"Successfully ran" @stderr!:"error" @stderr!:"#01" @stderr!:"#02" @stderr!:"#03" @-- $newCmdt1 @report=sub4
 $cmdtIn @test=exported_token_alt/global_report_all @stderr:"Successfully ran" @stderr!:"error" @stderr!:"#01" @stderr!:"#02" @stderr!:"#03" @stderr:main @stderr:sub4 @-- $newCmdt1 @report @all
-$cmdtIn @test=exported_token_alt/report_other_token @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @token=$tk0 @report=sub4
+$cmdtIn @test=exported_token_alt/report_suite_other_token @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @token=$tk0 @report=sub4
 $cmdt @report 
 
 export -n __CMDT_TOKEN
@@ -391,8 +391,11 @@ asyncReOpenExpected="@stderr:Cleared suite:"
 #asyncTestExpected="$noPanic @stderr!:#01 @stderr!:#02"
 asyncTestExpected="@stderr="
 asyncReportExpected="$noPanic @stderr:Test suite [ @stderr:#01 @stderr!:#02 @stderr:1 success"
-asyncReReportExpected="$noPanic @stderr!:Test suite [ @stderr:#01 @stderr!:#02 @stderr:1 success"
+asyncReopenedReportExpected="$noPanic @stderr!:Test suite [ @stderr:#01 @stderr!:#02 @stderr:1 success"
+asyncReReportExpected="$noPanic @stderr!:Test suite [ @stderr:!#01 @stderr!:#02 @stderr:1 success"
+asyncReopenedReReportExpected="$noPanic @stderr!:Test suite [ @stderr!:#01 @stderr!:#02 @stderr:1 success"
 asyncReportAllExpected="$noPanic @stderr!:Test suite [ @stderr!:#01 @stderr!:#02 @stderr:1 success"
+asyncReReportAllExpected="$noPanic @stderr!:Test suite [ @stderr!:#01 @stderr!:#02 @stderr:1 success"
 
 $cmdtIn @init=suite_flow_sync
 $cmdtIn @test=suite_flow_sync/A_open $syncOpenExpected @-- $newCmdt1 @init=suite_flow_sync_sub @async=false @verbose=5 @suiteTimeout=2s
@@ -412,7 +415,7 @@ for i in $( seq 1 5 ); do
 	$cmdtIn @test=suite_flow_sync/B${i}b_reopen $syncReOpenExpected @-- $newCmdt1 @init=suite_flow_sync_sub @async=false @verbose=5 @suiteTimeout=2s
 	$cmdtIn @test=suite_flow_sync/B${i}b_test $syncTestExpected @stderr:tB${i}z @-- $newCmdt1 @test=suite_flow_sync_sub/tB${i}z true
 	$cmdtIn @test=suite_flow_sync/B${i}b_global_report $syncReportExpected @stderr!:tB${i}z @stderr:"Session duration:" @-- $newCmdt1 @report
-	$cmdtIn @test=suite_flow_sync/B${i}b_global_report_all @fail $syncReportExpected @stderr:"suite_flow_sync_sub" @stderr!:tB${i}z @stderr:"Session duration:" @-- $newCmdt1 @report @all
+	$cmdtIn @test=suite_flow_sync/B${i}b_global_report_all @fail $syncReportAllExpected @stderr:"suite_flow_sync_sub" @stderr!:tB${i}z @stderr:"Session duration:" @-- $newCmdt1 @report @all
 done
 
 $cmdtIn @test=suite_flow_sync/C_reopen $syncReOpenExpected @-- $newCmdt1 @init=suite_flow_sync_sub @async=false @verbose=5 @suiteTimeout=2s
@@ -435,20 +438,20 @@ sleepTime=0
 sleep $sleepTime
 $cmdtIn @test=suite_flow_async/B0_reopen $asyncReOpenExpected @-- $newCmdt1 @init=suite_flow_async_sub @async=true @verbose=5 @suiteTimeout=5s
 $cmdtIn @test=suite_flow_async/B0_test $asyncTestExpected @-- $newCmdt1 @test=suite_flow_async_sub/tB0z true
-$cmdtIn @test=suite_flow_async/B0_report_suite $asyncReReportExpected @stderr:tB0z @stderr!:tA @-- $newCmdt1 @report=suite_flow_async_sub
+$cmdtIn @test=suite_flow_async/B0_report_suite $asyncReopenedReportExpected @stderr:tB0z @stderr!:tA @-- $newCmdt1 @report=suite_flow_async_sub
 
 for i in $( seq 1 5 ); do
 	sleep $sleepTime
 	$cmdtIn @test=suite_flow_async/B${i}a_reopen $asyncReOpenExpected @-- $newCmdt1 @init=suite_flow_async_sub @async=true @verbose=5 @suiteTimeout=5s
 	$cmdtIn @test=suite_flow_async/B${i}a_test $asyncTestExpected @-- $newCmdt1 @test=suite_flow_async_sub/tB${i}z true
-	$cmdtIn @test=suite_flow_async/B${i}a_report_suite $asyncReReportExpected @stderr:tB${i}z @stderr!:t1 @stderr!=t2 @-- $newCmdt1 @report=suite_flow_async_sub
+	$cmdtIn @test=suite_flow_async/B${i}a_report_suite $asyncReopenedReportExpected @stderr:tB${i}z @stderr!:t1 @stderr!=t2 @-- $newCmdt1 @report=suite_flow_async_sub
 done
 
 for i in $( seq 1 5 ); do
 	sleep $sleepTime
 	$cmdtIn @test=suite_flow_async/B${i}b_reopen $asyncReOpenExpected @-- $newCmdt1 @init=suite_flow_async_sub @async=true @verbose=5 @suiteTimeout=5s
 	$cmdtIn @test=suite_flow_async/B${i}b_test $asyncTestExpected @-- $newCmdt1 @test=suite_flow_async_sub/tB${i}z true
-	$cmdtIn @test=suite_flow_async/B${i}b_global_report $asyncReReportExpected @stderr:"Session duration:" @stderr:tB${i}z @stderr!:t1 @stderr!=t2 @-- $newCmdt1 @report
+	$cmdtIn @test=suite_flow_async/B${i}b_global_report $asyncReopenedReportExpected @stderr:"Session duration:" @stderr:tB${i}z @stderr!:t1 @stderr!=t2 @-- $newCmdt1 @report
 	$cmdtIn @test=suite_flow_async/B${i}b_global_report_all $asyncReportAllExpected @stderr:"suite_flow_async_sub" @fail @stderr:"Session duration:" @stderr!:tB${i}z @stderr!:t1 @stderr!=t2 @-- $newCmdt1 @report @all
 done
 

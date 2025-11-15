@@ -141,28 +141,28 @@ $cmdtIn @test=reinit/ @-- $newCmdt1 @test=sub3/ true
 $cmdtIn @test=reinit/ @stderr:"1 success" @-- $newCmdt1 @report=sub3
 
 >&2 echo "## Test Suite re-report and @keep"
-$cmdtIn $forkCfg @init=rereport_and_keep @ignore #@verbose=5
-$cmdtIn @test=rereport_and_keep/init1 @-- $newCmdt1 @init=rereport_sub1
-$cmdtIn @test=rereport_and_keep/test1 @-- $newCmdt1 @test=rereport_sub1/test true
-$cmdtIn @test=rereport_and_keep/report1 @stderr:"rereport_sub1" @-- $newCmdt1 @report=rereport_sub1
-$cmdtIn @test=rereport_and_keep/rereport1 @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=rereport_sub1
+$cmdtIn $forkCfg @init=re-report_and_keep @ignore #@verbose=5
+$cmdtIn @test=re-report_and_keep/init1 @-- $newCmdt1 @init=re-report_sub1
+$cmdtIn @test=re-report_and_keep/test1 @-- $newCmdt1 @test=re-report_sub1/test true
+$cmdtIn @test=re-report_and_keep/report1 @stderr:"re-report_sub1" @-- $newCmdt1 @report=re-report_sub1
+$cmdtIn @test=re-report_and_keep/re-report1 @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=re-report_sub1
 
-$cmdtIn @test=rereport_and_keep/init2 @-- $newCmdt1 @init=rereport_sub2
-$cmdtIn @test=rereport_and_keep/test2 @-- $newCmdt1 @test=rereport_sub2/test true
-$cmdtIn @test=rereport_and_keep/reportall2 @stderr:"rereport_sub2" @-- $newCmdt1 @report
-$cmdtIn @test=rereport_and_keep/rereportall2 @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report
+$cmdtIn @test=re-report_and_keep/init2 @-- $newCmdt1 @init=re-report_sub2
+$cmdtIn @test=re-report_and_keep/test2 @-- $newCmdt1 @test=re-report_sub2/test true
+$cmdtIn @test=re-report_and_keep/report_all2 @stderr:"re-report_sub2" @-- $newCmdt1 @report
+$cmdtIn @test=re-report_and_keep/re-report_all2 @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report
 
-$cmdtIn @test=rereport_and_keep/init3 @-- $newCmdt1 @init=rereport_sub3
-$cmdtIn @test=rereport_and_keep/test3 @-- $newCmdt1 @test=rereport_sub3/test true
-$cmdtIn @test=rereport_and_keep/report3_keeping @stderr:"rereport_sub3" @-- $newCmdt1 @report=rereport_sub3 @keep
-$cmdtIn @test=rereport_and_keep/rereport3 @stderr:"rereport_sub3" @-- $newCmdt1 @report=rereport_sub3
-$cmdtIn @test=rereport_and_keep/rerereport3 @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=rereport_sub3
+$cmdtIn @test=re-report_and_keep/init3 @-- $newCmdt1 @init=re-report_sub3
+$cmdtIn @test=re-report_and_keep/test3 @-- $newCmdt1 @test=re-report_sub3/test true
+$cmdtIn @test=re-report_and_keep/report3_keeping @stderr:"re-report_sub3" @-- $newCmdt1 @report=re-report_sub3 @keep
+$cmdtIn @test=re-report_and_keep/re-report3 @stderr:"re-report_sub3" @-- $newCmdt1 @report=re-report_sub3
+$cmdtIn @test=re-report_and_keep/re-re-report3 @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report=re-report_sub3
 
-$cmdtIn @test=rereport_and_keep/init4 @-- $newCmdt1 @init=rereport_sub4
-$cmdtIn @test=rereport_and_keep/test4 @-- $newCmdt1 @test=rereport_sub4/test true
-$cmdtIn @test=rereport_and_keep/reportall4_keeping @stderr:"rereport_sub4" @-- $newCmdt1 @report @keep
-$cmdtIn @test=rereport_and_keep/rereportall4 @stderr:"rereport_sub4" @-- $newCmdt1 @report
-$cmdtIn @test=rereport_and_keep/rerereportall4 @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report
+$cmdtIn @test=re-report_and_keep/init4 @-- $newCmdt1 @init=re-report_sub4
+$cmdtIn @test=re-report_and_keep/test4 @-- $newCmdt1 @test=re-report_sub4/test true
+$cmdtIn @test=re-report_and_keep/report-all4_keeping @stderr:"re-report_sub4" @-- $newCmdt1 @report @keep
+$cmdtIn @test=re-report_and_keep/re-report_all4 @stderr:"re-report_sub4" @-- $newCmdt1 @report
+$cmdtIn @test=re-report_and_keep/re-re-report_all4 @fail @stderr:"$nothingToReportExpectedStderrMsg" @-- $newCmdt1 @report
 
 
 >&2 echo "## Test Suite re-report v2"

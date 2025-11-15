@@ -49,3 +49,29 @@ An empty suite should not pollute output :
 ### Ignored suite report
 An ignored suite should always be reported to warn that it is ignored.
 If only ignored suite are reported should fail, because no test was executed. RC=1
+
+### Re-Reporting
+It's possible to re-report.
+- Re-reporting one suite : display the suite outcome
+- Re-reporting global : display nothing because no more suites not reported. 
+- Re-reporting global @all : display all suites outcomes.
+When re-reporting re display suite outcomes with a low verbosity.
+Re-reporting with higher verbosity SHOULD re-display tests display.
+
+### Re-Opening suite
+After a suite is reported it can be reopen to add more test in it. 
+This suite should not be cleaned unless explicitly asked with a @init=suite.
+Adding more test to the suite allow to report all the suite including previous tests already reported.
+
+## TODO
+- fix daemon : how to update daemon openedSuites field ? Is it necessary ?
+  - need to ensure daemon is in sync
+  - FOR NOW:
+    - init a suite is not an operation queued
+    - first test of a suite dequeued init a suite on daemon side
+    - report dequeued close a suite on daemon side
+  - NEEDS:
+    - need to open a suite on daemon side to print on async screen ? => NO could write on async screen on client side
+    - need to close a suite on daemon side ? => NO
+- end global report
+- do the same for suite report

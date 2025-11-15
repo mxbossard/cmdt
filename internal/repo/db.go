@@ -134,6 +134,7 @@ func (r DbRepo) InitSuite(cfg model.Config) (err error) {
 		fmt.Fprintf(os.Stderr, "Cleared suite: [%s] (contained %d tests)\n", suite, n)
 	}
 
+	cfg.Reported.Set(false)
 	err = r.SaveSuiteConfig(cfg)
 	if err != nil {
 		err = fmt.Errorf("unable to init suite: %w", err)
