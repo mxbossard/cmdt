@@ -117,7 +117,7 @@ func (d AsyncDisplay) CloseSuite(ctx facade.SuiteContext, msg string) {
 
 func (d AsyncDisplay) ClearSuite(name string) {
 	if d.tailer != nil {
-		err := d.tailer.ClearSession(name)
+		err := zcreen.ClearSession(d.tmpDir, name)
 		if err != nil {
 			panic(err)
 		}
