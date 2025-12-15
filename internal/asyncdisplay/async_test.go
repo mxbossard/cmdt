@@ -1,7 +1,6 @@
 package asyncdisplay
 
 import (
-	"fmt"
 	"os"
 
 	//"path/filepath"
@@ -17,6 +16,7 @@ import (
 	"cmdt/internal/facade"
 	"cmdt/internal/model"
 	"cmdt/internal/repo"
+	"cmdt/internal/unittest"
 
 	"github.com/mxbossard/utilz/anzi"
 	"github.com/mxbossard/utilz/cmdz"
@@ -138,8 +138,10 @@ func TestAsyncDisplay_TestTitle(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Empty(t, outW.String())
-	expectedTitlePattern := fmt.Sprintf(`\[\d+\] Test \[%s\]\(on host\)>true #01...\s*UNKNOWN\s*Executing cmd:\s*\[true\]\s*$`, suite)
-	assert.Regexp(t, regexp.MustCompile(expectedTitlePattern), anzi.Unformat(errW.String()))
+	// expectedTitlePattern := fmt.Sprintf(`\[\d+\] Test \[%s\]\(on host\)>true #01...\s*UNKNOWN\s*Executing cmd:\s*\[true\]\s*$`, suite)
+	// assert.Regexp(t, regexp.MustCompile(expectedTitlePattern), anzi.Unformat(errW.String()))
+	unittest.MatchTestTitleSpec(t, model.SHOW_ALL, suite, "", "", "true", "01", model.UNKNOWN, errW.String())
+	unittest.MatchTestOutputSpec(t, model.SHOW_ALL, "true", "", "", model.UNKNOWN, errW.String())
 
 }
 

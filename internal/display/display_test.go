@@ -68,7 +68,7 @@ func TestDisplay_Stdout(t *testing.T) {
 
 	assert.Equal(t, "beforeOut\n"+outMsg, anzi.Unformat(outW.String()))
 	assert.Regexp(t, `beforeErr\n\[\d+\] Test \[suite\]\(on host\)>true #12\.\.\.\s+FAILED \(in 3ms\)\s*\n`+
-		`\s+Executing cmd:\s+\[true\]\s*\n`+errMsg, anzi.Unformat(errW.String()))
+		`\s+Executing cmd:\s+\[true\]\s*<empty outputs>\n`+errMsg, anzi.Unformat(errW.String()))
 
 	d.CloseTest(ctx)
 
@@ -82,7 +82,7 @@ func TestDisplay_Stdout(t *testing.T) {
 
 	assert.Equal(t, "beforeOut\n"+outMsg, anzi.Unformat(outW.String()))
 	assert.Regexp(t, `beforeErr\n\[\d+\] Test \[suite\]\(on host\)>true #12\.\.\.\s+FAILED \(in 3ms\)\s*\n`+
-		`\s+Executing cmd:\s+\[true\]\s*\n`+errMsg, anzi.Unformat(errW.String()))
+		`\s+Executing cmd:\s+\[true\]\s*<empty outputs>\n`+errMsg, anzi.Unformat(errW.String()))
 
 }
 

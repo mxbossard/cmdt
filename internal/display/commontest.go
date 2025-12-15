@@ -75,7 +75,7 @@ func SuiteInitRegexp(token string, suite int) string {
 }
 
 func TestTitleRegexp(suite, seq int) string {
-	return fmt.Sprintf(`\[\d+\] Test \[suite-%d\]\(on host\)>true #0%d...\s*FAILED \(in \dms\)\n\s+Executing cmd:\s+\[\w+\]\s*\n`, suite, seq)
+	return fmt.Sprintf(`\[\d+\] Test \[suite-%d\]\(on host\)>true #0%d...\s*FAILED \(in \d+ms\)\n\s+Executing cmd:\s+\[\w+\]\s+<empty outputs>\s*\n`, suite, seq)
 }
 
 func TestStdoutRegexp(suite, seq int) string {
@@ -87,5 +87,5 @@ func TestStderrRegexp(suite, seq int) string {
 }
 
 func ReportSuitePattern(suite int) string {
-	return fmt.Sprintf(`Successfully ran \[ suite-%d\s* \] test suite in    [\d.]+ s \(\s*\d+ success\)\s*\n`, suite)
+	return fmt.Sprintf(`Successfully ran \[ suite-%d\s* \] test suite in \s*[\d.]+ s \(\s*\d+ success\)\s*\n`, suite)
 }

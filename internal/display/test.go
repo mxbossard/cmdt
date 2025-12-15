@@ -163,13 +163,13 @@ func (d *basicTestDisplayer) Outcome(outcome model.TestOutcome) {
 	if outcome.Outcome == model.ERRORED {
 		d.printer.Errf("\tSupplied cmd: \t\t[%s]", CmdTitle(d.ctx))
 		if noOutputs {
-			d.printer.ColoredErrf(WarningColor, "\tNo outputs.")
+			d.printer.ColoredErrf(WarningColor, "\t<empty outputs>")
 		}
 		d.printer.Errf("\n")
 	} else if verbose >= model.SHOW_FAILED_ONLY && outcome.Outcome != model.PASSED && outcome.Outcome != model.IGNORED || verbose >= model.SHOW_PASSED_OUTS {
 		d.printer.Errf("\tExecuting cmd: \t\t[%s]", CmdTitle(d.ctx))
 		if noOutputs {
-			d.printer.ColoredErrf(WarningColor, "\t> empty outputs")
+			d.printer.ColoredErrf(WarningColor, "\t<empty outputs>")
 		}
 		d.printer.Errf("\n")
 	}
