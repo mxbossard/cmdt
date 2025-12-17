@@ -433,7 +433,6 @@ $cmdtIn @init=suite_flow_async
 $cmdtIn @test=suite_flow_async/A_open $asyncOpenExpected @-- $newCmdt1 @init=suite_flow_async_sub @async=true @verbose=5 @suiteTimeout=5s
 $cmdtIn @test=suite_flow_async/A_test $asyncTestExpected @-- $newCmdt1 @test=suite_flow_async_sub/tA true
 $cmdtIn @test=suite_flow_async/A_report_suite $asyncReportExpected @stderr:tA @-- $newCmdt1 @report=suite_flow_async_sub
-exit 1
 
 sleepTime=0
 sleep $sleepTime

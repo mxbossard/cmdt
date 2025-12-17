@@ -7,7 +7,7 @@ import (
 	"cmdt/internal/model"
 	"cmdt/internal/utils"
 	"fmt"
-	"os"
+	//"os"
 	"time"
 
 	"github.com/mxbossard/utilz/collectionz"
@@ -216,10 +216,10 @@ func reportAllAction(token, isolation string, inputConfig model.Config, parseArg
 			}
 
 			go func() {
-				fmt.Fprintf(os.Stderr, "\n<<>> tailing suites: %s ... \n", asyncSuites)
+				//fmt.Fprintf(os.Stderr, "\n<<>> tailing suites: %s ... \n", asyncSuites)
 				err = asyncDpl.TailSuppliedBlocking(asyncSuites, globalCtx.Config.SuiteTimeout.GetOr(model.DefaultSuiteTimeout))
 				ProcessGlobalError(globalCtx, err)
-				fmt.Fprintf(os.Stderr, "\n<<>> tailing suites: %s finished. \n", asyncSuites)
+				//fmt.Fprintf(os.Stderr, "\n<<>> tailing suites: %s finished. \n", asyncSuites)
 				logger.Info("finished async TailAllBlocking", "opId", op.Id())
 			}()
 		}
@@ -436,7 +436,7 @@ func reportSuiteAction(token, isolation string, inputConfig model.Config, parseA
 				//panic(err)
 				Dpl.Errors(err)
 			}
-			fmt.Fprintf(os.Stderr, "\n<<>> all op done.\n")
+			//fmt.Fprintf(os.Stderr, "\n<<>> all op done.\n")
 			logger.Info("all op done")
 
 			exitCode, err = ProcessReportDef(def)

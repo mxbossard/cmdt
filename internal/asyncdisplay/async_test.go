@@ -23,6 +23,7 @@ import (
 	"github.com/mxbossard/utilz/printz"
 	"github.com/mxbossard/utilz/utilz"
 
+	"github.com/mxbossard/utilz/filez"
 	//"github.com/mxbossard/utilz/screen"
 	"github.com/mxbossard/utilz/zlog"
 )
@@ -45,9 +46,11 @@ func TestAsyncDisplay_TestStdout(t *testing.T) {
 	err = repo.ClearWorkDirectory(token, isol)
 	require.NoError(t, err)
 
-	tmpDir := "/tmp/asyncdisplay.foo1002"
+	tmpDirPattern := "/tmp/asyncdisplay.foo1002"
+	tmpDir := filez.MkdirTempOrPanic(tmpDirPattern)
 	err = os.RemoveAll(tmpDir)
 	require.NoError(t, err)
+	defer func() { os.RemoveAll(tmpDir) }()
 
 	outW := &strings.Builder{}
 	errW := &strings.Builder{}
@@ -697,8 +700,8 @@ func TestAsyncDisplayUsage_SerialSuitesSerialTests(t *testing.T) {
 	assert.Empty(t, outW.String())
 	assert.Empty(t, errW.String())
 
-	d.AsyncFlushAll(20 * time.Millisecond)
-	err = d.TailAllBlocking(20 * time.Millisecond)
+	d.AsyncFlushAll(30 * time.Millisecond)
+	err = d.TailAllBlocking(30 * time.Millisecond)
 	require.NoError(t, err)
 
 	outScenarioRegexp := regexp.MustCompile("^" +

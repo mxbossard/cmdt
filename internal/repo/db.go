@@ -749,7 +749,7 @@ func (r DbRepo) ClearDaemonPid(pid int) (err error) {
 
 func (r DbRepo) GetDaemonPid() (int, error) {
 	pid, err := r.globalDao.GetDaemonPid()
-	fmt.Printf("\n<<>> found Daemon [%d](%s/%s) PID in DB: %d\n", os.Getpid(), r.token, r.isolation, pid)
+	//fmt.Printf("\n<<>> found Daemon [%d](%s/%s) PID in DB: %d\n", os.Getpid(), r.token, r.isolation, pid)
 	return pid, err
 }
 

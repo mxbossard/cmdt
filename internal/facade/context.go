@@ -59,8 +59,8 @@ func Repo1(token, isolation string) repo.Repo {
 			r := repo.New(token, isolation)
 			n++
 			if n > 3 {
-				available, inUse := _repoPool.Count()
-				fmt.Printf("\n<<>> built single pool DbRepo #%d (avail: %d ; inUse: %d)\n", n, available, inUse)
+				//available, inUse := _repoPool.Count()
+				//fmt.Printf("\n<<>> built single pool DbRepo #%d (avail: %d ; inUse: %d)\n", n, available, inUse)
 			}
 			return &r, nil
 		})

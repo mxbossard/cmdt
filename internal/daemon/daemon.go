@@ -107,7 +107,7 @@ func (d *daemon) run() {
 				duration := time.Since(lastUnqueue)
 				if duration > MaxNoOpToUnqueueDuration {
 					logger.Debug("DAEMON: nothing to unqueue", "duration", duration, "token", d.token)
-					fmt.Printf("\n<<>> No Op to unqueue for %s\n", time.Since(lastUnqueue))
+					//fmt.Printf("\n<<>> No Op to unqueue for %s\n", time.Since(lastUnqueue))
 					break
 				}
 			}
@@ -163,7 +163,7 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 		return
 	}
 
-	fmt.Printf("\n<<>> Processing op: %s ...\n", op)
+	//fmt.Printf("\n<<>> Processing op: %s ...\n", op)
 
 	onDone := func() {
 		//logger.Warn("doning op ...", "op", op)
@@ -176,7 +176,7 @@ func (d *daemon) process(op model.Operater) (ok bool, err error) {
 			logger.Info("op done", "ok", ok, "op", op)
 			// fmt.Printf("\n<<>> op done: %d (%s %d) [%s] ... \n", op.Id(), op.Kind(), op.Seq(), d.token)
 		}
-		fmt.Printf("\n<<>> Op: %s DONE.\n", op)
+		//fmt.Printf("\n<<>> Op: %s DONE.\n", op)
 	}
 
 	// onDoneSavingSuiteCfg := func() {

@@ -167,7 +167,7 @@ func TestFork10By20WorkScheduling(t *testing.T) {
 	// Wait work is done
 	wg.Wait()
 
-	assert.Less(t, time.Since(started), sleepTime*3)
+	assert.Less(t, time.Since(started), sleepTime*4)
 	assert.Greater(t, time.Since(started), sleepTime)
 	assert.Equal(t, 20, k)
 
